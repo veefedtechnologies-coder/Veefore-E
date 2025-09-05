@@ -3,11 +3,11 @@ import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWith
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'demo-api-key',
   authDomain: 'veefore-b84c8.firebaseapp.com', // Use Firebase's default domain for OAuth
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'veefore-b84c8',
+  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'veefore-b84c8'}.firebasestorage.app`,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || 'demo-app-id'
 }
 
 console.log('🔥 Firebase Config:', {
@@ -16,6 +16,15 @@ console.log('🔥 Firebase Config:', {
   appId: firebaseConfig.appId ? '✅ SET' : '❌ MISSING',
   authDomain: firebaseConfig.authDomain
 })
+
+// Check if we have proper Firebase configuration
+const hasValidConfig = firebaseConfig.apiKey !== 'demo-api-key' && 
+                      firebaseConfig.projectId !== 'veefore-b84c8' && 
+                      firebaseConfig.appId !== 'demo-app-id'
+
+if (!hasValidConfig) {
+  console.warn('⚠️ Firebase environment variables not set. Using demo values. Please set VITE_FIREBASE_* variables.')
+}
 
 // Log the current domain for debugging
 console.log('🌐 Current domain:', window.location.hostname)

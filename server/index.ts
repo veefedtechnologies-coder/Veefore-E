@@ -766,8 +766,49 @@ app.use((req, res, next) => {
   // CRITICAL FIX: Let Vite handle ALL /src requests - no static file interference
   // Remove static serving that interferes with Vite's module resolution
   
-  // Serve client public directory
-  app.use(express.static(path.join(process.cwd(), 'client/public'), {
+  // Serve only specific static assets from client public directory
+  app.use('/favicon.ico', express.static(path.join(process.cwd(), 'client/public/favicon.ico')));
+  
+  // Handle manifest.json with proper content type and caching
+  app.get('/manifest.json', (req, res) => {
+    const manifestPath = path.join(process.cwd(), 'client/public/manifest.json');
+    
+    try {
+      if (fs.existsSync(manifestPath)) {
+        res.setHeader('Content-Type', 'application/manifest+json');
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+        res.sendFile(manifestPath);
+      } else {
+        // Return a basic manifest if file doesn't exist
+        res.setHeader('Content-Type', 'application/manifest+json');
+        res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+        res.json({
+          "name": "VeeFore",
+          "short_name": "VeeFore",
+          "description": "Professional Social Media Management",
+          "start_url": "/",
+          "display": "standalone",
+          "background_color": "#f9fafb",
+          "theme_color": "#2563eb",
+          "icons": [
+            {
+              "src": "/favicon.ico",
+              "sizes": "32x32",
+              "type": "image/x-icon"
+            }
+          ]
+        });
+      }
+    } catch (error) {
+      console.error('[MANIFEST] Error serving manifest.json:', error);
+      res.status(500).json({ error: 'Failed to load manifest' });
+    }
+  });
+  
+  app.use('/browserconfig.xml', express.static(path.join(process.cwd(), 'client/public/browserconfig.xml')));
+  
+  // Serve images and other assets with proper MIME types
+  app.use('/assets', express.static(path.join(process.cwd(), 'client/public'), {
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.png')) {
         res.setHeader('Content-Type', 'image/png');
@@ -775,8 +816,8 @@ app.use((req, res, next) => {
         res.setHeader('Content-Type', 'image/jpeg');
       } else if (filePath.endsWith('.svg')) {
         res.setHeader('Content-Type', 'image/svg+xml');
-      } else if (filePath.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      } else if (filePath.endsWith('.ico')) {
+        res.setHeader('Content-Type', 'image/x-icon');
       }
     }
   }));

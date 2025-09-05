@@ -5,6 +5,10 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const viteLogger = createLogger();
 
@@ -31,6 +35,8 @@ export async function setupVite(app: Express, server: Server) {
     host: '0.0.0.0', // Allow external connections (Cloudflare tunnel)
     port: 5000,
     strictPort: true,
+    cors: true,
+    force: true, // Force dependency re-optimization
   };
 
   const vite = await createViteServer({
@@ -47,13 +53,21 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  // Use Vite middleware to handle all module requests
   app.use(vite.middlewares);
+  
+  // Handle all other requests (SPA routing)
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
+    
+    // Skip API routes
+    if (url.startsWith('/api/') || url.startsWith('/uploads/') || url.startsWith('/metrics/')) {
+      return next();
+    }
 
     try {
       const clientTemplate = path.resolve(
-        import.meta.dirname,
+        __dirname,
         "..",
         "client",
         "index.html",
@@ -68,6 +82,7 @@ export async function setupVite(app: Express, server: Server) {
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
+      console.error('[VITE] Error transforming HTML:', e);
       vite.ssrFixStacktrace(e as Error);
       next(e);
     }
@@ -75,7 +90,7 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  const distPath = path.resolve(__dirname, "public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
