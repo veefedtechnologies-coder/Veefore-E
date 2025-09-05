@@ -26,6 +26,8 @@ const getAllowedOrigins = (): string[] => {
       'http://127.0.0.1:3000',
       'http://127.0.0.1:5000',
       'http://0.0.0.0:5000',
+      // Cloudflare tunnel URL
+      'https://veefore-webhook.veefore.com',
       // Replit development URL
       'https://61ac61b0-5835-4a08-a9df-b5bdf937f9b4-00-2ixvi7v9sb9yz.worf.replit.dev'
     );

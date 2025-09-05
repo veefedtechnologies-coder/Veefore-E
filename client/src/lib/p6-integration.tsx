@@ -255,9 +255,9 @@ function setupGlobalEventListeners(): void {
   const checkRouteChange = () => {
     const currentPath = window.location.pathname;
     if (currentPath !== lastPath) {
-      // AccessibilityManager is static, no getInstance needed
+      // Use AccessibilityManager class directly
       const pageName = getPageName(currentPath);
-      a11yManager.announceRouteChange(pageName);
+      AccessibilityManager.announceRouteChange(pageName);
       lastPath = currentPath;
     }
   };
@@ -282,8 +282,8 @@ function setupGlobalEventListeners(): void {
 
   // Error boundary for unhandled errors
   window.addEventListener('error', (event) => {
-    // UXManager is static, no getInstance needed
-    uxManager.handleGlobalError(event.error, 'Global Error Handler');
+    // Use UXManager class directly
+    UXManager.handleGlobalError(event.error, 'Global Error Handler');
   });
 
   // Memory usage monitoring (development only)

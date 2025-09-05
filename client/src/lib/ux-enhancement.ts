@@ -306,11 +306,12 @@ export class UXManager {
   /**
    * P6-3.8: Error handling utilities
    */
-  handleGlobalError(error: Error | any, context: string): void {
+  static handleGlobalError(error: Error | any, context: string): void {
     console.error(`[${context}]`, error);
 
-    // Show user-friendly error message
-    this.showToast({
+    // Get instance to show toast
+    const instance = UXManager.getInstance();
+    instance.showToast({
       type: 'error',
       title: 'Something went wrong',
       message: 'We\'re working to fix this issue. Please try again.',
@@ -323,7 +324,7 @@ export class UXManager {
         },
         {
           label: 'Report Issue',
-          action: () => this.reportError(error, context),
+          action: () => instance.reportError(error, context),
           style: 'secondary'
         }
       ]

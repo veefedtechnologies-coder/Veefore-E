@@ -1,5 +1,24 @@
 import { auth } from './firebase'
 
+// Get the correct API base URL based on current environment
+function getApiBaseUrl(): string {
+  const currentHost = window.location.hostname;
+  const currentProtocol = window.location.protocol;
+  
+  // If we're on localhost, use HTTP
+  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+    return 'http://localhost:5000';
+  }
+  
+  // If we're on the Cloudflare tunnel, use HTTPS
+  if (currentHost === 'veefore-webhook.veefore.com') {
+    return 'https://veefore-webhook.veefore.com';
+  }
+  
+  // Default to current protocol and host
+  return `${currentProtocol}//${currentHost}`;
+}
+
 export class ApiClient {
   private static async getAuthToken(): Promise<string | null> {
     const user = auth.currentUser
@@ -15,6 +34,12 @@ export class ApiClient {
 
   static async request(url: string, options: RequestInit = {}) {
     const token = await this.getAuthToken()
+    
+    // Ensure URL is absolute
+    if (!url.startsWith('http')) {
+      const baseUrl = getApiBaseUrl();
+      url = `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
+    }
     
     const headers = {
       'Content-Type': 'application/json',

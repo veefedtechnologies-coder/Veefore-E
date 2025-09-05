@@ -321,6 +321,40 @@ export class MobilePerformance {
   }
 
   /**
+   * Setup memory management for mobile devices
+   */
+  private setupMemoryManagement(): void {
+    // Monitor memory usage and apply optimizations
+    this.monitorMemoryUsage();
+    
+    // Setup memory pressure handling
+    if ('memory' in performance) {
+      const memory = (performance as any).memory;
+      
+      // Check memory every 10 seconds
+      setInterval(() => {
+        const memoryUsage = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
+        
+        if (memoryUsage > 0.7) {
+          console.log('🧠 P11: High memory usage detected, applying optimizations');
+          this.optimizeMemoryUsage();
+        }
+      }, 10000);
+    }
+    
+    // Setup page visibility API for memory cleanup
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Page is hidden, cleanup memory
+        this.cleanupEventListeners();
+        this.unloadOffScreenImages();
+      }
+    });
+    
+    console.log('🧠 P11: Memory management setup completed');
+  }
+
+  /**
    * Setup image optimization for mobile
    */
   private setupImageOptimization(): void {

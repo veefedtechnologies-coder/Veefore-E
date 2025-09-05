@@ -63,6 +63,13 @@ export class AccessibilityManager {
   }
 
   /**
+   * Announce route changes to screen readers
+   */
+  static announceRouteChange(pageName: string): void {
+    this.announceToScreenReader(`Navigated to ${pageName} page`);
+  }
+
+  /**
    * Setup keyboard navigation
    */
   private static setupKeyboardNavigation(): void {
