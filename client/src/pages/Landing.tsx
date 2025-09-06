@@ -69,51 +69,22 @@ const LandingContent = ({ onNavigate, waitlistStatus }: LandingProps) => {
   // Refs for container management
   const containerRef = useRef<HTMLDivElement>(null)
   
-  // Device fingerprinting state
-  const [deviceStatus, setDeviceStatus] = useState<{
-    isOnWaitlist: boolean
-    user: any
-    loading: boolean
-  }>({
+  // Use waitlist status from props, fallback to default if not provided
+  const deviceStatus = waitlistStatus || {
     isOnWaitlist: false,
     user: null,
-    loading: true
-  })
+    loading: true,
+    isApproved: false
+  }
+  
+  // Debug logging
+  console.log('[LANDING] Device status:', deviceStatus)
+  console.log('[LANDING] Is on waitlist:', deviceStatus.isOnWaitlist)
+  console.log('[LANDING] Is approved:', deviceStatus.isApproved)
+  console.log('[LANDING] User status:', deviceStatus.user?.status)
 
   useEffect(() => {
-    // Check device fingerprint status
-    const checkDeviceStatus = async () => {
-      try {
-        const response = await fetch('/api/early-access/check-device')
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Device check successful:', data)
-          console.log('User status:', data.user?.status)
-          console.log('Is approved or early_access?', data.user?.status === 'approved' || data.user?.status === 'early_access')
-          setDeviceStatus(prev => ({
-            isOnWaitlist: true,
-            user: data.user,
-            loading: false
-          }))
-        } else {
-          console.log('Device check failed:', response.status)
-          setDeviceStatus({
-            isOnWaitlist: false,
-            user: null,
-            loading: false
-          })
-        }
-      } catch (error) {
-        console.error('Device check error:', error)
-        setDeviceStatus({
-          isOnWaitlist: false,
-          user: null,
-          loading: false
-        })
-      }
-    }
-
-    checkDeviceStatus()
+    // Device status is now managed by App.tsx and passed as props
 
     // Auto-cycle through features
     const featureInterval = setInterval(() => {

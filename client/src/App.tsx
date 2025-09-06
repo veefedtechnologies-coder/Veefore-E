@@ -168,6 +168,9 @@ function App() {
         const response = await fetch('/api/early-access/check-device')
         if (response.ok) {
           const data = await response.json()
+          console.log('[WAITLIST] Device check response:', data)
+          console.log('[WAITLIST] User status:', data.user?.status)
+          console.log('[WAITLIST] Is approved check:', data.user?.status === 'approved' || data.user?.status === 'early_access')
           setWaitlistStatus({
             isOnWaitlist: true,
             user: data.user,
