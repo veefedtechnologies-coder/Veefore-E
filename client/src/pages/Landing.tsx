@@ -690,26 +690,17 @@ const LandingContent = ({ onNavigate, waitlistStatus }: LandingProps) => {
                   </Button>
                 </>
               ) : deviceStatus.isOnWaitlist ? (
-                // Regular waitlist users - show Sign In and Status buttons
-                <>
-                  <Button 
-                    variant="outline"
-                    onClick={() => handleNavigation('signin')}
-                    className="border border-gray-300 text-gray-700 hover:bg-gray-50 backdrop-blur-sm px-6 py-2.5 rounded-xl font-medium transition-all duration-300"
-                  >
-                    Sign In
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      const email = encodeURIComponent(deviceStatus.user?.email || '')
-                      window.location.href = `/waitlist-status?user=${email}`
-                    }}
-                    className="relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-8 py-2.5 rounded-xl font-semibold shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 group"
-                  >
-                    <span className="relative z-10">View Status</span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  </Button>
-                </>
+                // Regular waitlist users - show only Status button
+                <Button 
+                  onClick={() => {
+                    const email = encodeURIComponent(deviceStatus.user?.email || '')
+                    window.location.href = `/waitlist-status?user=${email}`
+                  }}
+                  className="relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-8 py-2.5 rounded-xl font-semibold shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 group"
+                >
+                  <span className="relative z-10">View Status</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </Button>
               ) : (
                 // User not on waitlist - show only Join Waitlist button
                 <Button 
