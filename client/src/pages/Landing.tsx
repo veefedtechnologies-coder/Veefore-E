@@ -26,21 +26,27 @@ import VeeForeTransparentLogo from '@assets/output-onlinepngtools_1754852514040.
 
 interface LandingProps {
   onNavigate: (view: string) => void
+  waitlistStatus?: {
+    isOnWaitlist: boolean
+    user: any
+    loading: boolean
+    isApproved: boolean
+  }
 }
 
-const Landing = ({ onNavigate }: LandingProps) => {
+const Landing = ({ onNavigate, waitlistStatus }: LandingProps) => {
   return (
     <>
       <SEO 
         {...seoConfig.landing}
         structuredData={generateStructuredData.organization()}
       />
-      <LandingContent onNavigate={onNavigate} />
+      <LandingContent onNavigate={onNavigate} waitlistStatus={waitlistStatus} />
     </>
   )
 }
 
-const LandingContent = ({ onNavigate }: LandingProps) => {
+const LandingContent = ({ onNavigate, waitlistStatus }: LandingProps) => {
   const [activeFeature, setActiveFeature] = useState(0)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
   const [previewMode, setPreviewMode] = useState<'overview' | 'detailed'>('overview')
@@ -665,7 +671,7 @@ const LandingContent = ({ onNavigate }: LandingProps) => {
                   <div className="w-20 h-10 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-xl"></div>
                   <div className="w-28 h-10 bg-gray-300 animate-pulse rounded-xl"></div>
                 </div>
-              ) : deviceStatus.isOnWaitlist && (deviceStatus.user?.status === 'approved' || deviceStatus.user?.status === 'early_access') ? (
+              ) : deviceStatus.isOnWaitlist && deviceStatus.isApproved ? (
                 // Approved/Early Access users - show Sign In and Sign Up buttons
                 <>
                   <Button 
@@ -1094,7 +1100,7 @@ const LandingContent = ({ onNavigate }: LandingProps) => {
                         </div>
                       ) : deviceStatus.isOnWaitlist ? (
                         // User is on waitlist - check their status
-                        deviceStatus.user?.status === 'approved' || deviceStatus.user?.status === 'early_access' ? (
+                        deviceStatus.isApproved ? (
                           // Approved or Early Access users - show Sign Up button
                           <>
                             <button 

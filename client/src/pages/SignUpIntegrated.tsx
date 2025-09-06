@@ -40,6 +40,15 @@ function SignUpIntegrated() {
   const { user } = useFirebaseAuth()
   const [, setLocation] = useLocation()
 
+  // Handle URL parameters for pre-filling email
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const email = urlParams.get('email')
+    if (email && validateEmail(email)) {
+      setFormData(prev => ({ ...prev, email }))
+    }
+  }, [])
+
   // Unique feature highlights for signup (different from sign in)
   const signupFeatures = [
     {

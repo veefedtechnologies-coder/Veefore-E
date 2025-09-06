@@ -427,7 +427,11 @@ const WaitlistStatus = () => {
                     className="flex flex-col sm:flex-row gap-6 justify-center mb-12"
                   >
                     <button
-                      onClick={() => window.location.href = '/signup'}
+                      onClick={() => {
+                        // Redirect to signup with email pre-filled
+                        const email = user?.email || '';
+                        window.location.href = `/signup?email=${encodeURIComponent(email)}`;
+                      }}
                       className="group bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-green-500/25 transition-all duration-300 transform hover:-translate-y-2"
                     >
                       <div className="flex items-center space-x-4">

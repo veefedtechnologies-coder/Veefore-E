@@ -13982,6 +13982,55 @@ Create a detailed growth strategy in JSON format:
     }
   });
 
+  // Check waitlist status by email (more reliable than device fingerprinting)
+  app.get('/api/early-access/check-email/:email', async (req: any, res: Response) => {
+    try {
+      const { email } = req.params;
+      
+      console.log('[EARLY ACCESS] Checking email:', email);
+      
+      // Find user by email
+      const users = await storage.getAllWaitlistUsers();
+      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      
+      if (user) {
+        // Exclude removed, banned users from early access
+        if (user.status === 'removed' || user.status === 'banned') {
+          res.json({
+            success: false,
+            message: 'User account is not active'
+          });
+          return;
+        }
+        
+        console.log('[EARLY ACCESS] User found:', user.email, 'Status:', user.status);
+        res.json({
+          success: true,
+          user: {
+            email: user.email,
+            name: user.name,
+            status: user.status,
+            referralCode: user.referralCode,
+            joinedAt: user.joinedAt
+          },
+          message: 'User found in waitlist'
+        });
+      } else {
+        console.log('[EARLY ACCESS] User not found in waitlist');
+        res.json({
+          success: false,
+          message: 'User not found in waitlist'
+        });
+      }
+    } catch (error: any) {
+      console.error('[EARLY ACCESS] Check email error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to check user status'
+      });
+    }
+  });
+
   // Get Waitlist Stats (Public)
   app.get('/api/early-access/stats', async (req: any, res: Response) => {
     try {

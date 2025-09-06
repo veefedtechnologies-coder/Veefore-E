@@ -422,6 +422,342 @@ router.post('/waitlist-users/:id/ban', async (req, res) => {
   }
 });
 
+// Remove waitlist user
+router.post('/waitlist-users/:id/remove', async (req, res) => {
+  try {
+    const connection = await connectToMainApp();
+    const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
+    
+    const { id } = req.params;
+    const { reason, adminNotes } = req.body;
+    
+    // Update waitlist user status
+    await WaitlistUser.findByIdAndUpdate(id, {
+      status: 'removed',
+      updatedAt: new Date(),
+      $set: {
+        'metadata.removedAt': new Date(),
+        'metadata.removedBy': 'admin',
+        'metadata.removeReason': reason || 'Admin decision',
+        'metadata.adminNotes': adminNotes || null
+      }
+    });
+
+    console.log(`[WAITLIST] User ${id} removed: ${reason}`);
+
+    res.json({
+      success: true,
+      message: 'User removed successfully',
+      data: {
+        waitlistUserId: id,
+        status: 'removed',
+        reason: reason || 'Admin decision'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error removing waitlist user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to remove waitlist user'
+    });
+  }
+});
+
+// Suspend waitlist user
+router.post('/waitlist-users/:id/suspend', async (req, res) => {
+  try {
+    const connection = await connectToMainApp();
+    const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
+    
+    const { id } = req.params;
+    const { reason, adminNotes, suspendUntil } = req.body;
+    
+    // Update waitlist user status
+    await WaitlistUser.findByIdAndUpdate(id, {
+      status: 'suspended',
+      updatedAt: new Date(),
+      $set: {
+        'metadata.suspendedAt': new Date(),
+        'metadata.suspendedBy': 'admin',
+        'metadata.suspendReason': reason || 'Policy violation',
+        'metadata.suspendUntil': suspendUntil ? new Date(suspendUntil) : null,
+        'metadata.adminNotes': adminNotes || null
+      }
+    });
+
+    console.log(`[WAITLIST] User ${id} suspended: ${reason}`);
+
+    res.json({
+      success: true,
+      message: 'User suspended successfully',
+      data: {
+        waitlistUserId: id,
+        status: 'suspended',
+        reason: reason || 'Policy violation',
+        suspendUntil: suspendUntil || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error suspending waitlist user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to suspend waitlist user'
+    });
+  }
+});
+
+// Postpone early access for user
+router.post('/waitlist-users/:id/postpone', async (req, res) => {
+  try {
+    const connection = await connectToMainApp();
+    const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
+    
+    const { id } = req.params;
+    const { reason, adminNotes, postponeUntil } = req.body;
+    
+    // Update waitlist user status
+    await WaitlistUser.findByIdAndUpdate(id, {
+      status: 'postponed',
+      updatedAt: new Date(),
+      $set: {
+        'metadata.postponedAt': new Date(),
+        'metadata.postponedBy': 'admin',
+        'metadata.postponeReason': reason || 'Temporary postponement',
+        'metadata.postponeUntil': postponeUntil ? new Date(postponeUntil) : null,
+        'metadata.adminNotes': adminNotes || null
+      }
+    });
+
+    console.log(`[WAITLIST] User ${id} early access postponed: ${reason}`);
+
+    res.json({
+      success: true,
+      message: 'Early access postponed successfully',
+      data: {
+        waitlistUserId: id,
+        status: 'postponed',
+        reason: reason || 'Temporary postponement',
+        postponeUntil: postponeUntil || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error postponing early access:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to postpone early access'
+    });
+  }
+});
+
+// Restore user from suspended/removed/postponed status
+router.post('/waitlist-users/:id/restore', async (req, res) => {
+  try {
+    const connection = await connectToMainApp();
+    const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
+    
+    const { id } = req.params;
+    const { newStatus, adminNotes } = req.body;
+    
+    // Update waitlist user status
+    await WaitlistUser.findByIdAndUpdate(id, {
+      status: newStatus || 'waitlisted',
+      updatedAt: new Date(),
+      $set: {
+        'metadata.restoredAt': new Date(),
+        'metadata.restoredBy': 'admin',
+        'metadata.restoreNotes': adminNotes || null,
+        'metadata.adminNotes': adminNotes || null
+      }
+    });
+
+    console.log(`[WAITLIST] User ${id} restored to status: ${newStatus || 'waitlisted'}`);
+
+    res.json({
+      success: true,
+      message: 'User restored successfully',
+      data: {
+        waitlistUserId: id,
+        status: newStatus || 'waitlisted'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error restoring user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to restore user'
+    });
+  }
+});
+
+// Delete waitlist user completely
+router.delete('/waitlist-users/:id', async (req, res) => {
+  try {
+    const connection = await connectToMainApp();
+    const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
+    
+    const { id } = req.params;
+    const { reason, adminNotes } = req.body;
+    
+    // Find the user first to get their details for logging
+    const userToDelete = await WaitlistUser.findById(id);
+    if (!userToDelete) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Log the deletion before actually deleting
+    console.log(`[WAITLIST] Deleting user ${id} (${userToDelete.email}): ${reason || 'Admin decision'}`);
+
+    // Delete the user completely
+    await WaitlistUser.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully',
+      data: {
+        deletedUserId: id,
+        deletedUserEmail: userToDelete.email,
+        reason: reason || 'Admin decision'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting waitlist user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete waitlist user'
+    });
+  }
+});
+
+// Bulk actions for multiple users
+router.post('/waitlist-users/bulk-action', async (req, res) => {
+  try {
+    const connection = await connectToMainApp();
+    const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
+    
+    const { userIds, action, reason, adminNotes, additionalData } = req.body;
+    
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'User IDs are required'
+      });
+    }
+
+    if (!action) {
+      return res.status(400).json({
+        success: false,
+        error: 'Action is required'
+      });
+    }
+
+    const validActions = ['approve', 'reject', 'ban', 'remove', 'suspend', 'postpone', 'restore', 'delete'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid action'
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const userId of userIds) {
+      try {
+        let updateData = {
+          updatedAt: new Date(),
+          $set: {
+            'metadata.adminNotes': adminNotes || null,
+            [`metadata.${action}At`]: new Date(),
+            [`metadata.${action}By`]: 'admin',
+            [`metadata.${action}Reason`]: reason || 'Bulk action'
+          }
+        };
+
+        let newStatus = action;
+
+        switch (action) {
+          case 'approve':
+            newStatus = 'early_access';
+            break;
+          case 'reject':
+            newStatus = 'rejected';
+            break;
+          case 'ban':
+            newStatus = 'banned';
+            break;
+          case 'remove':
+            newStatus = 'removed';
+            break;
+          case 'suspend':
+            newStatus = 'suspended';
+            if (additionalData?.suspendUntil) {
+              updateData.$set['metadata.suspendUntil'] = new Date(additionalData.suspendUntil);
+            }
+            break;
+          case 'postpone':
+            newStatus = 'postponed';
+            if (additionalData?.postponeUntil) {
+              updateData.$set['metadata.postponeUntil'] = new Date(additionalData.postponeUntil);
+            }
+            break;
+          case 'restore':
+            newStatus = additionalData?.newStatus || 'waitlisted';
+            updateData.$set['metadata.restoredAt'] = new Date();
+            updateData.$set['metadata.restoredBy'] = 'admin';
+            break;
+          case 'delete':
+            // For delete, we actually remove the document
+            await WaitlistUser.findByIdAndDelete(userId);
+            results.push({ userId, status: 'deleted', message: 'User deleted successfully' });
+            continue;
+        }
+
+        if (action !== 'delete') {
+          await WaitlistUser.findByIdAndUpdate(userId, {
+            status: newStatus,
+            ...updateData
+          });
+        }
+
+        results.push({ userId, status: 'success', message: `${action} action completed` });
+
+      } catch (userError) {
+        console.error(`Error processing user ${userId}:`, userError);
+        errors.push({ userId, error: userError.message });
+      }
+    }
+
+    console.log(`[WAITLIST] Bulk ${action} action completed: ${results.length} successful, ${errors.length} errors`);
+
+    res.json({
+      success: true,
+      message: `Bulk ${action} action completed`,
+      data: {
+        totalProcessed: userIds.length,
+        successful: results.length,
+        errors: errors.length,
+        results,
+        errors
+      }
+    });
+
+  } catch (error) {
+    console.error('Error processing bulk action:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process bulk action'
+    });
+  }
+});
+
 // Get waitlist statistics
 router.get('/waitlist-stats', async (req, res) => {
   try {
@@ -464,7 +800,9 @@ router.get('/waitlist-stats', async (req, res) => {
           early_access: statusCounts.early_access || 0,
           rejected: statusCounts.rejected || 0,
           banned: statusCounts.banned || 0,
-          removed: statusCounts.removed || 0
+          removed: statusCounts.removed || 0,
+          suspended: statusCounts.suspended || 0,
+          postponed: statusCounts.postponed || 0
         }
       }
     });
