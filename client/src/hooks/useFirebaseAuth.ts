@@ -1,82 +1,79 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { User, onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 
 export const useFirebaseAuth = () => {
-  const [user, setUser] = useState<User | null>(null) // Always start with null to prevent hook errors
-  const [loading, setLoading] = useState(true) // Always start with loading true
+  // Always call hooks at the top level - React rules require this
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const unsubscribeRef = useRef<(() => void) | null>(null)
+
+  // Check if we're in a server environment - use state instead of early return
+  const isServerSide = typeof window === 'undefined'
 
   useEffect(() => {
+    // Prevent multiple listeners or server-side execution
+    if (isInitialized || isServerSide) return
+
     console.log('useFirebaseAuth: Setting up Firebase auth listener')
     
     // Check if Firebase auth is available
     if (!auth) {
       console.error('useFirebaseAuth: Firebase auth not available')
       setLoading(false)
+      setIsInitialized(true)
       return
     }
     
-    // Debug localStorage for Firebase persistence
-    const firebaseKeys = Object.keys(localStorage).filter(key => 
-      key.includes('firebase') || key.includes('auth')
-    )
-    console.log('useFirebaseAuth: Firebase localStorage keys:', firebaseKeys)
-    
-    // Shorter timeout for faster loading
-    const loadingTimeout = setTimeout(() => {
-      console.log('useFirebaseAuth: Timeout reached, stopping loading state')
-      setLoading(false)
-    }, 2000) // 2 second timeout to prevent rapid auth state changes
-    
     try {
-      // If user is already available, clear loading immediately
-      if (auth.currentUser) {
-        console.log('useFirebaseAuth: Found existing authenticated user:', auth.currentUser.email)
-        setUser(auth.currentUser)
-        setLoading(false)
-        clearTimeout(loadingTimeout)
-      }
-      
+      // Set up auth state listener only once
       const unsubscribe = onAuthStateChanged(auth, (user) => {
         console.log('useFirebaseAuth: Auth state changed:', user ? `User logged in: ${user.email}` : 'User logged out')
         setUser(user)
         setLoading(false)
-        clearTimeout(loadingTimeout)
-        
-        // Additional debugging for persistence
-        if (user) {
-          console.log('useFirebaseAuth: User authenticated with tokens:', {
-            uid: user.uid,
-            email: user.email,
-            emailVerified: user.emailVerified
-          })
-          
-          // Store debug info in localStorage
-          localStorage.setItem('debug_user_auth', JSON.stringify({
-            uid: user.uid,
-            email: user.email,
-            timestamp: new Date().toISOString()
-          }))
-        } else {
-          // Clear debug info when logged out
-          localStorage.removeItem('debug_user_auth')
-        }
+        setIsInitialized(true)
       })
 
+      unsubscribeRef.current = unsubscribe
+
+      // Set a maximum timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        if (!isInitialized) {
+          console.log('useFirebaseAuth: Timeout reached, stopping loading state')
+          setLoading(false)
+          setIsInitialized(true)
+        }
+      }, 3000)
+
       return () => {
-        unsubscribe()
-        clearTimeout(loadingTimeout)
+        clearTimeout(timeout)
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current()
+          unsubscribeRef.current = null
+        }
       }
     } catch (error) {
       console.error('useFirebaseAuth: Error setting up auth listener:', error)
       setLoading(false)
-      clearTimeout(loadingTimeout)
+      setIsInitialized(true)
+    }
+  }, [isInitialized, isServerSide])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current()
+        unsubscribeRef.current = null
+      }
     }
   }, [])
 
+  // Return appropriate values based on server-side state
   return {
-    user,
-    loading,
-    isAuthenticated: !!user
+    user: isServerSide ? null : user,
+    loading: isServerSide ? false : (loading && !isInitialized),
+    isAuthenticated: isServerSide ? false : !!user
   }
 }

@@ -50,6 +50,9 @@ const AuditLogSchema = new Schema<IAuditLog>({
       'coupon_create', 'coupon_update', 'coupon_delete', 'coupon_apply',
       'role_create', 'role_update', 'role_delete', 'role_assign',
       'permission_grant', 'permission_revoke',
+      'admin_invitation_sent', 'admin_invitation_accepted', 'admin_invitation_approved', 
+      'admin_invitation_rejected', 'admin_invitation_resent', 'admin_invitation_expired',
+      'admin_create', 'admin_update', 'admin_delete', 'admin_suspend', 'admin_activate',
       'system_config', 'maintenance_mode', 'backup_create', 'backup_restore',
       'data_export', 'data_import', 'bulk_action',
       'ai_prompt', 'ai_response', 'moderation_action',
@@ -63,7 +66,7 @@ const AuditLogSchema = new Schema<IAuditLog>({
     enum: [
       'admin', 'user', 'refund', 'subscription', 'ticket', 'coupon', 'role',
       'permission', 'system', 'backup', 'audit_log', 'notification', 'popup',
-      'webhook', 'ai_log', 'moderation', 'analytics', 'report'
+      'webhook', 'ai_log', 'moderation', 'analytics', 'report', 'AdminInvite'
     ]
   },
   resourceId: {

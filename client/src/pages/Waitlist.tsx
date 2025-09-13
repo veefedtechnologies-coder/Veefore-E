@@ -266,75 +266,76 @@ const Waitlist = () => {
     };
   }, []);
 
-  // Fade cursor trail
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCursorTrail(prev => prev.map(trail => ({
-        ...trail,
-        opacity: trail.opacity * 0.8
-      })).filter(trail => trail.opacity > 0.1));
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
+  // Fade cursor trail - REMOVED to prevent re-renders
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     setCursorTrail(prev => prev.map(trail => ({
+  //       ...trail,
+  //       opacity: trail.opacity * 0.8
+  //     })).filter(trail => trail.opacity > 0.1));
+  //   }, 50);
+  //   return () => clearInterval(interval);
+  // }, []);
 
-  // Auto-advance demo scenarios
-  useEffect(() => {
-    if (!isPlaying) return;
-    const interval = setInterval(() => {
-      setCurrentDemo((prev) => (prev + 1) % demoScenarios.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+  // Remove all intervals to prevent re-renders and button blinking
+  // Auto-advance demo scenarios - REMOVED
+  // useEffect(() => {
+  //   if (!isPlaying) return;
+  //   const interval = setInterval(() => {
+  //     setCurrentDemo((prev) => (prev + 1) % demoScenarios.length);
+  //   }, 5000);
+  //   return () => clearInterval(interval);
+  // }, [isPlaying]);
 
-  // Feature showcase rotation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentFeature((prev) => (prev + 1) % featureShowcase.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  // Feature showcase rotation - REMOVED
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     setCurrentFeature((prev) => (prev + 1) % featureShowcase.length);
+  //   }, 3000);
+  //   return () => clearInterval(interval);
+  // }, []);
 
-  // Advanced typing animation
-  useEffect(() => {
-    const messages = [
-      "Join 2,000+ creators revolutionizing social media",
-      "Early access to AI-powered content creation",
-      "Be part of the future of social media management",
-      "Exclusive access to VeeFore's advanced features"
-    ];
-    
-    let messageIndex = 0;
-    let charIndex = 0;
-    let isDeleting = false;
-    
-    const typeWriter = () => {
-      const currentMessage = messages[messageIndex];
-      
-      if (!isDeleting && charIndex < currentMessage.length) {
-        setTypedText(currentMessage.substring(0, charIndex + 1));
-        setIsTyping(true);
-        charIndex++;
-        setTimeout(typeWriter, 80);
-      } else if (isDeleting && charIndex > 0) {
-        setTypedText(currentMessage.substring(0, charIndex - 1));
-        charIndex--;
-        setTimeout(typeWriter, 40);
-      } else if (!isDeleting && charIndex === currentMessage.length) {
-        setIsTyping(false);
-        setTimeout(() => {
-          isDeleting = true;
-          typeWriter();
-        }, 3000);
-      } else if (isDeleting && charIndex === 0) {
-        isDeleting = false;
-        messageIndex = (messageIndex + 1) % messages.length;
-        setTimeout(typeWriter, 500);
-      }
-    };
-    
-    const timeout = setTimeout(typeWriter, 1000);
-    return () => clearTimeout(timeout);
-  }, []);
+  // Advanced typing animation - REMOVED
+  // useEffect(() => {
+  //   const messages = [
+  //     "Join 2,000+ creators revolutionizing social media",
+  //     "Early access to AI-powered content creation",
+  //     "Be part of the future of social media management",
+  //     "Exclusive access to VeeFore's advanced features"
+  //   ];
+  //   
+  //   let messageIndex = 0;
+  //   let charIndex = 0;
+  //   let isDeleting = false;
+  //   
+  //   const typeWriter = () => {
+  //     const currentMessage = messages[messageIndex];
+  //     
+  //     if (!isDeleting && charIndex < currentMessage.length) {
+  //       setTypedText(currentMessage.substring(0, charIndex + 1));
+  //       setIsTyping(true);
+  //       charIndex++;
+  //       setTimeout(typeWriter, 80);
+  //     } else if (isDeleting && charIndex > 0) {
+  //       setTypedText(currentMessage.substring(0, charIndex - 1));
+  //       charIndex--;
+  //       setTimeout(typeWriter, 40);
+  //     } else if (!isDeleting && charIndex === currentMessage.length) {
+  //       setIsTyping(false);
+  //       setTimeout(() => {
+  //         isDeleting = true;
+  //         typeWriter();
+  //       }, 3000);
+  //     } else if (isDeleting && charIndex === 0) {
+  //       isDeleting = false;
+  //       messageIndex = (messageIndex + 1) % messages.length;
+  //       setTimeout(typeWriter, 500);
+  //     }
+  //   };
+  //   
+  //   const timeout = setTimeout(typeWriter, 1000);
+  //   return () => clearTimeout(timeout);
+  // }, []);
 
   // Interactive ripple effects
   const createRipple = (e: React.MouseEvent) => {

@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -28,10 +28,28 @@ import {
   Home,
   Search as SearchIcon,
   Settings as SettingsIcon,
-  BookOpen,
-  Grid3X3,
   GraduationCap,
-  Clock
+  Clock,
+  Zap,
+  Star,
+  TrendingUp,
+  Database,
+  Globe,
+  Lock,
+  Eye,
+  EyeOff,
+  Minimize2,
+  Maximize2,
+  Moon,
+  Sun,
+  Palette,
+  Sparkles,
+  Target,
+  Crown,
+  Award,
+  Rocket,
+  UserPlus,
+  Download
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -54,7 +72,7 @@ interface NavSection {
   items: NavItem[]
 }
 
-// Main navigation items (top level)
+// Main navigation items (top level) - Only functional routes
 const mainNavItems: NavItem[] = [
   {
     name: 'Dashboard',
@@ -70,16 +88,6 @@ const mainNavItems: NavItem[] = [
     name: 'Settings',
     href: '/settings',
     icon: SettingsIcon
-  },
-  {
-    name: 'Courses',
-    href: '/courses',
-    icon: BookOpen
-  },
-  {
-    name: 'Modules',
-    href: '/modules',
-    icon: Grid3X3
   }
 ]
 
@@ -108,6 +116,12 @@ const navigationSections: NavSection[] = [
         href: '/admins',
         icon: UserCheck,
         permission: 'admins.read'
+      },
+      {
+        name: 'Admin Management',
+        href: '/admin/management',
+        icon: Settings,
+        permission: 'admins.read.detailed'
       },
       {
         name: 'Teams',
@@ -231,13 +245,18 @@ const navigationSections: NavSection[] = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { admin, logout } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const hasPermission = (permission?: string) => {
     if (!permission) return true
     return admin?.permissions.includes(permission) || false
   }
 
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Overview']))
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['User Management']))
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(true)
+  const [showQuickActions, setShowQuickActions] = useState(true)
 
   const toggleSection = (sectionTitle: string) => {
     const newExpanded = new Set(expandedSections)
@@ -251,11 +270,56 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const getBadgeColor = (color?: string) => {
     switch (color) {
-      case 'success': return 'bg-green-100 text-green-800'
-      case 'warning': return 'bg-yellow-100 text-yellow-800'
-      case 'error': return 'bg-red-100 text-red-800'
-      case 'info': return 'bg-blue-100 text-blue-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'success': return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+      case 'warning': return 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+      case 'error': return 'bg-red-500/20 text-red-400 border border-red-500/30'
+      case 'info': return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+      default: return 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+    }
+  }
+
+  // Quick actions for innovation
+  const quickActions = [
+    { 
+      name: 'New User', 
+      icon: UserPlus, 
+      action: () => {
+        navigate('/users')
+        onClose()
+      }
+    },
+    { 
+      name: 'Bulk Import', 
+      icon: Database, 
+      action: () => {
+        navigate('/bulk-operations')
+        onClose()
+      }
+    },
+    { 
+      name: 'Export Data', 
+      icon: Download, 
+      action: () => {
+        // You can implement export functionality here
+        console.log('Export Data functionality')
+      }
+    },
+    { 
+      name: 'System Health', 
+      icon: Activity, 
+      action: () => {
+        navigate('/performance')
+        onClose()
+      }
+    }
+  ]
+
+  const handleLogoClick = () => {
+    if (isCollapsed) {
+      setIsCollapsed(false)
+    } else {
+      navigate('/dashboard')
+      onClose()
     }
   }
 
@@ -264,7 +328,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       {/* Mobile backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={onClose}
         />
       )}
@@ -272,36 +336,117 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       {/* Sidebar */}
       <div
         className={clsx(
-          'fixed left-0 top-0 z-50 h-screen w-20 lg:w-64 bg-gradient-to-b from-blue-900 to-blue-800 transform transition-all duration-300 ease-in-out lg:translate-x-0',
+          'fixed left-0 top-0 z-50 h-screen bg-black border-r border-gray-800 transform transition-all duration-300 ease-in-out lg:translate-x-0',
+          isCollapsed ? 'w-16' : 'w-72',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex h-16 items-center justify-center lg:justify-between px-4 lg:px-6">
-            <div className="flex items-center">
-              <div className="bg-white p-2 rounded-xl shadow-lg">
-                <GraduationCap className="h-6 w-6 text-blue-900" />
+          <div className="flex h-16 items-center justify-between px-4 border-b border-gray-800">
+            <div className="flex items-center space-x-3">
+              <div className="relative group flex items-center justify-center">
+                <div className="relative">
+                  {/* Logo - hidden on hover when collapsed */}
+                  <button 
+                    onClick={handleLogoClick}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg overflow-hidden transition-opacity duration-200 ${isCollapsed ? 'group-hover:opacity-0' : ''}`}
+                  >
+                    <img 
+                      src="/veefore-logo.png" 
+                      alt="VeeFore Logo" 
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        // Fallback to gradient icon if logo fails to load
+                        e.currentTarget.style.display = 'none'
+                        const nextElement = e.currentTarget.nextElementSibling as HTMLElement
+                        if (nextElement) {
+                          nextElement.style.display = 'flex'
+                        }
+                      }}
+                    />
+                    <div className="w-full h-full bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 rounded-xl flex items-center justify-center shadow-lg hidden">
+                      <GraduationCap className="h-6 w-6 text-white" />
+                    </div>
+                  </button>
+                  
+                  {/* Expand button - shown on hover when collapsed */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsCollapsed(!isCollapsed)
+                    }}
+                    className={`absolute inset-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-opacity duration-200 bg-transparent hover:bg-transparent text-white ${isCollapsed ? 'opacity-0 group-hover:opacity-100' : 'hidden'}`}
+                    title="Expand"
+                  >
+                    <Maximize2 className="h-5 w-5" />
+                  </button>
+                  
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>
+                </div>
               </div>
-              <div className="ml-3 hidden lg:block">
-                <h1 className="text-lg font-bold text-white">VeeFore</h1>
-                <p className="text-xs text-blue-200">Admin Panel</p>
-              </div>
+              
+              {!isCollapsed && (
+                <div>
+                  <h1 className="text-lg font-bold text-white">VeeFore</h1>
+                  <p className="text-xs text-gray-400">Admin Panel</p>
+                </div>
+              )}
             </div>
-            <button
-              onClick={onClose}
-              className="lg:hidden p-2 rounded-md text-white hover:bg-blue-800"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            
+            <div className="flex items-center space-x-2">
+              {!isCollapsed && (
+                <button
+                  onClick={() => setIsCollapsed(!isCollapsed)}
+                  className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors hidden lg:block"
+                  title="Collapse"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors lg:hidden"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
-          {/* Main Navigation Icons */}
-          <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
+          {/* Quick Actions Bar */}
+          {!isCollapsed && (
+            <div className="p-4 border-b border-gray-800">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-300">Quick Actions</h3>
+                <button
+                  onClick={() => setShowQuickActions(!showQuickActions)}
+                  className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-800"
+                >
+                  {showQuickActions ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {showQuickActions && (
+                <div className="grid grid-cols-2 gap-2">
+                  {quickActions.map((action, index) => (
+                    <button
+                      key={index}
+                      onClick={action.action}
+                      className="flex items-center space-x-2 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      <action.icon className="h-4 w-4" />
+                      <span>{action.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Main Navigation */}
+          <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto custom-scrollbar">
             {/* Main navigation items */}
-            <div className="space-y-2">
+            <div className="space-y-1">
               {mainNavItems.map((item) => {
-                const location = useLocation();
                 const isActive = location.pathname === item.href;
                 
                 return (
@@ -310,19 +455,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     to={item.href}
                     className={({ isActive }) =>
                       clsx(
-                        'flex items-center justify-center lg:justify-start px-3 py-3 text-white rounded-xl transition-all duration-200 group relative',
+                        'flex items-center px-3 py-3 text-gray-300 rounded-xl transition-all duration-200 group relative',
                         isActive
-                          ? 'bg-blue-600 shadow-lg'
-                          : 'hover:bg-blue-700'
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                          : 'hover:bg-gray-800 hover:text-white'
                       )
                     }
                     onClick={onClose}
-                    title={item.name}
+                    title={isCollapsed ? item.name : undefined}
                   >
-                    <item.icon className="h-6 w-6 flex-shrink-0" />
-                    <span className="ml-3 hidden lg:block font-medium">{item.name}</span>
-                    {isActive && (
-                      <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-l-full"></div>
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    {!isCollapsed && (
+                      <>
+                        <span className="ml-3 font-medium">{item.name}</span>
+                        {isActive && (
+                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-white rounded-full"></div>
+                        )}
+                      </>
                     )}
                   </NavLink>
                 );
@@ -330,7 +479,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Divider */}
-            <div className="border-t border-blue-700 my-4"></div>
+            <div className="border-t border-gray-800 my-4"></div>
 
             {/* Secondary navigation sections */}
             <div className="space-y-1">
@@ -344,7 +493,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   <div key={section.title} className="space-y-1">
                     <button
                       onClick={() => toggleSection(section.title)}
-                      className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-blue-200 uppercase tracking-wider hover:text-white transition-colors hidden lg:flex"
+                      className={clsx(
+                        'flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors',
+                        !isCollapsed ? 'flex' : 'hidden'
+                      )}
                     >
                       <span>{section.title}</span>
                       {isExpanded ? (
@@ -356,35 +508,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     
                     {isExpanded && (
                       <div className="space-y-1 ml-0 lg:ml-2">
-                        {filteredItems.map((item) => (
-                          <NavLink
-                            key={item.name}
-                            to={item.href}
-                            className={({ isActive }) =>
-                              clsx(
-                                'flex items-center justify-center lg:justify-between px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group',
-                                isActive
-                                  ? 'bg-blue-600 text-white shadow-sm'
-                                  : 'text-blue-200 hover:bg-blue-700 hover:text-white'
-                              )
-                            }
-                            onClick={onClose}
-                            title={item.name}
-                          >
-                            <div className="flex items-center space-x-3">
-                              <item.icon className="h-5 w-5 flex-shrink-0" />
-                              <span className="hidden lg:block">{item.name}</span>
-                            </div>
-                            {item.badge && (
-                              <span className={clsx(
-                                'px-2 py-1 text-xs font-medium rounded-full hidden lg:block',
-                                getBadgeColor(item.badgeColor)
-                              )}>
-                                {item.badge}
-                              </span>
-                            )}
-                          </NavLink>
-                        ))}
+                        {filteredItems.map((item) => {
+                          const isActive = location.pathname === item.href;
+                          
+                          return (
+                            <NavLink
+                              key={item.name}
+                              to={item.href}
+                              className={({ isActive }) =>
+                                clsx(
+                                  'flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group',
+                                  isActive
+                                    ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white border border-purple-500/30'
+                                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                                )
+                              }
+                              onClick={onClose}
+                              title={isCollapsed ? item.name : undefined}
+                            >
+                              <div className="flex items-center space-x-3">
+                                <item.icon className="h-4 w-4 flex-shrink-0" />
+                                {!isCollapsed && <span>{item.name}</span>}
+                              </div>
+                              {item.badge && !isCollapsed && (
+                                <span className={clsx(
+                                  'px-2 py-1 text-xs font-medium rounded-full',
+                                  getBadgeColor(item.badgeColor)
+                                )}>
+                                  {item.badge}
+                                </span>
+                              )}
+                            </NavLink>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -394,32 +550,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-blue-700 p-4 bg-blue-800">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-white text-sm font-medium">
-                  {admin?.firstName?.[0] || 'A'}{admin?.lastName?.[0] || ''}
-                </span>
+          <div className="border-t border-gray-800 p-3 bg-gray-900/50">
+            <div className="flex items-center space-x-3 mb-2">
+              <div className="relative">
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="text-white text-xs font-bold">
+                    {admin?.firstName?.[0] || 'A'}{admin?.lastName?.[0] || ''}
+                  </span>
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-black flex items-center justify-center">
+                  <Crown className="h-1.5 w-1.5 text-black" />
+                </div>
               </div>
-              <div className="flex-1 min-w-0 hidden lg:block">
-                <p className="text-sm font-medium text-white truncate">
-                  {admin?.firstName} {admin?.lastName}
-                </p>
-                <p className="text-xs text-blue-200 truncate">
-                  {admin?.role} • Level {admin?.level}
-                </p>
-              </div>
+              {!isCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-white truncate">
+                    {admin?.firstName} {admin?.lastName}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {admin?.role} • Level {admin?.level}
+                  </p>
+                </div>
+              )}
             </div>
             
-            <div className="flex space-x-2">
-              <button
-                onClick={logout}
-                className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 text-sm text-blue-200 hover:text-white hover:bg-blue-700 rounded-lg transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden lg:block">Logout</span>
-              </button>
-            </div>
+            <button
+              onClick={logout}
+              className="w-full flex items-center justify-center space-x-2 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              {!isCollapsed && <span>Logout</span>}
+            </button>
           </div>
         </div>
       </div>

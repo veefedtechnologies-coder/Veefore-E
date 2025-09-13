@@ -45,16 +45,31 @@ export const getUsers = async (req: Request, res: Response) => {
       mappedPlan = 'Enterprise';
     }
 
+    // Build filter object
+    const filter: any = {};
+    
+    if (mappedStatus && mappedStatus !== 'all') {
+      filter.status = mappedStatus;
+    }
+    
+    if (mappedPlan && mappedPlan !== 'all') {
+      filter.plan = mappedPlan;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } },
+        { displayName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
     // Get users from main app
-    const result = await getMainAppUsers({}, {
-      page,
-      limit,
-      sortBy,
-      sortOrder,
-      search,
-      status: mappedStatus,
-      plan: mappedPlan
-    });
+    const result = await getMainAppUsers(
+      parseInt(page.toString()),
+      parseInt(limit.toString()),
+      filter
+    );
 
     res.json({
       success: true,
@@ -63,7 +78,7 @@ export const getUsers = async (req: Request, res: Response) => {
         total: result.total,
         page: result.page,
         limit: result.limit,
-        totalPages: result.totalPages
+        pages: result.totalPages
       }
     });
   } catch (error) {

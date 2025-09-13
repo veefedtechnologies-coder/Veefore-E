@@ -3,8 +3,9 @@ import nodemailer from 'nodemailer';
 interface EmailOptions {
   to: string;
   subject: string;
-  template: string;
-  data: any;
+  html?: string;
+  template?: string;
+  data?: any;
 }
 
 export class EmailService {
@@ -24,7 +25,15 @@ export class EmailService {
 
   async sendEmail(options: EmailOptions): Promise<void> {
     try {
-      const html = this.generateEmailTemplate(options.template, options.data);
+      let html = options.html;
+      
+      if (options.template && options.data) {
+        html = this.generateEmailTemplate(options.template, options.data);
+      }
+      
+      if (!html) {
+        throw new Error('Either html content or template with data must be provided');
+      }
       
       await this.transporter.sendMail({
         from: process.env.SMTP_FROM || 'noreply@veefore.com',
@@ -32,6 +41,8 @@ export class EmailService {
         subject: options.subject,
         html
       });
+      
+      console.log(`Email sent successfully to ${options.to}`);
     } catch (error) {
       console.error('Email sending error:', error);
       throw error;
