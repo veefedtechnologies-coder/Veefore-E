@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Route, Switch, useLocation } from 'wouter'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
@@ -18,6 +18,11 @@ import { AnalyticsDashboard } from './components/analytics/analytics-dashboard'
 import { CreatePost } from './components/create/create-post'
 import VeeGPT from './pages/VeeGPT'
 import Landing from './pages/Landing'
+import Landing3D from './pages/Landing3D'
+import Landing3DAdvanced from './pages/Landing3DAdvanced'
+import SplineKeyboardLanding from './pages/SplineKeyboardLanding'
+import RobotHeroLanding from './pages/RobotHeroLanding'
+import GlobalLandingPage from './pages/GlobalLandingPage'
 import SignUpIntegrated from './pages/SignUpIntegrated'
 import SignIn from './pages/SignIn'
 import Workspaces from './pages/Workspaces'
@@ -53,6 +58,13 @@ import { initializeCoreWebVitals } from './lib/core-web-vitals';
 import { initializeComponentModernization } from './lib/component-modernization';
 
 function App() {
+  // Comprehensive React availability check
+  // Debug log removed
+
+  // React availability check
+  // React check removed to prevent timing issues
+
+  // Always call hooks at the top level - never inside conditions
   const [isCreateDropdownOpen, setIsCreateDropdownOpen] = useState(false)
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false)
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
@@ -148,64 +160,12 @@ function App() {
     retry: false
   })
   
-  // Waitlist and device status state
-  const [waitlistStatus, setWaitlistStatus] = useState<{
-    isOnWaitlist: boolean
-    user: any
-    loading: boolean
-    isApproved: boolean
-  }>({
-    isOnWaitlist: false,
-    user: null,
-    loading: true,
-    isApproved: false
-  })
-
-  // Check waitlist status on app load
-  useEffect(() => {
-    const checkWaitlistStatus = async () => {
-      try {
-        const response = await fetch('/api/early-access/check-device')
-        if (response.ok) {
-          const data = await response.json()
-          console.log('[WAITLIST] Device check response:', data)
-          console.log('[WAITLIST] User status:', data.user?.status)
-          console.log('[WAITLIST] Is approved check:', data.user?.status === 'approved' || data.user?.status === 'early_access')
-          setWaitlistStatus({
-            isOnWaitlist: true,
-            user: data.user,
-            loading: false,
-            isApproved: data.user?.status === 'approved' || data.user?.status === 'early_access'
-          })
-        } else {
-          setWaitlistStatus({
-            isOnWaitlist: false,
-            user: null,
-            loading: false,
-            isApproved: false
-          })
-        }
-      } catch (error) {
-        console.error('Error checking waitlist status:', error)
-        setWaitlistStatus({
-          isOnWaitlist: false,
-          user: null,
-          loading: false,
-          isApproved: false
-        })
-      }
-    }
-
-    checkWaitlistStatus()
-  }, [])
-
   // Authentication and onboarding guard logic - STRICT ENFORCEMENT
   useEffect(() => {
     // Wait for both loading states to complete to prevent timing issues
-    if (!loading && !userDataLoading && !waitlistStatus.loading) {
+    if (!loading && !userDataLoading) {
       console.log('Auth guard - User:', user?.email || 'Not authenticated', 'Location:', location)
       console.log('User data:', userData)
-      console.log('Waitlist status:', waitlistStatus)
       console.log('Onboarding modal state:', isOnboardingModalOpen)
       
       // If user is authenticated and fully onboarded, allow full access
@@ -251,37 +211,10 @@ function App() {
         }
       }
     }
-  }, [user, loading, userData, userDataLoading, location, setLocation, isOnboardingModalOpen, waitlistStatus.loading])
-
-  // Waitlist route protection
-  useEffect(() => {
-    if (!waitlistStatus.loading) {
-      // If user tries to access /waitlist but is already on waitlist
-      if (location === '/waitlist' && waitlistStatus.isOnWaitlist) {
-        console.log('User already on waitlist, redirecting to status page')
-        if (waitlistStatus.user?.email) {
-          setLocation(`/waitlist-status?user=${encodeURIComponent(waitlistStatus.user.email)}`)
-        } else {
-          setLocation('/')
-        }
-      }
-      
-      // If user tries to access /waitlist-status but not on waitlist
-      if (location === '/waitlist-status' && !waitlistStatus.isOnWaitlist) {
-        console.log('User not on waitlist, redirecting to waitlist page')
-        setLocation('/waitlist')
-      }
-      
-      // If user tries to access /signin or /signup but not approved
-      if ((location === '/signin' || location === '/signup') && !waitlistStatus.isApproved && !user) {
-        console.log('User not approved for early access, redirecting to landing')
-        setLocation('/')
-      }
-    }
-  }, [location, waitlistStatus, user, setLocation])
+  }, [user, loading, userData, userDataLoading, location, setLocation, isOnboardingModalOpen])
 
   // Show loading spinner only during initial auth - not for user data loading (better UX)
-  if (loading || waitlistStatus.loading) {
+  if (loading) {
     return <LoadingSpinner />
   }
   
@@ -352,15 +285,42 @@ function App() {
         </div>
       </Route>
 
-      {/* Root route - Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
+      {/* 3D Landing Page - Public access */}
+      <Route path="/3d">
+        <Landing3D />
+      </Route>
+
+      {/* Advanced 3D Landing Page with Spline Robot - Public access */}
+      <Route path="/3d-advanced">
+        <Landing3DAdvanced />
+      </Route>
+
+      {/* Spline Keyboard Landing Page - Public access */}
+      <Route path="/keyboard">
+        <SplineKeyboardLanding />
+      </Route>
+
+      {/* Robot Hero Landing Page - Public access */}
+      <Route path="/robot-hero">
+        <RobotHeroLanding />
+      </Route>
+
+      {/* Global Landing Page - Public access */}
+      <Route path="/global">
+        <GlobalLandingPage />
+      </Route>
+
+      {/* Original Landing Page - Public access */}
+      <Route path="/landing">
+        <div className="min-h-screen">
+          <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+        </div>
+      </Route>
+
+      {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
       <Route path="/">
         {!user && !hasFirebaseAuth ? (
-          <div className="min-h-screen">
-            <Landing 
-              onNavigate={(page: string) => setLocation(`/${page}`)} 
-              waitlistStatus={waitlistStatus}
-            />
-          </div>
+          <GlobalLandingPage />
         ) : !user && hasFirebaseAuth ? (
           <LoadingSpinner />
         ) : user && userData ? (

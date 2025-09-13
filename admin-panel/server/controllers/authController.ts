@@ -156,6 +156,23 @@ export class AuthController {
       // Reset login attempts
       await admin.resetLoginAttempts();
 
+      // Generate username if missing
+      if (!admin.username) {
+        const emailPrefix = admin.email.split('@')[0];
+        const baseUsername = emailPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        
+        // Ensure username is unique
+        let username = baseUsername;
+        let counter = 1;
+        
+        while (await Admin.findOne({ username })) {
+          username = `${baseUsername}${counter}`;
+          counter++;
+        }
+        
+        admin.username = username;
+      }
+
       // Update last login
       admin.lastLogin = new Date();
       if (deviceFingerprint) {
@@ -221,6 +238,7 @@ export class AuthController {
           admin: {
             id: admin._id,
             email: admin.email,
+            username: admin.username,
             firstName: admin.firstName,
             lastName: admin.lastName,
             role: admin.role,

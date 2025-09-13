@@ -9,8 +9,14 @@ import { Server as SocketIOServer } from 'socket.io';
 import path from 'path';
 import dotenv from 'dotenv';
 
-// Load environment variables from the main .env file
+// Load environment variables from the admin-panel .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
+
+// Set default JWT secret if not provided
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'your-super-secret-jwt-key-here-change-this-in-production';
+  console.log('⚠️  Using default JWT_SECRET - change this in production!');
+}
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -40,6 +46,8 @@ import sessionManagementRoutes from './routes/sessionManagement';
 import bulkOperationsRoutes from './routes/bulkOperations';
 import userDetailRoutes from './routes/userDetail';
 import waitlistRoutes from './routes/waitlist';
+import permissionsRoutes from './routes/permissions';
+import adminManagementRoutes from './routes/adminManagement';
 import { SystemMonitoringService } from './services/systemMonitoringService';
 
 // Import middleware
@@ -73,7 +81,7 @@ class AdminServer {
   private async initializeDatabase() {
     try {
       // Connect to separate admin database for admin users
-      const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://localhost:27017/veefore';
+      const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb+srv://brandboost09:Arpitc8433@cluster0.mekr2dh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
       if (mongoUri.includes('mongodb+srv://')) {
         // For MongoDB Atlas, use admin database
         await mongoose.connect(mongoUri, {
@@ -183,6 +191,8 @@ class AdminServer {
     this.app.use('/api/bulk-operations', authenticate, bulkOperationsRoutes);
     this.app.use('/api/user-detail', authenticate, userDetailRoutes);
     this.app.use('/api/waitlist', authenticate, waitlistRoutes);
+    this.app.use('/api/permissions', permissionsRoutes);
+    this.app.use('/api', adminManagementRoutes);
 
     // Serve static files in production
     if (process.env.NODE_ENV === 'production') {

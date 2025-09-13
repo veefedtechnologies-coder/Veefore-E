@@ -9,6 +9,8 @@ import { LoginPage } from './pages/auth/LoginPage'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import { AdminsPage } from './pages/admin/AdminsPage'
+import { AcceptInvitation } from './pages/admin/AcceptInvitation'
+import { AdminManagement } from './pages/admin/AdminManagement'
 import UsersPage from './pages/users/UsersPage'
 import UserDetailPage from './pages/users/UserDetailPage'
 import TeamsPage from './pages/teams/TeamsPage'
@@ -64,6 +66,8 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/admins" element={<AdminsPage />} />
+              <Route path="/admin/accept-invitation" element={<AcceptInvitation />} />
+              <Route path="/admin/management" element={<AdminManagement />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/users/:userId" element={<UserDetailPage />} />
               <Route path="/teams" element={<TeamsPage />} />

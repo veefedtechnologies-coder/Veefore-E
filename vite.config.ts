@@ -42,12 +42,38 @@ export default defineConfig({
         ].filter(Boolean)
       : []),
   ],
+  optimizeDeps: {
+    force: true,
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+      'three',
+      '@react-three/fiber',
+      '@react-three/drei',
+      'framer-motion',
+      'lucide-react',
+      '@tanstack/react-query',
+      'wouter'
+    ],
+    exclude: ['@react-three/postprocessing']
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
+      // Force React to be resolved from a single location
+      "react": path.resolve(__dirname, "node_modules", "react"),
+      "react-dom": path.resolve(__dirname, "node_modules", "react-dom"),
+      "react/jsx-runtime": path.resolve(__dirname, "node_modules", "react", "jsx-runtime"),
+      "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules", "react", "jsx-dev-runtime"),
     },
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
   },
   root: path.resolve(__dirname, "client"),
   build: {
@@ -55,6 +81,8 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    port: 5000,
+    host: true,
     fs: {
       strict: true,
       deny: ["**/.*"],

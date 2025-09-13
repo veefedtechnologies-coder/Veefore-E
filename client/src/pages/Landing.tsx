@@ -85,32 +85,33 @@ const LandingContent = ({ onNavigate, waitlistStatus }: LandingProps) => {
 
   useEffect(() => {
     // Device status is now managed by App.tsx and passed as props
+    // Remove all intervals to prevent re-renders and button blinking
 
-    // Auto-cycle through features
-    const featureInterval = setInterval(() => {
-      setActiveFeature(prev => (prev + 1) % 8)
-    }, 4000)
+    // Auto-cycle through features - REMOVED to prevent re-renders
+    // const featureInterval = setInterval(() => {
+    //   setActiveFeature(prev => (prev + 1) % 8)
+    // }, 4000)
 
-    // Simulate live data updates
-    const statsInterval = setInterval(() => {
-      setLiveStats(prev => ({
-        conversations: prev.conversations + Math.floor(Math.random() * 5),
-        contentGenerated: prev.contentGenerated + Math.floor(Math.random() * 3),
-        analyticsViews: prev.analyticsViews + Math.floor(Math.random() * 4),
-        activeUsers: Math.max(200, prev.activeUsers + Math.floor(Math.random() * 4) - 2)
-      }))
-    }, 3000)
+    // Simulate live data updates - REMOVED to prevent re-renders
+    // const statsInterval = setInterval(() => {
+    //   setLiveStats(prev => ({
+    //     conversations: prev.conversations + Math.floor(Math.random() * 5),
+    //     contentGenerated: prev.contentGenerated + Math.floor(Math.random() * 3),
+    //     analyticsViews: prev.analyticsViews + Math.floor(Math.random() * 4),
+    //     activeUsers: Math.max(200, prev.activeUsers + Math.floor(Math.random() * 4) - 2)
+    //   }))
+    // }, 3000)
 
-    // Update current time
-    const timeInterval = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
+    // Update current time - REMOVED to prevent re-renders
+    // const timeInterval = setInterval(() => {
+    //   setCurrentTime(new Date())
+    // }, 1000)
     
-    return () => {
-      clearInterval(featureInterval)
-      clearInterval(statsInterval)
-      clearInterval(timeInterval)
-    }
+    // return () => {
+    //   clearInterval(featureInterval)
+    //   clearInterval(statsInterval)
+    //   clearInterval(timeInterval)
+    // }
   }, [])
 
   const handleNavigation = (page: string) => {
@@ -832,6 +833,21 @@ const LandingContent = ({ onNavigate, waitlistStatus }: LandingProps) => {
                   <Play className="w-4 h-4 fill-gray-700 ml-0.5" />
                 </div>
                 <span>Watch Demo</span>
+              </div>
+            </Button>
+
+            <Button 
+              onClick={() => setLocation('/3d')}
+              className="group relative overflow-hidden bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-500 hover:via-pink-500 hover:to-blue-500 text-white px-16 py-6 text-xl font-bold rounded-3xl shadow-2xl hover:shadow-purple-500/30 transition-all duration-700 transform hover:-translate-y-2 hover:scale-105 border border-white/10"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-white/20 via-white/10 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+              <div className="relative flex items-center space-x-4">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <span>3D Experience</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </div>
             </Button>
           </div>

@@ -1,0 +1,5 @@
+[33m998d170[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m fix: Fix approved user button display issue
+[33mc993340[m fix: Remove Sign In button for non-approved waitlist users
+[33ma84d97a[m feat: Add comprehensive waitlist management features
+[33m348b1fa[m Fix React hook errors and module resolution issues
+[33m620b210[m Fix React hook errors and Vite integration issues

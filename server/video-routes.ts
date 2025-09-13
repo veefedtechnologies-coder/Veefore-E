@@ -15,9 +15,17 @@ const router = express.Router();
 // Video-specific authentication middleware that matches main routes
 const requireAuth = async (req: any, res: any, next: any) => {
   try {
+    console.log('[VIDEO AUTH] Authentication attempt:', {
+      hasAuthHeader: !!req.headers.authorization,
+      authHeader: req.headers.authorization?.substring(0, 20) + '...',
+      url: req.url,
+      method: req.method
+    });
+    
     const authHeader = req.headers.authorization;
     
     if (!authHeader) {
+      console.log('[VIDEO AUTH] No authorization header');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -33,8 +41,10 @@ const requireAuth = async (req: any, res: any, next: any) => {
     }
 
     // Verify Firebase token
+    console.log('[VIDEO AUTH] Verifying Firebase token...');
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
     const firebaseUid = decodedToken.uid;
+    console.log('[VIDEO AUTH] Firebase token verified for UID:', firebaseUid);
     
     // Get storage from app locals
     const storage = req.app.locals.storage;
@@ -419,7 +429,7 @@ router.post('/debug-auth', requireAuth, async (req: any, res) => {
   }
 });
 
-// Generate or regenerate script with comprehensive OpenAI service
+// Generate or regenerate script with hybrid AI service (Gemini + OpenAI fallback)
 router.post('/generate-script', requireAuth, async (req: any, res) => {
   try {
     const { 
@@ -436,21 +446,64 @@ router.post('/generate-script', requireAuth, async (req: any, res) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    // Generate comprehensive script using enhanced OpenAI service
-    const { OpenAIService } = await import('./openai-client');
-    const service = new OpenAIService();
+    let script;
     
-    console.log('[VIDEO API] Generating comprehensive script with OpenAI service...');
-    
-    const script = await service.generateVideoScript({
-      prompt,
-      duration,
-      visualStyle,
-      tone,
-      voiceGender,
-      language,
-      accent
-    });
+    // Try Gemini first (if available and has credits)
+    if (process.env.GOOGLE_API_KEY) {
+      try {
+        console.log('[VIDEO API] Generating script with Gemini...');
+        const { GeminiScriptGenerator } = await import('./gemini-script-generator');
+        const geminiService = new GeminiScriptGenerator();
+        
+        script = await geminiService.generateVideoScript({
+          prompt,
+          duration,
+          visualStyle,
+          tone,
+          voiceGender,
+          language,
+          accent
+        });
+        
+        console.log('[VIDEO API] ✓ Script generated with Gemini');
+      } catch (error) {
+        console.error('[VIDEO API] Gemini script generation failed:', error.message);
+        console.log('[VIDEO API] Falling back to OpenAI...');
+        
+        // Fallback to OpenAI
+        const { OpenAIService } = await import('./openai-client');
+        const service = new OpenAIService();
+        
+        script = await service.generateVideoScript({
+          prompt,
+          duration,
+          visualStyle,
+          tone,
+          voiceGender,
+          language,
+          accent
+        });
+        
+        console.log('[VIDEO API] ✓ Script generated with OpenAI fallback');
+      }
+    } else {
+      // Use OpenAI if Gemini not available
+      console.log('[VIDEO API] Gemini not available, using OpenAI...');
+      const { OpenAIService } = await import('./openai-client');
+      const service = new OpenAIService();
+      
+      script = await service.generateVideoScript({
+        prompt,
+        duration,
+        visualStyle,
+        tone,
+        voiceGender,
+        language,
+        accent
+      });
+      
+      console.log('[VIDEO API] ✓ Script generated with OpenAI');
+    }
 
     console.log('[VIDEO API] ✓ Comprehensive script generated with voiceover instructions');
 
@@ -475,6 +528,56 @@ router.post('/generate-script', requireAuth, async (req: any, res) => {
   }
 });
 
+// Generate AI images for script scenes
+router.post('/generate-images', requireAuth, async (req: any, res) => {
+  try {
+    console.log('[VIDEO API] Received image generation request:', {
+      hasScript: !!req.body.script,
+      scenesCount: req.body.scenes?.length || 0,
+      userId: req.user?.id
+    });
+    
+    const { script, scenes } = req.body;
+    
+    if (!script || !scenes || !Array.isArray(scenes)) {
+      return res.status(400).json({ error: 'Script and scenes array are required' });
+    }
+
+    console.log(`[VIDEO API] Generating ${scenes.length} AI images for script scenes...`);
+    console.log(`[VIDEO API] Available APIs: OpenAI=${!!process.env.OPENAI_API_KEY}, Gemini=${!!process.env.GOOGLE_API_KEY}`);
+    
+    // Use hybrid image generator
+    const { HybridImageGenerator } = await import('./hybrid-image-generator');
+    const imageGenerator = new HybridImageGenerator();
+    
+    const generatedImages = await imageGenerator.generateMultipleImages(scenes, {
+      fallbackToPlaceholder: true
+    });
+    
+    console.log(`[VIDEO API] ✓ Completed image generation for ${Object.keys(generatedImages).length} scenes`);
+    
+    console.log('[VIDEO API] Sending response with images:', {
+      success: true,
+      generatedImagesCount: Object.keys(generatedImages).length,
+      generatedImages: generatedImages
+    });
+    
+    res.json({
+      success: true,
+      generatedImages,
+      totalImages: Object.keys(generatedImages).length,
+      generatedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('[VIDEO API] Image generation error:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate images',
+      details: error.message 
+    });
+  }
+});
+
 // Regenerate specific scene in script
 router.post('/regenerate-scene', requireAuth, async (req: any, res) => {
   try {
@@ -492,17 +595,58 @@ router.post('/regenerate-scene', requireAuth, async (req: any, res) => {
       });
     }
 
-    // Regenerate scene using OpenAI
-    const { default: OpenAIService } = await import('./openai-client');
-    const service = new OpenAIService();
+    let updatedScene;
     
-    const updatedScene = await service.regenerateScene({
-      originalPrompt,
-      sceneId,
-      visualStyle,
-      tone,
-      currentScript
-    });
+    // Try Gemini first (if available and has credits)
+    if (process.env.GOOGLE_API_KEY) {
+      try {
+        console.log('[VIDEO API] Regenerating scene with Gemini...');
+        const { GeminiScriptGenerator } = await import('./gemini-script-generator');
+        const geminiService = new GeminiScriptGenerator();
+        
+        updatedScene = await geminiService.regenerateScene({
+          originalPrompt,
+          sceneId,
+          visualStyle,
+          tone,
+          currentScript
+        });
+        
+        console.log('[VIDEO API] ✓ Scene regenerated with Gemini');
+      } catch (error) {
+        console.error('[VIDEO API] Gemini scene regeneration failed:', error.message);
+        console.log('[VIDEO API] Falling back to OpenAI...');
+        
+        // Fallback to OpenAI
+        const { default: OpenAIService } = await import('./openai-client');
+        const service = new OpenAIService();
+        
+        updatedScene = await service.regenerateScene({
+          originalPrompt,
+          sceneId,
+          visualStyle,
+          tone,
+          currentScript
+        });
+        
+        console.log('[VIDEO API] ✓ Scene regenerated with OpenAI fallback');
+      }
+    } else {
+      // Use OpenAI if Gemini not available
+      console.log('[VIDEO API] Gemini not available, using OpenAI...');
+      const { default: OpenAIService } = await import('./openai-client');
+      const service = new OpenAIService();
+      
+      updatedScene = await service.regenerateScene({
+        originalPrompt,
+        sceneId,
+        visualStyle,
+        tone,
+        currentScript
+      });
+      
+      console.log('[VIDEO API] ✓ Scene regenerated with OpenAI');
+    }
 
     res.json({
       success: true,

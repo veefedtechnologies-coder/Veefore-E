@@ -31,10 +31,11 @@ function SignUpIntegrated() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [currentFeature, setCurrentFeature] = useState(0)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const [typedText, setTypedText] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
+  // Remove state variables that cause re-renders
+  // const [currentFeature, setCurrentFeature] = useState(0)
+  // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  // const [typedText, setTypedText] = useState('')
+  // const [isTyping, setIsTyping] = useState(false)
   
   const { toast } = useToast()
   const { user } = useFirebaseAuth()
@@ -98,64 +99,72 @@ function SignUpIntegrated() {
     return () => clearInterval(interval)
   }, [currentStep, otpData.timeRemaining])
 
-  // Mouse tracking for unique effects
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
+  // Remove mouse tracking to prevent re-renders
+  // useEffect(() => {
+  //   let timeoutId: NodeJS.Timeout
+  //   const handleMouseMove = (e: MouseEvent) => {
+  //     clearTimeout(timeoutId)
+  //     timeoutId = setTimeout(() => {
+  //       setMousePosition({ x: e.clientX, y: e.clientY })
+  //     }, 100)
+  //   }
+  //   window.addEventListener('mousemove', handleMouseMove)
+  //   return () => {
+  //     window.removeEventListener('mousemove', handleMouseMove)
+  //     clearTimeout(timeoutId)
+  //   }
+  // }, [])
 
-  // Auto-advance features (different timing)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentFeature((prev) => (prev + 1) % signupFeatures.length)
-    }, 3500) // Different timing than sign in
-    return () => clearInterval(interval)
-  }, [])
+  // Remove auto-advance features to prevent re-renders
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     setCurrentFeature((prev) => (prev + 1) % signupFeatures.length)
+  //   }, 3500)
+  //   return () => clearInterval(interval)
+  // }, [])
 
-  // Unique typing animation for signup
-  useEffect(() => {
-    const messages = [
-      "Join 500+ growing businesses",
-      "Start your AI transformation today",
-      "Everything you need to succeed",
-      "Professional tools, instant results"
-    ]
-    
-    let messageIndex = 0
-    let charIndex = 0
-    let isDeleting = false
-    
-    const typeWriter = () => {
-      const currentMessage = messages[messageIndex]
-      
-      if (!isDeleting && charIndex < currentMessage.length) {
-        setTypedText(currentMessage.substring(0, charIndex + 1))
-        setIsTyping(true)
-        charIndex++
-        setTimeout(typeWriter, 80) // Faster typing
-      } else if (isDeleting && charIndex > 0) {
-        setTypedText(currentMessage.substring(0, charIndex - 1))
-        charIndex--
-        setTimeout(typeWriter, 40)
-      } else if (!isDeleting && charIndex === currentMessage.length) {
-        setIsTyping(false)
-        setTimeout(() => {
-          isDeleting = true
-          typeWriter()
-        }, 1500) // Shorter pause
-      } else if (isDeleting && charIndex === 0) {
-        isDeleting = false
-        messageIndex = (messageIndex + 1) % messages.length
-        setTimeout(typeWriter, 300)
-      }
-    }
-    
-    const timeout = setTimeout(typeWriter, 800)
-    return () => clearTimeout(timeout)
-  }, [])
+  // Remove typing animation to prevent re-renders
+  // useEffect(() => {
+  //   const messages = [
+  //     "Join 500+ growing businesses",
+  //     "Start your AI transformation today",
+  //     "Everything you need to succeed",
+  //     "Professional tools, instant results"
+  //   ]
+  //   
+  //   let messageIndex = 0
+  //   let charIndex = 0
+  //   let isDeleting = false
+  //   let timeoutId: NodeJS.Timeout
+  //   
+  //   const typeWriter = () => {
+  //     const currentMessage = messages[messageIndex]
+  //     
+  //     if (!isDeleting && charIndex < currentMessage.length) {
+  //       setTypedText(currentMessage.substring(0, charIndex + 1))
+  //       setIsTyping(true)
+  //       charIndex++
+  //       timeoutId = setTimeout(typeWriter, 120)
+  //     } else if (isDeleting && charIndex > 0) {
+  //       setTypedText(currentMessage.substring(0, charIndex - 1))
+  //       charIndex--
+  //       timeoutId = setTimeout(typeWriter, 60)
+  //     } else if (!isDeleting && charIndex === currentMessage.length) {
+  //       setIsTyping(false)
+  //       timeoutId = setTimeout(() => {
+  //         isDeleting = true
+  //         typeWriter()
+  //       }, 1500)
+  //     } else if (isDeleting && charIndex === 0) {
+  //       isDeleting = false
+  //       messageIndex = (messageIndex + 1) % messages.length
+  //       timeoutId = setTimeout(typeWriter, 300)
+  //     }
+  //   }
+  //   
+  //   timeoutId = setTimeout(typeWriter, 800)
+  //   return () => clearTimeout(timeoutId)
+  // }, [])
 
   // Show loading state when we have a user
   if (user) {
@@ -407,16 +416,16 @@ function SignUpIntegrated() {
         <div 
           className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-r from-emerald-100/30 to-teal-100/40 blur-3xl"
           style={{
-            right: `${20 + mousePosition.x * 0.02}%`,
-            top: `${10 + mousePosition.y * 0.015}%`,
+            right: '20%',
+            top: '10%',
             transform: 'translate(50%, -50%)'
           }}
         />
         <div 
           className="absolute w-[400px] h-[400px] rounded-full bg-gradient-to-r from-blue-100/40 to-indigo-100/30 blur-2xl"
           style={{
-            left: `${15 + mousePosition.x * 0.012}%`,
-            bottom: `${20 + mousePosition.y * 0.01}%`,
+            left: '15%',
+            bottom: '20%',
             transform: 'translate(-50%, 50%)'
           }}
         />
@@ -501,8 +510,7 @@ function SignUpIntegrated() {
                   <div className="absolute inset-0 w-3 h-3 bg-emerald-400 rounded-full animate-ping opacity-30" />
                 </div>
                 <span className="text-gray-800 font-medium text-base min-w-[280px] text-left">
-                  {typedText}
-                  {isTyping && <span className="animate-pulse text-emerald-500">|</span>}
+                  Join thousands of creators building their brand
                 </span>
                 <Sparkles className="w-4 h-4 text-emerald-500 group-hover:rotate-12 transition-transform duration-500" />
               </div>
@@ -550,25 +558,25 @@ function SignUpIntegrated() {
               <div className="p-6">
                 <div className="flex items-center space-x-4 mb-4">
                   <motion.div 
-                    className={`w-12 h-12 rounded-xl bg-gradient-to-r ${signupFeatures[currentFeature].color} flex items-center justify-center shadow-lg`}
+                    className={`w-12 h-12 rounded-xl bg-gradient-to-r ${signupFeatures[0].color} flex items-center justify-center shadow-lg`}
                     animate={{ scale: [1, 1.1, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
                     {(() => {
-                      const IconComponent = signupFeatures[currentFeature].icon;
+                      const IconComponent = signupFeatures[0].icon;
                       return <IconComponent className="w-6 h-6 text-white" />;
                     })()}
                   </motion.div>
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900">{signupFeatures[currentFeature].title}</h3>
-                    <p className="text-gray-600 text-sm">{signupFeatures[currentFeature].description}</p>
+                    <h3 className="text-lg font-bold text-gray-900">{signupFeatures[0].title}</h3>
+                    <p className="text-gray-600 text-sm">{signupFeatures[0].description}</p>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-700 font-medium">Expected Result:</span>
-                    <span className="text-emerald-600 font-bold">{signupFeatures[currentFeature].benefit}</span>
+                    <span className="text-emerald-600 font-bold">{signupFeatures[0].benefit}</span>
                   </div>
                   <div className="w-full h-2 bg-gray-200 rounded-full mt-3">
                     <motion.div 
@@ -583,11 +591,10 @@ function SignUpIntegrated() {
                 {/* Feature indicators */}
                 <div className="flex space-x-2 mt-4">
                   {signupFeatures.map((_, index) => (
-                    <button
+                    <div
                       key={index}
-                      onClick={() => setCurrentFeature(index)}
                       className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                        index === currentFeature ? 'bg-emerald-500 scale-125' : 'bg-gray-300'
+                        index === 0 ? 'bg-emerald-500 scale-125' : 'bg-gray-300'
                       }`}
                     />
                   ))}

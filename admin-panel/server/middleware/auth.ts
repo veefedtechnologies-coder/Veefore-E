@@ -171,7 +171,16 @@ export const requirePermission = (permission: string) => {
       });
     }
 
-    if (!req.admin.permissions.includes(permission)) {
+    // Check both req.permissions (from role) and req.admin.permissions (direct)
+    const userPermissions = req.permissions || req.admin.permissions || [];
+    
+    if (!userPermissions.includes(permission)) {
+      console.log('🔍 Permission Check Debug:');
+      console.log('  - Required permission:', permission);
+      console.log('  - User permissions:', userPermissions);
+      console.log('  - Admin permissions:', req.admin.permissions);
+      console.log('  - Role permissions:', req.permissions);
+      
       return res.status(403).json({ 
         success: false, 
         message: 'Insufficient permissions.' 

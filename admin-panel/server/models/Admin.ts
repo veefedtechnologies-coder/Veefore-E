@@ -5,6 +5,7 @@ import crypto from 'crypto';
 export interface IAdmin extends Document {
   _id: string;
   email: string;
+  username: string;
   password: string;
   firstName: string;
   lastName: string;
@@ -103,6 +104,17 @@ const AdminSchema = new Schema<IAdmin>({
     lowercase: true,
     trim: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+  },
+  username: {
+    type: String,
+    required: false, // Make it optional for existing records
+    unique: true,
+    sparse: true, // Allow multiple null values
+    lowercase: true,
+    trim: true,
+    minlength: 3,
+    maxlength: 20,
+    match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores']
   },
   password: {
     type: String,

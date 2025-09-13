@@ -6,6 +6,16 @@
 
 import { useEffect } from 'react';
 
+// Utility to check if React is properly loaded
+function isReactAvailable(): boolean {
+  try {
+    return typeof window !== 'undefined' && 
+           typeof useEffect === 'function';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * P7.5: Accessibility Compliance Manager
  */
@@ -295,7 +305,14 @@ export class AccessibilityManager {
  * P7.5: React Hook for Route Announcements
  */
 export function useAccessibilityRouteAnnouncements(currentPath: string) {
+  // Always call hooks at the top level - React rules require this
   useEffect(() => {
+    // Check React availability inside the effect
+    if (!isReactAvailable()) {
+      console.warn('useAccessibilityRouteAnnouncements: React not available, skipping accessibility announcements');
+      return;
+    }
+
     const pageNames: { [key: string]: string } = {
       '/': 'Home page',
       '/dashboard': 'Dashboard',

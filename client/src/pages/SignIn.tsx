@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Eye, EyeOff, ArrowLeft, Sparkles, Brain, Play, Pause } from 'lucide-react'
 import { Link, useLocation } from 'wouter'
@@ -9,6 +9,44 @@ import veeforceLogo from '@assets/output-onlinepngtools_1754815000405.png'
 interface SignInProps {
   onNavigate: (view: string) => void
 }
+
+// Memoized button components to prevent unnecessary re-renders
+const MemoizedSignInButton = memo(({ isLoading, onSubmit }: { isLoading: boolean, onSubmit: (e: React.FormEvent) => void }) => (
+  <Button 
+    type="submit" 
+    disabled={isLoading}
+    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-semibold text-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+  >
+    {isLoading ? (
+      <div className="flex items-center justify-center space-x-2">
+        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        <span>Signing in...</span>
+      </div>
+    ) : (
+      'Sign In'
+    )}
+  </Button>
+))
+
+const MemoizedGoogleButton = memo(({ isLoading, onClick }: { isLoading: boolean, onClick: () => void }) => (
+  <Button 
+    type="button" 
+    variant="outline"
+    disabled={isLoading}
+    onClick={onClick}
+    className="w-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-2 border-gray-200/60 dark:border-gray-600/60 text-gray-700 dark:text-gray-300 py-6 rounded-2xl font-bold text-xl hover:bg-gray-50/90 dark:hover:bg-gray-700/90 hover:border-gray-300/60 dark:hover:border-gray-500/60 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50"
+  >
+    <div className="flex items-center justify-center space-x-4">
+      <svg className="w-6 h-6" viewBox="0 0 24 24">
+        <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      <span>{isLoading ? 'Signing in...' : 'Continue with Google'}</span>
+    </div>
+  </Button>
+))
 
 const SignIn = ({ onNavigate }: SignInProps) => {
   const [showPassword, setShowPassword] = useState(false)
@@ -23,14 +61,14 @@ const SignIn = ({ onNavigate }: SignInProps) => {
   const { toast } = useToast()
   const [, setLocation] = useLocation()
   const [isLoading, setIsLoading] = useState(false)
-  const [currentDemo, setCurrentDemo] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const [isTyping, setIsTyping] = useState(false)
-  const [typedText, setTypedText] = useState('')
-  const [focusedField, setFocusedField] = useState('')
-  const [ripples, setRipples] = useState<Array<{id: number, x: number, y: number}>>([])
-  const particleCount = 0
+  // Remove all unnecessary state variables that cause re-renders
+  // const [currentDemo, setCurrentDemo] = useState(0)
+  // const [isPlaying, setIsPlaying] = useState(true)
+  // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  // const [isTyping, setIsTyping] = useState(false)
+  // const [typedText, setTypedText] = useState('')
+  // const [focusedField, setFocusedField] = useState('')
+  // const particleCount = 0
 
   // Advanced interactive demo data
   const demoScenarios = [
@@ -57,81 +95,88 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     }
   ]
 
-  // Mouse tracking for interactive effects
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
+  // Remove mouse tracking to prevent re-renders
+  // useEffect(() => {
+  //   let timeoutId: NodeJS.Timeout
+  //   const handleMouseMove = (e: MouseEvent) => {
+  //     clearTimeout(timeoutId)
+  //     timeoutId = setTimeout(() => {
+  //       setMousePosition({ x: e.clientX, y: e.clientY })
+  //     }, 100)
+  //   }
+  //   window.addEventListener('mousemove', handleMouseMove)
+  //   return () => {
+  //     window.removeEventListener('mousemove', handleMouseMove)
+  //     clearTimeout(timeoutId)
+  //   }
+  // }, [])
 
-  // Auto-advance demo scenarios
-  useEffect(() => {
-    if (!isPlaying) return
-    const interval = setInterval(() => {
-      setCurrentDemo((prev) => (prev + 1) % demoScenarios.length)
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [isPlaying, demoScenarios.length])
+  // Remove auto-advance demo to prevent re-renders
+  // useEffect(() => {
+  //   if (!isPlaying) return
+  //   const interval = setInterval(() => {
+  //     setCurrentDemo((prev) => (prev + 1) % demoScenarios.length)
+  //   }, 4000)
+  //   return () => clearInterval(interval)
+  // }, [isPlaying, demoScenarios.length])
 
-  // Advanced typing animation
-  useEffect(() => {
-    const messages = [
-      "Welcome back to VeeFore AI",
-      "Your intelligent workspace awaits",
-      "AI-powered content creation ready",
-      "Advanced analytics at your fingertips"
-    ]
-    
-    let messageIndex = 0
-    let charIndex = 0
-    let isDeleting = false
-    
-    const typeWriter = () => {
-      const currentMessage = messages[messageIndex]
-      
-      if (!isDeleting && charIndex < currentMessage.length) {
-        setTypedText(currentMessage.substring(0, charIndex + 1))
-        setIsTyping(true)
-        charIndex++
-        setTimeout(typeWriter, 100)
-      } else if (isDeleting && charIndex > 0) {
-        setTypedText(currentMessage.substring(0, charIndex - 1))
-        charIndex--
-        setTimeout(typeWriter, 50)
-      } else if (!isDeleting && charIndex === currentMessage.length) {
-        setIsTyping(false)
-        setTimeout(() => {
-          isDeleting = true
-          typeWriter()
-        }, 2000)
-      } else if (isDeleting && charIndex === 0) {
-        isDeleting = false
-        messageIndex = (messageIndex + 1) % messages.length
-        setTimeout(typeWriter, 500)
-      }
-    }
-    
-    const timeout = setTimeout(typeWriter, 1000)
-    return () => clearTimeout(timeout)
-  }, [])
+  // Remove typing animation to prevent re-renders
+  // useEffect(() => {
+  //   const messages = [
+  //     "Welcome back to VeeFore AI",
+  //     "Your intelligent workspace awaits",
+  //     "AI-powered content creation ready",
+  //     "Advanced analytics at your fingertips"
+  //   ]
+  //   
+  //   let messageIndex = 0
+  //   let charIndex = 0
+  //   let isDeleting = false
+  //   let timeoutId: NodeJS.Timeout
+  //   
+  //   const typeWriter = () => {
+  //     const currentMessage = messages[messageIndex]
+  //     
+  //     if (!isDeleting && charIndex < currentMessage.length) {
+  //       setTypedText(currentMessage.substring(0, charIndex + 1))
+  //       setIsTyping(true)
+  //       charIndex++
+  //       timeoutId = setTimeout(typeWriter, 150)
+  //     } else if (isDeleting && charIndex > 0) {
+  //       setTypedText(currentMessage.substring(0, charIndex - 1))
+  //       charIndex--
+  //       timeoutId = setTimeout(typeWriter, 75)
+  //     } else if (!isDeleting && charIndex === currentMessage.length) {
+  //       setIsTyping(false)
+  //       timeoutId = setTimeout(() => {
+  //         isDeleting = true
+  //         typeWriter()
+  //       }, 2000)
+  //     } else if (isDeleting && charIndex === 0) {
+  //       isDeleting = false
+  //       messageIndex = (messageIndex + 1) % messages.length
+  //       timeoutId = setTimeout(typeWriter, 500)
+  //     }
+  //   }
+  //   
+  //   timeoutId = setTimeout(typeWriter, 1000)
+  //   return () => clearTimeout(timeoutId)
+  // }, [])
 
-  // Interactive ripple effects
-  const createRipple = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const newRipple = { id: Date.now(), x, y }
-    
-    setRipples(prev => [...prev, newRipple])
-    setTimeout(() => {
-      setRipples(prev => prev.filter(ripple => ripple.id !== newRipple.id))
-    }, 1000)
-  }
+  // Remove ripple effects to prevent button blinking
+  // const createRipple = (e: React.MouseEvent) => {
+  //   const rect = e.currentTarget.getBoundingClientRect()
+  //   const x = e.clientX - rect.left
+  //   const y = e.clientY - rect.top
+  //   const newRipple = { id: Date.now(), x, y }
+  //   
+  //   setRipples(prev => [...prev, newRipple])
+  //   setTimeout(() => {
+  //     setRipples(prev => prev.filter(ripple => ripple.id !== newRipple.id))
+  //   }, 1000)
+  // }
   
-  // Use createRipple for interactions
-  console.log('Interactive effects ready', { particleCount, createRipple })
+  // Interactive effects removed to prevent re-renders
 
 
 
@@ -287,16 +332,16 @@ const SignIn = ({ onNavigate }: SignInProps) => {
       <div 
         className="absolute w-96 h-96 rounded-full bg-gradient-to-r from-blue-100/40 to-purple-100/30 dark:from-blue-900/20 dark:to-purple-900/20 blur-3xl animate-pulse"
         style={{ 
-          top: `${mousePosition.y * 0.1}px`, 
-          left: `${mousePosition.x * 0.1}px`,
+          top: '20%', 
+          left: '10%',
           animationDelay: '0s'
         }} 
       />
       <div 
         className="absolute w-80 h-80 rounded-full bg-gradient-to-r from-violet-100/30 to-blue-100/40 dark:from-violet-900/20 dark:to-blue-900/20 blur-2xl animate-pulse delay-1000"
         style={{ 
-          top: `${mousePosition.y * 0.2}px`, 
-          right: `${mousePosition.x * 0.15}px`,
+          top: '60%', 
+          right: '15%',
           animationDelay: '1s'
         }} 
       />
@@ -331,8 +376,8 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         className="absolute inset-0 opacity-5"
         style={{
           background: `
-            radial-gradient(circle at ${25 + mousePosition.x * 0.02}% ${25 + mousePosition.y * 0.02}%, rgba(99, 102, 241, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at ${75 + mousePosition.x * 0.015}% ${75 + mousePosition.y * 0.015}%, rgba(139, 92, 246, 0.3) 0%, transparent 50%)
+            radial-gradient(circle at 25% 25%, rgba(99, 102, 241, 0.4) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.3) 0%, transparent 50%)
           `
         }}
       />
@@ -376,8 +421,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-800 font-semibold text-lg min-w-[300px] text-left">
-                    {typedText}
-                    {isTyping && <span className="animate-pulse">|</span>}
+                    Welcome back! Sign in to continue
                   </span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -420,19 +464,17 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   <span className="text-gray-900 font-semibold text-lg">VeeFore AI Workspace</span>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition-all duration-300"
+                  <div
+                    className="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600"
                   >
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  </button>
+                    <Play className="w-4 h-4" />
+                  </div>
                   <div className="flex space-x-1">
                     {demoScenarios.map((_, index) => (
-                      <button
+                      <div
                         key={index}
-                        onClick={() => setCurrentDemo(index)}
                         className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                          index === currentDemo ? 'bg-blue-600 scale-125' : 'bg-gray-300 hover:bg-gray-400'
+                          index === 0 ? 'bg-blue-600 scale-125' : 'bg-gray-300'
                         }`}
                       />
                     ))}
@@ -443,21 +485,21 @@ const SignIn = ({ onNavigate }: SignInProps) => {
               {/* Panel Content */}
               <div className="p-8">
                 <div className="flex items-center space-x-4 mb-6">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${demoScenarios[currentDemo].gradient} flex items-center justify-center shadow-lg`}>
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${demoScenarios[0].gradient} flex items-center justify-center shadow-lg`}>
                     {(() => {
-                      const IconComponent = demoScenarios[currentDemo].icon;
+                      const IconComponent = demoScenarios[0].icon;
                       return <IconComponent className="w-8 h-8 text-white" />;
                     })()}
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{demoScenarios[currentDemo].title}</h3>
-                    <p className="text-gray-600">{demoScenarios[currentDemo].description}</p>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{demoScenarios[0].title}</h3>
+                    <p className="text-gray-600">{demoScenarios[0].description}</p>
                   </div>
                 </div>
 
                 {/* Clean Professional Metrics */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
-                  {Object.entries(demoScenarios[currentDemo].metrics).map(([key, value], index) => (
+                  {Object.entries(demoScenarios[0].metrics).map(([key, value], index) => (
                     <div key={key} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
                       <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
                       <div className="text-gray-600 text-sm capitalize font-medium mb-3">{key}</div>
@@ -544,21 +586,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-200/50 via-purple-200/50 to-violet-200/50 rounded-3xl blur-xl opacity-60" />
               
               <div className="relative bg-white/95 backdrop-blur-xl rounded-3xl p-10 border border-gray-200/60 shadow-2xl overflow-hidden">
-                {/* Ripple effects */}
-                {ripples.map(ripple => (
-                  <div
-                    key={ripple.id}
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: ripple.x - 50,
-                      top: ripple.y - 50,
-                      width: 100,
-                      height: 100,
-                    }}
-                  >
-                    <div className="w-full h-full rounded-full bg-gradient-to-r from-blue-400/20 to-purple-400/20 animate-ping" />
-                  </div>
-                ))}
+                {/* Removed ripple effects to prevent button blinking */}
                 
                 {/* Clean Professional Header */}
                 <div className="text-center mb-10 relative z-10">
@@ -608,14 +636,10 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                           id="email"
                           value={formData.email}
                           onChange={(e) => handleInputChange('email', e.target.value)}
-                          onFocus={() => setFocusedField('email')}
-                          onBlur={() => setFocusedField('')}
                           className={`w-full pl-12 pr-12 py-4 bg-white/90 dark:bg-gray-800/90 border-2 ${
                             errors.email 
                               ? 'border-red-400 focus:border-red-500' 
-                              : focusedField === 'email'
-                                ? 'border-blue-500 focus:border-blue-600'
-                                : 'border-transparent hover:border-blue-200 dark:hover:border-blue-600'
+                              : 'border-transparent hover:border-blue-200 dark:hover:border-blue-600 focus:border-blue-500'
                           } rounded-2xl focus:outline-none transition-all duration-300 text-gray-900 dark:text-gray-100 text-base shadow-lg hover:shadow-xl focus:shadow-2xl`}
                           placeholder="Enter your email address"
                         />
@@ -678,14 +702,10 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                           id="password"
                           value={formData.password}
                           onChange={(e) => handleInputChange('password', e.target.value)}
-                          onFocus={() => setFocusedField('password')}
-                          onBlur={() => setFocusedField('')}
                           className={`w-full pl-12 pr-16 py-4 bg-white/90 dark:bg-gray-800/90 border-2 ${
                             errors.password 
                               ? 'border-red-400 focus:border-red-500' 
-                              : focusedField === 'password'
-                                ? 'border-blue-500 focus:border-blue-600'
-                                : 'border-transparent hover:border-blue-200 dark:hover:border-blue-600'
+                              : 'border-transparent hover:border-blue-200 dark:hover:border-blue-600 focus:border-blue-500'
                           } rounded-2xl focus:outline-none transition-all duration-300 text-gray-900 dark:text-gray-100 text-base shadow-lg hover:shadow-xl focus:shadow-2xl`}
                           placeholder="Enter your password"
                         />
@@ -758,20 +778,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                     </div>
 
                     {/* Clean Professional Sign In Button */}
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-semibold text-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Signing in...</span>
-                      </div>
-                    ) : (
-                      'Sign In'
-                    )}
-                  </Button>
+                  <MemoizedSignInButton isLoading={isLoading} onSubmit={handleSubmit} />
 
                   {/* Clean Divider */}
                   <div className="relative my-6">
@@ -784,23 +791,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   </div>
 
                   {/* Google Sign In */}
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    disabled={isLoading}
-                    onClick={handleGoogleSignIn}
-                    className="w-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-2 border-gray-200/60 dark:border-gray-600/60 text-gray-700 dark:text-gray-300 py-6 rounded-2xl font-bold text-xl hover:bg-gray-50/90 dark:hover:bg-gray-700/90 hover:border-gray-300/60 dark:hover:border-gray-500/60 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50"
-                  >
-                    <div className="flex items-center justify-center space-x-4">
-                      <svg className="w-6 h-6" viewBox="0 0 24 24">
-                        <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      <span>{isLoading ? 'Signing in...' : 'Continue with Google'}</span>
-                    </div>
-                  </Button>
+                  <MemoizedGoogleButton isLoading={isLoading} onClick={handleGoogleSignIn} />
 
                   {/* Test Firebase Button */}
                   <Button 
