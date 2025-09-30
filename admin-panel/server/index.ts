@@ -65,7 +65,7 @@ class AdminServer {
     this.server = createServer(this.app);
     this.io = new SocketIOServer(this.server, {
       cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+        origin: process.env.FRONTEND_URL || 'http://localhost:8000',
         methods: ['GET', 'POST']
       }
     });
@@ -267,12 +267,12 @@ class AdminServer {
   }
 
   public start() {
-    const port = process.env.ADMIN_PORT || 5001;
+    const port = process.env.ADMIN_PORT || 8001;
     
-    this.server.listen(port, () => {
+    this.server.listen(port, '0.0.0.0', () => {
       console.log(`🚀 VeeFore Admin Panel Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3001'}`);
+      console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8000'}`);
       console.log(`📱 API URL: http://localhost:${port}/api`);
     });
   }
