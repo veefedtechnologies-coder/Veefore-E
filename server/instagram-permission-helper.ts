@@ -8,6 +8,21 @@ import { instagramAPI } from './instagram-api';
 export class InstagramPermissionHelper {
   
   /**
+   * Get standardized error information for video publishing failures
+   */
+  static getVideoPublishingError(): {
+    error: string;
+    technicalReason: string;
+    solution: string;
+  } {
+    return {
+      error: 'Video publishing not available',
+      technicalReason: 'Instagram API video publishing requires app review and additional permissions',
+      solution: 'Submit your app for Instagram Platform review to enable video publishing, or convert videos to photos for posting'
+    };
+  }
+
+  /**
    * Check what permissions are available for the given access token
    */
   static async checkAvailablePermissions(accessToken: string): Promise<{

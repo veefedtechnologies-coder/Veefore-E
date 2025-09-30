@@ -756,14 +756,10 @@ export class InstagramAPI {
                 // Import VideoCompressor
                 const { VideoCompressor } = await import('./video-compression');
                 
-                const compressionResult = await VideoCompressor.compressForInstagram(localPath, {
-                  quality: 'high',
-                  targetSizeMB: 25,
-                  maintainAspectRatio: true
-                });
+                const compressionResult = await VideoCompressor.compressForInstagram(localPath);
                 
                 if (compressionResult.success && compressionResult.outputPath) {
-                  console.log(`[INSTAGRAM PUBLISH] Video compressed from ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB to ${(compressionResult.compressedSize! / 1024 / 1024).toFixed(2)}MB`);
+                  console.log(`[INSTAGRAM PUBLISH] Video compressed from ${((compressionResult.originalSize || 0) / 1024 / 1024).toFixed(2)}MB to ${((compressionResult.compressedSize || 0) / 1024 / 1024).toFixed(2)}MB`);
                   
                   const compressedUrl = compressionResult.outputPath.replace(process.cwd(), '').replace(/\\/g, '/');
                   return await this.publishVideoWithCompression(accessToken, compressedUrl, caption, true);
@@ -882,14 +878,10 @@ export class InstagramAPI {
                   console.log(`[INSTAGRAM PUBLISH] Instagram rejected video - activating intelligent compression system`);
                   
                   try {
-                    const compressionResult = await VideoCompressor.compressForInstagram(localPath, {
-                      quality: 'high',
-                      targetSizeMB: 45, // Target 45MB to be safely under Instagram's 50MB limit
-                      maintainAspectRatio: true
-                    });
+                    const compressionResult = await VideoCompressor.compressForInstagram(localPath);
                     
                     if (compressionResult.success && compressionResult.outputPath) {
-                      console.log(`[INSTAGRAM PUBLISH] Video compressed successfully from ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB to ${(compressionResult.compressedSize! / 1024 / 1024).toFixed(2)}MB`);
+                      console.log(`[INSTAGRAM PUBLISH] Video compressed successfully from ${((compressionResult.originalSize || 0) / 1024 / 1024).toFixed(2)}MB to ${((compressionResult.compressedSize || 0) / 1024 / 1024).toFixed(2)}MB`);
                       
                       // Convert compressed file path to URL format
                       const compressedUrl = compressionResult.outputPath.replace(process.cwd(), '').replace(/\\/g, '/');
@@ -925,11 +917,7 @@ export class InstagramAPI {
               console.log(`[INSTAGRAM PUBLISH] Timeout reached - attempting emergency video compression as final attempt`);
               
               try {
-                const compressionResult = await VideoCompressor.compressForInstagram(localPath, {
-                  quality: 'medium', // Use medium quality for emergency compression
-                  targetSizeMB: 40, // Even more aggressive target
-                  maintainAspectRatio: true
-                });
+                const compressionResult = await VideoCompressor.compressForInstagram(localPath);
                 
                 if (compressionResult.success && compressionResult.outputPath) {
                   console.log(`[INSTAGRAM PUBLISH] Emergency compression successful - retrying with compressed video`);
