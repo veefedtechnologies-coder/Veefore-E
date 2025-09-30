@@ -17,13 +17,14 @@ console.log('🔥 Firebase Config:', {
   authDomain: firebaseConfig.authDomain
 })
 
-// Check if we have proper Firebase configuration
+// Check if we have proper Firebase configuration (not using demo fallback values)
 const hasValidConfig = firebaseConfig.apiKey !== 'demo-api-key' && 
-                      firebaseConfig.projectId !== 'veefore-b84c8' && 
                       firebaseConfig.appId !== 'demo-app-id'
 
 if (!hasValidConfig) {
   console.warn('⚠️ Firebase environment variables not set. Using demo values. Please set VITE_FIREBASE_* variables.')
+} else {
+  console.log('✅ Firebase environment variables loaded successfully from secrets')
 }
 
 // Log the current domain for debugging
