@@ -9,6 +9,12 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **September 30, 2025**
+- ✅ **SIGN-IN LOADING BUG FIX**: Resolved infinite loading spinner after authentication by properly handling `userDataLoading` state
+  - **Problem**: After successful Firebase authentication, app got stuck on "Initializing..." spinner indefinitely
+  - **Root Cause**: Conditional rendering logic didn't account for `userDataLoading` state during userData API fetch
+  - **Solution**: Added explicit check for `userDataLoading` before rendering dashboard; added error handling for failed userData API calls with redirect to sign-in
+  - **Impact**: Authentication flow now works correctly: Sign-in → Loading → Dashboard (no infinite spinner)
+  - **Files Modified**: `client/src/App.tsx` (lines 332-333, 433-438)
 - ✅ **REACT HOOKS ERROR RESOLUTION - COMPLETE SUCCESS**: Permanently resolved persistent "Cannot read properties of null (reading 'useState')" error
   - **Root cause**: `preserveSymlinks: true` in vite.config.ts prevented Vite from deduplicating React instances across symlink boundaries
   - **Solution implemented**:
