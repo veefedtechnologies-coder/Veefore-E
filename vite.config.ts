@@ -50,25 +50,19 @@ export default defineConfig({
       'react/jsx-dev-runtime'
     ],
     exclude: ['@react-three/postprocessing'],
-    esbuildOptions: {
-      preserveSymlinks: true
-    }
+    force: true
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
   },
   resolve: {
+    preserveSymlinks: true,
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
-      // Force React to be resolved from a single location
-      "react": path.resolve(__dirname, "node_modules", "react"),
-      "react-dom": path.resolve(__dirname, "node_modules", "react-dom"),
-      "react/jsx-runtime": path.resolve(__dirname, "node_modules", "react", "jsx-runtime"),
-      "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules", "react", "jsx-dev-runtime"),
     },
-    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
   },
   root: path.resolve(__dirname, "client"),
   build: {
@@ -98,6 +92,11 @@ export default defineConfig({
     fs: {
       strict: true,
       deny: ["**/.*"],
+      allow: [
+        path.resolve(__dirname, 'client'),
+        path.resolve(__dirname, 'shared'),
+        path.resolve(__dirname, 'node_modules')
+      ]
     },
   },
 });
