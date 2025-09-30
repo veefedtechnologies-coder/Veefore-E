@@ -65,7 +65,7 @@ class AdminServer {
     this.server = createServer(this.app);
     this.io = new SocketIOServer(this.server, {
       cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:8000',
+        origin: '*',
         methods: ['GET', 'POST']
       }
     });
@@ -111,9 +111,22 @@ class AdminServer {
       },
     }));
 
-    // CORS configuration
+    // CORS configuration - flexible for Replit development
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'http://localhost:8000',
+      'http://localhost:3001',
+      'https://ba558a73-cb16-4658-938f-80c18363cc87-00-g5fd72rik685.riker.replit.dev:8000'
+    ].filter(Boolean);
+    
     this.app.use(cors({
-      origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Device-Fingerprint']
