@@ -23,8 +23,21 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start Game"
+
 [[workflows.workflow]]
 name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Start Game"
 author = "agent"
 
 [[workflows.workflow.tasks]]
@@ -35,5 +48,9 @@ waitForPort = 5000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 40379
+externalPort = 3000
 
 [agent]
