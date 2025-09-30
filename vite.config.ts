@@ -47,17 +47,12 @@ export default defineConfig({
       'react',
       'react-dom',
       'react/jsx-runtime',
-      'react/jsx-dev-runtime',
-      'three',
-      '@react-three/fiber',
-      '@react-three/drei',
-      'framer-motion',
-      'lucide-react',
-      '@tanstack/react-query',
-      'wouter'
+      'react/jsx-dev-runtime'
     ],
     exclude: ['@react-three/postprocessing'],
-    force: true
+    esbuildOptions: {
+      preserveSymlinks: true
+    }
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
@@ -79,6 +74,16 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // Keep React and React-DOM together in a single chunk
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor-react';
+          }
+        }
+      }
+    }
   },
   server: {
     port: 5000,
