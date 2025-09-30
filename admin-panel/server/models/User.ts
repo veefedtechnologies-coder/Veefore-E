@@ -106,9 +106,7 @@ const UserSchema = new Schema<IUser>({
   timestamps: true
 });
 
-// Indexes
-UserSchema.index({ email: 1 });
-UserSchema.index({ username: 1 });
+// Indexes (email and username already indexed via unique: true)
 UserSchema.index({ status: 1 });
 UserSchema.index({ plan: 1 });
 UserSchema.index({ createdAt: -1 });

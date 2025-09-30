@@ -198,9 +198,7 @@ export const MainAppUserSchema = new mongoose.Schema({
   collection: 'users'
 });
 
-// Indexes
-MainAppUserSchema.index({ email: 1 });
-MainAppUserSchema.index({ username: 1 });
+// Indexes (email and username already indexed via unique: true)
 MainAppUserSchema.index({ status: 1 });
 MainAppUserSchema.index({ plan: 1 });
 MainAppUserSchema.index({ createdAt: -1 });

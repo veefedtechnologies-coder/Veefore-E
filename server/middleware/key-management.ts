@@ -285,12 +285,14 @@ export class KeyRotationManager {
     const daysSinceRotation = (Date.now() - lastRotatedDate.getTime()) / (1000 * 60 * 60 * 24);
     
     // Different rotation intervals by category
-    const rotationIntervals = {
+    const rotationIntervals: Record<string, number> = {
       'oauth': 90,      // 3 months
       'api': 60,        // 2 months  
       'payment': 30,    // 1 month
       'encryption': 90, // 3 months
-      'email': 180      // 6 months
+      'email': 180,     // 6 months
+      'database': 90,   // 3 months
+      'storage': 180    // 6 months
     };
     
     const secret = SECRETS_INVENTORY.find(s => s.name === secretName);
