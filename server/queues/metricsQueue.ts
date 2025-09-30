@@ -4,12 +4,19 @@ import IORedis from 'ioredis';
 // Redis connection status tracking
 let redisConnection: IORedis | null = null;
 let redisAvailable = false;
+let redisQuotaExceeded = false;
 
 // Initialize Redis connection with graceful fallback
 function initializeRedisConnection(): IORedis | null {
   try {
     console.log('🔧 Initializing Redis connection...');
     console.log('🔍 REDIS_URL available:', !!process.env.REDIS_URL);
+    
+    // If quota was already exceeded, don't try to reconnect
+    if (redisQuotaExceeded) {
+      console.log('⚠️  Redis: Quota exceeded, using smart polling system instead');
+      return null;
+    }
     
     let connection: IORedis;
     
@@ -24,6 +31,15 @@ function initializeRedisConnection(): IORedis | null {
         lazyConnect: false, // Connect immediately
         retryDelayOnFailover: 2000,
         enableOfflineQueue: true, // Enable for better background job reliability
+        // Disable automatic reconnection - we'll handle it manually
+        retryStrategy: (times: number) => {
+          // Stop retrying if quota is exceeded
+          if (redisQuotaExceeded) {
+            return null;
+          }
+          // Otherwise retry with exponential backoff
+          return Math.min(times * 1000, 30000);
+        },
         // TLS configuration for Upstash Redis - secure by default
         tls: {
           // Use default certificate validation for production security
@@ -57,7 +73,7 @@ function initializeRedisConnection(): IORedis | null {
 
     // Redis connection event handlers for status monitoring
     connection.on('connect', () => {
-      console.log('🔌 Redis: Attempting connection...');
+      console.log('🔗 Redis connected for job queues');
     });
 
     connection.on('ready', () => {
@@ -66,18 +82,32 @@ function initializeRedisConnection(): IORedis | null {
     });
 
     connection.on('error', (error) => {
-      console.log('❌ Redis: Connection failed -', error.message);
-      console.log('ℹ️  Redis: Falling back to existing smart polling system');
+      // Check if this is a quota exceeded error
+      if (error.message && error.message.includes('max requests limit exceeded')) {
+        if (!redisQuotaExceeded) {
+          console.log('❌ Redis: Quota limit exceeded - permanently disabling Redis');
+          console.log('ℹ️  Redis: App will function normally using smart polling system');
+          redisQuotaExceeded = true;
+          // Disconnect and don't retry
+          connection.disconnect(false);
+        }
+      } else {
+        console.log('❌ Redis: Connection failed -', error.message);
+        console.log('ℹ️  Redis: Falling back to existing smart polling system');
+      }
       redisAvailable = false;
     });
 
     connection.on('close', () => {
-      console.log('🔌 Redis: Connection closed');
+      console.log('🔌 Redis connection closed');
       redisAvailable = false;
     });
 
-    connection.on('reconnecting', (delay) => {
-      console.log(`🔄 Redis: Reconnecting in ${delay}ms...`);
+    connection.on('reconnecting', () => {
+      // Only allow reconnection if quota wasn't exceeded
+      if (redisQuotaExceeded) {
+        connection.disconnect(false);
+      }
     });
 
     return connection;
