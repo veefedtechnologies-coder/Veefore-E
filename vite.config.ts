@@ -49,7 +49,8 @@ export default defineConfig({
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
       'use-sync-external-store/shim',
-      'use-sync-external-store/shim/with-selector'
+      'use-sync-external-store/shim/with-selector',
+      '@tanstack/react-query'
     ],
     exclude: [
       '@react-three/postprocessing'
@@ -60,12 +61,16 @@ export default defineConfig({
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
   },
   resolve: {
-    preserveSymlinks: true,
+    preserveSymlinks: false,
     dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
+      "react": path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime"),
+      "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules/react/jsx-dev-runtime"),
     },
   },
   root: path.resolve(__dirname, "client"),

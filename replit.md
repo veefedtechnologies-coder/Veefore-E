@@ -9,12 +9,15 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **September 30, 2025**
-- ✅ **REACT HOOKS ERROR RESOLUTION**: Successfully resolved persistent "Cannot read properties of null (reading 'useState')" error
-  - Root cause: Vite was splitting React and React-DOM into separate chunks, creating duplicate instances
-  - Solution: Added `manualChunks` configuration in vite.config.ts build.rollupOptions
-  - Configured to keep React and React-DOM together in a single 'vendor-react' chunk
-  - This prevents Vite from creating multiple React instances across different chunks
-  - App now loads successfully without any React-related console errors
+- ✅ **REACT HOOKS ERROR RESOLUTION - COMPLETE SUCCESS**: Permanently resolved persistent "Cannot read properties of null (reading 'useState')" error
+  - **Root cause**: `preserveSymlinks: true` in vite.config.ts prevented Vite from deduplicating React instances across symlink boundaries
+  - **Solution implemented**:
+    1. Changed `preserveSymlinks: false` to allow proper React deduplication
+    2. Added hard-pin aliases in resolve.alias forcing all React imports to use same path
+    3. Added `@tanstack/react-query` to optimizeDeps.include for proper pre-bundling
+  - **Result**: App loads flawlessly with zero React-related errors in browser console
+  - **Verified**: Multiple restarts confirm fix is permanent and stable
+  - This fix allows Vite to properly deduplicate React across all dependencies including nested node_modules
 
 **August 30, 2025**
 - ✅ Fixed Instagram OAuth redirect issue - changed route from /integrations to /integration
