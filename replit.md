@@ -8,6 +8,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**September 30, 2025**
+- ✅ **REACT HOOKS ERROR RESOLUTION**: Successfully resolved persistent "Cannot read properties of null (reading 'useState')" error
+  - Root cause: Vite was creating duplicate React instances through dependency bundling
+  - Solution: Added `force: true` to optimizeDeps to force re-optimization of all dependencies
+  - Included all React-related packages (react, react-dom, react/jsx-runtime, react/jsx-dev-runtime) in optimizeDeps.include
+  - Maintained existing alias and dedupe configurations for React to ensure single instance
+  - App now loads successfully without any React-related console errors
+
 **August 30, 2025**
 - ✅ Fixed Instagram OAuth redirect issue - changed route from /integrations to /integration
 - ✅ Instagram profile pictures now display correctly (fetched from API, not placeholder images)
