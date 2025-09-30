@@ -166,7 +166,9 @@ async function analyzeContentCharacteristics(request: ViralPredictorRequest) {
   // Analyze content patterns and characteristics
   const contentLength = request.content.length;
   const wordCount = request.content.split(' ').length;
-  const hasEmojis = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/u.test(request.content);
+  // Use a simpler emoji detection that works well with bundlers
+  const emojiRegex = new RegExp('[\uD83C-\uDBFF\uDC00-\uDFFF]+', 'g');
+  const hasEmojis = emojiRegex.test(request.content);
   const hasQuestions = request.content.includes('?');
   const hasCallToAction = /\b(like|share|comment|follow|subscribe|tag|dm|check out|link in bio)\b/i.test(request.content);
   const hasHashtags = (request.hashtags?.length || 0) > 0;
