@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import admin from 'firebase-admin';
+import { admin } from '../firebase-admin';
 import crypto from 'crypto';
 
 export interface CookieAuthRequest extends Request {
