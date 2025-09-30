@@ -23,6 +23,10 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Admin Panel Server"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -35,17 +39,28 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "Admin Panel Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd admin-panel && npm run dev"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 24678
-externalPort = 3000
+localPort = 5001
+externalPort = 3002
 
 [[ports]]
-localPort = 35999
-externalPort = 3003
+localPort = 24678
+externalPort = 3000
 
 [[ports]]
 localPort = 40407
