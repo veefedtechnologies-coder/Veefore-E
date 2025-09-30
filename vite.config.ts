@@ -93,9 +93,8 @@ export default defineConfig({
     strictPort: false,
     hmr: {
       protocol: 'wss',
+      host: process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` : undefined,
       clientPort: 443,
-      // Let the browser use the current hostname for WebSocket
-      // This works with Replit's dynamic domain system
     },
     fs: {
       strict: true,
