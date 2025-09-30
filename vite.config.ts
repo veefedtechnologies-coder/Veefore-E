@@ -82,7 +82,14 @@ export default defineConfig({
   },
   server: {
     port: 5000,
-    host: true,
+    host: '0.0.0.0',
+    strictPort: false,
+    hmr: {
+      protocol: 'wss',
+      clientPort: 443,
+      // Let the browser use the current hostname for WebSocket
+      // This works with Replit's dynamic domain system
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],

@@ -82,50 +82,53 @@ function App() {
   // P6: Initialize Frontend SEO, Accessibility & UX System  
   // P7: Initialize Accessibility System
   // P11: Initialize Mobile & Cross-Platform Excellence
+  // Optimized: Defer non-critical initializations to prevent blank page
   useEffect(() => {
-    initializeAccessibilityCompliance()
-    // P11: Initialize mobile excellence system
-    initializeMobileExcellence()
-    
-    // P7: Initialize SEO optimization system
-    initializeSEO()
-    
-    // P7.4: Initialize Core Web Vitals monitoring
-    initializeCoreWebVitals()
-    
-    // P7.5: Initialize accessibility compliance
+    // Critical: Run immediately for accessibility
     initializeAccessibilityCompliance()
     
-    // P7.7: Initialize component modernization
-    initializeComponentModernization()
-    initializeP6System({
-      seo: {
-        defaultTitle: 'VeeFore - AI-Powered Social Media Management',
-        defaultDescription: 'Transform your social media presence with VeeFore\'s AI-powered content creation, automated scheduling, and comprehensive analytics.',
-        siteName: 'VeeFore',
-        twitterHandle: '@VeeFore'
-      },
-      accessibility: {
-        enableScreenReaderSupport: true,
-        enableKeyboardNavigation: true,
-        announceRouteChanges: true
-      },
-      ux: {
-        enableLoadingStates: true,
-        enableToastNotifications: true,
-        autoSaveInterval: 30000
-      },
-      mobile: {
-        enableTouchOptimization: true,
-        enableGestureSupport: true,
-        enablePullToRefresh: true
-      },
-      performance: {
-        enableLazyLoading: true,
-        enableImageOptimization: true,
-        enableWebVitalsMonitoring: true
-      }
-    })
+    // Defer non-critical initializations to prevent blocking render
+    const deferInit = () => {
+      initializeMobileExcellence()
+      initializeSEO()
+      initializeCoreWebVitals()
+      initializeComponentModernization()
+      initializeP6System({
+        seo: {
+          defaultTitle: 'VeeFore - AI-Powered Social Media Management',
+          defaultDescription: 'Transform your social media presence with VeeFore\'s AI-powered content creation, automated scheduling, and comprehensive analytics.',
+          siteName: 'VeeFore',
+          twitterHandle: '@VeeFore'
+        },
+        accessibility: {
+          enableScreenReaderSupport: true,
+          enableKeyboardNavigation: true,
+          announceRouteChanges: true
+        },
+        ux: {
+          enableLoadingStates: true,
+          enableToastNotifications: true,
+          autoSaveInterval: 30000
+        },
+        mobile: {
+          enableTouchOptimization: true,
+          enableGestureSupport: true,
+          enablePullToRefresh: true
+        },
+        performance: {
+          enableLazyLoading: true,
+          enableImageOptimization: true,
+          enableWebVitalsMonitoring: true
+        }
+      })
+    }
+    
+    // Use requestIdleCallback if available, otherwise setTimeout
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(deferInit)
+    } else {
+      setTimeout(deferInit, 1)
+    }
   }, [])
 
   console.log('App component rendering:', { location, user: !!user, loading })
