@@ -88,10 +88,6 @@ initializeOAuthPKCE();
 
 // P2-2 SECURITY: Initialize enhanced token encryption
 import { initializeTokenEncryption, tokenEncryptionMiddleware, scheduleTokenReEncryption } from './security/token-migration';
-(async () => {
-  await initializeTokenEncryption();
-  scheduleTokenReEncryption();
-})();
 
 // P2-3 SECURITY: Initialize webhook signature verification
 import { initializeWebhookSecurity } from './security/webhook-verification';
@@ -959,7 +955,7 @@ app.use((req, res, next) => {
   // Use HTTP server with WebSocket support instead of Express server directly
   // Bind to all interfaces for Replit external access
   console.log(`🚀 Attempting to bind HTTP server to port ${port}...`);
-  httpServer.listen(port, "0.0.0.0", () => {
+  httpServer.listen(port, "0.0.0.0", async () => {
     console.log(`✅ HTTP Server successfully bound to port ${port}`);
     log(`serving on port ${port} with WebSocket support`);
     log(`External URL: https://${process.env.REPL_SLUG || 'app'}.${process.env.REPL_OWNER || 'user'}.repl.co`);
@@ -975,6 +971,14 @@ app.use((req, res, next) => {
     });
     
     console.log('🔄 P9: Graceful shutdown system initialized');
+    
+    // P2-2 SECURITY: Initialize token encryption AFTER server starts
+    try {
+      await initializeTokenEncryption();
+      scheduleTokenReEncryption();
+    } catch (error) {
+      console.error('⚠️ P2-2: Token encryption initialization failed:', error);
+    }
   });
 })().catch((error) => {
   console.error('❌ Server startup failed:', error);

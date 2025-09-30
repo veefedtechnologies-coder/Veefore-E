@@ -39,7 +39,11 @@ const getAllowedOrigins = (): string[] => {
       'https://veefore.com',
       'https://www.veefore.com',
       'https://app.veefore.com',
-      'https://dashboard.veefore.com'
+      'https://dashboard.veefore.com',
+      // Allow localhost for same-server requests (Replit production environment)
+      'http://localhost:5000',
+      'http://127.0.0.1:5000',
+      'http://0.0.0.0:5000'
     );
   }
   

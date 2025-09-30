@@ -220,23 +220,27 @@ export async function initializeTokenEncryption(): Promise<void> {
  * P2-2.4: Scheduled token re-encryption (security hygiene)
  */
 export function scheduleTokenReEncryption(): void {
-  // Re-encrypt all tokens monthly for security hygiene
-  const REENCRYPTION_INTERVAL = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-  // Only schedule in production, skip in development to avoid console spam
-  if (process.env.NODE_ENV === 'production') {
-    setInterval(async () => {
-      console.log('🔐 P2-2: Starting scheduled token re-encryption...');
-      try {
-        await TokenMigrationService.migrateSocialAccountTokens();
-        console.log('✅ P2-2: Scheduled token re-encryption completed');
-      } catch (error) {
-        console.error('🚨 P2-2: Scheduled token re-encryption failed:', error);
-      }
-    }, REENCRYPTION_INTERVAL);
-
-    console.log('🔐 P2-2: Scheduled token re-encryption initialized (monthly)');
-  } else {
-    console.log('🔐 P2-2: Token re-encryption scheduling skipped in development mode');
-  }
+  // TEMPORARILY DISABLED: This function was causing an infinite loop
+  // TODO: Fix the scheduling mechanism before re-enabling
+  console.log('🔐 P2-2: Token re-encryption scheduling temporarily disabled due to infinite loop bug');
+  
+  // // Re-encrypt all tokens monthly for security hygiene
+  // const REENCRYPTION_INTERVAL = 30 * 24 * 60 * 60 * 1000; // 30 days
+  //
+  // // Only schedule in production, skip in development to avoid console spam
+  // if (process.env.NODE_ENV === 'production') {
+  //   setInterval(async () => {
+  //     console.log('🔐 P2-2: Starting scheduled token re-encryption...');
+  //     try {
+  //       await TokenMigrationService.migrateSocialAccountTokens();
+  //       console.log('✅ P2-2: Scheduled token re-encryption completed');
+  //     } catch (error) {
+  //       console.error('🚨 P2-2: Scheduled token re-encryption failed:', error);
+  //     }
+  //   }, REENCRYPTION_INTERVAL);
+  //
+  //   console.log('🔐 P2-2: Scheduled token re-encryption initialized (monthly)');
+  // } else {
+  //   console.log('🔐 P2-2: Token re-encryption scheduling skipped in development mode');
+  // }
 }
