@@ -36,7 +36,6 @@ export async function setupVite(app: Express, server: Server) {
     port: 5000,
     strictPort: true,
     cors: true,
-    force: true, // Force dependency re-optimization
   };
 
   const vite = await createViteServer({

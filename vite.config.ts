@@ -49,13 +49,12 @@ export default defineConfig({
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
       'use-sync-external-store/shim',
-      'use-sync-external-store/shim/with-selector',
-      '@tanstack/react-query'
+      'use-sync-external-store/shim/with-selector'
     ],
     exclude: [
-      '@react-three/postprocessing'
-    ],
-    force: true
+      '@react-three/postprocessing',
+      '@tanstack/react-query'
+    ]
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
