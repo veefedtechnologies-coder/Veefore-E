@@ -43,7 +43,6 @@ export default defineConfig({
       : []),
   ],
   optimizeDeps: {
-    force: true,
     include: [
       'react',
       'react-dom',
@@ -57,7 +56,8 @@ export default defineConfig({
       '@tanstack/react-query',
       'wouter'
     ],
-    exclude: ['@react-three/postprocessing']
+    exclude: ['@react-three/postprocessing'],
+    force: true
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')

@@ -1,0 +1,33 @@
+[vite] connecting...
+[vite] failed to connect to websocket (Error: WebSocket closed without opened.). 
+WebSocket closed without opened.
+🔥 Firebase Config: 
+Object {apiKey: "✅ SET", projectId: "✅ SET", appId: "✅ SET", authDomain: "veefore-b84c8.firebaseapp.com"}
+⚠️ Firebase environment variables not set. Using demo values. Please set VITE_FIREBASE_* variables.
+🌐 Current domain: ba558a73-cb16-4658-938f-80c18363cc87-00-g5fd72rik685.riker.replit.dev
+🔧 Using authDomain: veefore-b84c8.firebaseapp.com
+🔧 Full URL: https://ba558a73-cb16-4658-938f-80c18363cc87-00-g5fd72rik685.riker.replit.dev/
+ℹ️ Running on custom domain: ba558a73-cb16-4658-938f-80c18363cc87-00-g5fd72rik685.riker.replit.dev
+ℹ️ Firebase authDomain is always firebaseapp.com for OAuth flows
+🔥 Firebase App Initialized: 
+FirebaseAppImpl {_isDeleted: false, _options: {…}, _config: {…}, _name: "[DEFAULT]", _automaticDataCollectionEnabled: true, …}
+🔥 Firebase Auth Initialized: 
+AuthImpl {app: FirebaseAppImpl, heartbeatServiceProvider: Provider, appCheckServiceProvider: Provider, config: {…}, currentUser: null, …}
+🔥 Firebase Persistence Set
+🔥 Google Provider Created: 
+_GoogleAuthProvider {providerId: "google.com", defaultLanguageCode: null, customParameters: {…}, scopes: Array(1)}
+React availability check: 
+Object {React: "object", createRoot: "function", useState: "function", QueryClientProvider: "function"}
+Rendering React app...
+React app rendered successfully
+Warning: Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:
+1. You might have mismatching versions of React and the renderer (such as React DOM)
+2. You might be breaking the Rules of Hooks
+3. You might have more than one copy of React in the same app
+See https://reactjs.org/link/invalid-hook-call for tips about how to debug and fix this problem.
+Cannot read properties of null (reading 'useState')
+Warning: Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:
+1. You might have mismatching versions of React and the renderer (such as React DOM)
+2. You might be breaking the Rules of Hooks
+3. You might have more than one copy of React in the same app
+See https://reactjs.org/link/invalid-hook-call for tips about how to debug and fix this problem.
