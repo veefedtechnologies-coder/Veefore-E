@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Route, Switch, useLocation } from 'wouter'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
@@ -326,6 +326,8 @@ function App() {
           <GlobalLandingPage />
         ) : !user && hasFirebaseAuth ? (
           <LoadingSpinner />
+        ) : userDataLoading ? (
+          <LoadingSpinner />
         ) : user && userData ? (
           // ONBOARDED users see dashboard
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
@@ -425,6 +427,12 @@ function App() {
               />
             )}
           </div>
+        ) : user && !userData && !userDataLoading ? (
+          // If user exists but userData failed to load, redirect to signin
+          <>
+            {setLocation('/signin')}
+            <LoadingSpinner />
+          </>
         ) : (
           <LoadingSpinner />
         )}
