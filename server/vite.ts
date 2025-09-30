@@ -27,12 +27,10 @@ export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
     hmr: { 
-      server,
-      port: 5000,
-      host: 'localhost'
+      server
     },
     allowedHosts: true,
-    host: '0.0.0.0', // Allow external connections (Cloudflare tunnel)
+    host: '0.0.0.0',
     port: 5000,
     strictPort: true,
     cors: true,
