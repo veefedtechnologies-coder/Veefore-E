@@ -208,7 +208,9 @@ export class VideoCompressor {
       }
 
       // Check frame rate (Instagram: max 30fps)
-      const fps = eval(videoStream.r_frame_rate || '30/1');
+      const fpsString = videoStream.r_frame_rate || '30/1';
+      const [num, den] = fpsString.split('/').map(Number);
+      const fps = den ? num / den : num;
       if (fps > 30) {
         errors.push(`Frame rate too high (${fps}fps, maximum 30fps)`);
       }
