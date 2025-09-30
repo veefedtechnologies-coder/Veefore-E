@@ -372,21 +372,24 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Load Vite modules conditionally
+  // Load Vite modules conditionally based on environment
   try {
-    if (!isProduction) {
-      console.log('[DEV] Loading Vite modules for development...');
+    if (isDevelopment) {
+      console.log('[DEV] Loading Vite development modules...');
       const viteModule = await import("./vite");
       log = viteModule.log;
       setupVite = viteModule.setupVite;
-      serveStatic = viteModule.serveStatic;
-      console.log('[DEV] Vite modules loaded successfully');
+      console.log('[DEV] Vite development modules loaded successfully');
     } else {
-      console.log('[PRODUCTION] Using production mode - Vite modules not loaded');
+      console.log('[PRODUCTION] Loading production modules...');
       log = fallbackLog;
+      // Only import serveStatic for production - setupVite will never be loaded
+      const viteModule = await import("./vite");
+      serveStatic = viteModule.serveStatic;
+      console.log('[PRODUCTION] Production modules loaded successfully');
     }
   } catch (error) {
-    console.warn('[WARN] Vite modules not available, using fallback log function:', (error as Error).message);
+    console.warn('[WARN] Vite modules not available, using fallback:', (error as Error).message);
     log = fallbackLog;
   }
   

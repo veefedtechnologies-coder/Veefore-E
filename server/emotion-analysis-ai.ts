@@ -385,7 +385,9 @@ function analyzeContentStructure(content: string, contentType: string) {
   // Social media elements
   structure.hasHashtags = /#\w+/g.test(content);
   structure.hasMentions = /@\w+/g.test(content);
-  structure.hasEmojis = /[\u{1F600}-\u{1F64F}]|[\\u{1F300}-\u{1F5FF}]|[\u{1F680}-\\u{1F6FF}]|[\\u{1F1E0}-\\u{1F1FF}]/u.test(content);
+  // Use a simpler emoji detection that works well with bundlers
+  const emojiRegex = new RegExp('[\uD83C-\uDBFF\uDC00-\uDFFF]+', 'g');
+  structure.hasEmojis = emojiRegex.test(content);
   
   return structure;
 }

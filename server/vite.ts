@@ -24,9 +24,9 @@ export async function setupVite(app: Express, server: Server) {
     throw new Error('setupVite should only be called in development mode');
   }
 
-  const [{ createServer: createViteServer, createLogger }, viteConfig, { nanoid }] = await Promise.all([
+  // Import Vite and nanoid dynamically - no need to import vite.config
+  const [{ createServer: createViteServer, createLogger }, { nanoid }] = await Promise.all([
     import('vite'),
-    import('../vite.config.js'),
     import('nanoid')
   ]);
 
@@ -42,9 +42,8 @@ export async function setupVite(app: Express, server: Server) {
     cors: true,
   };
 
+  // Let Vite load its own config file automatically
   const vite = await createViteServer({
-    ...viteConfig.default,
-    configFile: false,
     customLogger: {
       ...viteLogger,
       error: (msg: string, options?: any) => {
@@ -80,7 +79,7 @@ export async function setupVite(app: Express, server: Server) {
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid.nanoid()}"`,
+        `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
@@ -101,6 +100,7 @@ export function serveStatic(app: Express) {
     );
   }
 
+  console.log('[PRODUCTION] Serving static files from:', distPath);
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
