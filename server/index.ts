@@ -487,10 +487,11 @@ app.use((req, res, next) => {
   // Start the background scheduler service
   startSchedulerService(storage as any);
   
-  // Auto-sync enabled to fetch Instagram metrics (followers, engagement, etc.)
-  console.log('[AUTO SYNC] Starting automatic Instagram sync service...');
-  const autoSyncService = new AutoSyncService(storage);
-  autoSyncService.start();
+  // Start comprehensive Instagram Smart Polling for metrics
+  console.log('[SMART POLLING] Starting comprehensive Instagram Smart Polling system...');
+  const { InstagramSmartPolling } = await import('./instagram-smart-polling');
+  const smartPolling = new InstagramSmartPolling(storage);
+  console.log('[SMART POLLING] ✅ Smart Polling initialized with adaptive rate limiting');
   
   const server = await registerRoutes(app, storage as any, upload);
   
