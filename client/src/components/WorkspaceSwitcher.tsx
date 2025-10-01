@@ -83,14 +83,17 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
     staleTime: 5 * 60 * 1000 // 5 minutes
   })
 
+  // Ensure workspaces is always an array (defensive programming)
+  const safeWorkspaces = Array.isArray(workspaces) ? workspaces : []
+
   // Get current workspace
-  const currentWorkspace = workspaces.find((ws: Workspace) => 
+  const currentWorkspace = safeWorkspaces.find((ws: Workspace) => 
     currentWorkspaceId ? ws.id === currentWorkspaceId : ws.isDefault
-  ) || workspaces.find((ws: Workspace) => ws.isDefault) || workspaces[0]
+  ) || safeWorkspaces.find((ws: Workspace) => ws.isDefault) || safeWorkspaces[0]
 
   // Advanced workspace switching with beautiful animation
   const handleWorkspaceSwitch = async (workspaceId: string) => {
-    const workspace = workspaces.find((ws: Workspace) => ws.id === workspaceId)
+    const workspace = safeWorkspaces.find((ws: Workspace) => ws.id === workspaceId)
     if (!workspace) return
     
     // Start beautiful transition
@@ -194,14 +197,14 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
               </Button>
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              {workspaces.length} workspace{workspaces.length !== 1 ? 's' : ''} available
+              {safeWorkspaces.length} workspace{safeWorkspaces.length !== 1 ? 's' : ''} available
             </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         
         <div className="space-y-1">
-          {workspaces.map((workspace: Workspace) => (
+          {safeWorkspaces.map((workspace: Workspace) => (
             <DropdownMenuItem
               key={workspace.id}
               onClick={() => handleWorkspaceSwitch(workspace.id)}
