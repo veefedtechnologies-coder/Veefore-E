@@ -131,7 +131,8 @@ export class InstagramSmartPolling {
         try {
           console.log(`[SMART POLLING] Scanning workspace: ${workspace.id} (${workspace.name || 'Unnamed'})`);
           
-          const accounts = await this.storage.getSocialAccountsByWorkspace(workspace.id.toString());
+          // Use internal method that returns decrypted tokens
+          const accounts = await (this.storage as any).getSocialAccountsWithTokensInternal(workspace.id.toString());
           const instagramAccounts = accounts.filter(acc => 
             acc.platform === 'instagram' && 
             acc.accessToken && 
