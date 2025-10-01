@@ -7,17 +7,20 @@
 import { z } from 'zod';
 import { safeJsonParse } from './validation';
 
-// Schema for Instagram state data validation
+// Schema for Instagram state data validation (PostgreSQL uses numeric IDs)
 export const instagramStateSchema = z.object({
-  workspaceId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid workspace ID'),
-  source: z.enum(['integration', 'oauth', 'callback']).optional(),
+  workspaceId: z.union([z.number(), z.string()]), // Accept both numeric and string IDs
+  userId: z.union([z.number(), z.string()]).optional(),
+  timestamp: z.number().optional(),
+  source: z.string().optional(),
   returnUrl: z.string().url().optional()
 });
 
-// Schema for OAuth callback state validation
+// Schema for OAuth callback state validation (PostgreSQL uses numeric IDs)
 export const oauthStateSchema = z.object({
-  workspaceId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid workspace ID'),
-  service: z.enum(['instagram', 'facebook', 'youtube', 'twitter', 'linkedin']),
+  workspaceId: z.union([z.number(), z.string()]), // Accept both numeric and string IDs
+  userId: z.union([z.number(), z.string()]).optional(),
+  service: z.enum(['instagram', 'facebook', 'youtube', 'twitter', 'linkedin']).optional(),
   returnUrl: z.string().url().optional(),
   timestamp: z.number().optional()
 });
@@ -165,16 +168,16 @@ export function migrateUnsafeJsonParse<T>(
  * P1-4.2: Validation for common request patterns
  */
 
-// Validate workspace access in query parameters
+// Validate workspace access in query parameters (PostgreSQL uses numeric IDs)
 export function validateWorkspaceInQuery(query: any): {
   success: true;
-  workspaceId: string;
+  workspaceId: string | number;
 } | {
   success: false;
   error: string;
 } {
   const schema = z.object({
-    workspaceId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid workspace ID format')
+    workspaceId: z.union([z.number(), z.string(), z.coerce.number()])
   });
   
   const result = schema.safeParse(query);
