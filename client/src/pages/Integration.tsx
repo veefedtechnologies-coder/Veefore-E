@@ -128,7 +128,7 @@ export default function Integration() {
 function IntegrationContent() {
   const queryClient = useQueryClient()
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
-  // const [isProcessingOAuth, setIsProcessingOAuth] = useState(false)
+  const [isProcessingOAuth, setIsProcessingOAuth] = useState(false)
   const [errorModal, setErrorModal] = useState<{
     isOpen: boolean
     title: string
