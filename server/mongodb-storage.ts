@@ -1364,6 +1364,37 @@ export class MongoStorage implements IStorage {
     return accounts.map(account => this.convertSocialAccount(account));
   }
 
+  /**
+   * INTERNAL USE ONLY: Get social accounts with decrypted tokens
+   * This method exposes actual tokens and should ONLY be used by internal services
+   * like auto-sync, NOT for API responses to clients
+   */
+  async getSocialAccountsWithTokensInternal(workspaceId: string): Promise<any[]> {
+    await this.connect();
+    
+    const accounts = await SocialAccountModel.find({
+      workspaceId: workspaceId.toString(),
+      isActive: true
+    });
+    
+    return accounts.map(account => ({
+      id: account._id.toString(),
+      workspaceId: account.workspaceId,
+      platform: account.platform,
+      username: account.username,
+      accountId: account.accountId,
+      // Decrypt tokens for internal use
+      accessToken: this.getAccessTokenFromAccount(account),
+      refreshToken: this.getRefreshTokenFromAccount(account),
+      expiresAt: account.expiresAt,
+      isActive: account.isActive,
+      followersCount: account.followersCount,
+      mediaCount: account.mediaCount,
+      profilePictureUrl: account.profilePictureUrl,
+      lastSyncAt: account.lastSyncAt
+    }));
+  }
+
   async getAllSocialAccounts(): Promise<SocialAccount[]> {
     await this.connect();
     

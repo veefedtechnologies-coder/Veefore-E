@@ -99,7 +99,8 @@ class AutoSyncService {
         try {
           console.log(`[AUTO SYNC] Scanning workspace: ${workspace.id} (${workspace.name || 'Unnamed'})`);
           
-          const socialAccounts = await this.storage.getSocialAccountsByWorkspace(workspace.id.toString());
+          // Use internal method that returns decrypted tokens
+          const socialAccounts = await (this.storage as any).getSocialAccountsWithTokensInternal(workspace.id.toString());
           const instagramAccounts = socialAccounts.filter(
             (acc: any) => acc.platform === 'instagram' && acc.isActive && acc.accessToken
           );
