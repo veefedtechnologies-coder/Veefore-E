@@ -257,15 +257,6 @@ function App() {
   if (!user && protectedRoutes.some(route => location.startsWith(route))) {
     return <LoadingSpinner />
   }
-  
-  // If we have evidence of existing authentication but no user yet, show loading
-  const hasFirebaseAuth = Object.keys(localStorage).some(key => 
-    key.includes('firebase:authUser') && localStorage.getItem(key)
-  )
-  
-  if (hasFirebaseAuth && !user && loading) {
-    return <LoadingSpinner />
-  }
 
   const handleCreateOptionSelect = (option: string) => {
     setIsCreateDropdownOpen(false)
@@ -353,9 +344,9 @@ function App() {
 
       {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
       <Route path="/">
-        {!user && !hasFirebaseAuth ? (
+        {!user && !hasFirebaseAuthInStorage ? (
           <GlobalLandingPage />
-        ) : !user && hasFirebaseAuth ? (
+        ) : !user && hasFirebaseAuthInStorage ? (
           <LoadingSpinner />
         ) : user && userData ? (
           // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
