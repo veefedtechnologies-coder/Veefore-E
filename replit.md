@@ -44,6 +44,14 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Historical Analytics Data Fix
+- ✅ **FIX**: Fixed historical analytics endpoint to use correct storage method (`getAnalytics` instead of `getAnalyticsByWorkspace`)
+- ✅ Fixed workspace ID parameter type (MongoDB uses string ObjectIds, not integers)
+- ✅ Identified root cause of missing historical data: Instagram account access token cannot be decrypted
+- **Status**: Historical analytics endpoint is now working correctly
+- **Action Required**: User must reconnect Instagram account in settings to enable smart polling data collection
+- **Smart Polling**: System automatically creates daily analytics snapshots when valid access token is present
+
 ### 2025-10-02: Animation Performance Optimization
 - ✅ **CRITICAL FIX**: Fixed fluctuating/janky animations throughout the app
 - ✅ Added useRef guards to App.tsx initialization effects (P6, SEO, accessibility, mobile, web vitals)
