@@ -144,6 +144,11 @@ function App() {
     staleTime: 30000, // Consider fresh for 30 seconds
   })
   
+  // Check for Firebase auth in localStorage
+  const hasFirebaseAuthInStorage = Object.keys(localStorage).some(key => 
+    key.includes('firebase:authUser') && localStorage.getItem(key)
+  )
+  
   // Debug: Log all auth state values
   console.log('🔍 AUTH STATE:', { 
     hasUser: !!user, 
@@ -151,8 +156,24 @@ function App() {
     userDataLoading,
     userDataError: !!userDataError,
     firebaseLoading: loading,
+    hasFirebaseAuth: hasFirebaseAuthInStorage,
     location 
   })
+  
+  // Debug: Determine which render path will be taken
+  let renderPath = 'unknown'
+  if (hasFirebaseAuthInStorage && !user && loading) {
+    renderPath = 'EARLY_RETURN_LOADING'
+  } else if (!user && !hasFirebaseAuthInStorage) {
+    renderPath = 'LANDING_PAGE'
+  } else if (!user && hasFirebaseAuthInStorage) {
+    renderPath = 'LOADING_NO_USER'
+  } else if (user && userData) {
+    renderPath = 'DASHBOARD'
+  } else if (userDataLoading) {
+    renderPath = 'LOADING_USERDATA'
+  }
+  console.log('🎯 RENDER PATH:', renderPath)
 
   // Pre-fetch workspaces data for faster navigation
   const { data: workspaces } = useQuery({
