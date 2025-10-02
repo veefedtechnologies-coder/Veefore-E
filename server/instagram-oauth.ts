@@ -78,11 +78,25 @@ export class InstagramOAuthService {
       console.log(`✅ Instagram account @${userProfile.username} is available for connection`);
 
       // Store or update social account
-      await this.storeSocialAccount(workspaceId, {
+      const accountData = {
         ...userProfile,
         accessToken: longLivedData.access_token,
         expiresAt: new Date(Date.now() + longLivedData.expires_in * 1000),
-      });
+      };
+      
+      await this.storeSocialAccount(workspaceId, accountData);
+
+      // Immediately sync real Instagram data (followers, posts, engagement, etc.)
+      try {
+        console.log('[INSTAGRAM OAUTH] 🔄 Triggering immediate sync for newly connected account...');
+        const { InstagramDirectSync } = await import('./instagram-direct-sync');
+        const sync = new InstagramDirectSync(this.storage);
+        await sync.syncInstagramAccount(userProfile.accountId, longLivedData.access_token);
+        console.log('[INSTAGRAM OAUTH] ✅ Initial sync completed successfully');
+      } catch (syncError) {
+        console.error('[INSTAGRAM OAUTH] ⚠️ Initial sync failed (will retry via smart polling):', syncError);
+        // Don't fail the OAuth flow if sync fails - smart polling will retry
+      }
 
       return userProfile;
 
