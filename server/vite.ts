@@ -44,7 +44,7 @@ export async function setupVite(app: Express, server: Server) {
     cors: true,
   };
 
-  // Let Vite load its own config file automatically
+  // Let Vite load its own config file automatically - vite.config.ts handles root directory
   const vite = await createViteServer({
     customLogger: {
       ...viteLogger,
