@@ -33,15 +33,11 @@ export default defineConfig({
   },
   resolve: {
     preserveSymlinks: false,
-    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
+    dedupe: ['react', 'react-dom'],
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
-      "react": path.resolve(__dirname, "node_modules/react"),
-      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
-      "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime"),
-      "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules/react/jsx-dev-runtime"),
     },
   },
   root: path.resolve(__dirname, "client"),
