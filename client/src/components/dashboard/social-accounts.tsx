@@ -21,7 +21,7 @@ export function SocialAccounts() {
     enabled: !!currentWorkspace?.id,
     refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes before marking as stale
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes before marking as stale (faster updates)
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnMount: false, // Don't refetch on mount - rely on cache
     refetchOnReconnect: true, // Refresh when network reconnects

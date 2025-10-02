@@ -1,5 +1,6 @@
 import { IStorage } from './storage';
 import { DashboardCache } from './dashboard-cache';
+import { RealtimeService } from './services/realtime';
 
 interface RateLimitTracker {
   requestCount: number;
@@ -442,7 +443,25 @@ export class InstagramSmartPolling {
         });
 
         // Clear dashboard cache to force refresh
-        await this.dashboardCache.clearCache(config.workspaceId);
+        this.dashboardCache.clearWorkspaceCache(config.workspaceId);
+        
+        // Broadcast WebSocket event to notify frontend of data update
+        RealtimeService.broadcastToWorkspace(config.workspaceId, 'instagram_data_update', {
+          accountId: config.accountId,
+          username: config.username,
+          followersCount: newFollowerCount,
+          mediaCount: mediaCount,
+          accountType: realAccountType,
+          avgLikes: engagementMetrics.avgLikes,
+          avgComments: engagementMetrics.avgComments,
+          engagementRate: engagementMetrics.engagementRate,
+          totalLikes: engagementMetrics.totalLikes,
+          totalComments: engagementMetrics.totalComments,
+          lastSyncAt: new Date(),
+          changes: changes
+        });
+        
+        console.log(`[SMART POLLING] 📡 Broadcasted instagram_data_update event to workspace ${config.workspaceId}`);
         
         // Reset consecutive no-changes counter and update tracked values
         config.consecutiveNoChanges = 0;
