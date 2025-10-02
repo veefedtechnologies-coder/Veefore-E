@@ -44,6 +44,12 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Firebase Session Persistence Fix
+- ✅ **CRITICAL FIX**: Added proper error handling for `setPersistence` Promise in firebase.ts
+- ✅ Firebase auth sessions now persist correctly across page refreshes
+- ✅ Users no longer lose authentication state when refreshing the page
+- ✅ Eliminated race condition between persistence setup and auth initialization
+
 ### 2025-10-02: Authentication Flow Bug Fixes
 - ✅ Fixed critical signup bug where users got stuck on loading screen
 - ✅ Added proper error handling for `/api/auth/link-firebase` endpoint
