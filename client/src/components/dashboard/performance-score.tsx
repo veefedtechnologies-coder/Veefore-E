@@ -5,7 +5,7 @@ import { apiRequest } from '@/lib/queryClient'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, Sparkles, Users, Heart, MessageCircle, Share, Eye, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { TrendingUp, Sparkles, Users, Heart, MessageCircle, Share, Eye, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react'
 
 export function PerformanceScore() {
   const [, setLocation] = useLocation()
@@ -399,53 +399,53 @@ export function PerformanceScore() {
       })()}
 
       <CardContent className="space-y-8">
-        {/* Reconnect Warning Banner - Show when any platform is missing access token */}
-        {socialAccounts?.some((account: any) => !account.hasAccessToken && !account.accessToken) && (
-          <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 border-2 border-orange-200 dark:border-orange-600 rounded-2xl p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 dark:text-gray-100">Reconnect Account Required</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Your Instagram access token is missing. Reconnect to see your real followers, posts, and engagement data.
-                  </p>
-                </div>
+        {/* Show Reconnect Prompt in Center if Access Token Missing - Replaces All Data */}
+        {socialAccounts?.some((account: any) => !account.hasAccessToken && !account.accessToken) ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center max-w-md">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center">
+                <RefreshCw className="w-10 h-10 text-orange-600 dark:text-orange-400" />
               </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                Reconnect Your Instagram Account
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                Your access token is missing or expired. Reconnect your account to start seeing your real followers, posts, and engagement data.
+              </p>
               <Button
                 onClick={() => setLocation('/settings')}
-                variant="outline"
-                size="sm"
-                className="bg-orange-500 hover:bg-orange-600 text-white border-orange-600 dark:border-orange-500"
+                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg text-lg"
               >
+                <RefreshCw className="w-5 h-5 mr-2" />
                 Reconnect Now
               </Button>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-6">
+                After reconnecting, your performance metrics will appear here automatically
+              </p>
             </div>
           </div>
-        )}
-
-        {/* Connected Platforms Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Connected Platforms</h3>
-            <div className="flex items-center space-x-2">
-              {connectedPlatforms.map((platform: any) => (
-                <div key={platform.name} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm">
-                  {platform.logo}
+        ) : (
+          <>
+            {/* Connected Platforms Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Connected Platforms</h3>
+                <div className="flex items-center space-x-2">
+                  {connectedPlatforms.map((platform: any) => (
+                    <div key={platform.name} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm">
+                      {platform.logo}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span>{connectedPlatforms.length} Active</span>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span>{connectedPlatforms.length} Active</span>
-          </div>
-        </div>
 
-        {/* Main Metrics Grid or Connect Platforms Call-to-Action */}
-        {connectedPlatforms.length > 0 ? (
+            {/* Main Metrics Grid or Connect Platforms Call-to-Action */}
+            {connectedPlatforms.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {/* Total Followers */}
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl p-4 relative overflow-hidden">
@@ -739,6 +739,8 @@ export function PerformanceScore() {
             </div>
           </div>
         </div>
+          </>
+        )}
       </CardContent>
     </Card>
   )
