@@ -15,16 +15,17 @@ export function SocialAccounts() {
   const { currentWorkspace } = useCurrentWorkspace()
   
   // Fetch social accounts data for current workspace - HYBRID: Webhooks + Smart Polling
-  const { data: socialAccounts, isLoading, refetch: refetchAccounts } = useQuery({
+  const { data: socialAccounts, isLoading, isFetching, refetch: refetchAccounts } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id],
     queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
     enabled: !!currentWorkspace?.id,
     refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes - webhooks provide immediate updates for comments/mentions
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes before marking as stale
     refetchOnWindowFocus: true, // Refresh when user returns to tab
-    refetchOnMount: true, // Always fetch fresh data on mount
+    refetchOnMount: false, // Don't refetch on mount - rely on cache
     refetchOnReconnect: true, // Refresh when network reconnects
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
     placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 

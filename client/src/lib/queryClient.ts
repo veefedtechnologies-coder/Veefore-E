@@ -1,4 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
+import { persistQueryClient } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 
 // Create a client
 export const queryClient = new QueryClient({
@@ -11,8 +13,21 @@ export const queryClient = new QueryClient({
       refetchOnMount: false, // Don't refetch when component mounts
       refetchInterval: false, // Disable automatic polling
       refetchIntervalInBackground: false, // Disable background polling
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
     },
   },
+})
+
+// Create persister for localStorage
+const localStoragePersister = createSyncStoragePersister({
+  storage: window.localStorage,
+})
+
+// Persist the query client to localStorage
+persistQueryClient({
+  queryClient,
+  persister: localStoragePersister,
+  maxAge: 1000 * 60 * 60 * 24, // 24 hours
 })
 
 // Get the correct API base URL based on current environment
