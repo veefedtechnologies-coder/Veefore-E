@@ -614,8 +614,10 @@ app.use((req, res, next) => {
       console.log('⚠️ Rate Limiting: Redis not available, using memory-based fallbacks');
     }
     
-    await MetricsWorker.start();
-    console.log('✅ MetricsWorker started with Redis queue system');
+    // TEMPORARILY DISABLED: MetricsWorker disabled due to Redis quota limits
+    // await MetricsWorker.start();
+    console.log('⚠️  MetricsWorker: Disabled to prevent Redis quota exceeded errors');
+    console.log('📊 Instagram metrics continue via existing smart polling system');
   } catch (error) {
     console.log('⚠️  MetricsWorker: Redis unavailable, using smart polling fallback');
     console.log('📊 Instagram metrics continue via existing polling system');
