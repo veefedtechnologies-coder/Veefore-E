@@ -65,7 +65,7 @@ export function PerformanceScore() {
   }
   
   // Fetch real dashboard analytics data for current workspace - PRODUCTION-SAFE
-  const { data: analytics, isLoading } = useQuery({
+  const { data: analytics, isLoading, isFetching } = useQuery({
     queryKey: ['/api/dashboard/analytics', currentWorkspace?.id],
     queryFn: () => currentWorkspace?.id ? apiRequest(`/api/dashboard/analytics?workspaceId=${currentWorkspace.id}`) : Promise.resolve({}),
     enabled: !!currentWorkspace?.id,
@@ -73,7 +73,9 @@ export function PerformanceScore() {
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes - webhooks provide immediate updates for comments/mentions
+    refetchOnMount: false, // Don't refetch on mount - rely on cache
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes before marking as stale
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
     placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 
@@ -86,7 +88,9 @@ export function PerformanceScore() {
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes - webhooks provide immediate updates for comments/mentions
+    refetchOnMount: false, // Don't refetch on mount - rely on cache
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes before marking as stale
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
     placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 
@@ -99,7 +103,9 @@ export function PerformanceScore() {
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes - webhooks provide immediate updates for comments/mentions
+    refetchOnMount: false, // Don't refetch on mount - rely on cache
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes before marking as stale
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
     placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 
