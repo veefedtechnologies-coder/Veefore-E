@@ -328,10 +328,8 @@ function App() {
           <GlobalLandingPage />
         ) : !user && hasFirebaseAuth ? (
           <LoadingSpinner />
-        ) : userDataLoading ? (
-          <LoadingSpinner />
         ) : user && userData ? (
-          // ONBOARDED users see dashboard
+          // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
             {/* Sidebar - Fixed height with independent scrolling */}
             <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
@@ -429,6 +427,8 @@ function App() {
               />
             )}
           </div>
+        ) : userDataLoading ? (
+          <LoadingSpinner />
         ) : user && !userData && !userDataLoading && userDataError ? (
           // If user exists but userData failed to load after retries, show error
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
