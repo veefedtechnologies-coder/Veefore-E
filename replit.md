@@ -44,6 +44,17 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Authentication Flow Bug Fixes
+- ✅ Fixed critical signup bug where users got stuck on loading screen
+- ✅ Added proper error handling for `/api/auth/link-firebase` endpoint
+- ✅ Implemented 15-second timeout protection with AbortController
+- ✅ Added retry logic (3 attempts) for user data loading in App.tsx
+- ✅ Improved signin flow with better error handling
+- ✅ Added helpful error UI for failed user data loads with retry button
+- ✅ Fixed exponential backoff retry delay (1s, 2s, 4s) for robustness
+- ✅ Timeout errors now properly reset UI state and show actionable toast
+- ✅ AbortController cancels stuck requests server-side
+
 ### 2025-10-02: Replit Environment Setup
 - ✅ Configured port routing (admin panel on 8000, main app on 5000)
 - ✅ Fixed OpenAI client initialization (lazy loading pattern)
