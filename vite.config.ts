@@ -9,39 +9,11 @@ const __dirname = path.dirname(__filename);
 // Check if we're in Replit environment
 const isReplit = process.env.REPL_ID !== undefined;
 
-// Build plugins array conditionally
+// Build plugins array - use dynamic imports for Replit plugins
 const plugins = [react()];
 
-// Only add Replit plugins if in Replit environment
-if (isReplit) {
-  try {
-    // This will only work in Replit, gracefully skip in local development
-    const runtimeErrorOverlay = require("@replit/vite-plugin-runtime-error-modal");
-    plugins.push(runtimeErrorOverlay.default());
-  } catch (e) {
-    console.log('[VITE] Replit runtime error overlay not available (local development)');
-  }
-}
-
 export default defineConfig({
-  plugins: [
-    ...plugins,
-    ...(process.env.NODE_ENV !== "production" &&
-    isReplit
-      ? [
-          // Conditionally load cartographer only in Replit
-          (() => {
-            try {
-              const cartographer = require("@replit/vite-plugin-cartographer");
-              return cartographer.cartographer();
-            } catch (e) {
-              console.log('[VITE] Replit cartographer not available (local development)');
-              return null;
-            }
-          })()
-        ].filter(Boolean)
-      : []),
-  ],
+  plugins,
   optimizeDeps: {
     include: [
       'react',
