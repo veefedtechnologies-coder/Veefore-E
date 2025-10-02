@@ -44,6 +44,19 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Reconnect Account Prompt
+- ✅ **NEW FEATURE**: Added prominent reconnect prompts when Instagram access token is missing
+- ✅ **Performance Score**: Shows orange warning banner with "Reconnect Now" button when token invalid
+- ✅ **Social Accounts Page**: Displays full-screen reconnect message instead of zeros when token missing
+- ✅ **User Experience**: Clear messaging explaining why data isn't showing and how to fix it
+- **Result**: Users will see actionable prompts to reconnect accounts instead of confusing zero data
+
+### 2025-10-02: Instagram OAuth Auto-Sync
+- ✅ **CRITICAL FIX**: Instagram OAuth now immediately syncs real data after account connection
+- ✅ Added InstagramDirectSync call in OAuth callback to fetch followers, posts, engagement
+- ✅ Users no longer see zeros after connecting - real data appears immediately
+- **Result**: Connecting Instagram account now pulls actual follower count, posts, and metrics instantly
+
 ### 2025-10-02: Historical Analytics Data Fix
 - ✅ **FIX**: Fixed historical analytics endpoint to use correct storage method (`getAnalytics` instead of `getAnalyticsByWorkspace`)
 - ✅ Fixed workspace ID parameter type (MongoDB uses string ObjectIds, not integers)

@@ -344,7 +344,33 @@ export function SocialAccounts() {
         {/* Enhanced Account Details */}
         {currentAccount && (
           <div className={`p-6 ${getPlatformBgColor(currentAccount.platform)}`}>
-            <div className="bg-white dark:bg-gray-700 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-600">
+            {/* Reconnect Warning - Show when access token is missing */}
+            {(!currentAccount.hasAccessToken && !currentAccount.accessToken) ? (
+              <div className="bg-white dark:bg-gray-700 rounded-2xl p-8 shadow-sm border-2 border-orange-200 dark:border-orange-600">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center">
+                    <RefreshCw className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                    Reconnect Your {currentAccount.platform === 'instagram' ? 'Instagram' : currentAccount.platform} Account
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    Your access token is missing or expired. Reconnect your account to start syncing your real followers, posts, and engagement data.
+                  </p>
+                  <Button
+                    onClick={() => setLocation('/settings')}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reconnect Account in Settings
+                  </Button>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                    After reconnecting, your real Instagram data will appear here automatically
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-700 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-600">
               {/* Account Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-4">
@@ -457,7 +483,8 @@ export function SocialAccounts() {
                    <span>View insights</span>
                  </Button>
                </div>
-            </div>
+              </div>
+            )}
           </div>
         )}
 

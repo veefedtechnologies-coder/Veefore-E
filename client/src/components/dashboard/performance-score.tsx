@@ -399,6 +399,33 @@ export function PerformanceScore() {
       })()}
 
       <CardContent className="space-y-8">
+        {/* Reconnect Warning Banner - Show when any platform is missing access token */}
+        {socialAccounts?.some((account: any) => !account.hasAccessToken && !account.accessToken) && (
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 border-2 border-orange-200 dark:border-orange-600 rounded-2xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100">Reconnect Account Required</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Your Instagram access token is missing. Reconnect to see your real followers, posts, and engagement data.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => setLocation('/settings')}
+                variant="outline"
+                size="sm"
+                className="bg-orange-500 hover:bg-orange-600 text-white border-orange-600 dark:border-orange-500"
+              >
+                Reconnect Now
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Connected Platforms Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
