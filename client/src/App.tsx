@@ -344,9 +344,9 @@ function App() {
 
       {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
       <Route path="/">
-        {!user && !hasFirebaseAuthInStorage ? (
+        {!user && !hasFirebaseAuthInStorage && !loading ? (
           <GlobalLandingPage />
-        ) : !user && hasFirebaseAuthInStorage ? (
+        ) : !user && (hasFirebaseAuthInStorage || loading) ? (
           <LoadingSpinner />
         ) : user && userData ? (
           // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
