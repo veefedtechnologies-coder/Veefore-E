@@ -2530,8 +2530,9 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
         return res.json([]);
       }
 
-      // Get historical analytics data from database
-      const historicalRecords = await storage.getAnalyticsByWorkspace(
+      // Get historical analytics data from database - use getAnalytics for proper filtering
+      // MongoDB storage handles string workspace IDs natively (ObjectIds)
+      const historicalRecords = await storage.getAnalytics(
         workspace.id.toString(), 
         'instagram', 
         parseInt(days as string)
