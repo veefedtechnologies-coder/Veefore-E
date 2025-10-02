@@ -31,13 +31,10 @@ export function SocialAccounts() {
 
   // Smart Instagram sync mutation with rate limit protection and immediate updates
   const syncMutation = useMutation({
-    mutationFn: () => currentWorkspace?.id ? apiRequest('/api/instagram/smart-sync', { 
+    mutationFn: () => currentWorkspace?.id ? apiRequest('/api/instagram/force-sync', { 
       method: 'POST',
       body: JSON.stringify({ 
-        workspaceId: currentWorkspace.id,
-        forceRefresh: true,
-        respectRateLimit: true,
-        immediateUpdate: true
+        workspaceId: currentWorkspace.id
       })
     }) : Promise.reject(new Error('No workspace selected')),
     onSuccess: (data) => {

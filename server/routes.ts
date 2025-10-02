@@ -2967,6 +2967,17 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
         
         // Get updated data from storage
         const updatedAccount = await storage.getSocialAccount(instagramAccount.id);
+        
+        // Emit WebSocket event for real-time frontend update
+        RealtimeService.broadcastToWorkspace(workspaceId, 'instagram_data_update', {
+          accountId: updatedAccount.id,
+          username: updatedAccount.username,
+          followersCount: updatedAccount.followersCount,
+          mediaCount: updatedAccount.mediaCount,
+          changes: ['Manual sync completed']
+        });
+        console.log('[FORCE SYNC] 📡 Broadcasted instagram_data_update event to workspace:', workspaceId);
+        
         res.json({ 
           success: true, 
           followers: updatedAccount.followersCount,
@@ -2987,7 +2998,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
           console.log('[FORCE SYNC] Live Instagram data received via direct API:', data);
           
           // Clear cache and update database with fresh data
-          dashboardCache.clearCache();
+          dashboardCache.clearWorkspaceCache(workspaceId);
           
           // Update the stored account data with current values
           await storage.updateSocialAccount(instagramAccount.id, {
@@ -2998,6 +3009,16 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
           });
 
           console.log('[FORCE SYNC] Database updated with live follower count:', data.followers_count);
+          
+          // Emit WebSocket event for real-time frontend update
+          RealtimeService.broadcastToWorkspace(workspaceId, 'instagram_data_update', {
+            accountId: instagramAccount.id,
+            username: instagramAccount.username,
+            followersCount: data.followers_count,
+            mediaCount: data.media_count,
+            changes: ['Direct API sync completed']
+          });
+          console.log('[FORCE SYNC] 📡 Broadcasted instagram_data_update event to workspace:', workspaceId);
           
           res.json({ 
             success: true, 
