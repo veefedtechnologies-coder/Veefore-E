@@ -21,34 +21,19 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Admin Panel Server"
+args = "Start Game"
 
 [[workflows.workflow]]
-name = "Start application"
+name = "Start Game"
 author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "NODE_ENV=production npm run start"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Admin Panel Server"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd admin-panel && npm run dev"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 3001
@@ -59,12 +44,12 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8001
-externalPort = 4200
-
-[[ports]]
 localPort = 24678
 externalPort = 3000
+
+[[ports]]
+localPort = 34217
+externalPort = 3002
 
 [[ports]]
 localPort = 40407

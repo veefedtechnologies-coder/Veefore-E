@@ -1,8 +1,14 @@
 import OpenAI from 'openai';
+import { getOpenAIClient } from './openai-client';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    openai = getOpenAIClient();
+  }
+  return openai;
+}
 
 interface TrendingTopic {
   topic: string;
@@ -106,7 +112,7 @@ export class TrendingTopicsAPI {
     - Include variety in platform distribution
     - Focus on ${category} topics that content creators would want to engage with`;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
