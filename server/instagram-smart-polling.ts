@@ -391,7 +391,7 @@ export class InstagramSmartPolling {
       console.log(`[SMART POLLING] Account @${config.username} debug:`, {
         isBusinessAccount: account?.isBusinessAccount,
         accountType: account?.accountType,
-        hasAccessToken: !!config.accessToken
+        hasAccessToken: account?.hasAccessToken
       });
       
       // Use REAL account type from Instagram API, not outdated database value

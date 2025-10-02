@@ -1950,7 +1950,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
       console.log('[MULTI-PLATFORM] Found social accounts:', allSocialAccounts.map((acc: any) => ({ 
         platform: acc.platform, 
         username: acc.username, 
-        hasToken: !!acc.accessToken 
+        hasToken: acc.hasAccessToken // Use the already computed hasAccessToken field
       })));
       
       if (!allSocialAccounts || allSocialAccounts.length === 0) {
@@ -3131,6 +3131,56 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
     }
   });
 
+  // Public endpoint to check Instagram account status (for debugging)
+  app.get("/api/instagram/account-status/:workspaceId", async (req: any, res: any) => {
+    try {
+      const { workspaceId } = req.params;
+      
+      console.log(`[ACCOUNT STATUS] Checking Instagram account status for workspace: ${workspaceId}`);
+      
+      // Get Instagram account for this workspace
+      const accounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+      const instagramAccount = accounts.find((acc: any) => acc.platform === 'instagram' && acc.isActive);
+      
+      if (!instagramAccount) {
+        return res.json({
+          found: false,
+          message: 'No Instagram account found for this workspace',
+          accounts: accounts.map((acc: any) => ({ platform: acc.platform, username: acc.username, isActive: acc.isActive }))
+        });
+      }
+      
+      // Check if smart polling is monitoring this account
+      const pollingStatus = smartPolling.getPollingStatus();
+      const isMonitored = pollingStatus.accounts?.some((acc: any) => 
+        acc.username === instagramAccount.username || acc.accountId === instagramAccount.accountId
+      );
+      
+      res.json({
+        found: true,
+        account: {
+          username: instagramAccount.username,
+          accountId: instagramAccount.accountId,
+          followersCount: instagramAccount.followersCount,
+          mediaCount: instagramAccount.mediaCount,
+          lastSyncAt: instagramAccount.lastSyncAt,
+          hasAccessToken: instagramAccount.hasAccessToken, // Use the already computed value from convertSocialAccount
+          isActive: instagramAccount.isActive
+        },
+        smartPolling: {
+          isMonitored: isMonitored,
+          totalAccounts: pollingStatus.totalAccounts,
+          status: pollingStatus.status
+        },
+        message: isMonitored ? 'Account is being monitored by smart polling' : 'Account is not being monitored by smart polling'
+      });
+      
+    } catch (error: any) {
+      console.error('[ACCOUNT STATUS] Error:', error);
+      res.status(500).json({ error: 'Failed to get account status' });
+    }
+  });
+
   // Disconnect social account
   // P1-5 SECURITY: Strict CORS for account deletion
   app.delete('/api/social-accounts/:id', strictCorsMiddleware, requireAuth, async (req: any, res: Response) => {
@@ -3758,7 +3808,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
         username: profile.username,
         workspaceId: workspaceId.toString(),
         platform: 'instagram',
-        accountId: profile.id,
+        accountId: String(profile.id), // Ensure ID is a string
         accessToken: longLivedToken.access_token,
         refreshToken: null,
         expiresAt: expiresAt,
@@ -3766,6 +3816,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
         profilePictureUrl: profile.profile_picture_url,
         mediaCount: profile.media_count || 0,
         accountType: profile.account_type,
+        pageId: profile.pageId ? String(profile.pageId) : null, // Also ensure Page ID is a string
         lastSyncAt: new Date()
       };
 
@@ -3776,7 +3827,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
         workspaceIdType: typeof socialAccountData.workspaceId,
         platform: socialAccountData.platform,
         accountId: socialAccountData.accountId,
-        hasAccessToken: !!socialAccountData.accessToken
+        hasAccessToken: socialAccountData.hasAccessToken
       });
       
       // Check if account already exists
@@ -3804,11 +3855,11 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
       console.log(`[INSTAGRAM CALLBACK] 🚀 Triggering immediate Instagram data sync for new account...`);
       try {
         // Import the Instagram sync service for immediate data fetch
-        const { InstagramSyncService } = await import('./instagram-sync-service');
+        const { InstagramDirectSync } = await import('./instagram-direct-sync');
         const instagramSync = new InstagramDirectSync(storage);
         
         // Sync the specific workspace where the account was added
-        await instagramSync.syncInstagramAccountsForWorkspace(workspaceId.toString());
+        await instagramSync.updateAccountWithRealData(workspaceId.toString());
         console.log(`[INSTAGRAM CALLBACK] ✅ Immediate Instagram sync completed successfully`);
         
         // Clear dashboard cache for this workspace to show fresh data
@@ -7468,24 +7519,57 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
       
       console.log(`[INSTAGRAM MANUAL SYNC] 🚀 Manual sync requested for workspace: ${workspaceId}`);
       
-      // Import and use the Instagram sync service
-      const { InstagramSyncService } = await import('./instagram-sync-service');
-      const instagramSync = new InstagramDirectSync(storage);
+      // Get Instagram account for this workspace
+      const accounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+      const instagramAccount = accounts.find((acc: any) => acc.platform === 'instagram' && acc.isActive);
       
-      // Perform immediate sync
-      const result = await instagramSync.syncInstagramAccountsForWorkspace(workspaceId);
+      if (!instagramAccount) {
+        return res.status(400).json({ error: 'No Instagram account found for this workspace' });
+      }
+      
+      console.log(`[INSTAGRAM MANUAL SYNC] Found Instagram account: @${instagramAccount.username}`);
+      
+      // Try smart polling first
+      const pollingSuccess = await smartPolling.forcePoll(instagramAccount.accountId || instagramAccount.id);
+      
+      if (pollingSuccess) {
+        console.log(`[INSTAGRAM MANUAL SYNC] ✅ Smart polling successful for @${instagramAccount.username}`);
+        
+        // Get updated account data
+        const updatedAccount = await storage.getSocialAccount(instagramAccount.id);
+        
+        res.json({
+          success: true,
+          message: 'Instagram data synced successfully via smart polling',
+          account: {
+            username: updatedAccount.username,
+            followersCount: updatedAccount.followersCount,
+            mediaCount: updatedAccount.mediaCount,
+            lastSyncAt: updatedAccount.lastSyncAt
+          },
+          method: 'smart_polling',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        console.log(`[INSTAGRAM MANUAL SYNC] ⚠️ Smart polling rate limited, using direct sync`);
+        
+        // Fallback to direct sync
+        const { InstagramDirectSync } = await import('./instagram-direct-sync');
+        const instagramSync = new InstagramDirectSync(storage);
+        
+        await instagramSync.updateAccountWithRealData(workspaceId);
+        
+        res.json({
+          success: true,
+          message: 'Instagram data synced successfully via direct API',
+          method: 'direct_api',
+          timestamp: new Date().toISOString()
+        });
+      }
       
       // Clear dashboard cache to show fresh data
       dashboardCache.clearCache();
       
-      console.log(`[INSTAGRAM MANUAL SYNC] ✅ Manual sync completed for workspace: ${workspaceId}`);
-      
-      res.json({
-        success: true,
-        message: 'Instagram data synced successfully',
-        result,
-        timestamp: new Date().toISOString()
-      });
     } catch (error: any) {
       console.error('[INSTAGRAM MANUAL SYNC] Error:', error);
       res.status(500).json({
@@ -7639,7 +7723,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
             reach: acc.totalReach,
             lastSync: acc.lastSyncAt,
             isActive: acc.isActive,
-            hasAccessToken: !!acc.accessToken
+            hasAccessToken: acc.hasAccessToken
           }))
         });
       }
@@ -7694,7 +7778,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
                 reach: acc.totalReach,
                 lastSync: acc.lastSyncAt,
                 isActive: acc.isActive,
-                hasAccessToken: !!acc.accessToken
+                hasAccessToken: acc.hasAccessToken
               }))
             });
           }

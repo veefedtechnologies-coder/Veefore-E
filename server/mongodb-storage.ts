@@ -687,11 +687,22 @@ export class MongoStorage implements IStorage {
    * Get access token from social account with automatic migration from plain text
    */
   private getAccessTokenFromAccount(account: any): string | null {
+    console.log(`[TOKEN DEBUG] Checking access token for account: ${account.username}`);
+    console.log(`[TOKEN DEBUG] Has encryptedAccessToken: ${!!account.encryptedAccessToken}`);
+    console.log(`[TOKEN DEBUG] Has plain accessToken: ${!!account.accessToken}`);
+    
     // First try encrypted token
     if (account.encryptedAccessToken) {
-      const decryptedToken = this.decryptStoredToken(account.encryptedAccessToken);
-      if (decryptedToken) {
-        return decryptedToken;
+      console.log(`[TOKEN DEBUG] Attempting to decrypt encrypted token for ${account.username}`);
+      try {
+        const decryptedToken = this.decryptStoredToken(account.encryptedAccessToken);
+        if (decryptedToken) {
+          console.log(`[TOKEN DEBUG] ✅ Successfully decrypted token for ${account.username}`);
+          return decryptedToken;
+        }
+        console.warn(`[TOKEN DEBUG] ❌ Decryption returned null for ${account.username}`);
+      } catch (error) {
+        console.error(`[TOKEN DEBUG] ❌ Decryption failed for ${account.username}:`, error.message);
       }
       // If decryption failed, log and continue to fallback
       console.warn(`🚨 P2-FIX: Failed to decrypt access token for account ${account.username}, falling back to plain text`);
@@ -703,6 +714,7 @@ export class MongoStorage implements IStorage {
       return account.accessToken;
     }
     
+    console.log(`[TOKEN DEBUG] ❌ No valid access token found for ${account.username}`);
     return null;
   }
 
@@ -1487,14 +1499,34 @@ export class MongoStorage implements IStorage {
   async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
     await this.connect();
     
+    console.log('[MONGODB DEBUG] createSocialAccount input:', {
+      ...account,
+      accessToken: account.accessToken ? '[REDACTED]' : undefined,
+      refreshToken: account.refreshToken ? '[REDACTED]' : undefined
+    });
+    console.log('[MONGODB DEBUG] Account ID type:', typeof account.accountId);
+    console.log('[MONGODB DEBUG] Account ID value:', account.accountId);
+    
+    // Check if there's an _id field in the input
+    if ('_id' in account) {
+      console.log('[MONGODB DEBUG] WARNING: _id field found in input:', (account as any)._id);
+    }
+    if ('id' in account) {
+      console.log('[MONGODB DEBUG] WARNING: id field found in input:', (account as any).id);
+    }
+    
     // SECURITY: Encrypt tokens before storing in database
     const socialAccountData: any = {
       ...account,
-      id: Date.now(),
+      // Don't set id/ID here - let MongoDB auto-generate _id as ObjectId
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
+
+    // Remove any id or _id fields that might have been passed in
+    delete socialAccountData.id;
+    delete socialAccountData._id;
 
     // Encrypt access token if provided
     if (account.accessToken) {

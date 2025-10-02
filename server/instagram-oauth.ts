@@ -119,6 +119,13 @@ export class InstagramOAuthService {
 
       const profileData = await response.json();
       
+      console.log('[INSTAGRAM OAUTH] Profile data received:', {
+        id: profileData.id,
+        idType: typeof profileData.id,
+        username: profileData.username,
+        account_type: profileData.account_type
+      });
+      
       // Step 2: Get connected Facebook Page ID for Business accounts (required for DMs)
       let pageId = null;
       if (profileData.account_type === 'BUSINESS') {
@@ -153,12 +160,12 @@ export class InstagramOAuthService {
       }
       
       return {
-        accountId: profileData.id,
+        accountId: String(profileData.id), // Ensure ID is always a string
         username: profileData.username,
         accountType: profileData.account_type,
         mediaCount: profileData.media_count,
         profilePictureUrl: profileData.profile_picture_url,
-        pageId: pageId, // 🎯 Critical for Instagram Business DMs
+        pageId: pageId ? String(pageId) : null, // Ensure Page ID is also a string
         platform: 'instagram',
       };
 
