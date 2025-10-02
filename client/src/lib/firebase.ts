@@ -52,9 +52,14 @@ console.log('🔥 Firebase App Initialized:', app)
 export const auth = getAuth(app)
 console.log('🔥 Firebase Auth Initialized:', auth)
 
-// Set persistence
+// Set persistence - Must be awaited to ensure auth state persists across page refreshes
 setPersistence(auth, browserLocalPersistence)
-console.log('🔥 Firebase Persistence Set')
+  .then(() => {
+    console.log('🔥 Firebase Persistence Set Successfully')
+  })
+  .catch((error) => {
+    console.error('❌ Failed to set Firebase persistence:', error)
+  })
 
 // Create Google Provider
 export const googleProvider = new GoogleAuthProvider()
