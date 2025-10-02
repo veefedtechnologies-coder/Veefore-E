@@ -222,14 +222,21 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         // Sign in with Firebase
         await signInWithEmailAndPassword(formData.email, formData.password)
         
-        // Send user data to backend
-        await fetch('/api/auth/signin', {
+        // Send user data to backend - with error handling
+        const signinResponse = await fetch('/api/auth/signin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: formData.email
           })
         })
+
+        // Check if backend signin was successful
+        if (!signinResponse.ok) {
+          const errorData = await signinResponse.json().catch(() => ({ message: 'Backend signin failed' }))
+          console.warn('Backend signin issue:', errorData.message)
+          // Don't block user - Firebase auth succeeded, backend will auto-create user on next request
+        }
         
         toast({
           title: "Success",
