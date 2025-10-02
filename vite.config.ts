@@ -24,9 +24,11 @@ export default defineConfig({
       'use-sync-external-store/shim/with-selector'
     ],
     exclude: [
-      '@react-three/postprocessing',
-      '@tanstack/react-query'
-    ]
+      '@react-three/postprocessing'
+    ],
+    esbuildOptions: {
+      target: 'es2020'
+    }
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
