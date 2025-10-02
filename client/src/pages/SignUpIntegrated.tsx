@@ -318,21 +318,39 @@ function SignUpIntegrated() {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
       console.log('✅ Firebase user created successfully:', userCredential.user.uid)
 
-      // Update backend with Firebase UID
-      await fetch('/api/auth/link-firebase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          firebaseUid: userCredential.user.uid,
-          displayName: formData.fullName
-        })
-      })
+      // Update backend with Firebase UID - with proper error handling and timeout
+      console.log('🔗 Linking Firebase account to backend...')
+      
+      const linkResponse = await Promise.race([
+        fetch('/api/auth/link-firebase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            firebaseUid: userCredential.user.uid,
+            displayName: formData.fullName
+          })
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout - please try again')), 15000)
+        )
+      ]) as Response
+
+      if (!linkResponse.ok) {
+        const errorData = await linkResponse.json().catch(() => ({ message: 'Failed to link account' }))
+        throw new Error(errorData.message || 'Failed to create account in database')
+      }
+
+      const linkData = await linkResponse.json()
+      console.log('✅ Account linked successfully:', linkData)
       
       toast({
         title: "Account created successfully!",
         description: "Welcome to VeeFore! Let's get you set up.",
       })
+      
+      // Wait a moment to ensure backend is ready, then redirect
+      await new Promise(resolve => setTimeout(resolve, 500))
       
       // The app will automatically redirect and show onboarding modal
       setLocation('/')
