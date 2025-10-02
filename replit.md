@@ -44,6 +44,25 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Animation Performance Optimization
+- ✅ **CRITICAL FIX**: Fixed fluctuating/janky animations throughout the app
+- ✅ Added useRef guards to App.tsx initialization effects (P6, SEO, accessibility, mobile, web vitals)
+- ✅ Each system now runs exactly once per app mount, eliminating re-render storms
+- ✅ Optimized GlobalLandingPage: reduced floating particles from 30 to 10 (67% reduction)
+- ✅ Grouped navigation, hero, and feature animations into stagger containers
+- ✅ Wrapped GlobalLandingPage in React.memo to prevent unnecessary re-renders
+- ✅ Memoized all Framer Motion variant objects with useMemo
+- ✅ Simplified CSS keyframes (pulse, glow) to avoid conflicts with Framer Motion
+- ✅ Removed debug logging that was causing re-renders
+- **Result**: Smooth, non-flickering animations with significantly reduced re-render overhead
+
+### 2025-10-02: Google Sign-In Redirect Fix
+- ✅ **CRITICAL FIX**: Fixed stuck "Initializing..." screen after Google sign-in redirect
+- ✅ Added 500ms delay after backend linking to allow Firebase session persistence
+- ✅ Changed redirect method from SPA navigation to full page reload (`window.location.href`)
+- ✅ Backend linking endpoint `/api/auth/link-firebase` properly creates user in MongoDB
+- **Result**: Users now successfully reach dashboard after Google sign-in
+
 ### 2025-10-02: Google Sign-In Loading Screen Fix
 - ✅ **CRITICAL FIX**: Fixed stuck "Initializing..." screen after Google sign-in
 - ✅ Reordered React conditional rendering to check for `userData` BEFORE `userDataLoading`
