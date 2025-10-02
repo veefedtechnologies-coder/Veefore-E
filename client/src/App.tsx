@@ -131,8 +131,6 @@ function App() {
     }
   }, [])
 
-  console.log('App component rendering:', { location, user: !!user, loading })
-
   // Google sign-in is now handled directly in SignIn.tsx with popup method
   // No need for redirect result handling
 
@@ -144,6 +142,16 @@ function App() {
     retry: 3, // Retry up to 3 times for new users whose account might still be creating
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s
     staleTime: 30000, // Consider fresh for 30 seconds
+  })
+  
+  // Debug: Log all auth state values
+  console.log('🔍 AUTH STATE:', { 
+    hasUser: !!user, 
+    hasUserData: !!userData,
+    userDataLoading,
+    userDataError: !!userDataError,
+    firebaseLoading: loading,
+    location 
   })
 
   // Pre-fetch workspaces data for faster navigation
