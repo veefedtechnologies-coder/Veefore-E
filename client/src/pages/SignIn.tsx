@@ -316,8 +316,13 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         description: "Signed in with Google successfully!",
       })
       
-      // Redirect to home page
-      setLocation('/')
+      // Wait a moment for Firebase to persist the session
+      console.log('⏳ Waiting for Firebase session to persist...')
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log('🔄 Redirecting to dashboard...')
+      // Force a full page reload to ensure fresh auth state
+      window.location.href = '/'
       
     } catch (error: any) {
       console.error('❌ Google sign in error:', error)
