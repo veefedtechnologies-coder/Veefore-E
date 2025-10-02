@@ -175,6 +175,22 @@ export function InstagramWebhookListener() {
           }
         })
 
+        socket.on('instagram_data_update', (data) => {
+          try {
+            console.log('[Instagram Webhook] 🔄 Received data update from smart polling:', data)
+            console.log('[Instagram Webhook] Instagram data update (followers/likes/engagement), refreshing immediately')
+            queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] })
+            queryClient.invalidateQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
+            queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] })
+            queryClient.invalidateQueries({ queryKey: ['/api/analytics/historical'] })
+            queryClient.refetchQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
+            queryClient.refetchQueries({ queryKey: ['/api/social-accounts'] })
+            console.log('[Instagram Webhook] ✅ Data update webhook processed - dashboard refreshed with latest metrics')
+          } catch (error) {
+            console.error('[Instagram Webhook] Error processing data update:', error)
+          }
+        })
+
         // Legacy event handler for backward compatibility
         socket.on('instagram_metrics_update', (data) => {
           try {
