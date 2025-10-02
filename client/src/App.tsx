@@ -136,12 +136,14 @@ function App() {
   // Google sign-in is now handled directly in SignIn.tsx with popup method
   // No need for redirect result handling
 
-  // Fetch user data when authenticated
-  const { data: userData, isLoading: userDataLoading } = useQuery({
+  // Fetch user data when authenticated - with retry for new users
+  const { data: userData, isLoading: userDataLoading, error: userDataError } = useQuery({
     queryKey: ['/api/user'],
     queryFn: () => apiRequest('/api/user'),
     enabled: !!user && !loading,
-    retry: false
+    retry: 3, // Retry up to 3 times for new users whose account might still be creating
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s
+    staleTime: 30000, // Consider fresh for 30 seconds
   })
 
   // Pre-fetch workspaces data for faster navigation
@@ -427,12 +429,43 @@ function App() {
               />
             )}
           </div>
-        ) : user && !userData && !userDataLoading ? (
-          // If user exists but userData failed to load, redirect to signin
-          <>
-            {setLocation('/signin')}
-            <LoadingSpinner />
-          </>
+        ) : user && !userData && !userDataLoading && userDataError ? (
+          // If user exists but userData failed to load after retries, show error
+          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
+            <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Unable to Load Account
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                We're having trouble loading your account. This might be a temporary issue.
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                    window.location.reload()
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => {
+                    auth.signOut()
+                    setLocation('/signin')
+                  }}
+                  className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Sign Out and Try Again
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
           <LoadingSpinner />
         )}
