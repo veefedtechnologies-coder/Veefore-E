@@ -185,7 +185,7 @@ export function PerformanceScore() {
   }
 
 
-  if (isLoading && !analytics) {
+  if (!analytics && isLoading) {
     return (
       <Card data-testid="performance-score" className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 border-0 rounded-3xl overflow-hidden">
         <CardHeader className="text-center pb-4">
