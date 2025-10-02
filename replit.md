@@ -44,6 +44,15 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Real-Time Dashboard Cache Updates
+- ✅ **CRITICAL FIX**: Fixed dashboard caching issue where social account data wasn't updating in real-time
+- ✅ Instagram smart polling now emits WebSocket events (`instagram_data_update`) when data changes
+- ✅ Frontend automatically refreshes when Instagram followers, likes, engagement are updated
+- ✅ Fixed cache clearing method to use workspace-specific invalidation (`clearWorkspaceCache`)
+- ✅ Reduced frontend cache staleness from 5 minutes to 2 minutes for faster updates
+- ✅ Added comprehensive WebSocket event listeners for polling updates
+- **Result**: Dashboard now shows real-time updates without manual refresh when Instagram data changes
+
 ### 2025-10-02: Loading State Fix & React Module Resolution
 - ✅ **PERMANENT FIX**: Fixed critical React hook error that prevented app from loading
 - ✅ **Root Cause**: client/package.json was missing React and react-dom dependencies
