@@ -74,6 +74,7 @@ export function PerformanceScore() {
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes - webhooks provide immediate updates for comments/mentions
+    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 
   // Fetch real social accounts data for current workspace - HYBRID: Webhooks + Smart Polling
@@ -86,6 +87,7 @@ export function PerformanceScore() {
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes - webhooks provide immediate updates for comments/mentions
+    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 
   // Fetch historical analytics data for trend comparisons - HYBRID: Webhooks + Smart Polling
@@ -98,6 +100,7 @@ export function PerformanceScore() {
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes - webhooks provide immediate updates for comments/mentions
+    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 
   // Calculate REAL growth data using historical records
@@ -176,7 +179,7 @@ export function PerformanceScore() {
   }
 
 
-  if (isLoading) {
+  if (isLoading && !analytics) {
     return (
       <Card data-testid="performance-score" className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 border-0 rounded-3xl overflow-hidden">
         <CardHeader className="text-center pb-4">
