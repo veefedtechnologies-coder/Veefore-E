@@ -437,12 +437,18 @@ function IntegrationContent() {
     return count.toString()
   }
 
+  const hasValidAccessToken = (account: SocialAccount | undefined) => {
+    if (!account) return false
+    return account.accessToken && account.accessToken.trim() !== ''
+  }
+
   const renderPlatformCard = (platform: keyof typeof platformConfig) => {
     const config = platformConfig[platform]
     const Icon = config.icon
     const isConnected = isAccountConnected(platform)
     const connectedAccount = getConnectedAccount(platform)
     const isConnecting = connectingPlatform === platform
+    const hasAccessToken = hasValidAccessToken(connectedAccount)
 
     return (
       <Card key={platform} className={`relative overflow-hidden transition-all duration-300 hover:shadow-lg border-2 ${config.borderColor} ${config.bgColor}`}>
@@ -482,24 +488,41 @@ function IntegrationContent() {
 
           {/* Connected Account Info */}
           {isConnected && connectedAccount && (
-            <div className="mb-4 p-3 bg-white/60 dark:bg-gray-700/60 rounded-lg border border-gray-200 dark:border-gray-600">
-              <div className="flex items-center space-x-3">
-                {connectedAccount.profilePicture && (
-                  <img 
-                    src={connectedAccount.profilePicture} 
-                    alt={connectedAccount.displayName || connectedAccount.username}
-                    className="w-10 h-10 rounded-full border-2 border-white dark:border-gray-600 shadow-sm"
-                  />
-                )}
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-gray-100">@{connectedAccount.username}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatFollowersCount(connectedAccount.followers)} followers</p>
+            <>
+              <div className="mb-4 p-3 bg-white/60 dark:bg-gray-700/60 rounded-lg border border-gray-200 dark:border-gray-600">
+                <div className="flex items-center space-x-3">
+                  {connectedAccount.profilePicture && (
+                    <img 
+                      src={connectedAccount.profilePicture} 
+                      alt={connectedAccount.displayName || connectedAccount.username}
+                      className="w-10 h-10 rounded-full border-2 border-white dark:border-gray-600 shadow-sm"
+                    />
+                  )}
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">@{connectedAccount.username}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{formatFollowersCount(connectedAccount.followers)} followers</p>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Last synced: {connectedAccount.lastSync ? new Date(connectedAccount.lastSync).toLocaleDateString() : 'Never'}
                 </div>
               </div>
-              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Last synced: {connectedAccount.lastSync ? new Date(connectedAccount.lastSync).toLocaleDateString() : 'Never'}
-              </div>
-            </div>
+
+              {/* Warning Banner for Missing Access Token */}
+              {!hasAccessToken && (
+                <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-600 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <RefreshCw className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">Reconnection Required</p>
+                      <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                        Your access token has expired or is missing. Please reconnect to continue using analytics and posting features.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Features */}
@@ -518,27 +541,42 @@ function IntegrationContent() {
           {/* Action Buttons */}
           <div className="flex space-x-2">
             {isConnected ? (
-              <>
+              !hasAccessToken ? (
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refreshMutation.mutate(platform)}
-                  disabled={refreshMutation.isPending}
-                  className="flex-1"
+                  onClick={() => connectMutation.mutate(platform)}
+                  disabled={isConnecting || connectMutation.isPending}
+                  className={`w-full bg-gradient-to-r ${config.color} hover:opacity-90 text-white shadow-lg`}
                 >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
-                  Refresh
+                  {isConnecting ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  {isConnecting ? 'Reconnecting...' : 'Reconnect Account'}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => disconnectMutation.mutate(connectedAccount!.id)}
-                  disabled={disconnectMutation.isPending}
-                  className="flex-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  Disconnect
-                </Button>
-              </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refreshMutation.mutate(platform)}
+                    disabled={refreshMutation.isPending}
+                    className="flex-1"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => disconnectMutation.mutate(connectedAccount!.id)}
+                    disabled={disconnectMutation.isPending}
+                    className="flex-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    Disconnect
+                  </Button>
+                </>
+              )
             ) : (
               <Button
                 onClick={() => connectMutation.mutate(platform)}
