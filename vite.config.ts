@@ -71,8 +71,7 @@ export default defineConfig({
       deny: ["**/.*"],
       allow: [
         path.resolve(__dirname, 'client'),
-        path.resolve(__dirname, 'shared'),
-        path.resolve(__dirname, 'node_modules')
+        path.resolve(__dirname, 'shared')
       ]
     },
   },
