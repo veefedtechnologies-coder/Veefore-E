@@ -9,13 +9,18 @@ let openaiClient: OpenAI | null = null;
 
 /**
  * Get OpenAI client instance - creates one if not exists
+ * Returns a client with placeholder key if not configured (will fail when used)
  */
 export const getOpenAIClient = (): OpenAI => {
   if (!openaiClient) {
     if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OpenAI API key is not configured. Please set OPENAI_API_KEY environment variable.');
+      console.warn('[OPENAI] API key not configured - OpenAI features will not work');
+      // Create client with placeholder to avoid startup errors
+      // It will fail gracefully when actually used
+      openaiClient = new OpenAI({ apiKey: 'sk-placeholder' });
+    } else {
+      openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     }
-    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
   return openaiClient;
 };
@@ -38,10 +43,17 @@ export const resetOpenAIClient = (): void => {
  * Enhanced OpenAI Service for Complete Video Generation Pipeline
  */
 class OpenAIService {
-  private openai: OpenAI;
+  private openai: OpenAI | null = null;
 
   constructor() {
-    this.openai = getOpenAIClient();
+    // Lazy load OpenAI client to avoid startup errors
+  }
+
+  private getClient(): OpenAI {
+    if (!this.openai) {
+      this.openai = getOpenAIClient();
+    }
+    return this.openai;
   }
 
   /**
@@ -115,7 +127,7 @@ CRITICAL: Respond with JSON in this EXACT format:
   }
 }`;
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.getClient().chat.completions.create({
         model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         messages: [
           { role: "system", content: systemPrompt },
@@ -344,7 +356,7 @@ Respond with JSON in this format:
   }
 }`;
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.getClient().chat.completions.create({
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
@@ -430,7 +442,7 @@ Respond with JSON in this format:
   "overallStyleGuide": "Consistency guidelines for all scenes"
 }`;
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.getClient().chat.completions.create({
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
@@ -519,7 +531,7 @@ Respond with JSON in this exact format:
   "visualElements": ["element1", "element2", "element3"]
 }`;
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.getClient().chat.completions.create({
         model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         messages: [
           { role: "system", content: systemPrompt },
