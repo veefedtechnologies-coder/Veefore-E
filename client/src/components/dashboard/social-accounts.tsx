@@ -187,7 +187,7 @@ export function SocialAccounts() {
     }
   }, [connectedAccounts, startPollingMutation.isPending, hasStartedPolling])
 
-  if (isLoading && !socialAccounts) {
+  if (!socialAccounts && isLoading) {
     return (
       <Card data-testid="social-accounts" className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
         <CardContent className="p-6">

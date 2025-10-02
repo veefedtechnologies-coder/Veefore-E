@@ -44,6 +44,15 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Loading State Fix & React Module Resolution
+- ✅ **PERMANENT FIX**: Fixed critical React hook error that prevented app from loading
+- ✅ **Root Cause**: client/package.json was missing React and react-dom dependencies
+- ✅ **Solution**: Added React 18.3.1 and react-dom 18.3.1 to client/package.json
+- ✅ **Loading States**: Changed condition from `if (isLoading && !data)` to `if (!data && isLoading)`
+- ✅ **Result**: Cached data now displays immediately on page reload, no loading skeletons
+- ✅ **Prevention**: React dependencies now properly declared in all package.json files
+- **Technical**: Module resolution conflict resolved by ensuring React is declared in both root and client package.json
+
 ### 2025-10-02: Reconnect Account Prompt
 - ✅ **NEW FEATURE**: Added prominent reconnect prompts when Instagram access token is missing
 - ✅ **Performance Score**: Shows orange warning banner with "Reconnect Now" button when token invalid
