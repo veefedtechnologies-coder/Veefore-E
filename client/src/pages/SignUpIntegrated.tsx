@@ -321,52 +321,77 @@ function SignUpIntegrated() {
       // Update backend with Firebase UID - with proper error handling and timeout
       console.log('🔗 Linking Firebase account to backend...')
       
-      const linkResponse = await Promise.race([
-        fetch('/api/auth/link-firebase', {
+      // Use AbortController to cancel the request if timeout occurs
+      const abortController = new AbortController()
+      const timeoutId = setTimeout(() => abortController.abort(), 15000)
+      
+      try {
+        const linkResponse = await fetch('/api/auth/link-firebase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: formData.email,
             firebaseUid: userCredential.user.uid,
             displayName: formData.fullName
-          })
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout - please try again')), 15000)
-        )
-      ]) as Response
+          }),
+          signal: abortController.signal
+        })
 
-      if (!linkResponse.ok) {
-        const errorData = await linkResponse.json().catch(() => ({ message: 'Failed to link account' }))
-        throw new Error(errorData.message || 'Failed to create account in database')
+        clearTimeout(timeoutId)
+
+        if (!linkResponse.ok) {
+          const errorData = await linkResponse.json().catch(() => ({ message: 'Failed to link account' }))
+          throw new Error(errorData.message || 'Failed to create account in database')
+        }
+
+        const linkData = await linkResponse.json()
+        console.log('✅ Account linked successfully:', linkData)
+        
+        toast({
+          title: "Account created successfully!",
+          description: "Welcome to VeeFore! Let's get you set up.",
+        })
+        
+        // Wait a moment to ensure backend is ready, then redirect
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // The app will automatically redirect and show onboarding modal
+        setLocation('/')
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        
+        // Handle AbortController timeout
+        if (fetchError.name === 'AbortError') {
+          throw new Error('timeout')
+        }
+        throw fetchError
       }
-
-      const linkData = await linkResponse.json()
-      console.log('✅ Account linked successfully:', linkData)
-      
-      toast({
-        title: "Account created successfully!",
-        description: "Welcome to VeeFore! Let's get you set up.",
-      })
-      
-      // Wait a moment to ensure backend is ready, then redirect
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // The app will automatically redirect and show onboarding modal
-      setLocation('/')
 
     } catch (error: any) {
       console.error('❌ Verification error:', error)
       setCurrentStep('verification') // Go back to verification step
       
       let errorMessage = 'Verification failed. Please try again.'
-      if (error.code === 'auth/email-already-in-use') {
+      let toastTitle = "Verification Failed"
+      
+      if (error.message === 'timeout') {
+        errorMessage = 'Account creation is taking longer than expected. Please try signing in - your account may have been created.'
+        toastTitle = "Request Timeout"
+      } else if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'An account with this email already exists. Please try signing in instead.'
       } else if (error.message.includes('expired') || error.message.includes('invalid')) {
         errorMessage = 'Invalid or expired verification code. Please try again.'
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'The request timed out. Please try signing in - your account may have been created.'
+        toastTitle = "Request Timeout"
       }
       
       setErrors({ otp: errorMessage })
+      toast({
+        title: toastTitle,
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
