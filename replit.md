@@ -44,6 +44,12 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-10-02: Google Sign-In Loading Screen Fix
+- ✅ **CRITICAL FIX**: Fixed stuck "Initializing..." screen after Google sign-in
+- ✅ Reordered React conditional rendering to check for `userData` BEFORE `userDataLoading`
+- ✅ Users now see dashboard immediately after sign-in without needing to refresh
+- ✅ Eliminated React Query state management race condition
+
 ### 2025-10-02: Firebase Session Persistence Fix
 - ✅ **CRITICAL FIX**: Added proper error handling for `setPersistence` Promise in firebase.ts
 - ✅ Firebase auth sessions now persist correctly across page refreshes
