@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, Lock, ArrowRight, Play, Instagram, Youtube, CheckCircle, Zap, Shield, BarChart3 } from 'lucide-react'
 
-const GlobalLandingPage = () => {
+const GlobalLandingPage = React.memo(() => {
   const [isLoading, setIsLoading] = useState(true)
   const [splineLoaded, setSplineLoaded] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -11,6 +11,55 @@ const GlobalLandingPage = () => {
   const [isActivated, setIsActivated] = useState(false)
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null)
+
+  // Memoized animation variants to prevent recreation on re-renders
+  const navItemVariants = useMemo(() => ({
+    hidden: { opacity: 0, y: -20 },
+    visible: { opacity: 1, y: 0 }
+  }), [])
+
+  const navContainerVariants = useMemo(() => ({
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.3
+      }
+    }
+  }), [])
+
+  const heroContentVariants = useMemo(() => ({
+    hidden: { opacity: 0, y: 30 },
+    visible: { opacity: 1, y: 0 }
+  }), [])
+
+  const heroContainerVariants = useMemo(() => ({
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.3,
+        delayChildren: 0.5
+      }
+    }
+  }), [])
+
+  const featureCardVariants = useMemo(() => ({
+    hidden: { opacity: 0, y: 50 },
+    visible: { opacity: 1, y: 0 }
+  }), [])
+
+  const featuresContainerVariants = useMemo(() => ({
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2,
+        delayChildren: 0.1
+      }
+    }
+  }), [])
 
   // Handle key hold interaction
   const handleKeyHold = () => {
@@ -41,15 +90,7 @@ const GlobalLandingPage = () => {
     }
   }, [isHolding])
 
-  // Simulate finding the key after spline loads
-  useEffect(() => {
-    if (!isLoading) {
-      const timer = setTimeout(() => {
-        console.log('Spline loaded - showing interactive key')
-      }, splineLoaded ? 3000 : 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [isLoading, splineLoaded])
+  // No debug logging to prevent re-renders
 
   return (
     <div 
@@ -62,21 +103,20 @@ const GlobalLandingPage = () => {
       }}
     >
       <style>{`
+        /* Simplified animations to avoid conflicts with Framer Motion */
         @keyframes pulse {
           0%, 100% {
-            box-shadow: 0 0 40px rgba(16, 185, 129, 0.6), 0 0 80px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.6);
           }
           50% {
-            box-shadow: 0 0 60px rgba(16, 185, 129, 0.8), 0 0 120px rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 60px rgba(16, 185, 129, 0.8);
           }
         }
         @keyframes glow {
           0%, 100% {
-            transform: scale(1);
             opacity: 0.7;
           }
           50% {
-            transform: scale(1.1);
             opacity: 1;
           }
         }
@@ -152,12 +192,10 @@ const GlobalLandingPage = () => {
           allow="fullscreen"
           className="spline-iframe"
           onLoad={() => {
-            console.log('Spline 3D model loaded successfully')
             setSplineLoaded(true)
             setIsLoading(false)
           }}
-          onError={(e) => {
-            console.error('Spline 3D model failed to load:', e)
+          onError={() => {
             setSplineLoaded(false)
             setIsLoading(false)
           }}
@@ -181,21 +219,24 @@ const GlobalLandingPage = () => {
               <span className="text-2xl font-bold text-white">VeeFore</span>
             </motion.div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              {['PRODUCT', 'SOLUTIONS', 'PRICING', 'DEVELOPERS', 'RESOURCES', 'SUPPORT'].map((item, index) => (
+            {/* Desktop Navigation with Stagger Animation */}
+            <motion.div 
+              className="hidden md:flex items-center space-x-8"
+              variants={navContainerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              {['PRODUCT', 'SOLUTIONS', 'PRICING', 'DEVELOPERS', 'RESOURCES', 'SUPPORT'].map((item) => (
                 <motion.a
                   key={item}
                   href="#"
                   className="text-white/80 hover:text-white transition-colors duration-200 font-medium"
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  variants={navItemVariants}
                 >
                   {item}
                 </motion.a>
               ))}
-            </div>
+            </motion.div>
 
             {/* Login Button */}
             <motion.button
@@ -257,14 +298,17 @@ const GlobalLandingPage = () => {
             zIndex: 10
           }}
         >
-          {/* Hero Content Overlay */}
-          <div className="relative z-20 text-center max-w-6xl mx-auto">
+          {/* Hero Content Overlay with Stagger Animation */}
+          <motion.div 
+            className="relative z-20 text-center max-w-6xl mx-auto"
+            variants={heroContainerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             {/* Main Headline */}
             <motion.h1
               className="text-6xl md:text-8xl font-bold text-white mb-6 leading-tight"
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: 0.5 }}
+              variants={heroContentVariants}
               style={{
                 background: 'linear-gradient(135deg, #ffffff, #a0a0a0)',
                 WebkitBackgroundClip: 'text',
@@ -280,9 +324,7 @@ const GlobalLandingPage = () => {
             {/* Subtitle */}
             <motion.p
               className="text-xl md:text-2xl text-white/80 mb-12 max-w-4xl mx-auto leading-relaxed"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: 0.8 }}
+              variants={heroContentVariants}
             >
               As your merchant of record, we manage your payments, tax and compliance needs, 
               so you can focus on growth.
@@ -291,9 +333,7 @@ const GlobalLandingPage = () => {
             {/* CTA Buttons */}
             <motion.div
               className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: 1.1 }}
+              variants={heroContentVariants}
             >
               <motion.button
                 className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-300 flex items-center gap-2 shadow-2xl"
@@ -317,9 +357,7 @@ const GlobalLandingPage = () => {
             {/* Social Media Icons */}
             <motion.div
               className="flex items-center justify-center gap-6"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: 1.4 }}
+              variants={heroContentVariants}
             >
               <motion.a
                 href="#"
@@ -339,7 +377,7 @@ const GlobalLandingPage = () => {
                 <Instagram className="w-6 h-6 text-white" />
               </motion.a>
             </motion.div>
-          </div>
+          </motion.div>
 
           {/* Interactive Key Button - positioned over the 3D scene */}
           <AnimatePresence>
@@ -431,7 +469,13 @@ const GlobalLandingPage = () => {
               </p>
             </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <motion.div 
+              className="grid md:grid-cols-3 gap-8"
+              variants={featuresContainerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+            >
               {[
                 {
                   icon: <Zap className="w-8 h-8" />,
@@ -448,21 +492,18 @@ const GlobalLandingPage = () => {
                   title: "Advanced Analytics",
                   description: "Get insights into your revenue with detailed reporting and analytics."
                 }
-              ].map((feature, index) => (
+              ].map((feature) => (
                 <motion.div
                   key={feature.title}
                   className="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10 hover:bg-white/10 transition-all duration-300"
-                  initial={{ opacity: 0, y: 50 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: index * 0.2 }}
-                  viewport={{ once: true }}
+                  variants={featureCardVariants}
                 >
                   <div className="text-blue-400 mb-4">{feature.icon}</div>
                   <h3 className="text-2xl font-bold text-white mb-4">{feature.title}</h3>
                   <p className="text-white/70">{feature.description}</p>
                 </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
@@ -508,9 +549,9 @@ const GlobalLandingPage = () => {
         </AnimatePresence>
       </div>
 
-      {/* Floating Particles Effect */}
+      {/* Floating Particles Effect - Reduced from 30 to 10 for performance */}
       <div className="fixed inset-0 pointer-events-none z-5">
-        {[...Array(30)].map((_, i) => (
+        {[...Array(10)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-white/20 rounded-full"
@@ -533,6 +574,6 @@ const GlobalLandingPage = () => {
       </div>
     </div>
   )
-}
+})
 
 export default GlobalLandingPage
