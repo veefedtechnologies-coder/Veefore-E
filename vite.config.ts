@@ -21,29 +21,25 @@ export default defineConfig({
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
       'use-sync-external-store/shim',
-      'use-sync-external-store/shim/with-selector',
-      '@tanstack/react-query',
-      '@tanstack/react-query-persist-client',
-      '@tanstack/query-sync-storage-persister'
+      'use-sync-external-store/shim/with-selector'
     ],
     exclude: [
       '@react-three/postprocessing'
     ],
     esbuildOptions: {
       target: 'es2020'
-    },
-    force: true
+    }
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
   },
   resolve: {
     preserveSymlinks: false,
-    dedupe: ['react', 'react-dom', '@tanstack/react-query'],
+    dedupe: ['react', 'react-dom'],
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
-      "@assets": path.resolve(__dirname, "attached_assets")
+      "@assets": path.resolve(__dirname, "attached_assets"),
     },
   },
   root: path.resolve(__dirname, "client"),
@@ -71,7 +67,8 @@ export default defineConfig({
       clientPort: 443,
     },
     fs: {
-      strict: false,
+      strict: true,
+      deny: ["**/.*"],
       allow: [
         path.resolve(__dirname, 'client'),
         path.resolve(__dirname, 'shared')
