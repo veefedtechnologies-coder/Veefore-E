@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Route, Switch, useLocation } from 'wouter'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
@@ -58,11 +58,14 @@ import { initializeCoreWebVitals } from './lib/core-web-vitals';
 import { initializeComponentModernization } from './lib/component-modernization';
 
 function App() {
-  // Comprehensive React availability check
-  // Debug log removed
-
-  // React availability check
-  // React check removed to prevent timing issues
+  // Initialization guards to prevent re-initialization
+  const themeInitialized = useRef(false)
+  const p6Initialized = useRef(false)
+  const accessibilityInitialized = useRef(false)
+  const mobileInitialized = useRef(false)
+  const seoInitialized = useRef(false)
+  const webVitalsInitialized = useRef(false)
+  const componentModernizationInitialized = useRef(false)
 
   // Always call hooks at the top level - never inside conditions
   const [isCreateDropdownOpen, setIsCreateDropdownOpen] = useState(false)
@@ -74,9 +77,12 @@ function App() {
   // P7: Route announcements for accessibility
   useAccessibilityRouteAnnouncements(location)
 
-  // Initialize theme system
+  // Initialize theme system - only once
   useEffect(() => {
-    initializeTheme()
+    if (!themeInitialized.current) {
+      initializeTheme()
+      themeInitialized.current = true
+    }
   }, [])
 
   // P6: Initialize Frontend SEO, Accessibility & UX System  
@@ -84,43 +90,61 @@ function App() {
   // P11: Initialize Mobile & Cross-Platform Excellence
   // Optimized: Defer non-critical initializations to prevent blank page
   useEffect(() => {
-    // Critical: Run immediately for accessibility
-    initializeAccessibilityCompliance()
+    // Critical: Run immediately for accessibility - only once
+    if (!accessibilityInitialized.current) {
+      initializeAccessibilityCompliance()
+      accessibilityInitialized.current = true
+    }
     
     // Defer non-critical initializations to prevent blocking render
     const deferInit = () => {
-      initializeMobileExcellence()
-      initializeSEO()
-      initializeCoreWebVitals()
-      initializeComponentModernization()
-      initializeP6System({
-        seo: {
-          defaultTitle: 'VeeFore - AI-Powered Social Media Management',
-          defaultDescription: 'Transform your social media presence with VeeFore\'s AI-powered content creation, automated scheduling, and comprehensive analytics.',
-          siteName: 'VeeFore',
-          twitterHandle: '@VeeFore'
-        },
-        accessibility: {
-          enableScreenReaderSupport: true,
-          enableKeyboardNavigation: true,
-          announceRouteChanges: true
-        },
-        ux: {
-          enableLoadingStates: true,
-          enableToastNotifications: true,
-          autoSaveInterval: 30000
-        },
-        mobile: {
-          enableTouchOptimization: true,
-          enableGestureSupport: true,
-          enablePullToRefresh: true
-        },
-        performance: {
-          enableLazyLoading: true,
-          enableImageOptimization: true,
-          enableWebVitalsMonitoring: true
-        }
-      })
+      if (!mobileInitialized.current) {
+        initializeMobileExcellence()
+        mobileInitialized.current = true
+      }
+      if (!seoInitialized.current) {
+        initializeSEO()
+        seoInitialized.current = true
+      }
+      if (!webVitalsInitialized.current) {
+        initializeCoreWebVitals()
+        webVitalsInitialized.current = true
+      }
+      if (!componentModernizationInitialized.current) {
+        initializeComponentModernization()
+        componentModernizationInitialized.current = true
+      }
+      if (!p6Initialized.current) {
+        initializeP6System({
+          seo: {
+            defaultTitle: 'VeeFore - AI-Powered Social Media Management',
+            defaultDescription: 'Transform your social media presence with VeeFore\'s AI-powered content creation, automated scheduling, and comprehensive analytics.',
+            siteName: 'VeeFore',
+            twitterHandle: '@VeeFore'
+          },
+          accessibility: {
+            enableScreenReaderSupport: true,
+            enableKeyboardNavigation: true,
+            announceRouteChanges: true
+          },
+          ux: {
+            enableLoadingStates: true,
+            enableToastNotifications: true,
+            autoSaveInterval: 30000
+          },
+          mobile: {
+            enableTouchOptimization: true,
+            enableGestureSupport: true,
+            enablePullToRefresh: true
+          },
+          performance: {
+            enableLazyLoading: true,
+            enableImageOptimization: true,
+            enableWebVitalsMonitoring: true
+          }
+        })
+        p6Initialized.current = true
+      }
     }
     
     // Use requestIdleCallback if available, otherwise setTimeout
@@ -148,32 +172,6 @@ function App() {
   const hasFirebaseAuthInStorage = Object.keys(localStorage).some(key => 
     key.includes('firebase:authUser') && localStorage.getItem(key)
   )
-  
-  // Debug: Log all auth state values
-  console.log('🔍 AUTH STATE:', { 
-    hasUser: !!user, 
-    hasUserData: !!userData,
-    userDataLoading,
-    userDataError: !!userDataError,
-    firebaseLoading: loading,
-    hasFirebaseAuth: hasFirebaseAuthInStorage,
-    location 
-  })
-  
-  // Debug: Determine which render path will be taken
-  let renderPath = 'unknown'
-  if (hasFirebaseAuthInStorage && !user && loading) {
-    renderPath = 'EARLY_RETURN_LOADING'
-  } else if (!user && !hasFirebaseAuthInStorage) {
-    renderPath = 'LANDING_PAGE'
-  } else if (!user && hasFirebaseAuthInStorage) {
-    renderPath = 'LOADING_NO_USER'
-  } else if (user && userData) {
-    renderPath = 'DASHBOARD'
-  } else if (userDataLoading) {
-    renderPath = 'LOADING_USERDATA'
-  }
-  console.log('🎯 RENDER PATH:', renderPath)
 
   // Pre-fetch workspaces data for faster navigation
   const { data: workspaces } = useQuery({
@@ -198,37 +196,26 @@ function App() {
   useEffect(() => {
     // Wait for both loading states to complete to prevent timing issues
     if (!loading && !userDataLoading) {
-      console.log('Auth guard - User:', user?.email || 'Not authenticated', 'Location:', location)
-      console.log('User data:', userData)
-      console.log('Onboarding modal state:', isOnboardingModalOpen)
-      
       // If user is authenticated and fully onboarded, allow full access
       if (user && userData && userData.isOnboarded) {
         if (location === '/signin' || location === '/signup' || location === '/onboarding') {
-          console.log('Redirecting fully onboarded user to home page')
           setLocation('/')
         }
         // Close onboarding modal if open
         if (isOnboardingModalOpen) {
-          console.log('Closing onboarding modal for completed user')
           setIsOnboardingModalOpen(false)
         }
       }
       
       // STRICT: If user is authenticated but NOT onboarded, FORCE onboarding modal
       else if (user && userData && !userData.isOnboarded) {
-        console.log('🚨 ENFORCING ONBOARDING: User authenticated but not onboarded')
-        
         // Always ensure modal is open for non-onboarded users
         if (!isOnboardingModalOpen) {
-          console.log('🔴 OPENING ONBOARDING MODAL - User cannot proceed without onboarding')
           setIsOnboardingModalOpen(true)
         }
         
         // FORCE redirect away from auth pages to dashboard where modal will show
         if (location === '/signin' || location === '/signup') {
-          console.log('🚀 FORCE REDIRECTING to dashboard for MANDATORY onboarding')
-          console.log('🔀 Current location:', location, '-> Redirecting to /')
           setLocation('/')
           return // Exit early to prevent rendering auth page
         }
@@ -240,7 +227,6 @@ function App() {
           setIsOnboardingModalOpen(false)
         }
         if (location === '/onboarding') {
-          console.log('Redirecting unauthenticated user to root page')
           setLocation('/')
         }
       }
@@ -260,7 +246,6 @@ function App() {
 
   const handleCreateOptionSelect = (option: string) => {
     setIsCreateDropdownOpen(false)
-    console.log('Selected create option:', option)
   }
 
   return (
