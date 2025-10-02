@@ -285,6 +285,32 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         uid: result.user.uid
       })
       
+      // Link Firebase user with backend MongoDB database
+      console.log('🔗 Linking Firebase user with backend...')
+      const idToken = await result.user.getIdToken()
+      
+      const linkResponse = await fetch('/api/auth/link-firebase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          firebaseUid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName || result.user.email?.split('@')[0],
+          photoURL: result.user.photoURL
+        })
+      })
+
+      if (!linkResponse.ok) {
+        const errorData = await linkResponse.json().catch(() => ({ message: 'Failed to link user' }))
+        console.error('❌ Backend linking failed:', errorData)
+        throw new Error(errorData.message || 'Failed to link user account')
+      }
+
+      console.log('✅ User linked with backend successfully')
+      
       toast({
         title: "Success",
         description: "Signed in with Google successfully!",
