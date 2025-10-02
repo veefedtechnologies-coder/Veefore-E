@@ -25,6 +25,7 @@ export function SocialAccounts() {
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnMount: true, // Always fetch fresh data on mount
     refetchOnReconnect: true, // Refresh when network reconnects
+    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
   })
 
   // Smart Instagram sync mutation with rate limit protection and immediate updates
@@ -185,7 +186,7 @@ export function SocialAccounts() {
     }
   }, [connectedAccounts, startPollingMutation.isPending, hasStartedPolling])
 
-  if (isLoading) {
+  if (isLoading && !socialAccounts) {
     return (
       <Card data-testid="social-accounts" className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
         <CardContent className="p-6">
