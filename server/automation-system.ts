@@ -359,7 +359,7 @@ export class AutomationSystem {
             workspaceId: acc.workspaceId,
             hasPageId: !!acc.pageId,
             pageId: acc.pageId,
-            hasAccessToken: !!acc.accessToken,
+            hasAccessToken: acc.hasAccessToken,
             accessTokenMatch: acc.accessToken === accessToken
           });
         });
