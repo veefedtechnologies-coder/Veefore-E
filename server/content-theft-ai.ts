@@ -185,7 +185,8 @@ Focus on:
 
   } catch (error) {
     console.error('[CONTENT THEFT] Analysis failed:', error);
-    throw new Error(`Content theft detection failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Content theft detection failed: ${errorMessage}`);
   }
 }
 

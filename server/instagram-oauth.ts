@@ -9,14 +9,20 @@ export class InstagramOAuthService {
     this.appId = process.env.INSTAGRAM_APP_ID!;
     this.appSecret = process.env.INSTAGRAM_APP_SECRET!;
     // Environment-agnostic URL generation
-    const getBaseUrl = () => {
-      if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-      if (process.env.REPL_SLUG && process.env.REPL_OWNER) return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-      if (process.env.VITE_APP_URL) return process.env.VITE_APP_URL;
-      return process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5000';
+    const getRedirectUri = () => {
+      if (process.env.INSTAGRAM_REDIRECT_URL) return process.env.INSTAGRAM_REDIRECT_URL;
+      const base = (() => {
+        if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL;
+        if (process.env.CF_TUNNEL_HOSTNAME) return `https://${process.env.CF_TUNNEL_HOSTNAME}`;
+        if (process.env.VITE_APP_URL) return process.env.VITE_APP_URL;
+        if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+        if (process.env.REPL_SLUG && process.env.REPL_OWNER) return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+        return process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5000';
+      })();
+      return `${base}/api/instagram/callback`;
     };
     
-    this.redirectUri = `${getBaseUrl()}/api/instagram/callback`;
+    this.redirectUri = getRedirectUri();
   }
 
   getAuthUrl(workspaceId: string): string {
@@ -191,6 +197,7 @@ export class InstagramOAuthService {
           mediaCount: accountData.mediaCount || 0,
           profilePictureUrl: accountData.profilePictureUrl,
           pageId: accountData.pageId,
+          tokenStatus: 'valid',
           lastSyncAt: new Date(),
           updatedAt: new Date(),
         });
@@ -219,6 +226,7 @@ export class InstagramOAuthService {
           avgEngagement: 0,
           totalReach: 0,
           pageId: accountData.pageId,
+          tokenStatus: 'valid',
           lastSyncAt: new Date(),
         });
       }

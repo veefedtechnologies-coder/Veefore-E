@@ -205,7 +205,8 @@ Focus on:
 
   } catch (error) {
     console.error('[ROI CALCULATOR] Analysis failed:', error);
-    throw new Error(`ROI calculation failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`ROI calculation failed: ${errorMessage}`);
   }
 }
 

@@ -2540,7 +2540,7 @@ const VideoGeneratorAdvanced = () => {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-700">Description</label>
-                      <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{generatedScript.description}</p>
+                      <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{generatedScript.fullScript || generatedScript.hook || 'No description available'}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -2570,11 +2570,11 @@ const VideoGeneratorAdvanced = () => {
                         <div className="space-y-2">
                           <div>
                             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Visual</label>
-                            <p className="text-gray-900">{scene.visualDescription}</p>
+                            <p className="text-gray-900">{scene.visualElements || scene.description}</p>
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Camera & Lighting</label>
-                            <p className="text-gray-700 text-sm">{scene.cameraAngle} • {scene.lighting}</p>
+                            <p className="text-gray-700 text-sm">{scene.visualStyle || 'Standard'} • {scene.visualElements || 'Natural'}</p>
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Voiceover</label>

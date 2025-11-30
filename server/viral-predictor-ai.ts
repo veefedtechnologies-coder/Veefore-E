@@ -158,7 +158,8 @@ Provide actionable insights for maximizing viral potential.
 
   } catch (error) {
     console.error('[VIRAL PREDICTOR] Analysis failed:', error);
-    throw new Error(`Viral prediction analysis failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Viral prediction analysis failed: ${errorMessage}`);
   }
 }
 

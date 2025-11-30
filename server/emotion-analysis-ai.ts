@@ -210,7 +210,8 @@ Focus on:
 
   } catch (error) {
     console.error('[EMOTION ANALYSIS] Analysis failed:', error);
-    throw new Error(`Emotion analysis failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Emotion analysis failed: ${errorMessage}`);
   }
 }
 

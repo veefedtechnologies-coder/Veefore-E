@@ -18,10 +18,11 @@ export const TestAuth: React.FC = () => {
     )
   } catch (error) {
     console.error('TestAuth: Error using auth context', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return (
       <div>
         <h2>Auth Test Error</h2>
-        <p>Error: {error.message}</p>
+        <p>Error: {errorMessage}</p>
       </div>
     )
   }

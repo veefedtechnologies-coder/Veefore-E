@@ -40,6 +40,7 @@ const getAllowedOrigins = (): string[] => {
       'https://www.veefore.com',
       'https://app.veefore.com',
       'https://dashboard.veefore.com',
+      'https://veefore-webhook.veefore.com',
       // Allow localhost for same-server requests (Replit production environment)
       'http://localhost:5000',
       'http://127.0.0.1:5000',

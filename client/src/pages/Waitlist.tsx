@@ -724,7 +724,7 @@ const Waitlist = () => {
               <div className="inline-flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-full px-6 py-3">
                 <img src={veeforeLogo} alt="VeeFore" className="w-6 h-6 mr-2" />
                 <span className="text-blue-900 font-bold text-lg">
-                  Position #{waitlistData.user?.id?.slice(-3) || Math.floor(Math.random() * 999)}
+                  Position #{waitlistData.position || Math.floor(Math.random() * 999)}
                 </span>
               </div>
             </motion.div>
@@ -750,7 +750,7 @@ const Waitlist = () => {
             </motion.div>
 
             {/* Referral Section */}
-            {waitlistData.user?.referralCode && (
+            {waitlistData.referralCode && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -765,7 +765,7 @@ const Waitlist = () => {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={`${window.location.origin}/waitlist?ref=${waitlistData.user.referralCode}`}
+                    value={`${window.location.origin}/waitlist?ref=${waitlistData.referralCode}`}
                     readOnly
                     className="flex-1 bg-white border border-orange-200 rounded-lg px-3 py-2 text-xs text-gray-700 focus:outline-none"
                   />
@@ -1657,7 +1657,7 @@ const Waitlist = () => {
                         onKeyDown={(e) => {
                           // Handle backspace to focus previous input
                           if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
-                            const prevInput = e.target.parentElement?.parentElement?.children[index - 1]?.querySelector('input')
+                            const prevInput = (e.target as HTMLInputElement).parentElement?.parentElement?.children[index - 1]?.querySelector('input')
                             prevInput?.focus()
                           }
                         }}

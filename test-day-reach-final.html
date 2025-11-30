@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Day Reach Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        pre { white-space: pre-wrap; word-wrap: break-sanitized; }
+    </style>
+</head>
+<body>
+    <h1>🔬 Final Day Reach Solution Test</h1>
+    <p>This will test our enhanced day reach system that includes:</p>
+    <ul>
+        <li>Multiple Instagram API endpoint approaches</li>
+        <li>Post-level reach aggregation for day coverage</li>
+        <li>Smart fallback to week data if needed</li>
+    </ul>
+    
+    <button onclick="triggerSync()">🚀 Test Enhanced Day Reach</button>
+    <button onclick="checkDashboard()">📊 Check Dashboard Data</button>
+    <div id="results"></div>
+
+    <script>
+        async function triggerSync() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result">🔄 Triggering enhanced sync... Check server logs for detailed API debugging.</div>';
+            
+            try {
+                // Trigger the enhanced Instagram sync
+                const response = await fetch('/api/instagram/immediate-sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspaceId: '684402c2fd2cd4eb6521b386' })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Enhanced Sync Successful!</h3>
+                            <p>Username: ${data.username}</p>
+                            <p>The system has now attempted:</p>
+                            <ul>
+                                <li>Standard Instagram day reach API</li>
+                                <li>Alternative Instagram Graph API endpoints</li>
+                                <li>Post-level day reach calculation from recent posts</li>
+                                <li>Smart fallback estimation if needed</li>
+                            </ul>
+                            <p>Check server logs and then click "Check Dashboard Data" to see the results.</p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<div class="error">❌ Sync failed: ${data.error || 'Unknown error'}</div>`;
+                }
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function checkDashboard() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result">📊 Checking dashboard data...</div>';
+            
+            try {
+                // Check social accounts data to see if day reach is now properly populated
+                const response = await fetch('/api/social-accounts');
+                const accounts = await response.json();
+                
+                if (response.ok && accounts.length > 0) {
+                    const account = accounts[0];
+                    const dayReach = account.reachByPeriod?.day;
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h3>📊 Dashboard Data Status</h3>
+                            <h4>Account: @${account.username}</h4>
+                            <h4>Day Reach Data:</h4>
+                            <pre>${JSON.stringify(dayReach, null, 2)}</pre>
+                            <h4>All Periodized Reach:</h4>
+                            <pre>${JSON.stringify(account.reachByPeriod, null, 2)}</pre>
+                            <p><strong>Status:</strong> ${dayReach 
+                                ? `✅ Day reach is ${dayReach.source === 'account-level' ? 'real Instagram data' : 'calculated/estimated'} (${dayReach.value})`
+                                : '❌ Day reach still missing'}
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<div class="error">❌ Failed to fetch dashboard data: ${accounts.error || 'Unknown error'}</div>`;
+                }
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+

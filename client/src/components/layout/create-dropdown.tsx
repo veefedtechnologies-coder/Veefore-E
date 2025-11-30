@@ -2,13 +2,25 @@ import React from 'react'
 import { Edit3, Sparkles, MessageSquareText, Megaphone, Rocket, Link, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+interface CreateOption {
+  icon: React.ComponentType<any>
+  label: string
+  description: string
+  action: string
+  color: string
+  hoverColor: string
+  hasSubmenu?: boolean
+  badge?: string
+  badgeColor?: string
+}
+
 interface CreateDropdownProps {
   isOpen: boolean
   onClose: () => void
   onOptionSelect: (option: string) => void
 }
 
-const createOptions = [
+const createOptions: CreateOption[] = [
   {
     icon: Edit3,
     label: 'Post',

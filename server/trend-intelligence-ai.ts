@@ -155,7 +155,8 @@ Focus on:
 
   } catch (error) {
     console.error('[TREND INTELLIGENCE] Analysis failed:', error);
-    throw new Error(`Trend intelligence analysis failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Trend intelligence analysis failed: ${errorMessage}`);
   }
 }
 

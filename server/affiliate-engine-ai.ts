@@ -202,7 +202,8 @@ Provide 5-8 high-quality, diverse affiliate opportunities that offer genuine val
 
   } catch (error) {
     console.error('[AFFILIATE ENGINE] Discovery failed:', error);
-    throw new Error(`Affiliate opportunity discovery failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Affiliate opportunity discovery failed: ${errorMessage}`);
   }
 }
 

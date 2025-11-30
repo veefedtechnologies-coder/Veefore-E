@@ -1,0 +1,169 @@
+# AI Story Banner System - API Testing
+# Use this file with REST Client extension in VS Code
+# Or copy commands to test with curl/Postman
+
+### Variables
+@baseUrl = http://localhost:5000
+@workspaceId = 684402c2fd2cd4eb6521b386
+
+### 1. Check if AI Story services are loaded
+GET {{baseUrl}}/api/ai-growth-insights/status
+Content-Type: application/json
+
+### Expected Response:
+# {
+#   "status": "operational",
+#   "servicesLoaded": {
+#     "snapshotService": true,
+#     "aiStoryGenerator": true
+#   },
+#   "timestamp": "2025-10-03T..."
+# }
+
+###
+
+### 2. Get AI Stories for Today
+GET {{baseUrl}}/api/ai-growth-insights?workspaceId={{workspaceId}}&period=day
+Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Expected Response:
+# {
+#   "stories": [
+#     {
+#       "id": "story-1",
+#       "emoji": "🚀",
+#       "title": "Daily Momentum",
+#       "story": "Your followers grew by X%...",
+#       "working": "Engagement rate is strong",
+#       "attention": "Post frequency needs work",
+#       "suggestion": "Aim for 1 post per day",
+#       "priority": "high",
+#       "confidence": 85
+#     },
+#     // ... 2 more stories
+#   ],
+#   "insights": [...],
+#   "cached": false,
+#   "generatedAt": "2025-10-03T..."
+# }
+
+###
+
+### 3. Get AI Stories for This Week
+GET {{baseUrl}}/api/ai-growth-insights?workspaceId={{workspaceId}}&period=week
+Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN_HERE
+
+###
+
+### 4. Get AI Stories for This Month
+GET {{baseUrl}}/api/ai-growth-insights?workspaceId={{workspaceId}}&period=month
+Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN_HERE
+
+###
+
+### 5. Test Cache (call same endpoint twice)
+# First call - should be slow (AI generation)
+GET {{baseUrl}}/api/ai-growth-insights?workspaceId={{workspaceId}}&period=month
+Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Then immediately call again - should be instant (cached)
+GET {{baseUrl}}/api/ai-growth-insights?workspaceId={{workspaceId}}&period=month
+Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN_HERE
+
+###
+
+# ============================================
+# CURL COMMANDS (for terminal testing)
+# ============================================
+
+### Test status (no auth needed)
+# curl http://localhost:5000/api/ai-growth-insights/status
+
+### Test AI stories (need to be logged in)
+# First, log in and get your token from browser:
+# 1. Open DevTools (F12)
+# 2. Go to Application > Storage > Local Storage
+# 3. Find your auth token
+# 4. Replace YOUR_TOKEN in command below
+
+### Get stories for month
+# curl -H "Authorization: Bearer YOUR_TOKEN" \
+#      "http://localhost:5000/api/ai-growth-insights?workspaceId=684402c2fd2cd4eb6521b386&period=month"
+
+###
+
+# ============================================
+# POWERSHELL COMMANDS
+# ============================================
+
+### Test status
+# Invoke-RestMethod -Uri "http://localhost:5000/api/ai-growth-insights/status"
+
+### Test with auth (get token from browser first)
+# $token = "YOUR_TOKEN_HERE"
+# $headers = @{ Authorization = "Bearer $token" }
+# Invoke-RestMethod -Uri "http://localhost:5000/api/ai-growth-insights?workspaceId=684402c2fd2cd4eb6521b386&period=month" -Headers $headers
+
+###
+
+# ============================================
+# WHAT TO LOOK FOR
+# ============================================
+
+### In Server Terminal:
+# [AI INSIGHTS API] ⭐ REQUEST RECEIVED for workspace: XXX period: month
+# [AI INSIGHTS API] Services available: { snapshotService: true, aiStoryGenerator: true }
+# [AI INSIGHTS API] Data changed: true
+# [AI STORY] Generating stories for @username, period: month
+# [AI STORY] Claude generated 3 stories (or OpenAI if Claude fails)
+# [AI INSIGHTS API] Generated 3 stories and X insights
+# [AI STORY CACHE] Cached stories for workspace XXX, period month, expires at ...
+
+### On Second Call (cached):
+# [AI INSIGHTS API] ⭐ REQUEST RECEIVED for workspace: XXX period: month
+# [AI STORY CACHE] Cache hit for workspace XXX, period month
+# [AI INSIGHTS API] Returning cached stories
+
+###
+
+# ============================================
+# TROUBLESHOOTING
+# ============================================
+
+### If status returns false:
+# - Server not restarted after code changes
+# - Import errors in routes.ts
+# - Service files missing
+
+### If API returns 401:
+# - Not logged in / token expired
+# - Use browser session to test
+# - Check auth middleware
+
+### If API returns 404:
+# - Endpoint not registered
+# - Server not restarted
+# - Route typo
+
+### If API returns 500:
+# - Check server terminal for error stack trace
+# - Likely AI service error or database issue
+# - Check ANTHROPIC_API_KEY and OPENAI_API_KEY are set
+
+### If stories array is empty:
+# - No social accounts connected
+# - Check workspace has Instagram account linked
+
+### If "working" and "attention" fields missing:
+# - AI didn't generate them
+# - Fallback stories being used
+# - Check AI service logs for errors
+
+###
+
+

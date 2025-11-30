@@ -3,7 +3,7 @@ import { IStorage } from './storage';
 export class InstagramDirectSync {
   constructor(private storage: IStorage) {}
 
-  async updateAccountWithRealData(workspaceId: string): Promise<void> {
+  async updateAccountWithRealData(workspaceId: string, providedAccessToken?: string): Promise<void> {
     try {
       console.log('[INSTAGRAM DIRECT] Starting direct update for workspace:', workspaceId);
       
@@ -18,7 +18,18 @@ export class InstagramDirectSync {
         return;
       }
       
-      if (!instagramAccount.accessToken) {
+      let token = providedAccessToken || instagramAccount.accessToken;
+      if (!token && (instagramAccount as any).encryptedAccessToken) {
+        try {
+          const { tokenEncryption } = await import('./security/token-encryption');
+          token = tokenEncryption.decryptToken((instagramAccount as any).encryptedAccessToken);
+          console.log('[INSTAGRAM DIRECT] Decrypted access token from storage');
+        } catch (e) {
+          console.log('[INSTAGRAM DIRECT] Failed to decrypt encrypted token, skipping sync');
+          return;
+        }
+      }
+      if (!token) {
         console.log('[INSTAGRAM DIRECT] Instagram account exists but no access token - skipping sync');
         return;
       }
@@ -29,25 +40,36 @@ export class InstagramDirectSync {
         return;
       }
 
-      console.log(`[INSTAGRAM DIRECT] Using stored access token for account: ${instagramAccount.username}`);
-      console.log(`[INSTAGRAM DIRECT] Access token exists: ${!!instagramAccount.accessToken}`);
-      console.log(`[INSTAGRAM DIRECT] Token starts with: ${instagramAccount.accessToken ? instagramAccount.accessToken.substring(0, 10) + '...' : 'None'}`);
+      console.log(`[INSTAGRAM DIRECT] Using access token for account: ${instagramAccount.username}`);
+      console.log(`[INSTAGRAM DIRECT] Token starts with: ${token.substring(0, 10)}...`);
 
       // Fetch real Instagram profile data using the correct access token
-      const profileData = await this.fetchProfileData(instagramAccount.accessToken);
+      const profileData = await this.fetchProfileData(token);
       console.log('[INSTAGRAM DIRECT] Fetched profile data:', profileData);
 
       // Calculate realistic engagement metrics
       const engagementMetrics = this.calculateEngagementMetrics(profileData);
       console.log('[INSTAGRAM DIRECT] Calculated engagement:', engagementMetrics);
 
-      // Update account using MongoDB direct operation
-      await this.updateAccountDirect(workspaceId, {
+      // ✅ ENHANCED DEBUG: Log the exact data being sent to update
+      const updatePayload = {
         ...profileData,
         ...engagementMetrics,
         lastSyncAt: new Date(),
         updatedAt: new Date()
+      };
+      console.log('[INSTAGRAM DIRECT] 🔍 UPDATE PAYLOAD:', {
+        followersCount: updatePayload.followersCount,
+        followers: updatePayload.followers,
+        mediaCount: updatePayload.mediaCount,
+        totalLikes: updatePayload.totalLikes,
+        totalComments: updatePayload.totalComments,
+        avgEngagement: updatePayload.avgEngagement,
+        totalReach: updatePayload.totalReach
       });
+
+      // Update account using MongoDB direct operation
+      await this.updateAccountDirect(workspaceId, { ...updatePayload, tokenStatus: 'valid' });
 
       console.log('[INSTAGRAM DIRECT] Successfully updated account with real data');
 
@@ -61,7 +83,7 @@ export class InstagramDirectSync {
       console.log('[INSTAGRAM DIRECT] === STARTING NEW FETCH WITH ACCOUNT INSIGHTS ===');
       console.log('[INSTAGRAM DIRECT] Using Instagram Business API directly...');
       
-      // Use Instagram Business API directly without Facebook Graph API
+      // Use Instagram Business API directly
       const profileResponse = await fetch(
         `https://graph.instagram.com/me?fields=id,username,account_type,media_count,followers_count,profile_picture_url&access_token=${accessToken}`
       );
@@ -76,6 +98,47 @@ export class InstagramDirectSync {
       const profileData = await profileResponse.json();
       console.log('[INSTAGRAM DIRECT] Real Instagram Business profile:', profileData);
       console.log('[INSTAGRAM DIRECT] Profile ID for insights:', profileData.id);
+      console.log('[INSTAGRAM DIRECT] 🔍 followers_count from API:', profileData.followers_count);
+      console.log('[INSTAGRAM DIRECT] 🔍 media_count from API:', profileData.media_count);
+      console.log('[INSTAGRAM DIRECT] 🔍 account_type from API:', profileData.account_type);
+      
+      // ✅ CRITICAL CHECK: Is Instagram API returning followers_count?
+      if (profileData.followers_count === undefined || profileData.followers_count === null) {
+        console.log('⚠️  [INSTAGRAM DIRECT] WARNING: Instagram API did NOT return followers_count!');
+        console.log('⚠️  [INSTAGRAM DIRECT] This usually means:');
+        console.log('⚠️  1. Account type doesn\'t support this field (must be BUSINESS or CREATOR)');
+        console.log('⚠️  2. Access token missing instagram_business_basic permission');
+        console.log('⚠️  3. Account needs to be converted to Business/Creator account');
+        console.log('⚠️  Current account type:', profileData.account_type);
+
+        // Fallback: try Facebook Graph for followers_count
+        try {
+          const fbResp = await fetch(
+            `https://graph.facebook.com/v21.0/${profileData.id}?fields=followers_count,profile_picture_url,username,media_count&access_token=${accessToken}`
+          );
+          if (fbResp.ok) {
+            const fbData = await fbResp.json();
+            console.log('[INSTAGRAM DIRECT] FB Graph fallback data:', fbData);
+            if (typeof fbData.followers_count === 'number') {
+              profileData.followers_count = fbData.followers_count;
+              console.log('✅ [INSTAGRAM DIRECT] followers_count obtained via FB Graph fallback:', fbData.followers_count);
+            }
+            if (fbData.profile_picture_url && !profileData.profile_picture_url) {
+              profileData.profile_picture_url = fbData.profile_picture_url;
+            }
+            if (typeof fbData.media_count === 'number' && !profileData.media_count) {
+              profileData.media_count = fbData.media_count;
+            }
+          } else {
+            const fbErr = await fbResp.text();
+            console.log('[INSTAGRAM DIRECT] FB Graph fallback failed:', fbErr);
+          }
+        } catch (fbError) {
+          console.log('[INSTAGRAM DIRECT] FB Graph fallback error:', fbError);
+        }
+      } else {
+        console.log('✅ [INSTAGRAM DIRECT] followers_count successfully fetched:', profileData.followers_count);
+      }
 
       // Use correct Instagram Business API approach as per documentation
       // Step 1: Get account-level insights first
@@ -93,19 +156,19 @@ export class InstagramDirectSync {
         console.log('[INSTAGRAM DIRECT] Using Instagram official documentation format for business accounts');
         console.log('[INSTAGRAM DIRECT] Profile ID:', profileData.id, 'Account Type:', profileData.account_type);
         
-        // Try multiple Instagram Business API approaches for reach data
+        // Try multiple Instagram Business API approaches for reach and follower count data
         console.log('[INSTAGRAM DIRECT] Attempting official Instagram Business API format for reach data...');
         
         // Approach 1: Direct business insights without period (as shown in documentation)
         let accountInsightsResponse = await fetch(
-          `https://graph.instagram.com/${profileData.id}/insights?metric=reach&access_token=${accessToken}`
+          `https://graph.instagram.com/${profileData.id}/insights?metric=reach,follower_count&access_token=${accessToken}`
         );
         
         // If that fails, try with period parameter
         if (!accountInsightsResponse.ok) {
           console.log('[INSTAGRAM DIRECT] Fallback: trying with period parameter...');
           accountInsightsResponse = await fetch(
-            `https://graph.instagram.com/${profileData.id}/insights?metric=reach&period=day&access_token=${accessToken}`
+            `https://graph.instagram.com/${profileData.id}/insights?metric=reach,follower_count&period=day&access_token=${accessToken}`
           );
         }
         
@@ -132,6 +195,9 @@ export class InstagramDirectSync {
             if (metric.name === 'reach' && metric.values?.[0]?.value) {
               accountInsights.totalReach = metric.values[0].value;
             }
+            if (metric.name === 'follower_count' && metric.values?.[0]?.value) {
+              profileData.followers_count = metric.values[0].value;
+            }
             if (metric.name === 'impressions' && metric.values?.[0]?.value) {
               accountInsights.totalImpressions = metric.values[0].value;
             }
@@ -140,6 +206,91 @@ export class InstagramDirectSync {
             }
           }
           console.log('[INSTAGRAM DIRECT] Extracted account insights:', accountInsights);
+          // Also compute engagement totals from recent media (likes/comments) and saved/shares
+          try {
+            let totalLikesImmediate = 0;
+            let totalCommentsImmediate = 0;
+            let totalSharesImmediate = 0;
+            let totalSavesImmediate = 0;
+            let postsAnalyzedImmediate = 0;
+
+            const mediaResponse = await fetch(
+              `https://graph.instagram.com/${profileData.id}/media?fields=id,like_count,comments_count&limit=25&access_token=${accessToken}`
+            );
+            if (mediaResponse.ok) {
+              const mediaData = await mediaResponse.json();
+              const media = mediaData.data || [];
+              postsAnalyzedImmediate = media.length;
+              totalLikesImmediate = media.reduce((sum: number, post: any) => sum + (post.like_count || 0), 0);
+              totalCommentsImmediate = media.reduce((sum: number, post: any) => sum + (post.comments_count || 0), 0);
+
+              for (const item of media) {
+                const mediaId = item.id;
+                // saved
+                try {
+                  let savesValue = 0;
+                  let savesResp = await fetch(`https://graph.instagram.com/${mediaId}/insights?metric=saved&access_token=${accessToken}`);
+                  if (savesResp.ok) {
+                    const j = await savesResp.json();
+                    for (const m of (j.data || [])) {
+                      if (m.name === 'saved' && m.values?.[0]?.value !== undefined) {
+                        savesValue = m.values[0].value || 0;
+                      }
+                    }
+                  } else {
+                    const fbSavesResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}/insights?metric=saved&access_token=${accessToken}`);
+                    if (fbSavesResp.ok) {
+                      const j = await fbSavesResp.json();
+                      for (const m of (j.data || [])) {
+                        if (m.name === 'saved' && m.values?.[0]?.value !== undefined) {
+                          savesValue = m.values[0].value || 0;
+                        }
+                      }
+                    }
+                  }
+                  if (savesValue > 0) totalSavesImmediate += savesValue;
+                } catch {}
+                // shares
+                try {
+                  let sharesValue = 0;
+                  let sharesResp = await fetch(`https://graph.instagram.com/${mediaId}/insights?metric=shares&access_token=${accessToken}`);
+                  if (sharesResp.ok) {
+                    const j = await sharesResp.json();
+                    for (const m of (j.data || [])) {
+                      if (m.name === 'shares' && m.values?.[0]?.value !== undefined) {
+                        sharesValue = m.values[0].value || 0;
+                      }
+                    }
+                  } else {
+                    const fbSharesResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}/insights?metric=shares&access_token=${accessToken}`);
+                    if (fbSharesResp.ok) {
+                      const j = await fbSharesResp.json();
+                      for (const m of (j.data || [])) {
+                        if (m.name === 'shares' && m.values?.[0]?.value !== undefined) {
+                          sharesValue = m.values[0].value || 0;
+                        }
+                      }
+                    }
+                  }
+                  if (sharesValue > 0) totalSharesImmediate += sharesValue;
+                } catch {}
+              }
+            }
+
+            // Attach real engagement to profileData for downstream calculation
+            (profileData as any).realEngagement = {
+              totalLikes: totalLikesImmediate,
+              totalComments: totalCommentsImmediate,
+              totalShares: totalSharesImmediate,
+              totalSaves: totalSavesImmediate,
+              postsAnalyzed: postsAnalyzedImmediate,
+              totalReach: accountInsights.totalReach || 0,
+              totalImpressions: accountInsights.totalImpressions || 0
+            };
+            console.log('[INSTAGRAM DIRECT] Immediate engagement totals:', (profileData as any).realEngagement);
+          } catch (immediateError) {
+            console.log('[INSTAGRAM DIRECT] Immediate engagement computation failed:', immediateError);
+          }
         } else {
           const errorText = await accountInsightsResponse.text();
           console.log('[INSTAGRAM DIRECT] Account insights failed - Status:', accountInsightsResponse.status);
@@ -151,7 +302,7 @@ export class InstagramDirectSync {
           // Alternative 1: Try days_28 period for business accounts
           try {
             const alt1Response = await fetch(
-              `https://graph.instagram.com/${profileData.id}/insights?metric=reach,profile_views&period=days_28&access_token=${accessToken}`
+              `https://graph.instagram.com/${profileData.id}/insights?metric=reach,profile_views,follower_count&period=days_28&access_token=${accessToken}`
             );
             if (alt1Response.ok) {
               const alt1Data = await alt1Response.json();
@@ -161,6 +312,10 @@ export class InstagramDirectSync {
                 if (metric.name === 'reach' && metric.values?.[0]?.value) {
                   accountInsights.totalReach = metric.values[0].value;
                   console.log('[INSTAGRAM DIRECT] Extracted authentic reach from days_28:', accountInsights.totalReach);
+                }
+                if (metric.name === 'follower_count' && metric.values?.[0]?.value) {
+                  profileData.followers_count = metric.values[0].value;
+                  console.log('[INSTAGRAM DIRECT] Extracted follower_count from days_28:', profileData.followers_count);
                 }
                 if (metric.name === 'profile_views' && metric.values?.[0]?.value) {
                   accountInsights.profileViews = metric.values[0].value;
@@ -178,7 +333,7 @@ export class InstagramDirectSync {
           // Alternative 2: Try week period instead of day
           try {
             const alt2Response = await fetch(
-              `https://graph.instagram.com/${profileData.id}/insights?metric=reach,profile_views&period=week&access_token=${accessToken}`
+              `https://graph.instagram.com/${profileData.id}/insights?metric=reach,profile_views,follower_count&period=week&access_token=${accessToken}`
             );
             if (alt2Response.ok) {
               const alt2Data = await alt2Response.json();
@@ -188,6 +343,10 @@ export class InstagramDirectSync {
                 if (metric.name === 'reach' && metric.values?.[0]?.value) {
                   accountInsights.totalReach = metric.values[0].value;
                   console.log('[INSTAGRAM DIRECT] Extracted authentic reach from week period:', accountInsights.totalReach);
+                }
+                if (metric.name === 'follower_count' && metric.values?.[0]?.value) {
+                  profileData.followers_count = metric.values[0].value;
+                  console.log('[INSTAGRAM DIRECT] Extracted follower_count from week period:', profileData.followers_count);
                 }
               }
             } else {
@@ -317,6 +476,8 @@ export class InstagramDirectSync {
         // Calculate engagement totals from posts
         const totalLikes = posts.reduce((sum: number, post: any) => sum + (post.like_count || 0), 0);
         const totalComments = posts.reduce((sum: number, post: any) => sum + (post.comments_count || 0), 0);
+        let totalShares = 0;
+        let totalSaves = 0;
         
         // Step 3: Try to get media-level insights for each post
         let mediaReach = 0;
@@ -363,6 +524,76 @@ export class InstagramDirectSync {
                 console.log(`[INSTAGRAM DIRECT] Post ${post.id} reach extraction failed:`, errorText);
               }
             }
+
+            // Fetch saves insights (Instagram Graph -> Facebook Graph fallback)
+            try {
+              let savesOk = false;
+              let savesValue = 0;
+              const savesResponse = await fetch(`https://graph.instagram.com/${post.id}/insights?metric=saved&access_token=${accessToken}`);
+              if (savesResponse.ok) {
+                const savedInsights = await savesResponse.json();
+                const savedData = savedInsights.data || [];
+                for (const metric of savedData) {
+                  if (metric.name === 'saved' && metric.values?.[0]?.value !== undefined) {
+                    savesValue = metric.values[0].value || 0;
+                    savesOk = true;
+                  }
+                }
+              }
+              if (!savesOk) {
+                const fbSavesResponse = await fetch(`https://graph.facebook.com/v21.0/${post.id}/insights?metric=saved&access_token=${accessToken}`);
+                if (fbSavesResponse.ok) {
+                  const fbSavedInsights = await fbSavesResponse.json();
+                  const fbSavedData = fbSavedInsights.data || [];
+                  for (const metric of fbSavedData) {
+                    if (metric.name === 'saved' && metric.values?.[0]?.value !== undefined) {
+                      savesValue = metric.values[0].value || 0;
+                      savesOk = true;
+                    }
+                  }
+                }
+              }
+              if (savesOk && savesValue > 0) {
+                totalSaves += savesValue;
+              }
+            } catch (e) {
+              // continue
+            }
+
+            // Fetch shares insights (Instagram Graph -> Facebook Graph fallback)
+            try {
+              let sharesOk = false;
+              let sharesValue = 0;
+              const sharesResponse = await fetch(`https://graph.instagram.com/${post.id}/insights?metric=shares&access_token=${accessToken}`);
+              if (sharesResponse.ok) {
+                const sharesInsights = await sharesResponse.json();
+                const sharesData = sharesInsights.data || [];
+                for (const metric of sharesData) {
+                  if (metric.name === 'shares' && metric.values?.[0]?.value !== undefined) {
+                    sharesValue = metric.values[0].value || 0;
+                    sharesOk = true;
+                  }
+                }
+              }
+              if (!sharesOk) {
+                const fbSharesResponse = await fetch(`https://graph.facebook.com/v21.0/${post.id}/insights?metric=shares&access_token=${accessToken}`);
+                if (fbSharesResponse.ok) {
+                  const fbSharesInsights = await fbSharesResponse.json();
+                  const fbSharesData = fbSharesInsights.data || [];
+                  for (const metric of fbSharesData) {
+                    if (metric.name === 'shares' && metric.values?.[0]?.value !== undefined) {
+                      sharesValue = metric.values[0].value || 0;
+                      sharesOk = true;
+                    }
+                  }
+                }
+              }
+              if (sharesOk && sharesValue > 0) {
+                totalShares += sharesValue;
+              }
+            } catch (e) {
+              // continue
+            }
           } catch (mediaError) {
             console.log(`[INSTAGRAM DIRECT] Failed to process post ${post.id}:`, mediaError);
           }
@@ -395,7 +626,9 @@ export class InstagramDirectSync {
             totalComments,
             postsAnalyzed: posts.length,
             totalReach: hasAuthenticReach ? finalReach : 0,
-            totalImpressions: hasAuthenticImpressions ? finalImpressions : 0
+            totalImpressions: hasAuthenticImpressions ? finalImpressions : 0,
+            totalShares,
+            totalSaves
           };
         } else {
           console.log(`[INSTAGRAM DIRECT] Instagram Business API insights unavailable - API v22+ restrictions prevent access`);
@@ -405,7 +638,9 @@ export class InstagramDirectSync {
             totalComments,
             postsAnalyzed: posts.length,
             totalReach: 0, // Zero indicates insights restricted by Instagram API v22+
-            totalImpressions: 0 // Zero indicates insights restricted by Instagram API v22+
+            totalImpressions: 0, // Zero indicates insights restricted by Instagram API v22+
+            totalShares,
+            totalSaves
           };
         }
         
@@ -451,11 +686,21 @@ export class InstagramDirectSync {
 
       const data = await response.json();
       console.log('[INSTAGRAM DIRECT] Direct Instagram API data:', data);
+      console.log('[INSTAGRAM DIRECT] 🔍 Fallback - followers_count from API:', data.followers_count);
+      console.log('[INSTAGRAM DIRECT] 🔍 Fallback - media_count from API:', data.media_count);
+      
+      // ✅ CRITICAL CHECK: Is Instagram API returning followers_count?
+      if (data.followers_count === undefined || data.followers_count === null) {
+        console.log('⚠️  [INSTAGRAM DIRECT FALLBACK] WARNING: followers_count is NULL/UNDEFINED!');
+        console.log('⚠️  Account type:', data.account_type, '| ID:', data.id);
+      }
 
       // Try to fetch media insights for engagement calculation
       let totalLikes = 0;
       let totalComments = 0;
       let postsAnalyzed = 0;
+      let totalShares = 0;
+      let totalSaves = 0;
 
       try {
         if (data.id && data.media_count > 0) {
@@ -479,6 +724,69 @@ export class InstagramDirectSync {
               totalLikes,
               totalComments
             });
+
+            // Fetch saved and shares insights per media for immediate totals
+            for (const item of media) {
+              const mediaId = item.id;
+              // Saved
+              try {
+                let savesOk = false;
+                let savesValue = 0;
+                const savesResp = await fetch(`https://graph.instagram.com/${mediaId}/insights?metric=saved&access_token=${accessToken}`);
+                if (savesResp.ok) {
+                  const j = await savesResp.json();
+                  for (const m of (j.data || [])) {
+                    if (m.name === 'saved' && m.values?.[0]?.value !== undefined) {
+                      savesValue = m.values[0].value || 0;
+                      savesOk = true;
+                    }
+                  }
+                }
+                if (!savesOk) {
+                  const fbSavesResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}/insights?metric=saved&access_token=${accessToken}`);
+                  if (fbSavesResp.ok) {
+                    const j = await fbSavesResp.json();
+                    for (const m of (j.data || [])) {
+                      if (m.name === 'saved' && m.values?.[0]?.value !== undefined) {
+                        savesValue = m.values[0].value || 0;
+                        savesOk = true;
+                      }
+                    }
+                  }
+                }
+                if (savesOk && savesValue > 0) totalSaves += savesValue;
+              } catch {}
+
+              // Shares
+              try {
+                let sharesOk = false;
+                let sharesValue = 0;
+                const sharesResp = await fetch(`https://graph.instagram.com/${mediaId}/insights?metric=shares&access_token=${accessToken}`);
+                if (sharesResp.ok) {
+                  const j = await sharesResp.json();
+                  for (const m of (j.data || [])) {
+                    if (m.name === 'shares' && m.values?.[0]?.value !== undefined) {
+                      sharesValue = m.values[0].value || 0;
+                      sharesOk = true;
+                    }
+                  }
+                }
+                if (!sharesOk) {
+                  const fbSharesResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}/insights?metric=shares&access_token=${accessToken}`);
+                  if (fbSharesResp.ok) {
+                    const j = await fbSharesResp.json();
+                    for (const m of (j.data || [])) {
+                      if (m.name === 'shares' && m.values?.[0]?.value !== undefined) {
+                        sharesValue = m.values[0].value || 0;
+                        sharesOk = true;
+                      }
+                    }
+                  }
+                }
+                if (sharesOk && sharesValue > 0) totalShares += sharesValue;
+              } catch {}
+            }
+            console.log('[INSTAGRAM DIRECT] Immediate totals (shares/saves):', { totalShares, totalSaves });
           }
         }
       } catch (mediaError) {
@@ -495,6 +803,8 @@ export class InstagramDirectSync {
           totalLikes, 
           totalComments, 
           postsAnalyzed,
+          totalShares,
+          totalSaves,
           totalReach: 0, // Will be calculated based on engagement
           totalImpressions: 0
         }
@@ -556,6 +866,8 @@ export class InstagramDirectSync {
       followingCount: Math.floor(followers * 2),
       totalLikes,
       totalComments,
+      totalShares: realEngagement.totalShares || 0,
+      totalSaves: realEngagement.totalSaves || 0,
       avgLikes,
       avgComments,
       avgEngagement: parseFloat(engagementRate.toFixed(2)),
@@ -572,42 +884,39 @@ export class InstagramDirectSync {
       const instagramAccount = accounts.find(acc => acc.platform === 'instagram');
       
       if (instagramAccount) {
-        // Create update object with proper field mapping
+        console.log('[INSTAGRAM DIRECT] 🔍 Reading from updateData:', {
+          'updateData.followers': updateData.followers,
+          'updateData.followersCount': updateData.followersCount,
+          'updateData.mediaCount': updateData.mediaCount,
+          'updateData.totalLikes': updateData.totalLikes,
+          'updateData.totalComments': updateData.totalComments,
+          'updateData.totalShares': updateData.totalShares,
+          'updateData.totalSaves': updateData.totalSaves,
+          'updateData.totalReach': updateData.totalReach,
+          'updateData.avgEngagement': updateData.avgEngagement
+        });
+
         const updateFields = {
-          followersCount: updateData.followers,
-          followingCount: updateData.followingCount,
-          mediaCount: updateData.mediaCount,
-          totalLikes: updateData.totalLikes,
-          totalComments: updateData.totalComments,
-          avgLikes: updateData.avgLikes,
-          avgComments: updateData.avgComments,
-          avgEngagement: updateData.avgEngagement,
-          totalReach: updateData.totalReach,
-          profilePictureUrl: updateData.profilePictureUrl,
+          followersCount: updateData.followersCount || updateData.followers || 0,
+          followingCount: updateData.followingCount || 0,
+          mediaCount: updateData.mediaCount || 0,
+          totalLikes: updateData.totalLikes || 0,
+          totalComments: updateData.totalComments || 0,
+          totalShares: updateData.totalShares || 0,
+          totalSaves: updateData.totalSaves || 0,
+          avgLikes: updateData.avgLikes || 0,
+          avgComments: updateData.avgComments || 0,
+          avgEngagement: updateData.avgEngagement || 0,
+          totalReach: updateData.totalReach || 0,
+          profilePictureUrl: updateData.profilePictureUrl || null,
           lastSyncAt: updateData.lastSyncAt,
           updatedAt: updateData.updatedAt
         };
 
-        // Use MongoDB ObjectId directly for proper update
+        console.log('[INSTAGRAM DIRECT] 🔍 Final update fields being written to DB:', updateFields);
         const accountId = instagramAccount.id;
-        console.log('[INSTAGRAM DIRECT] Updating account with ID:', accountId, 'type:', typeof accountId);
-        
-        // Cast to any to bypass TypeScript for MongoDB ObjectId operations
-        const mongoStorage = this.storage as any;
-        if (mongoStorage.SocialAccount && mongoStorage.SocialAccount.findOneAndUpdate) {
-          // Direct MongoDB update using ObjectId
-          const result = await mongoStorage.SocialAccount.findOneAndUpdate(
-            { _id: accountId },
-            { $set: updateFields },
-            { new: true }
-          );
-          console.log('[INSTAGRAM DIRECT] MongoDB update result:', result ? 'success' : 'failed');
-        } else {
-          console.log('[INSTAGRAM DIRECT] Fallback: using storage interface with ID conversion');
-          // Fallback: try with ObjectId string conversion
-          await this.storage.updateSocialAccount(accountId, updateFields);
-        }
-        console.log('[INSTAGRAM DIRECT] Updated account with fields:', updateFields);
+        await this.storage.updateSocialAccount(accountId, updateFields);
+        console.log('[INSTAGRAM DIRECT] ✅ Updated account via storage.updateSocialAccount');
       } else {
         console.log('[INSTAGRAM DIRECT] No Instagram account found for workspace');
       }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Route, Switch, useLocation } from 'wouter'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
@@ -182,8 +182,60 @@ function App() {
     retry: false
   })
 
+  // ✅ PRODUCTION FIX: Validate workspace ID on app initialization
+  useEffect(() => {
+    const safeWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+    if (!safeWorkspaces || safeWorkspaces.length === 0) return;
+
+    const validateAndCorrectWorkspace = async () => {
+      const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
+      
+      // Check if stored workspace ID exists in user's workspaces
+      const isValid = storedWorkspaceId && safeWorkspaces.some((ws: any) => ws.id === storedWorkspaceId);
+      
+      if (!isValid) {
+        // INVALID WORKSPACE ID - Auto-correct on app initialization
+        console.warn('[APP INIT] ❌ Invalid workspace ID detected:', storedWorkspaceId);
+        console.log('[APP INIT] 🔧 Auto-correcting to valid workspace...');
+        
+        const defaultWorkspace = safeWorkspaces.find((ws: any) => ws.isDefault) || safeWorkspaces[0];
+        const correctedWorkspaceId = defaultWorkspace.id;
+        
+        console.log('[APP INIT] ✅ Auto-corrected workspace:', {
+          from: storedWorkspaceId,
+          to: correctedWorkspaceId,
+          name: defaultWorkspace.name
+        });
+        
+        // Update localStorage with correct workspace ID
+        localStorage.setItem('currentWorkspaceId', correctedWorkspaceId);
+        
+        // ✅ CRITICAL: Invalidate all React Query caches that depend on workspace ID
+        console.log('[APP INIT] 🔄 Invalidating all workspace-dependent queries...');
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/analytics/historical'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/content'] }),
+          // Refetch immediately to get data for correct workspace
+          queryClient.refetchQueries({ queryKey: ['/api/social-accounts'], type: 'active' }),
+          queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics'], type: 'active' })
+        ]);
+        console.log('[APP INIT] ✅ All queries invalidated and refetched with correct workspace ID');
+        
+        // Dispatch events to notify components
+        window.dispatchEvent(new Event('workspace-changed'));
+      } else {
+        console.log('[APP INIT] ✅ Workspace ID validated:', storedWorkspaceId);
+      }
+    };
+
+    validateAndCorrectWorkspace();
+  }, [workspaces]);
+
   // Pre-fetch social accounts for current workspace to eliminate loading on Integration page
-  const currentWorkspaceId = workspaces?.find((w: any) => w.isActive)?.id
+  // ✅ PRODUCTION FIX: Use localStorage workspace ID (now validated)
+  const currentWorkspaceId = localStorage.getItem('currentWorkspaceId') || workspaces?.find((w: any) => w.isDefault)?.id || workspaces?.[0]?.id;
   useQuery({
     queryKey: ['/api/social-accounts', currentWorkspaceId],
     queryFn: () => currentWorkspaceId ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspaceId}`) : Promise.resolve([]),
@@ -966,4 +1018,3 @@ function App() {
 }
 
 export default App
-

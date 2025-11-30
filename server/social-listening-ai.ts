@@ -195,7 +195,8 @@ Focus on:
 
   } catch (error) {
     console.error('[SOCIAL LISTENING] Analysis failed:', error);
-    throw new Error(`Social listening analysis failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Social listening analysis failed: ${errorMessage}`);
   }
 }
 

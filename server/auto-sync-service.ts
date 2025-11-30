@@ -63,7 +63,8 @@ class AutoSyncService {
               console.log(`[AUTO SYNC] Found workspace: ${workspace.name || workspaceId}`);
             }
           } catch (error) {
-            console.log(`[AUTO SYNC] Could not get workspace ${workspaceId}:`, error.message);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            console.log(`[AUTO SYNC] Could not get workspace ${workspaceId}:`, errorMessage);
           }
         }
       } catch (error) {

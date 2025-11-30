@@ -53,8 +53,7 @@ export class ApiClient {
     })
 
     if (response.status === 401) {
-      // Token expired or invalid, redirect to login
-      window.location.href = '/'
+      // Avoid hard reloads on tunnel domains; surface error to UI instead
       throw new Error('Authentication required')
     }
 

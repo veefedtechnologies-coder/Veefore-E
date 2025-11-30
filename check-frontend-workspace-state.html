@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Frontend Workspace State</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #252526;
+            border-left: 3px solid #007acc;
+        }
+        h2 {
+            color: #4ec9b0;
+            margin-top: 0;
+        }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .fix-button {
+            padding: 10px 20px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .fix-button:hover {
+            background: #005a9e;
+        }
+        .error {
+            color: #f48771;
+        }
+        .success {
+            color: #89d185;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Frontend Workspace State Diagnostics</h1>
+    
+    <div class="section">
+        <h2>📦 LocalStorage State</h2>
+        <div id="localStorage-state"></div>
+    </div>
+    
+    <div class="section">
+        <h2>🔧 Fix Actions</h2>
+        <button class="fix-button" onclick="fixWorkspaceId()">
+            Set Correct Workspace ID (684402c2fd2cd4eb6521b386)
+        </button>
+        <button class="fix-button" onclick="clearAllCache()">
+            Clear All Cache & Reload
+        </button>
+        <div id="fix-result"></div>
+    </div>
+
+    <script>
+        // Display current localStorage state
+        function displayLocalStorageState() {
+            const container = document.getElementById('localStorage-state');
+            const currentWorkspaceId = localStorage.getItem('currentWorkspaceId');
+            
+            let html = `<strong>Current Workspace ID in LocalStorage:</strong><br>`;
+            html += `<pre class="${currentWorkspaceId === '684402c2fd2cd4eb6521b386' ? 'success' : 'error'}">${currentWorkspaceId || 'NOT SET'}</pre>`;
+            
+            if (currentWorkspaceId !== '684402c2fd2cd4eb6521b386') {
+                html += `<p class="error">❌ WRONG! Should be: 684402c2fd2cd4eb6521b386</p>`;
+            } else {
+                html += `<p class="success">✅ CORRECT!</p>`;
+            }
+            
+            html += `<br><strong>All Workspace-Related LocalStorage Keys:</strong><br><pre>`;
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('workspace') || key.includes('Workspace'))) {
+                    html += `${key}: ${localStorage.getItem(key)}\n`;
+                }
+            }
+            html += `</pre>`;
+            
+            container.innerHTML = html;
+        }
+        
+        function fixWorkspaceId() {
+            const correctWorkspaceId = '684402c2fd2cd4eb6521b386';
+            localStorage.setItem('currentWorkspaceId', correctWorkspaceId);
+            
+            // Dispatch event to notify React components
+            window.dispatchEvent(new Event('workspace-changed'));
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'currentWorkspaceId',
+                newValue: correctWorkspaceId,
+                storageArea: localStorage
+            }));
+            
+            document.getElementById('fix-result').innerHTML = 
+                `<p class="success">✅ Workspace ID updated to: ${correctWorkspaceId}</p>
+                <p>🔄 Reloading page in 2 seconds...</p>`;
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        }
+        
+        function clearAllCache() {
+            // Clear localStorage
+            localStorage.clear();
+            
+            // Clear sessionStorage
+            sessionStorage.clear();
+            
+            // Set correct workspace
+            localStorage.setItem('currentWorkspaceId', '684402c2fd2cd4eb6521b386');
+            
+            document.getElementById('fix-result').innerHTML = 
+                `<p class="success">✅ All cache cleared and workspace ID set!</p>
+                <p>🔄 Reloading page in 2 seconds...</p>`;
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        }
+        
+        // Initialize
+        displayLocalStorageState();
+        
+        // Refresh every 2 seconds
+        setInterval(displayLocalStorageState, 2000);
+    </script>
+</body>
+</html>
+

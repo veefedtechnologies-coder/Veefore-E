@@ -120,6 +120,7 @@ const SocialAccountSchema = new mongoose.Schema({
   encryptedAccessToken: { type: mongoose.Schema.Types.Mixed, default: null },
   encryptedRefreshToken: { type: mongoose.Schema.Types.Mixed, default: null },
   expiresAt: Date,
+  tokenStatus: { type: String, default: 'valid' },
   isActive: { type: Boolean, default: true },
   // Instagram sync data fields
   followersCount: { type: Number, default: 0 },
@@ -140,6 +141,9 @@ const SocialAccountSchema = new mongoose.Schema({
   totalComments: { type: Number, default: 0 },
   totalReach: { type: Number, default: 0 },
   avgEngagement: { type: Number, default: 0 },
+  // Additional engagement totals
+  totalShares: { type: Number, default: 0 },
+  totalSaves: { type: Number, default: 0 },
   lastSyncAt: Date,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -973,24 +977,13 @@ export class MongoStorage implements IStorage {
       
       let workspace;
       
-      // Handle truncated workspace ID issue - fix this before any MongoDB query
-      if (idString === '684402' || idString.length === 6) {
-        console.log('[MONGODB DEBUG] Detected truncated workspace ID, searching by pattern');
-        workspace = await WorkspaceModel.findOne({ 
-          _id: { $regex: `^${idString}` } 
-        });
-      } else if (idString.length === 24) {
+      // Only accept valid 24-character ObjectIds
+      if (idString.length === 24) {
         // Full ObjectId - use directly
         workspace = await WorkspaceModel.findOne({ _id: idString });
-      } else if (idString.length > 6 && idString.length < 24) {
-        // Partial ObjectId - try pattern matching
-        console.log('[MONGODB DEBUG] Partial ObjectId detected, searching by pattern');
-        workspace = await WorkspaceModel.findOne({ 
-          _id: { $regex: `^${idString}` } 
-        });
       } else {
-        // Invalid ID format - return undefined instead of fallback
-        console.log('[MONGODB DEBUG] Invalid ID format, returning undefined');
+        // Invalid ID format - return undefined
+        console.log('[MONGODB DEBUG] Invalid ID format (must be 24 chars), returning undefined');
         return undefined;
       }
       
@@ -1187,6 +1180,16 @@ export class MongoStorage implements IStorage {
     console.log(`[CONVERT DEBUG] Raw mongoAccount accountId:`, mongoAccount.accountId);
     console.log(`[CONVERT DEBUG] All available fields:`, Object.keys(mongoAccount.toObject ? mongoAccount.toObject() : mongoAccount));
     
+    const hasToken = this.getAccessTokenFromAccount(mongoAccount) !== null;
+    const hasEncryptedField = !!mongoAccount.encryptedAccessToken;
+    const isExpired = mongoAccount.expiresAt ? (new Date(mongoAccount.expiresAt).getTime() < Date.now()) : false;
+    const normalizedTokenStatus = ((): string => {
+      if (isExpired) return 'expired';
+      if (hasToken) return 'valid';
+      if (hasEncryptedField && !hasToken) return 'invalid';
+      return 'missing';
+    })();
+
     return {
       id: mongoAccount._id.toString(),
       workspaceId: mongoAccount.workspaceId,
@@ -1195,12 +1198,13 @@ export class MongoStorage implements IStorage {
       accountId: mongoAccount.accountId || null,
       pageId: mongoAccount.pageId || null,
       // SECURITY: Never expose actual tokens in API responses - return boolean flags only
-      hasAccessToken: this.getAccessTokenFromAccount(mongoAccount) !== null,
+      hasAccessToken: hasToken,
       hasRefreshToken: this.getRefreshTokenFromAccount(mongoAccount) !== null,
+      tokenStatus: mongoAccount.tokenStatus ?? normalizedTokenStatus,
       expiresAt: mongoAccount.expiresAt || null,
       isActive: mongoAccount.isActive !== false,
       // Platform-specific sync data fields
-      followersCount: mongoAccount.followersCount ?? null,
+      followersCount: mongoAccount.followersCount ?? 0,
       followingCount: mongoAccount.followingCount ?? null,
       mediaCount: mongoAccount.mediaCount ?? null,
       biography: mongoAccount.biography ?? null,
@@ -1220,10 +1224,19 @@ export class MongoStorage implements IStorage {
       avgReach: mongoAccount.avgReach ?? null,
       engagementRate: mongoAccount.engagementRate ?? null,
       // Critical engagement fields for analytics
-      totalLikes: mongoAccount.totalLikes ?? null,
-      totalComments: mongoAccount.totalComments ?? null,
+      totalLikes: mongoAccount.totalLikes ?? 0,
+      totalComments: mongoAccount.totalComments ?? 0,
+      // ✅ CRITICAL FIX: Include shares/saves fields that were missing!
+      totalShares: mongoAccount.totalShares ?? 0,
+      totalSaves: mongoAccount.totalSaves ?? 0,
+      postsAnalyzed: mongoAccount.postsAnalyzed ?? null,
       totalReach: mongoAccount.totalReach ?? null,
       avgEngagement: mongoAccount.avgEngagement ?? null,
+      // 🚀 Comprehensive reach data
+      accountLevelReach: mongoAccount.accountLevelReach ?? null,
+      postLevelReach: mongoAccount.postLevelReach ?? null,
+      reachSource: mongoAccount.reachSource ?? null,
+      reachByPeriod: mongoAccount.reachByPeriod ?? null,
       lastSyncAt: mongoAccount.lastSyncAt ?? null,
       createdAt: mongoAccount.createdAt || new Date(),
       updatedAt: mongoAccount.updatedAt || new Date()
@@ -1520,6 +1533,8 @@ export class MongoStorage implements IStorage {
       ...account,
       // Don't set id/ID here - let MongoDB auto-generate _id as ObjectId
       isActive: true,
+      totalShares: 0,
+      totalSaves: 0,
       createdAt: new Date(),
       updatedAt: new Date()
     };

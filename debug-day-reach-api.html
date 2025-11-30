@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Instagram Day Reach API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Instagram Day Reach API Debug</h1>
+    <p>This page tests the Instagram API calls to see why day reach is being estimated instead of fetched directly.</p>
+    
+    <button onclick="testInstagramAPI()">🚀 Test Instagram API Calls</button>
+    
+    <div id="results"></div>
+
+    <script>
+        async function testInstagramAPI() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result">🔄 Testing Instagram API calls...</div>';
+            
+            try {
+                console.log('🔍 Testing Instagram debug endpoint...');
+                
+                const response = await fetch('/api/instagram/debug-reach?workspaceId=684402c2fd2cd4eb6521b386', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('📊 Debug results:', data);
+                
+                let html = '<h2>📋 Instagram API Test Results</h2>';
+                
+                if (data.success) {
+                    html += `
+                        <div class="result success">
+                            <h3>✅ Account Info</h3>
+                            <p><strong>Username:</strong> ${data.account.username}</p>
+                            <p><strong>Account ID:</strong> ${data.account.accountId}</p>
+                            <p><strong>Account Type:</strong> ${data.account.accountType}</p>
+                        </div>
+                    `;
+                    
+                    html += '<h3>📊 API Call Results</h3>';
+                    
+                    const periods = [
+                        { key: 'day', label: 'Today (Day)' },
+                        { key: 'week', label: 'This Week' },
+                        { key: 'days_28', label: 'This Month (28 days)' }
+                    ];
+                    
+                    periods.forEach(period => {
+                        const result = data.debugResults[period.key];
+                        const className = result.ok ? 'success' : 'error';
+                        
+                        html += `
+                            <div class="result ${className}">
+                                <h4>${period.label}</h4>
+                                <p><strong>Status:</strong> ${result.status} ${result.ok ? '✅' : '❌'}</p>
+                                <p><strong>URL:</strong> ${result.url ? result.url.split('?')[0] + '?...' : 'N/A'}</p>
+                                <details>
+                                    <summary>📄 Full Response</summary>
+                                    <pre>${JSON.stringify(result.response, null, 2)}</pre>
+                                </details>
+                            </div>
+                        `;
+                    });
+                    
+                    // Analysis
+                    const dayResult = data.debugResults.day;
+                    const weekResult = data.debugResults.week;
+                    const monthResult = data.debugResults.days_28;
+                    
+                    html += '<h3>🔍 Analysis</h3>';
+                    
+                    if (dayResult && dayResult.ok) {
+                        html += '<div class="result success"><strong>✅ Day reach IS available from Instagram API!</strong><br>The issue is in our code logic, not Instagram API limitations.</div>';
+                    } else if (dayResult && !dayResult.ok) {
+                        html += `<div class="result error"><strong>❌ Day reach API call failed:</strong><br>Status: ${dayResult.status}<br>Response: ${JSON.stringify(dayResult.response)}</div>`;
+                    }
+                    
+                    if (weekResult && weekResult.ok) {
+                        html += '<div class="result success">✅ Week reach is working correctly</div>';
+                    }
+                    
+                    if (monthResult && monthResult.ok) {
+                        html += '<div class="result success">✅ Month reach is working correctly</div>';
+                    }
+                    
+                } else {
+                    html += `<div class="result error">❌ Debug failed: ${data.error || 'Unknown error'}</div>`;
+                }
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('❌ Error testing Instagram API:', error);
+                resultsDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Error</h3>
+                        <p><strong>Message:</strong> ${error.message}</p>
+                        <p><strong>Stack:</strong></p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
