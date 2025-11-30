@@ -13,6 +13,9 @@ export default defineConfig({
     preserveSymlinks: false,
     dedupe: ['react', 'react-dom'],
     alias: {
+      react: path.resolve(__dirname, 'client/node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'client/node_modules/react-dom'),
+      'three-mesh-bvh': path.resolve(__dirname, 'client/src/stubs/three-mesh-bvh.ts'),
       "@": path.resolve(__dirname, "client/src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
@@ -23,7 +26,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: 5000,
+    port: 5173,
     host: '0.0.0.0',
     hmr: process.env.REPL_SLUG
       ? { protocol: 'wss', clientPort: 443 }

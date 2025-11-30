@@ -1277,8 +1277,8 @@ function AutomationStepByStepContent() {
   const [searchTerm, setSearchTerm] = useState('')
   
   // Refs for dropdown click outside handling
-  const accountDropdownRef = useRef(null)
-  const contentTypeDropdownRef = useRef(null)
+  const accountDropdownRef = useRef<HTMLDivElement>(null)
+  const contentTypeDropdownRef = useRef<HTMLDivElement>(null)
   
   // Helper function to get current keywords based on automation type
   const getCurrentKeywords = () => {
@@ -3277,7 +3277,7 @@ function AutomationStepByStepContent() {
                         {/* Username and Follow Button - Right side - Use real username */}
                         <div className="flex items-center gap-2">
                           <span className="text-white font-semibold text-sm">
-                            {selectedAccountData?.username || selectedAccountData?.name || 'wanderwithsky'}
+                            {selectedAccountData?.name || 'wanderwithsky'}
                           </span>
                           <button className="bg-white/20 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full border border-white/30 pointer-events-auto hover:bg-white/30 transition-colors focus:outline-none focus:ring-0 focus:border-0">
                             Follow
@@ -3298,7 +3298,7 @@ function AutomationStepByStepContent() {
                           <div className="w-2 h-2 bg-white rounded-full"></div>
                         </div>
                         <span className="text-white/80 text-xs">
-                          {selectedAccountData?.username || selectedAccountData?.name || 'wanderwithsky'} • Original audio
+                          {selectedAccountData?.name || 'wanderwithsky'} • Original audio
                         </span>
                       </div>
                       

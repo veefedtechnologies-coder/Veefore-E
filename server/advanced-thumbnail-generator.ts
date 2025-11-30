@@ -145,7 +145,8 @@ Focus on viral psychology and high-CTR elements. Make it scroll-stopping.`;
       console.error("[STAGE 2] OpenAI API Error:", error);
       console.error("[STAGE 2] OpenAI API Key exists:", !!process.env.OPENAI_API_KEY);
       console.error("[STAGE 2] Full error details:", JSON.stringify(error, null, 2));
-      await storage.updateThumbnailProject(projectId, { status: "failed", error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      await storage.updateThumbnailProject(projectId, { status: "failed", error: errorMessage });
     }
   }
 

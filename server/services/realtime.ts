@@ -24,16 +24,19 @@ export class RealtimeService {
       cors: {
         origin: [
           process.env.CLIENT_URL || "http://localhost:3000",
-          "https://veefore-webhook.veefore.com",
           "http://localhost:3000",
-          "http://localhost:5173"
+          "http://localhost:5173",
+          "https://veefore-webhook.veefore.com"
         ],
         methods: ["GET", "POST"],
         credentials: true
       },
       path: '/ws/metrics',
       transports: ['websocket', 'polling'],
-      allowEIO3: true // Allow Engine.IO v3 for better compatibility
+      allowUpgrades: true,
+      allowEIO3: true,
+      pingTimeout: 30000,
+      pingInterval: 10000
     });
 
     // Authentication middleware

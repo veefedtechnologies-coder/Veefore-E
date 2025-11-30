@@ -190,7 +190,7 @@ export class WebhookService {
     delivery.status = 'failed';
     delivery.attempts += 1;
     delivery.error = {
-      message: error.message,
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
       code: error.code,
       stack: error.stack
     };
@@ -332,7 +332,7 @@ export class WebhookService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
         statusCode: error.response?.status,
         response: error.response?.data
       };

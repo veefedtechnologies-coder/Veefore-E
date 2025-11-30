@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Instagram Day Reach API</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 50px auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2980b9; }
+        .error { background: #ffebee; border-color: #f44336; }
+        .success { background: #e8f5e8; border-color: #4caf50; }
+        .warning { background: #fff3e0; border-color: #ff9800; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Instagram Day Reach API</h1>
+    
+    <div class="section">
+        <h2>🎯 Purpose</h2>
+        <p>This tool tests Instagram Business API calls to understand why day reach data is not being fetched. Previously, the system was successfully getting day reach data, but now it's only getting week and month data.</p>
+    </div>
+
+    <div class="section">
+        <h2>🧪 Test Instagram API Calls</h2>
+        <button onclick="testInstagramAPI()">Test Instagram Reach API</button>
+        <button onclick="triggerInstagramSync()">Trigger Instagram Sync</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <div class="section">
+        <h2>📊 Expected Results</h2>
+        <ul>
+            <li><strong>Day Reach:</strong> Should return reach data for last 24 hours</li>
+            <li><strong>Week Reach:</strong> Should return reach data for last 7 days</li>
+            <li><strong>Month Reach:</strong> Should return reach data for last 28 days</li>
+        </ul>
+        <p><strong>Issue:</strong> Day reach is returning 0 or failing, while week/month work fine.</p>
+    </div>
+
+    <script>
+        async function testInstagramAPI() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="status warning">🔄 Testing Instagram API calls...</div>';
+            
+            try {
+                const response = await fetch('/api/instagram/debug-reach', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultsDiv.innerHTML = `
+                        <div class="status success">✅ API Test Completed</div>
+                        <h3>Account Info:</h3>
+                        <pre>${JSON.stringify(data.account, null, 2)}</pre>
+                        
+                        <h3>API Results:</h3>
+                        <div class="section">
+                            <h4>Day Reach Test:</h4>
+                            <pre>${JSON.stringify(data.debugResults.day, null, 2)}</pre>
+                        </div>
+                        
+                        <div class="section">
+                            <h4>Week Reach Test:</h4>
+                            <pre>${JSON.stringify(data.debugResults.week, null, 2)}</pre>
+                        </div>
+                        
+                        <div class="section">
+                            <h4>Month Reach Test:</h4>
+                            <pre>${JSON.stringify(data.debugResults.days_28, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<div class="status error">❌ API Test Failed: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="status error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        async function triggerInstagramSync() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="status warning">🔄 Triggering Instagram sync...</div>';
+            
+            try {
+                const response = await fetch('/api/instagram/immediate-sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultsDiv.innerHTML = `
+                        <div class="status success">✅ Instagram Sync Completed</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <p><strong>Next:</strong> Check the server console logs for detailed Instagram API responses.</p>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<div class="status error">❌ Sync Failed: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="status error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Auto-test on page load
+        window.onload = function() {
+            setTimeout(testInstagramAPI, 1000);
+        };
+    </script>
+</body>
+</html>
+
+
+
+

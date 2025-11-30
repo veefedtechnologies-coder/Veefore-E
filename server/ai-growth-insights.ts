@@ -443,7 +443,8 @@ Ensure insights are data-driven, specific, and immediately actionable.
     return validatedInsights;
   } catch (error) {
     console.error('[AI INSIGHTS] Claude API Generation error:', error);
-    console.error('[AI INSIGHTS] Error details:', error.message);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('[AI INSIGHTS] Error details:', errorMessage);
     
     // First fallback: Try OpenAI GPT-4o
     try {
@@ -471,7 +472,7 @@ Average Engagement: ${data.overallMetrics.avgEngagement}%
 Return a JSON array with format:
 [{"id": "insight1", "type": "strategy", "priority": "high", "title": "Insight Title", "description": "Description", "actionable": "Action", "impact": "Impact", "confidence": 85, "category": "Growth"}]`;
 
-        const fallbackResponse = await anthropic.messages.create({
+        const fallbackResponse = await getAnthropic().messages.create({
           model: DEFAULT_MODEL_STR,
           max_tokens: 1000,
           messages: [{ role: 'user', content: simplePrompt }]

@@ -17,10 +17,11 @@ export const SimpleTest: React.FC = () => {
     )
   } catch (error) {
     console.error('SimpleTest: Error using context', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return (
       <div>
         <h2>Simple Context Test Error</h2>
-        <p>Error: {error.message}</p>
+        <p>Error: {errorMessage}</p>
         <p>Test Status: FAILED</p>
       </div>
     )

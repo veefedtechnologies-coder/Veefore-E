@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force Instagram Immediate Sync</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        button { background: #3498db; color: white; border: none; padding: 15px 30px; border-radius: 4px; cursor: pointer; margin: 5px; font-size: 16px; }
+        button:hover { background: #2980b9; }
+        .success { background: #e8f5e8; border-color: #4caf50; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #ffebee; border-color: #f44336; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+        .loading { color: #3498db; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Force Instagram Immediate Sync</h1>
+    
+    <div class="section">
+        <h2>Manual Sync Trigger</h2>
+        <p>This will force an immediate sync of your Instagram account data, including period-wise reach data.</p>
+        <button onclick="forceSyncInstagram()">🔄 Force Sync Instagram Account</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function forceSyncInstagram() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="loading">⏳ Syncing Instagram account...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/instagram/immediate-sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        workspaceId: '686d91be22c4290df81af016'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Sync Successful!</h3>
+                            <p>Instagram account has been synced with period-wise reach data.</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h3>❌ Sync Failed</h3>
+                            <p>${data.error || 'Unknown error'}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Request Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+

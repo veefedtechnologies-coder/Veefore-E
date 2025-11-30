@@ -76,6 +76,11 @@ export class FrontendPerformanceOptimizer {
    */
   initialize(config?: Partial<PerformanceConfig>): void {
     this.config = { ...DEFAULT_PERFORMANCE_CONFIG, ...config };
+    if ((import.meta as any).env?.DEV) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+      }
+    }
     
     this.setupWebVitalsMonitoring();
     this.setupLazyLoading();
@@ -578,6 +583,8 @@ export class FrontendPerformanceOptimizer {
    * P6-5.3p1: Install aggressive service worker
    */
   private installServiceWorker(): void {
+    // Disable service worker in development to avoid stale module cache (Outdated Optimize Dep)
+    if ((import.meta as any).env?.DEV) return;
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then(registration => {
@@ -660,7 +667,7 @@ export class FrontendPerformanceOptimizer {
     });
 
     // Prevent text reflow on font load
-    document.body.style.fontDisplay = 'swap';
+    (document.body.style as any).fontDisplay = 'swap';
   }
 
   /**

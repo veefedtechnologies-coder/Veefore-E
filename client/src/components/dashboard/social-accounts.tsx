@@ -7,27 +7,117 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
-import { Users, TrendingUp, MessageSquare, Share2, Eye, Calendar, BarChart3, Heart, Instagram, Facebook, Twitter, Linkedin, Youtube, RefreshCw } from 'lucide-react'
+import { Users, TrendingUp, MessageSquare, Share2, Eye, Calendar, BarChart3, Heart, Instagram, Facebook, Twitter, Linkedin, Youtube, RefreshCw, Bookmark } from 'lucide-react'
 
 export function SocialAccounts() {
   const [, setLocation] = useLocation()
   const { toast } = useToast()
   const { currentWorkspace } = useCurrentWorkspace()
   
-  // Fetch social accounts data for current workspace - HYBRID: Webhooks + Smart Polling
+  // ✅ CRITICAL FIX: Clear cache on component mount to ensure fresh data
+  React.useEffect(() => {
+    // Clear React Query cache for social accounts on mount
+    queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
+    queryClient.removeQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
+    
+    // Clear localStorage cache
+    try {
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && (
+          key.startsWith('REACT_QUERY_OFFLINE_CACHE') || 
+          key.startsWith('tanstack-query') ||
+          key.includes('social-accounts')
+        )) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key))
+      console.log(`[SOCIAL ACCOUNTS] ✅ Cleared ${keysToRemove.length} cache entries on mount`)
+    } catch (error) {
+      console.error('[SOCIAL ACCOUNTS] Error clearing cache on mount:', error)
+    }
+  }, [currentWorkspace?.id])
+  
+  // Fetch social accounts data for current workspace - IMMEDIATE FETCH ON LOAD
   const { data: socialAccounts, isLoading, isFetching, refetch: refetchAccounts } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id],
-    queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!currentWorkspace?.id) return [];
+      // ✅ FORCE FRESH FETCH: Add timestamp to bypass cache
+      const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}&_t=${Date.now()}`);
+      console.log('[FRONTEND API] Raw API response:', response);
+      return response;
+    },
     enabled: !!currentWorkspace?.id,
     refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes before marking as stale (faster updates)
+    staleTime: 0, // ✅ Data is always stale - ensures fresh fetch every time
     refetchOnWindowFocus: true, // Refresh when user returns to tab
-    refetchOnMount: false, // Don't refetch on mount - rely on cache
+    refetchOnMount: 'always', // ✅ ALWAYS fetch fresh data when component mounts - shows real data immediately!
     refetchOnReconnect: true, // Refresh when network reconnects
-    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
+    gcTime: 0, // ✅ CRITICAL: Don't cache at all - always fetch fresh
+    placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
+
+  // 🔍 DEBUG: Log the API response to see what we're actually receiving
+  React.useEffect(() => {
+    if (Array.isArray(socialAccounts) && socialAccounts.length > 0) {
+      const instagramAccount = socialAccounts.find((acc: any) => acc.platform === 'instagram')
+      if (instagramAccount) {
+        console.log('[FRONTEND DEBUG] Instagram account data received:', {
+          username: instagramAccount.username,
+          totalShares: instagramAccount.totalShares,
+          totalSaves: instagramAccount.totalSaves,
+          totalLikes: instagramAccount.totalLikes,
+          totalComments: instagramAccount.totalComments,
+          fullAccount: instagramAccount
+        })
+        
+        // 🔍 CRITICAL: Check if shares/saves are 0 when they shouldn't be
+        // If likes/comments exist but shares/saves are 0, it's likely cached data
+        if ((instagramAccount.totalShares === 0 || instagramAccount.totalSaves === 0) && 
+            (instagramAccount.totalLikes > 0 || instagramAccount.totalComments > 0)) {
+          console.warn('[FRONTEND DEBUG] ⚠️ Shares/Saves are 0 but likes/comments exist! Clearing ALL caches...')
+          
+          // ✅ AGGRESSIVE CACHE CLEARING: Clear ALL React Query cache
+          try {
+            // Clear persisted cache from localStorage
+            const keysToRemove: string[] = []
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i)
+              if (key && (
+                key.startsWith('REACT_QUERY_OFFLINE_CACHE') || 
+                key.startsWith('tanstack-query') ||
+                key.includes('social-accounts') ||
+                key.includes('queryClient')
+              )) {
+                keysToRemove.push(key)
+              }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key))
+            console.log(`[FRONTEND DEBUG] ✅ Cleared ${keysToRemove.length} cache entries from localStorage`)
+            
+            // Clear ALL React Query cache
+            queryClient.clear()
+            console.log('[FRONTEND DEBUG] ✅ Cleared all React Query cache')
+            
+            // Remove specific queries
+            queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
+            queryClient.removeQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
+            
+            // Force immediate refetch with cache bypass
+            setTimeout(() => {
+              refetchAccounts()
+            }, 200)
+          } catch (error) {
+            console.error('[FRONTEND DEBUG] Error clearing cache:', error)
+          }
+        }
+      }
+    }
+  }, [socialAccounts, currentWorkspace?.id, refetchAccounts, queryClient])
 
   // Smart Instagram sync mutation with rate limit protection and immediate updates
   const syncMutation = useMutation({
@@ -184,25 +274,27 @@ export function SocialAccounts() {
     }
   }, [connectedAccounts, startPollingMutation.isPending, hasStartedPolling])
 
-  if (!socialAccounts && isLoading) {
-    return (
-      <Card data-testid="social-accounts" className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
-        <CardContent className="p-6">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-4"></div>
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  const isInitialLoading = isLoading && !Array.isArray(socialAccounts)
 
   // Find current account
   const currentAccount = connectedAccounts.find((acc: any) => acc.platform === selectedAccount) || connectedAccounts[0]
+
+  // 🔍 DEBUG: Log currentAccount data to see what's being displayed
+  React.useEffect(() => {
+    if (currentAccount) {
+      console.log('[FRONTEND DEBUG] Current account being displayed:', {
+        username: currentAccount.username,
+        platform: currentAccount.platform,
+        totalShares: currentAccount.totalShares,
+        totalSaves: currentAccount.totalSaves,
+        totalLikes: currentAccount.totalLikes,
+        totalComments: currentAccount.totalComments,
+        hasTotalShares: 'totalShares' in currentAccount,
+        hasTotalSaves: 'totalSaves' in currentAccount,
+        allKeys: Object.keys(currentAccount)
+      })
+    }
+  }, [currentAccount])
 
   // Format numbers for display
   const formatNumber = (num: number) => {
@@ -266,6 +358,11 @@ export function SocialAccounts() {
       case 'youtube': return 'bg-gradient-to-br from-red-50 to-orange-50 dark:from-slate-800 dark:to-slate-700'
       default: return 'bg-gradient-to-br from-gray-50 to-slate-50 dark:from-slate-800 dark:to-slate-700'
     }
+  }
+
+  const getSafeAvatarUrl = (acc: any) => {
+    const bust = acc.lastSyncAt ? new Date(acc.lastSyncAt).getTime() : Date.now()
+    return `/public/instagram/profile-picture/${acc.id}?t=${bust}`
   }
 
   return (
@@ -340,11 +437,24 @@ export function SocialAccounts() {
           </div>
         </div>
 
-        {/* Enhanced Account Details */}
+        {isInitialLoading && (
+          <div className="p-6">
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-4"></div>
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        
         {currentAccount && (
           <div className={`p-6 ${getPlatformBgColor(currentAccount.platform)}`}>
-            {/* Reconnect Warning - Show when access token is missing */}
-            {(!currentAccount.hasAccessToken && !currentAccount.accessToken) ? (
+            {/* Reconnect Warning - Show only when token is invalid/expired/missing */}
+            {(currentAccount.tokenStatus && currentAccount.tokenStatus !== 'valid') ? (
               <div className="bg-white dark:bg-gray-700 rounded-2xl p-8 shadow-sm border-2 border-orange-200 dark:border-orange-600">
                 <div className="text-center">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center">
@@ -357,11 +467,19 @@ export function SocialAccounts() {
                     Your access token is missing or expired. Reconnect your account to start syncing your real followers, posts, and engagement data.
                   </p>
                   <Button
-                    onClick={() => setLocation('/settings')}
+                    onClick={async () => {
+                      try {
+                        await apiRequest('/api/instagram/disconnect', { method: 'POST', body: JSON.stringify({ accountId: currentAccount.id }) })
+                        const data = await apiRequest('/api/instagram/reconnect/start', { method: 'POST', body: JSON.stringify({ workspaceId: currentWorkspace?.id }) })
+                        if ((data as any)?.url) window.location.href = (data as any).url
+                      } catch (e) {
+                        console.error('Reconnect failed', e)
+                      }
+                    }}
                     className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Reconnect Account in Settings
+                    Reconnect Account
                   </Button>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
                     After reconnecting, your real Instagram data will appear here automatically
@@ -376,9 +494,13 @@ export function SocialAccounts() {
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(currentAccount.platform)}`}>
                     {currentAccount.profilePictureUrl || currentAccount.profilePicture ? (
                       <img 
-                        src={currentAccount.profilePictureUrl || currentAccount.profilePicture} 
+                        src={getSafeAvatarUrl(currentAccount)} 
                         alt={currentAccount.username}
                         className="w-16 h-16 rounded-full object-cover"
+                        onError={(e) => {
+                          const fallback = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentAccount.username}`
+                          ;(e.currentTarget as HTMLImageElement).src = fallback
+                        }}
                       />
                     ) : (
                       <span className="text-2xl font-bold">{currentAccount.username?.[0]?.toUpperCase() || 'A'}</span>
@@ -387,10 +509,17 @@ export function SocialAccounts() {
                   <div>
                     <div className="font-bold text-gray-900 dark:text-gray-100 text-lg">@{currentAccount.username}</div>
                     <div className="flex items-center space-x-2">
-                      <Badge className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-600">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                        active
-                      </Badge>
+                      {currentAccount.tokenStatus === 'valid' ? (
+                        <Badge className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-600">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                          token valid
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-600">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+                          token {currentAccount.tokenStatus}
+                        </Badge>
+                      )}
                       <span className="text-sm text-gray-500 dark:text-gray-400">
                         Last sync: {currentAccount.lastSyncAt ? 
                           new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
@@ -420,44 +549,64 @@ export function SocialAccounts() {
                 </div>
               </div>
 
-              {/* Key Metrics */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl">
+              {/* Key Metrics - Expanded to include Shares and Saves */}
+              <div className="grid grid-cols-5 gap-3 mb-6">
+                <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl">
                   <div className="flex items-center justify-center mb-2">
-                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
                     {formatNumber(currentAccount.followersCount || currentAccount.followers || 0)}
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400">Followers</div>
                 </div>
-                <div className="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl">
+                <div className="text-center p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl">
                   <div className="flex items-center justify-center mb-2">
-                    <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
                   </div>
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  <div className="text-xl font-bold text-green-600 dark:text-green-400">
                     {calculateEngagement(currentAccount)}%
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400">Engagement</div>
                 </div>
-                <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl">
+                <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl">
                   <div className="flex items-center justify-center mb-2">
-                    <Eye className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <Eye className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
                     {currentAccount.mediaCount || currentAccount.posts || 0}
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400">Posts</div>
                 </div>
+                <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl">
+                  <div className="flex items-center justify-center mb-2">
+                    <Share2 className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                    {formatNumber(currentAccount.totalShares || 0)}
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">Shares</div>
+                </div>
+                <div className="text-center p-3 bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/30 dark:to-amber-900/30 rounded-xl">
+                  <div className="flex items-center justify-center mb-2">
+                    <Bookmark className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                  <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {formatNumber(currentAccount.totalSaves || 0)}
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">Saves</div>
+                </div>
               </div>
 
-              {/* Real Engagement Metrics */}
+              {/* Enhanced Engagement Metrics - Including Shares and Saves */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-4 mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold text-gray-900 dark:text-gray-100">Account Reach</h4>
                   <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{currentAccount.totalReach || 0}</span>
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">Total accounts reached: {currentAccount.totalLikes || 0} likes • {currentAccount.totalComments || 0} comments</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                  Total engagement: {currentAccount.totalLikes || 0} likes • {currentAccount.totalComments || 0} comments • {currentAccount.totalShares || 0} shares • {currentAccount.totalSaves || 0} saves
+                </div>
                 <div className="w-full bg-white dark:bg-gray-600 rounded-full h-3 overflow-hidden">
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((currentAccount.totalReach || 0) / 500 * 100, 100)}%` }}></div>
                 </div>

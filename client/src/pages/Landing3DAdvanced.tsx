@@ -169,7 +169,8 @@ const HolographicGrid = () => {
   useFrame((state) => {
     if (gridRef.current) {
       gridRef.current.rotation.x = -Math.PI / 2
-      gridRef.current.material.opacity = 0.1 + Math.sin(state.clock.elapsedTime) * 0.05
+      const material = gridRef.current.material as THREE.MeshBasicMaterial
+      material.opacity = 0.1 + Math.sin(state.clock.elapsedTime) * 0.05
     }
   })
   

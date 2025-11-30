@@ -84,19 +84,14 @@ export default function OnboardingFlow({ open, onComplete, userData }: Onboardin
 
       const authToken = await user.getIdToken()
       
-      const response = await fetch('/api/onboarding/prefill', {
+      const { apiRequest } = await import('@/lib/queryClient')
+      const response = await apiRequest('/api/onboarding/prefill', {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         }
       })
-
-      if (!response.ok) {
-        console.error('[ONBOARDING] API response error:', response.status, response.statusText)
-        throw new Error('Failed to fetch prefill data')
-      }
-
-      const result = await response.json()
+      const result = response
       console.log('[ONBOARDING] API response received:', result)
       
       if (result.success && result.prefillData) {

@@ -108,7 +108,8 @@ export async function getAuthenticHashtags(workspaceId: string, category: string
           }
         }
       } catch (searchError) {
-        console.log('[AUTHENTIC HASHTAGS] Hashtag search failed:', searchError.message);
+        const errorMessage = searchError instanceof Error ? searchError.message : 'Unknown search error occurred';
+        console.log('[AUTHENTIC HASHTAGS] Hashtag search failed:', errorMessage);
       }
     }
 

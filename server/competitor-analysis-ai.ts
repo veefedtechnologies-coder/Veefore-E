@@ -144,7 +144,8 @@ Focus on actionable insights that can be immediately implemented to gain competi
 
   } catch (error) {
     console.error('[COMPETITOR ANALYSIS] Error:', error);
-    throw new Error(`Failed to generate competitor analysis: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Failed to generate competitor analysis: ${errorMessage}`);
   }
 }
 

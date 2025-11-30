@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Instagram Sync</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        #output {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Instagram Sync Tester</h1>
+    <p>This page directly calls the immediate sync API to test if it's working.</p>
+    
+    <div>
+        <label>Workspace ID:</label>
+        <input type="text" id="workspaceId" placeholder="Enter your workspace ID" value="686d98d74888852d5d7beb75">
+        <small style="color: #888;">Find this in your browser console or use the default above</small>
+    </div>
+    
+    <button onclick="testSync()">🚀 Test Immediate Sync</button>
+    <button onclick="checkAccount()">📊 Check Account Data</button>
+    <button onclick="clearOutput()">🗑️ Clear Output</button>
+    
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            output.innerHTML = '';
+            log('Output cleared', 'info');
+        }
+
+        async function testSync() {
+            const workspaceId = document.getElementById('workspaceId').value;
+            
+            if (!workspaceId) {
+                log('❌ Please enter a workspace ID', 'error');
+                return;
+            }
+            
+            log(`🚀 Calling immediate sync API for workspace: ${workspaceId}`, 'info');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            
+            try {
+                const response = await fetch('/api/instagram/immediate-sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ workspaceId })
+                });
+                
+                log(`📡 Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                log(`📦 Response data:`, 'info');
+                log(JSON.stringify(data, null, 2), response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    log('✅ Sync completed successfully!', 'success');
+                    log('💡 Now check "Check Account Data" button to see if data updated', 'info');
+                } else {
+                    log(`❌ Sync failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+                log('Make sure your server is running on the same domain', 'error');
+            }
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'info');
+        }
+
+        async function checkAccount() {
+            const workspaceId = document.getElementById('workspaceId').value;
+            
+            if (!workspaceId) {
+                log('❌ Please enter a workspace ID', 'error');
+                return;
+            }
+            
+            log(`📊 Fetching account data for workspace: ${workspaceId}`, 'info');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            
+            try {
+                const response = await fetch(`/api/social-accounts?workspaceId=${workspaceId}`);
+                
+                log(`📡 Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                const accounts = await response.json();
+                
+                if (accounts.length === 0) {
+                    log('⚠️ No accounts found for this workspace', 'error');
+                    return;
+                }
+                
+                const instagram = accounts.find(a => a.platform === 'instagram');
+                
+                if (!instagram) {
+                    log('⚠️ No Instagram account found', 'error');
+                    return;
+                }
+                
+                log(`📱 Instagram Account: @${instagram.username}`, 'success');
+                log(`👥 Followers: ${instagram.followers || instagram.followersCount || 0}`, instagram.followers > 0 ? 'success' : 'error');
+                log(`📊 Engagement: ${instagram.avgEngagement || 0}%`, instagram.avgEngagement > 0 ? 'success' : 'error');
+                log(`📝 Posts: ${instagram.mediaCount || 0}`, 'info');
+                log(`❤️  Total Likes: ${instagram.totalLikes || 0}`, 'info');
+                log(`💬 Total Comments: ${instagram.totalComments || 0}`, 'info');
+                log(`🔗 Has Access Token: ${instagram.hasAccessToken ? 'Yes' : 'No'}`, instagram.hasAccessToken ? 'success' : 'error');
+                log(`🕐 Last Sync: ${instagram.lastSync || 'Never'}`, 'info');
+                
+                log('\n📦 Full account data:', 'info');
+                log(JSON.stringify(instagram, null, 2), 'info');
+                
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+            }
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'info');
+        }
+
+        // Auto-log on page load
+        log('🎯 Instagram Sync Tester Ready', 'success');
+        log('ℹ️  Instructions:', 'info');
+        log('  1. Click "Test Immediate Sync" to trigger data fetch', 'info');
+        log('  2. Watch the server console (PowerShell) for [IMMEDIATE SYNC] logs', 'info');
+        log('  3. Click "Check Account Data" to see if followers/engagement updated', 'info');
+        log('  4. Compare the before/after numbers', 'info');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'info');
+    </script>
+</body>
+</html>
+

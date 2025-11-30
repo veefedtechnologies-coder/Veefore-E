@@ -264,10 +264,82 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
 }
 
 // Hook to get current workspace ID (reactive to localStorage changes)
+// ✅ PRODUCTION FIX: Auto-validates workspace ID on mount and corrects invalid IDs
 export function useCurrentWorkspace() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(
     localStorage.getItem('currentWorkspaceId')
   )
+  const [isValidating, setIsValidating] = useState(false)
+  const queryClient = useQueryClient()
+  
+  // Fetch user's workspaces
+  const { data: workspaces = [], isLoading: workspacesLoading } = useQuery({
+    queryKey: ['/api/workspaces'],
+    queryFn: () => apiRequest('/api/workspaces'),
+    staleTime: 5 * 60 * 1000
+  })
+
+  // ✅ PRODUCTION FIX: Validate workspace ID on mount and when workspaces change
+  useEffect(() => {
+    if (workspacesLoading || workspaces.length === 0 || isValidating) return;
+
+    const validateWorkspace = async () => {
+      setIsValidating(true);
+      
+      const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
+      
+      // Check if stored workspace ID exists in user's workspaces
+      const safeWorkspaces = Array.isArray(workspaces) ? workspaces as Workspace[] : [];
+      const isValid = storedWorkspaceId && safeWorkspaces.some((ws: Workspace) => ws.id === storedWorkspaceId);
+      
+      if (!isValid) {
+        // INVALID WORKSPACE ID - Auto-correct
+        console.warn('[useCurrentWorkspace] ❌ Invalid workspace ID detected:', storedWorkspaceId);
+        console.log('[useCurrentWorkspace] 🔧 Auto-correcting to valid workspace...');
+        
+        const defaultWorkspace = safeWorkspaces.find((ws: Workspace) => ws.isDefault) || safeWorkspaces[0];
+        const correctedWorkspaceId = defaultWorkspace.id;
+        
+        console.log('[useCurrentWorkspace] ✅ Auto-corrected to workspace:', {
+          id: correctedWorkspaceId,
+          name: defaultWorkspace.name
+        });
+        
+        // Update localStorage and state
+        localStorage.setItem('currentWorkspaceId', correctedWorkspaceId);
+        setCurrentWorkspaceId(correctedWorkspaceId);
+        
+        // ✅ CRITICAL: Invalidate all React Query caches that depend on workspace ID
+        // This forces React Query to refetch with the CORRECT workspace ID
+        console.log('[useCurrentWorkspace] 🔄 Invalidating all workspace-dependent queries...');
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/analytics/historical'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/content'] }),
+          // Refetch immediately to get data for correct workspace
+          queryClient.refetchQueries({ queryKey: ['/api/social-accounts'], type: 'active' }),
+          queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics'], type: 'active' })
+        ]);
+        console.log('[useCurrentWorkspace] ✅ All queries invalidated and refetched with correct workspace ID');
+        
+        // Dispatch events to notify other components
+        window.dispatchEvent(new Event('workspace-changed'));
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'currentWorkspaceId',
+          newValue: correctedWorkspaceId,
+          oldValue: storedWorkspaceId,
+          storageArea: localStorage
+        }));
+      } else {
+        console.log('[useCurrentWorkspace] ✅ Workspace ID is valid:', storedWorkspaceId);
+      }
+      
+      setIsValidating(false);
+    };
+
+    validateWorkspace();
+  }, [workspaces, workspacesLoading, isValidating, queryClient]);
   
   // Listen for localStorage changes to keep hook reactive
   useEffect(() => {
@@ -286,22 +358,18 @@ export function useCurrentWorkspace() {
       window.removeEventListener('workspace-changed', handleStorageChange)
     }
   }, [])
-  
-  const { data: workspaces = [] } = useQuery({
-    queryKey: ['/api/workspaces'],
-    queryFn: () => apiRequest('/api/workspaces'),
-    staleTime: 5 * 60 * 1000
-  })
 
   const currentWorkspace = useMemo(() => {
-    return workspaces.find((ws: Workspace) => 
+    const safeWorkspaces = Array.isArray(workspaces) ? workspaces as Workspace[] : [];
+    return safeWorkspaces.find((ws: Workspace) => 
       currentWorkspaceId ? ws.id === currentWorkspaceId : ws.isDefault
-    ) || workspaces.find((ws: Workspace) => ws.isDefault) || workspaces[0]
+    ) || safeWorkspaces.find((ws: Workspace) => ws.isDefault) || safeWorkspaces[0]
   }, [workspaces, currentWorkspaceId])
 
   return {
     currentWorkspace,
     currentWorkspaceId: currentWorkspace?.id || null,
-    workspaces
+    workspaces,
+    isValidating
   }
 }

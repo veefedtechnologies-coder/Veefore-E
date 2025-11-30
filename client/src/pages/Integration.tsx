@@ -42,6 +42,8 @@ interface SocialAccount {
   lastSync?: string
   profilePicture?: string
   accessToken?: string
+  hasAccessToken?: boolean
+  tokenStatus?: 'valid' | 'expired' | 'invalid' | 'missing'
 }
 
 const platformConfig = {
@@ -184,18 +186,40 @@ function IntegrationContent() {
     setIsProcessingOAuth(true)
     
     if (success === 'true' || connected === 'instagram' || connected === 'youtube') {
-      console.log('OAuth callback success detected, refreshing data...')
+      console.log('✅ OAuth callback success detected, triggering IMMEDIATE data refresh...')
       
       // Clean up URL parameters first to prevent double execution
       const cleanUrl = window.location.pathname
       window.history.replaceState({}, '', cleanUrl)
+      const username = urlParams.get('username')
       
-      // Background refresh without loading state - data will update silently
+      // ✅ IMMEDIATE REFETCH - Force fetch fresh data right now (not background)
       Promise.all([
-        queryClient.refetchQueries({ queryKey: ['/api/social-accounts'] }),
-        queryClient.refetchQueries({ queryKey: ['/api/workspaces'] })
-      ]).then(() => {
-        console.log('✅ OAuth success: Background refresh complete')
+        queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] }),
+        queryClient.refetchQueries({ queryKey: ['/api/social-accounts'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['/api/workspaces'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics'], type: 'active' })
+      ]).then(async () => {
+        // Trigger an immediate force sync to populate initial metrics
+        try {
+          if (currentWorkspace?.id) {
+            await apiRequest('/api/instagram/force-sync', {
+              method: 'POST',
+              body: JSON.stringify({ workspaceId: currentWorkspace.id })
+            })
+            // Refetch social accounts after force sync completes
+            await queryClient.refetchQueries({ queryKey: ['/api/social-accounts'], type: 'active' })
+          }
+        } catch (e) {
+          console.error('Immediate force-sync after OAuth failed:', e)
+        }
+        console.log('✅ OAuth success: IMMEDIATE data refresh complete - real metrics should now be visible!')
+        console.log(`✅ Connected account: @${username || 'unknown'}`)
+        setIsProcessingOAuth(false)
+      }).catch((err) => {
+        console.error('❌ OAuth success but data refresh failed:', err)
         setIsProcessingOAuth(false)
       })
     } else if (error) {
@@ -299,10 +323,16 @@ function IntegrationContent() {
       handleOptimisticConnect(platform) // Show immediate feedback
       
       if (platform === 'instagram') {
-        // Get Instagram OAuth URL
-        const response = await apiRequest(`/api/instagram/auth?workspaceId=${currentWorkspace.id}`)
-        if (response.authUrl) {
-          window.location.href = response.authUrl
+        // Use secure reconnect/start which validates workspace ownership and cleans tokens
+        const response = await apiRequest(`/api/instagram/reconnect/start`, {
+          method: 'POST',
+          body: JSON.stringify({ workspaceId: currentWorkspace.id })
+        })
+        const url = (response as any).url || (response as any).authUrl
+        if (url) {
+          window.location.href = url
+        } else {
+          throw new Error('No auth URL returned from server')
         }
       } else if (platform === 'youtube') {
         // Get YouTube OAuth URL
@@ -439,7 +469,9 @@ function IntegrationContent() {
 
   const hasValidAccessToken = (account: SocialAccount | undefined) => {
     if (!account) return false
-    return account.accessToken && account.accessToken.trim() !== ''
+    if (account.tokenStatus) return account.tokenStatus === 'valid'
+    if (typeof account.hasAccessToken === 'boolean') return account.hasAccessToken
+    return !!(account.accessToken && account.accessToken.trim() !== '')
   }
 
   const renderPlatformCard = (platform: keyof typeof platformConfig) => {
@@ -508,8 +540,13 @@ function IntegrationContent() {
                 </div>
               </div>
 
-              {/* Warning Banner for Missing Access Token */}
-              {!hasAccessToken && (
+              {/* Warning Banner for Missing/Invalid Token */}
+              {(() => {
+                const params = new URLSearchParams(window.location.search)
+                const oauthSuccess = params.get('success') === 'true' && params.get('connected') === 'instagram'
+                const isInvalid = (!hasAccessToken || connectedAccount.tokenStatus === 'expired' || connectedAccount.tokenStatus === 'invalid' || connectedAccount.tokenStatus === 'missing')
+                return isInvalid && !oauthSuccess
+              })() && (
                 <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-600 rounded-lg">
                   <div className="flex items-start space-x-2">
                     <RefreshCw className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />

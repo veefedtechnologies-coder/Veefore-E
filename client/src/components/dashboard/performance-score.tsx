@@ -64,7 +64,7 @@ export function PerformanceScore() {
     return stories[period]
   }
   
-  // Fetch real dashboard analytics data for current workspace - PRODUCTION-SAFE
+  // Fetch real dashboard analytics data for current workspace - IMMEDIATE FETCH ON LOAD
   const { data: analytics, isLoading, isFetching } = useQuery({
     queryKey: ['/api/dashboard/analytics', currentWorkspace?.id],
     queryFn: () => currentWorkspace?.id ? apiRequest(`/api/dashboard/analytics?workspaceId=${currentWorkspace.id}`) : Promise.resolve({}),
@@ -73,13 +73,13 @@ export function PerformanceScore() {
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    refetchOnMount: false, // Don't refetch on mount - rely on cache
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes before marking as stale
+    refetchOnMount: 'always', // ✅ ALWAYS fetch fresh data when component mounts - shows real data immediately!
+    staleTime: 0, // ✅ Data is always stale - ensures fresh fetch every time
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
+    placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
 
-  // Fetch real social accounts data for current workspace - HYBRID: Webhooks + Smart Polling
+  // Fetch real social accounts data for current workspace - IMMEDIATE FETCH ON LOAD
   const { data: socialAccounts } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id],
     queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
@@ -88,13 +88,13 @@ export function PerformanceScore() {
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    refetchOnMount: false, // Don't refetch on mount - rely on cache
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes before marking as stale
+    refetchOnMount: 'always', // ✅ ALWAYS fetch fresh data when component mounts - shows real data immediately!
+    staleTime: 0, // ✅ Data is always stale - ensures fresh fetch every time
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
+    placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
 
-  // Fetch historical analytics data for trend comparisons - HYBRID: Webhooks + Smart Polling
+  // Fetch historical analytics data for trend comparisons - IMMEDIATE FETCH ON LOAD
   const { data: historicalData } = useQuery({
     queryKey: ['/api/analytics/historical', selectedPeriod, currentWorkspace?.id],
     queryFn: () => currentWorkspace?.id ? apiRequest(`/api/analytics/historical?period=${selectedPeriod}&days=${selectedPeriod === 'day' ? 7 : selectedPeriod === 'week' ? 30 : 90}&workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
@@ -103,10 +103,10 @@ export function PerformanceScore() {
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    refetchOnMount: false, // Don't refetch on mount - rely on cache
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes before marking as stale
+    refetchOnMount: 'always', // ✅ ALWAYS fetch fresh data when component mounts - shows real data immediately!
+    staleTime: 0, // ✅ Data is always stale - ensures fresh fetch every time
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    placeholderData: (previousData) => previousData, // Show cached data immediately while refetching
+    placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
 
   // Calculate REAL growth data using historical records
@@ -185,27 +185,7 @@ export function PerformanceScore() {
   }
 
 
-  if (!analytics && isLoading) {
-    return (
-      <Card data-testid="performance-score" className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 border-0 rounded-3xl overflow-hidden">
-        <CardHeader className="text-center pb-4">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 mx-auto mb-2"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mx-auto"></div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="grid grid-cols-4 gap-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  const isInitialLoading = isLoading && !analytics
 
   // Map real connected platforms from social accounts
   const connectedPlatforms = socialAccounts?.filter((account: any) => {
@@ -408,8 +388,22 @@ export function PerformanceScore() {
       })()}
 
       <CardContent className="space-y-8">
+        {isInitialLoading && (
+          <div>
+            <div className="animate-pulse space-y-4">
+              <div className="grid grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Show Reconnect Prompt in Center if Access Token Missing - Replaces All Data */}
-        {socialAccounts?.some((account: any) => !account.hasAccessToken && !account.accessToken) ? (
+        {(() => {
+          const ig = socialAccounts?.find((account: any) => account.platform === 'instagram')
+          return ig && ig.tokenStatus && ig.tokenStatus !== 'valid'
+        })() ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center max-w-md">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center">

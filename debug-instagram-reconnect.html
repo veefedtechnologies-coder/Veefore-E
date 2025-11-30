@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Instagram Reconnection</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2980b9; }
+        .error { background: #ffebee; border-color: #f44336; }
+        .success { background: #e8f5e8; border-color: #4caf50; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Debug Instagram Connection Issues</h1>
+    
+    <div class="section">
+        <h2>Issue Analysis</h2>
+        <p><strong>Problem:</strong> OAuth authorization code "already used" error prevents Instagram reconnection</p>
+        <p><strong>Symptoms:</strong></p>
+        <ul>
+            <li>Dashboard shows post-level reach (50) instead of account-level reach</li>
+            <li>Social account tab shows 0 reach instead of actual reach data</li>
+            <li>OAuth token exchange fails with "This authorization code has been used" error</li>
+        </ul>
+        <p><strong>Solution:</strong> Need to disconnect Instagram account and reconnect with fresh authorization</p>
+    </div>
+
+    <div class="section" id="disconnect-section">
+        <h2>Step 1: Disconnect Instagram</h2>
+        <button onclick="disconnectInstagram()">🔌 Disconnect Instagram</button>
+        <div id="disconnect-result"></div>
+    </div>
+
+    <div class="section" id="connect-section">
+        <h2>Step 2: Reconnect Instagram</h2>
+        <button onclick="connectInstagram()">🔗 Connect Instagram</button>
+        <div id="connect-result"></div>
+    </div>
+
+    <div class="section" id="test-section">
+        <h2>Step 3: Test Reach Data</h2>
+        <button onclick="testImmediateSync()">📊 Test Immediate Sync</button>
+        <button onclick="testSocialAccounts()">👥 Test Social Accounts API</button>
+        <div id="test-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin.replace('veefore-webhook.veefore.com', 'localhost:3000');
+
+        async function disconnectInstagram() {
+            const resultDiv = document.getElementById('disconnect-result');
+            resultDiv.innerHTML = '⏳ Disconnecting Instagram...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/instagram/disconnect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = '<div class="success">✅ Instagram account disconnected successfully. You can now reconnect.</div>';
+                } else {
+                    const error = await response.json();
+                    resultDiv.innerHTML = `<div class="error">❌ Failed to disconnect: ${JSON.stringify(error)}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Connection error: ${error.message}</div>`;
+            }
+        }
+
+        async function connectInstagram() {
+            const resultDiv = document.getElementById('connect-result');
+            resultDiv.innerHTML = '⏳ Redirecting to Instagram authorization...';
+            
+            // Open authorization URL in new tab
+            const authUrl = `${API_BASE}/api/instagram/connect?workspaceId=686d98ce4888852d5d7beb64`;
+            const authWindow = window.open(authUrl, 'instagram-auth', 'width=600,height=700');
+            
+            // Listen for auth completion
+            const checkAuth = setInterval(async () => {
+                try {
+                    if (authWindow.closed) {
+                        clearInterval(checkAuth);
+                        
+                        // Test the connection after auth window closes
+                        const testResponse = await fetch(`${API_BASE}/api/social-accounts?workspaceId=686d98ce4888852d5d7beb64&period=day`);
+                        const testData = await testResponse.json();
+                        
+                        if (testData.accounts && testData.accounts.length > 0 && testData.accounts[0].totalReach > 0) {
+                            resultDiv.innerHTML = '<div class="success">✅ Instagram connected successfully with reach data!</div>';
+                        } else {
+                            resultDiv.innerHTML = '<div class="error">⚠️ Instagram connected but reach data not available yet.</div>';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Auth check error:', error);
+                }
+            }, 1000);
+        }
+
+        async function testImmediateSync() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '⏳ Testing immediate sync...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/instagram/immediate-sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                resultDiv.innerHTML = `
+                    <pre>📊 Immediate Sync Result:
+${JSON.stringify(result, null, 2)}
+                    </pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Sync error: ${error.message}</div>`;
+            }
+        }
+
+        async function testSocialAccounts() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '⏳ Testing social accounts API...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/social-accounts?workspaceId=686d98ce4888852d5d7beb64&period=day`);
+                const result = await response.json();
+                
+                const reachData = result.accounts?.map(acc => ({
+                    username: acc.username,
+                    total-Reach: acc.totalReach,
+                    account-Level-Reach: acc.accountLevelReach,
+                    post-Level-Reach: acc.postLevelReach,
+                    reachSource: acc.reachSource
+                }));
+                
+                resultDiv.innerHTML = `
+                    <pre>👥 Social Accounts Reach Data:
+${JSON.stringify(reachData, null, 2)}
+                    </pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ API error: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-load current status
+        window.onload = testSocialAccounts;
+    </script>
+</body>
+</html>
+
+
+
+

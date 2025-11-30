@@ -345,6 +345,10 @@ export class AutomationSystem {
         console.log('[AUTOMATION] 🔍 Looking up Instagram account for Private Reply...');
         console.log('[AUTOMATION] 🔍 AccessToken provided:', accessToken ? 'present' : 'missing');
         
+        if (!mongoose.connection.db) {
+          throw new Error('Database connection not available');
+        }
+        
         const accounts = await mongoose.connection.db.collection('socialaccounts').find({ 
           platform: 'instagram',
           pageId: { $exists: true, $ne: null }  // Only accounts with pageId
@@ -396,8 +400,8 @@ export class AutomationSystem {
 
         console.log('[AUTOMATION] 📱 Using Page ID for Private Reply:', pageId);
         console.log('[AUTOMATION] 📱 Account details:', {
-          username: instagramAccount.username,
-          isBusinessAccount: instagramAccount.isBusinessAccount
+          username: instagramAccount?.username,
+          isBusinessAccount: instagramAccount?.isBusinessAccount
         });
 
         // 🎯 STRUCTURED MESSAGE TEMPLATES for Private Replies API

@@ -24,7 +24,8 @@ try {
         console.log('[FIREBASE ADMIN] Client Email:', serviceAccount.client_email);
         
       } catch (parseError) {
-        console.error('[FIREBASE ADMIN] JSON parsing error:', parseError.message);
+        const errorMessage = parseError instanceof Error ? parseError.message : 'Unknown parsing error occurred';
+        console.error('[FIREBASE ADMIN] JSON parsing error:', errorMessage);
         console.error('[FIREBASE ADMIN] First 100 chars of key:', process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.substring(0, 100));
         throw parseError;
       }

@@ -32,21 +32,13 @@ persistQueryClient({
 
 // Get the correct API base URL based on current environment
 function getApiBaseUrl(): string {
-  const currentHost = window.location.hostname;
-  const currentProtocol = window.location.protocol;
-  
-  // If we're on localhost, use HTTP
-  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-    return 'http://localhost:5000';
-  }
-  
-  // If we're on the Cloudflare tunnel, use HTTPS
-  if (currentHost === 'veefore-webhook.veefore.com') {
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envUrl) return envUrl as string;
+  const host = window.location.hostname;
+  if (host === 'veefore-webhook.veefore.com') {
     return 'https://veefore-webhook.veefore.com';
   }
-  
-  // Default to current protocol and host
-  return `${currentProtocol}//${currentHost}`;
+  return 'http://localhost:5000';
 }
 
 // API request function with authentication

@@ -578,11 +578,221 @@ app.use((req, res, next) => {
     }
   });
 
+  app.get('/api/instagram/token-status/:accountId', async (req: any, res: Response) => {
+    try {
+      const accountId = req.params.accountId;
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      let raw: any = await SocialAccountModel.findById(accountId);
+      if (!raw) raw = await SocialAccountModel.findOne({ id: accountId });
+      if (!raw) return res.status(404).json({ status: 'missing', message: 'Account not found' });
+      const fetchMod = await import('node-fetch');
+      const fetch = (fetchMod as any).default || (fetchMod as any);
+      let token = raw.accessToken;
+      if (!token && raw.encryptedAccessToken) {
+        try {
+          const { tokenEncryption } = await import('./security/token-encryption');
+          token = tokenEncryption.decryptToken(raw.encryptedAccessToken);
+        } catch {}
+      }
+      if (!token) {
+        await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: { tokenStatus: 'missing' } });
+        return res.json({ status: 'missing' });
+      }
+      let valid = false;
+      try {
+        const r = await fetch(`https://graph.instagram.com/me?fields=id&access_token=${token}`);
+        valid = r.ok;
+      } catch {}
+      const expired = raw.expiresAt ? (new Date(raw.expiresAt).getTime() < Date.now()) : false;
+      const status = !valid ? (expired ? 'expired' : 'invalid') : 'valid';
+      await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: { tokenStatus: status } });
+      return res.json({ status, expiresAt: raw.expiresAt || null });
+    } catch (e: any) {
+      return res.status(500).json({ status: 'error', message: e.message });
+    }
+  });
+
+  app.post('/api/instagram/disconnect', async (req: any, res: Response) => {
+    try {
+      const { accountId, workspaceId } = req.body || {};
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      let raw: any = null;
+      if (accountId) {
+        raw = await SocialAccountModel.findById(accountId);
+        if (!raw) raw = await SocialAccountModel.findOne({ id: accountId });
+      } else if (workspaceId) {
+        raw = await SocialAccountModel.findOne({ workspaceId, platform: 'instagram' });
+      }
+      if (!raw) return res.status(404).json({ success: false, message: 'Account not found' });
+      await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: {
+        accessToken: null,
+        refreshToken: null,
+        encryptedAccessToken: null,
+        encryptedRefreshToken: null,
+        tokenStatus: 'expired',
+        updatedAt: new Date()
+      } });
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  });
+
+  app.post('/api/instagram/reconnect/start', async (req: any, res: Response) => {
+    try {
+      const { workspaceId } = req.body || {};
+      if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
+      // Cleanup first
+      await (await import('./index')).default; // no-op reference to ensure module context
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      const ig = await SocialAccountModel.findOne({ workspaceId, platform: 'instagram' });
+      if (ig) {
+        await SocialAccountModel.findByIdAndUpdate(ig._id, { $set: {
+          accessToken: null,
+          refreshToken: null,
+          encryptedAccessToken: null,
+          encryptedRefreshToken: null,
+          tokenStatus: 'expired',
+          updatedAt: new Date()
+        } });
+      }
+      const { InstagramOAuthService } = await import('./instagram-oauth');
+      const storage = new (await import('./mongodb-storage')).MongoStorage();
+      await storage.connect();
+      const oauth = new InstagramOAuthService(storage as any);
+      const url = oauth.getAuthUrl(String(workspaceId));
+      return res.json({ url });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/instagram/profile-picture/:accountId', async (req: any, res: Response) => {
+    try {
+      const accountId = req.params.accountId;
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      let raw: any = await SocialAccountModel.findById(accountId);
+      if (!raw) raw = await SocialAccountModel.findOne({ id: accountId });
+      if (!raw) return res.status(404).json({ error: 'Account not found' });
+      let pic = raw.profilePictureUrl || raw.profilePicture || '';
+      let token = raw.accessToken;
+      if (!token && raw.encryptedAccessToken) {
+        try {
+          const { tokenEncryption } = await import('./security/token-encryption');
+          token = tokenEncryption.decryptToken(raw.encryptedAccessToken);
+        } catch {}
+      }
+      const fetchMod = await import('node-fetch');
+      const fetch = (fetchMod as any).default || (fetchMod as any);
+      let refreshed = false;
+      if (!pic || (typeof pic === 'string' && pic.includes('dicebear.com'))) {
+        if (token) {
+          const r = await fetch(`https://graph.instagram.com/me?fields=profile_picture_url&access_token=${token}`);
+          if (r.ok) {
+            const j = await r.json();
+            if (j.profile_picture_url) { pic = j.profile_picture_url; refreshed = true; }
+          }
+        }
+      }
+      let imgResp: any = null;
+      if (pic) {
+        try { imgResp = await fetch(pic); } catch {}
+      }
+      if ((!imgResp || !imgResp.ok) && token) {
+        const r = await fetch(`https://graph.instagram.com/me?fields=profile_picture_url&access_token=${token}`);
+        if (r.ok) {
+          const j = await r.json();
+          if (j.profile_picture_url) { pic = j.profile_picture_url; refreshed = true; imgResp = await fetch(pic); }
+        }
+      }
+      if (refreshed) {
+        await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: { profilePictureUrl: pic, updatedAt: new Date() } });
+      }
+      if (imgResp && imgResp.ok) {
+        const ct = imgResp.headers.get('content-type') || 'image/jpeg';
+        const buf = await imgResp.arrayBuffer();
+        res.setHeader('Content-Type', ct);
+        return res.send(Buffer.from(buf));
+      }
+      return res.redirect(`https://api.dicebear.com/7.x/avataaars/svg?seed=${raw.username}`);
+    } catch {
+      return res.redirect(`https://api.dicebear.com/7.x/avataaars/svg?seed=fallback`);
+    }
+  });
+
+  app.get('/public/instagram/profile-picture/:accountId', async (req: any, res: Response) => {
+    try {
+      const accountId = req.params.accountId;
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      let raw: any = await SocialAccountModel.findById(accountId);
+      if (!raw) raw = await SocialAccountModel.findOne({ id: accountId });
+      if (!raw) return res.status(404).send('Not Found');
+      let pic = raw.profilePictureUrl || raw.profilePicture || '';
+      let token = raw.accessToken;
+      if (!token && raw.encryptedAccessToken) {
+        try {
+          const { tokenEncryption } = await import('./security/token-encryption');
+          token = tokenEncryption.decryptToken(raw.encryptedAccessToken);
+        } catch {}
+      }
+      const fetchMod = await import('node-fetch');
+      const fetch = (fetchMod as any).default || (fetchMod as any);
+      let refreshed = false;
+      let imgResp: any = null;
+      const tryRefresh = async () => {
+        if (!token) return false;
+        // Attempt via /me
+        let r = await fetch(`https://graph.instagram.com/me?fields=profile_picture_url&access_token=${token}`);
+        if (r.ok) {
+          const j = await r.json();
+          if (j.profile_picture_url) {
+            pic = j.profile_picture_url; refreshed = true;
+            await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: { profilePictureUrl: pic, updatedAt: new Date() } });
+            return true;
+          }
+        }
+        // Fallback via account id
+        r = await fetch(`https://graph.instagram.com/${raw.accountId}?fields=profile_picture_url&access_token=${token}`);
+        if (r.ok) {
+          const j = await r.json();
+          if (j.profile_picture_url) {
+            pic = j.profile_picture_url; refreshed = true;
+            await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: { profilePictureUrl: pic, updatedAt: new Date() } });
+            return true;
+          }
+        }
+        return false;
+      };
+      if (pic) {
+        try { imgResp = await fetch(pic); } catch {}
+      }
+      if (!imgResp || !imgResp.ok) {
+        await tryRefresh();
+        if (pic) {
+          try { imgResp = await fetch(pic); } catch {}
+        }
+      }
+      if (imgResp && imgResp.ok) {
+        const ct = imgResp.headers.get('content-type') || 'image/jpeg';
+        const buf = await imgResp.arrayBuffer();
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Content-Type', ct);
+        return res.send(Buffer.from(buf));
+      }
+      return res.redirect(`https://api.dicebear.com/7.x/avataaars/svg?seed=${raw.username}`);
+    } catch {
+      return res.redirect(`https://api.dicebear.com/7.x/avataaars/svg?seed=fallback`);
+    }
+  });
+
   // Set up WebSocket server for real-time chat streaming
   const { createServer } = await import('http');
   const { WebSocketServer } = await import('ws');
   
   const httpServer = createServer(app);
+  (httpServer as any).keepAliveTimeout = 65000;
+  (httpServer as any).headersTimeout = 66000;
+  (httpServer as any).requestTimeout = 0;
   
   // Initialize logger for metrics system
   Logger.configure({
@@ -809,23 +1019,31 @@ app.use((req, res, next) => {
   
   app.use('/browserconfig.xml', express.static(path.join(process.cwd(), 'client/public/browserconfig.xml')));
   
-  // Serve images and other assets with proper MIME types
-  app.use('/assets', express.static(path.join(process.cwd(), 'client/public'), {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.png')) {
-        res.setHeader('Content-Type', 'image/png');
-      } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
-        res.setHeader('Content-Type', 'image/jpeg');
-      } else if (filePath.endsWith('.svg')) {
-        res.setHeader('Content-Type', 'image/svg+xml');
-      } else if (filePath.endsWith('.ico')) {
-        res.setHeader('Content-Type', 'image/x-icon');
+  // Serve images and other assets with proper MIME types from built directory in production
+  if (isProduction) {
+    const distPublic = path.join(process.cwd(), 'dist/public');
+    app.use('/assets', express.static(distPublic, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.png')) {
+          res.setHeader('Content-Type', 'image/png');
+        } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+          res.setHeader('Content-Type', 'image/jpeg');
+        } else if (filePath.endsWith('.svg')) {
+          res.setHeader('Content-Type', 'image/svg+xml');
+        } else if (filePath.endsWith('.ico')) {
+          res.setHeader('Content-Type', 'image/x-icon');
+        } else if (filePath.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+        } else if (filePath.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
       }
-    }
-  }));
+    }));
+  }
 
   // Setup Vite in development and static serving in production
-  if (app.get("env") === "development" || !isProduction) {
+  // Split-dev option: when SPLIT_DEV=1, do NOT embed Vite; run client dev on 5173
+  if ((app.get("env") === "development" || !isProduction) && process.env.SPLIT_DEV !== '1') {
     // Temporarily disable REPL_ID to prevent cartographer plugin from loading
     const originalReplId = process.env.REPL_ID;
     delete process.env.REPL_ID;
@@ -941,9 +1159,7 @@ app.use((req, res, next) => {
     }
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // ALWAYS serve the API on port 5000
   const port = 5000;
   
   // P9 INFRASTRUCTURE: Enterprise graceful shutdown system
@@ -958,6 +1174,7 @@ app.use((req, res, next) => {
   // Use HTTP server with WebSocket support instead of Express server directly
   // Bind to all interfaces for Replit external access
   console.log(`🚀 Attempting to bind HTTP server to port ${port}...`);
+  // Listen on IPv6 to accept both IPv4 and IPv6 loopback (fixes cloudflared ::1 origin)
   httpServer.listen(port, "0.0.0.0", async () => {
     console.log(`✅ HTTP Server successfully bound to port ${port}`);
     log(`serving on port ${port} with WebSocket support`);

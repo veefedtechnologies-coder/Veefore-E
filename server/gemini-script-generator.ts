@@ -89,7 +89,8 @@ Format the response as a structured JSON object with the following structure:
           console.log('[GEMINI VERTEX] Attempting script generation with Vertex AI...');
           return await this.generateWithVertexAI(scriptPrompt, prompt, duration, visualStyle);
         } catch (vertexError) {
-          console.error('[GEMINI VERTEX] Vertex AI failed, falling back to standard Gemini:', vertexError.message);
+          const errorMessage = vertexError instanceof Error ? vertexError.message : 'Unknown vertex error occurred';
+          console.error('[GEMINI VERTEX] Vertex AI failed, falling back to standard Gemini:', errorMessage);
           return await this.generateWithStandardGemini(scriptPrompt, prompt, duration, visualStyle);
         }
   }
