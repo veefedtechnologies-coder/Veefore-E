@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { Users, TrendingUp, MessageSquare, Share2, Eye, Calendar, BarChart3, Heart, Instagram, Facebook, Twitter, Linkedin, Youtube, RefreshCw, Bookmark } from 'lucide-react'
+import { detectInvalidAccounts, getReconnectCopy, startReconnectFlow } from '@/lib/reconnect'
 
 export function SocialAccounts() {
   const [, setLocation] = useLocation()
@@ -409,6 +410,33 @@ export function SocialAccounts() {
           </div>
 
           {/* Account Selector */}
+          {(() => { const issues = detectInvalidAccounts(socialAccounts || []); return issues.count > 0 })() && (
+            <div className="mb-4 p-4 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-600 rounded-xl">
+              <div className="flex items-start space-x-2">
+                <RefreshCw className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  {(() => { const c = getReconnectCopy(socialAccounts || []); return (
+                    <>
+                      <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">{c.title}</p>
+                      <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">{c.description}</p>
+                    </>
+                  )})()}
+                </div>
+              </div>
+              <div className="mt-3">
+                <Button
+                  onClick={async () => {
+                    const res = await startReconnectFlow(socialAccounts || [], currentWorkspace?.id)
+                    if (res?.type === 'integrations') setLocation('/integration')
+                  }}
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Reconnect
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex space-x-2 overflow-x-auto">
             {connectedAccounts.map((account: any) => {
               const PlatformIcon = getPlatformIcon(account.platform)
@@ -468,13 +496,8 @@ export function SocialAccounts() {
                   </p>
                   <Button
                     onClick={async () => {
-                      try {
-                        await apiRequest('/api/instagram/disconnect', { method: 'POST', body: JSON.stringify({ accountId: currentAccount.id }) })
-                        const data = await apiRequest('/api/instagram/reconnect/start', { method: 'POST', body: JSON.stringify({ workspaceId: currentWorkspace?.id }) })
-                        if ((data as any)?.url) window.location.href = (data as any).url
-                      } catch (e) {
-                        console.error('Reconnect failed', e)
-                      }
+                      const res = await startReconnectFlow([currentAccount], currentWorkspace?.id)
+                      if (res?.type === 'integrations') setLocation('/integration')
                     }}
                     className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
                   >

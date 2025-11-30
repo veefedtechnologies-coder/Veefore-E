@@ -44,6 +44,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import Settings from './pages/Settings'
 import SecurityDashboard from './pages/SecurityDashboard'
+import TestFixtures from './pages/TestFixtures'
 import { GuidedTour } from './components/walkthrough/GuidedTour'
 import { initializeTheme } from './lib/theme'
 // P6: Frontend SEO, Accessibility & UX System
@@ -935,7 +936,7 @@ function App() {
              </div>
            </Route>
 
-                     <Route path="/settings">
+          <Route path="/settings">
              <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
@@ -984,6 +985,31 @@ function App() {
           {/* Privacy Policy Route - Public access */}
           <Route path="/privacy-policy">
             <PrivacyPolicy />
+          </Route>
+
+          <Route path="/test-fixtures">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+              {/* Sidebar - Fixed height with independent scrolling */}
+              <div className="h-screen overflow-y-auto">
+                <Sidebar 
+                  className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                  isCreateDropdownOpen={isCreateDropdownOpen}
+                  setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                />
+              </div>
+
+              {/* Main Content Area - Independent scrolling */}
+              <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                {/* Header */}
+                <Header 
+                  onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                />
+                {/* Main Content - Scrollable */}
+                <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                  <TestFixtures />
+                </main>
+              </div>
+            </div>
           </Route>
 
           {/* Terms of Service Route - Public access */}
