@@ -14819,7 +14819,7 @@ Create a detailed growth strategy in JSON format:
           })();
 
           const transformedAccount = {
-            id: account.id,
+            id: (account as any).id || (account as any)._id?.toString(),
             platform: account.platform,
             username: account.username,
             displayName: account.displayName || account.username,
@@ -14910,7 +14910,7 @@ Create a detailed growth strategy in JSON format:
                                      `https://api.dicebear.com/7.x/avataaars/svg?seed=${account.username}`);
             
             const transformedAccount = {
-              id: account.id,
+              id: (account as any).id || (account as any)._id?.toString(),
               platform: account.platform,
               username: account.username,
               displayName: account.displayName || account.username,
@@ -15075,6 +15075,116 @@ Create a detailed growth strategy in JSON format:
     } catch (error: any) {
       console.error('[INSTAGRAM AUTH PUBLIC] Error generating auth URL:', error);
       res.status(500).json({ error: error.message || 'Failed to initiate Instagram authentication' });
+    }
+  });
+
+  app.post('/api/social-accounts/test-fixtures', requireAuth, async (req: any, res: Response) => {
+    try {
+      const workspaceId = (req.query.workspaceId || req.body.workspaceId || '').toString();
+      if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
+      const existing = await storage.getSocialAccountsByWorkspace(workspaceId);
+      const toCreate = [] as any[];
+      const platforms = ['youtube', 'tiktok'];
+      for (const p of platforms) {
+        const uname = `test_${p}`;
+        const found = existing.find((a: any) => a.platform === p && a.username === uname);
+        if (!found) {
+          toCreate.push({
+            workspaceId,
+            platform: p,
+            username: uname,
+            accountId: `${p}_test_${Date.now()}`,
+            isActive: true,
+            followersCount: 1234,
+            mediaCount: 12,
+            totalLikes: 25,
+            totalComments: 7,
+            totalShares: 3,
+            totalSaves: 5,
+            avgEngagement: 2.4,
+            lastSyncAt: new Date(),
+            tokenStatus: 'missing'
+          });
+        }
+      }
+      const created = [] as any[];
+      for (const doc of toCreate) {
+        const c = await storage.createSocialAccount(doc as any);
+        created.push(c);
+      }
+      return res.json({ success: true, created });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete('/api/social-accounts/test-fixtures', requireAuth, async (req: any, res: Response) => {
+    try {
+      const workspaceId = (req.query.workspaceId || req.body.workspaceId || '').toString();
+      if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
+      const existing = await storage.getSocialAccountsByWorkspace(workspaceId);
+      const targets = existing.filter((a: any) => a.username?.startsWith('test_') && (a.platform === 'youtube' || a.platform === 'tiktok'));
+      for (const a of targets) {
+        await storage.deleteSocialAccount(a.id);
+      }
+      return res.json({ success: true, deleted: targets.map((t: any) => ({ id: t.id, platform: t.platform, username: t.username })) });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/social-accounts/test-token-status', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { workspaceId, accountId, status } = req.body || {};
+      if (!workspaceId || !accountId || !status) return res.status(400).json({ error: 'workspaceId, accountId, status required' });
+      const workspace = await storage.getWorkspace(String(workspaceId));
+      if (!workspace || String(workspace.userId) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'Access denied to workspace' });
+      }
+      const accounts = await storage.getSocialAccountsByWorkspace(String(workspaceId));
+      const target = accounts.find((a: any) => String(a.id) === String(accountId) || String(a._id) === String(accountId));
+      if (!target) return res.status(404).json({ error: 'Account not found' });
+      const isTestTarget = Boolean(target.isTestAccount) || (typeof target.username === 'string' && target.username.startsWith('test_'));
+      const fixturesEnv = String(process.env.ENABLE_TEST_FIXTURES || '').toLowerCase();
+      const fixturesEnabled = ['true','1','yes','on'].includes(fixturesEnv);
+      const headerOverride = String(req.headers['x-test-fixtures'] || '').toLowerCase() === '1';
+      const headerAllowed = headerOverride && (fixturesEnabled || process.env.NODE_ENV !== 'production');
+      if (!headerAllowed) {
+        if (!fixturesEnabled && process.env.NODE_ENV === 'production' && !isTestTarget) {
+          return res.status(403).json({ error: 'Test fixtures disabled' });
+        }
+      }
+      const updates: any = { tokenStatus: String(status) };
+      if (status === 'valid') {
+        updates.isActive = true;
+        updates.needsReconnection = false;
+        updates.hasAccessToken = true;
+        updates.accessToken = 'test_valid_token_' + Date.now();
+        updates.encryptedAccessToken = undefined;
+        updates.encryptedRefreshToken = undefined;
+        updates.expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
+      } else if (status === 'missing') {
+        updates.isActive = false;
+        updates.needsReconnection = true;
+        updates.hasAccessToken = false;
+        updates.accessToken = '';
+        updates.refreshToken = '';
+        updates.encryptedAccessToken = null;
+        updates.encryptedRefreshToken = null;
+        updates.expiresAt = null;
+      } else {
+        updates.isActive = false;
+        updates.needsReconnection = true;
+        updates.hasAccessToken = false;
+        updates.encryptedAccessToken = null;
+        updates.encryptedRefreshToken = null;
+        updates.expiresAt = new Date(Date.now() - 1000);
+      }
+      const updateId = target.id || target._id;
+      const updated = await storage.updateSocialAccount(updateId, updates);
+      res.json({ success: true, account: updated });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 

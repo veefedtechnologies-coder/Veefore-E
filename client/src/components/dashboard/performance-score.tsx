@@ -2,10 +2,21 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocation } from 'wouter'
 import { useState, useEffect } from 'react'
 import { apiRequest } from '@/lib/queryClient'
+import { detectInvalidAccounts, getReconnectCopy, startReconnectFlow } from '@/lib/reconnect'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, Sparkles, Users, Heart, MessageCircle, Share, Eye, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react'
+import { TrendingUp, Sparkles, Users, Heart, MessageCircle, Share, Eye, ArrowUpRight, ArrowDownRight, RefreshCw, Instagram, Facebook, Twitter, Linkedin, Youtube } from 'lucide-react'
+
+function TikTokIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} xmlns="http://www.w3.org/2000/svg" fill="none">
+      <path d="M14 4v7.5c0 2.485-2.015 4.5-4.5 4.5S5 13.985 5 11.5c0-2.2 1.59-4.037 3.675-4.424" stroke="#111" strokeWidth="1.5"/>
+      <path d="M14 4c.6 1.8 2.1 3.2 4 3.8v2.2c-1.9-.4-3.6-1.5-4-2.2V4z" fill="#FE2C55"/>
+      <path d="M9.5 9.5c1.4 0 2.5 1.1 2.5 2.5 0 1.6-1.3 2.9-2.9 2.9s-2.9-1.3-2.9-2.9c0-.3.05-.7.15-1" fill="#25F4EE"/>
+    </svg>
+  )
+}
 
 export function PerformanceScore() {
   const [, setLocation] = useLocation()
@@ -13,6 +24,9 @@ export function PerformanceScore() {
   const { currentWorkspace } = useCurrentWorkspace()
   const [showDataStory, setShowDataStory] = useState(false)
   const [storyAnimation, setStoryAnimation] = useState(0)
+  const [reconnectVisible, setReconnectVisible] = useState(true)
+  const [isClosingReconnect, setIsClosingReconnect] = useState(false)
+  
 
   // Create unique data story when period changes
   useEffect(() => {
@@ -93,6 +107,16 @@ export function PerformanceScore() {
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
     placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
+
+  const invalidInfo = detectInvalidAccounts(socialAccounts || [])
+  const hasAnyInvalid = invalidInfo.count > 0
+  const hasAnyValid = (socialAccounts || []).some((a: any) => a?.tokenStatus === 'valid' || a?.hasAccessToken)
+
+  useEffect(() => {
+    if (!hasAnyInvalid) setReconnectVisible(false)
+    else setReconnectVisible(true)
+  }, [hasAnyInvalid])
+  
 
   // Fetch historical analytics data for trend comparisons - IMMEDIATE FETCH ON LOAD
   const { data: historicalData } = useQuery({
@@ -187,28 +211,35 @@ export function PerformanceScore() {
 
   const isInitialLoading = isLoading && !analytics
 
-  // Map real connected platforms from social accounts
-  const connectedPlatforms = socialAccounts?.filter((account: any) => {
-    return account.isConnected || account.followersCount > 0 || account.accessToken
-  })?.map((account: any) => ({
+  const allAccounts = socialAccounts || []
+  const validAccounts = allAccounts.filter((a: any) => (a?.isConnected || a?.tokenStatus) && (a?.tokenStatus === 'valid' || a?.hasAccessToken || a?.accessToken))
+  const invalidAccounts = allAccounts.filter((a: any) => (a?.isConnected || a?.tokenStatus) && a?.tokenStatus && a.tokenStatus !== 'valid')
+  const ICON_LIMIT = 6
+  const invalidIconList = invalidAccounts.slice(0, ICON_LIMIT)
+  const invalidRemainder = Math.max(0, invalidAccounts.length - ICON_LIMIT)
+
+  const connectedPlatforms = validAccounts.map((account: any) => ({
     name: account.platform === 'instagram' ? 'Instagram' : 
           account.platform === 'youtube' ? 'YouTube' : 
           account.platform === 'twitter' ? 'Twitter' : 
-          account.platform === 'linkedin' ? 'LinkedIn' : 'Facebook',
-    logo: account.platform === 'instagram' ? '📷' : 
-          account.platform === 'youtube' ? '🎥' : 
-          account.platform === 'twitter' ? '🐦' : 
-          account.platform === 'linkedin' ? '💼' : '📘',
+          account.platform === 'linkedin' ? 'LinkedIn' : 
+          account.platform === 'facebook' ? 'Facebook' : 'TikTok',
+    logo: account.platform === 'instagram' ? <Instagram className="w-4 h-4 text-pink-600" /> : 
+          account.platform === 'youtube' ? <Youtube className="w-4 h-4 text-red-600" /> : 
+          account.platform === 'twitter' ? <Twitter className="w-4 h-4 text-blue-500" /> : 
+          account.platform === 'linkedin' ? <Linkedin className="w-4 h-4 text-blue-700" /> : 
+          account.platform === 'facebook' ? <Facebook className="w-4 h-4 text-blue-600" /> : <TikTokIcon className="w-4 h-4" />,
     color: account.platform === 'instagram' ? 'from-pink-500 to-orange-500' : 
            account.platform === 'youtube' ? 'from-red-500 to-red-700' : 
            account.platform === 'twitter' ? 'from-blue-400 to-blue-600' : 
-           account.platform === 'linkedin' ? 'from-blue-700 to-blue-900' : 'from-blue-600 to-blue-700',
+           account.platform === 'linkedin' ? 'from-blue-700 to-blue-900' : 
+           account.platform === 'facebook' ? 'from-blue-600 to-blue-700' : 'from-gray-700 to-black',
     followers: account.followersCount || account.followers || 0,
     engagement: account.avgEngagement ? `${account.avgEngagement.toFixed(1)}%` : '0%',
     reach: account.totalReach || 0,
     posts: account.mediaCount || account.posts || 0,
     username: account.username
-  })) || []
+  }))
 
   // Calculate total metrics from real data
   const totalFollowers = analytics?.totalFollowers || connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.followers, 0)
@@ -399,29 +430,136 @@ export function PerformanceScore() {
             </div>
           </div>
         )}
-        {/* Show Reconnect Prompt in Center if Access Token Missing - Replaces All Data */}
-        {(() => {
-          const ig = socialAccounts?.find((account: any) => account.platform === 'instagram')
-          return ig && ig.tokenStatus && ig.tokenStatus !== 'valid'
-        })() ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center max-w-md">
+        
+        {/* Connected Platforms Header */}
+        {!(hasAnyInvalid && reconnectVisible) && (
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Connected Platforms</h3>
+                {hasAnyInvalid && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-600 hover:bg-orange-50 dark:hover:bg-gray-600 rounded-xl px-3 font-semibold transition-all duration-[400ms] ease-out transform ${
+                      reconnectVisible ? 'opacity-0 translate-x-3 pointer-events-none' : 'opacity-100 translate-x-0'
+                    }`}
+                    onClick={async () => {
+                      const res = await startReconnectFlow(socialAccounts || [], currentWorkspace?.id)
+                      if (res?.type === 'integrations') setLocation('/integration')
+                    }}
+                    aria-label="Reconnect social accounts"
+                    
+                  >
+                    <span className="mr-2 whitespace-nowrap">Reconnect</span>
+                    <div className="flex flex-wrap items-center gap-1 ml-1">
+                      {invalidIconList.map((acc: any) => (
+                        <div key={acc.id} className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                          {acc.platform === 'instagram' ? <Instagram className="w-3 h-3 text-pink-600" /> :
+                           acc.platform === 'youtube' ? <Youtube className="w-3 h-3 text-red-600" /> :
+                           acc.platform === 'twitter' ? <Twitter className="w-3 h-3 text-blue-500" /> :
+                           acc.platform === 'linkedin' ? <Linkedin className="w-3 h-3 text-blue-700" /> :
+                           acc.platform === 'facebook' ? <Facebook className="w-3 h-3 text-blue-600" /> :
+                           <TikTokIcon className="w-3 h-3" />}
+                        </div>
+                      ))}
+                      {invalidRemainder > 0 && (
+                        <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">+{invalidRemainder}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Button>
+                )}
+                <div className="flex items-center space-x-2">
+                  {connectedPlatforms.map((platform: any) => (
+                    <div key={platform.name} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                      {platform.logo}
+                    </div>
+                  ))}
+                </div>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span>{connectedPlatforms.length} Active</span>
+          </div>
+        </div>
+        )}
+
+        {/* Show Reconnect Prompt in Center if Access Token Missing - replaces metrics below */}
+        {hasAnyInvalid && reconnectVisible ? (
+          <div
+            className={`flex items-center justify-center py-20 transition-all duration-[400ms] ease-out transform ${
+              isClosingReconnect ? '-translate-y-4 opacity-0' : 'translate-y-0 opacity-100'
+            }`}
+            style={{ willChange: 'transform, opacity' }}
+            aria-live="polite"
+          >
+              <div className="text-center max-w-md">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center">
                 <RefreshCw className="w-10 h-10 text-orange-600 dark:text-orange-400" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                Reconnect Your Instagram Account
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Your access token is missing or expired. Reconnect your account to start seeing your real followers, posts, and engagement data.
-              </p>
+              {(() => { const c = getReconnectCopy(socialAccounts || []); return (
+                <>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{c.title}</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">{c.description}</p>
+                  {invalidIconList.length > 0 && (
+                    <div className="flex items-center justify-center gap-2 mb-6">
+                      {invalidIconList.map((acc: any) => (
+                        <div key={acc.id} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                          {acc.platform === 'instagram' ? <Instagram className="w-4 h-4 text-pink-600" /> :
+                           acc.platform === 'youtube' ? <Youtube className="w-4 h-4 text-red-600" /> :
+                           acc.platform === 'twitter' ? <Twitter className="w-4 h-4 text-blue-500" /> :
+                           acc.platform === 'linkedin' ? <Linkedin className="w-4 h-4 text-blue-700" /> :
+                           acc.platform === 'facebook' ? <Facebook className="w-4 h-4 text-blue-600" /> :
+                           <TikTokIcon className="w-4 h-4" />}
+                        </div>
+                      ))}
+                      {invalidRemainder > 0 && (
+                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">+{invalidRemainder}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )})()}
               <Button
-                onClick={() => setLocation('/settings')}
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg text-lg"
+                onClick={async () => {
+                  const res = await startReconnectFlow(socialAccounts || [], currentWorkspace?.id)
+                  if (res?.type === 'integrations') setLocation('/integration')
+                }}
+                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg text-sm"
+                aria-label="Reconnect social accounts"
               >
                 <RefreshCw className="w-5 h-5 mr-2" />
-                Reconnect Now
+                <span className="whitespace-nowrap">Reconnect Now</span>
               </Button>
+              {hasAnyValid && (
+                <button
+                  type="button"
+                  className="ml-3 inline-flex items-center text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 rounded-md"
+                  aria-label="Dismiss reconnect prompt"
+                  onClick={() => {
+                    setIsClosingReconnect(true)
+                    setTimeout(() => {
+                      setReconnectVisible(false)
+                      setIsClosingReconnect(false)
+                    }, 400)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setIsClosingReconnect(true)
+                      setTimeout(() => {
+                        setReconnectVisible(false)
+                        setIsClosingReconnect(false)
+                      }, 400)
+                    }
+                  }}
+                >
+                  Close
+                </button>
+              )}
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-6">
                 After reconnecting, your performance metrics will appear here automatically
               </p>
@@ -429,24 +567,6 @@ export function PerformanceScore() {
           </div>
         ) : (
           <>
-            {/* Connected Platforms Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Connected Platforms</h3>
-                <div className="flex items-center space-x-2">
-                  {connectedPlatforms.map((platform: any) => (
-                    <div key={platform.name} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm">
-                      {platform.logo}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>{connectedPlatforms.length} Active</span>
-              </div>
-            </div>
-
             {/* Main Metrics Grid or Connect Platforms Call-to-Action */}
             {connectedPlatforms.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
