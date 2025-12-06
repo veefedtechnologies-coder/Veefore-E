@@ -58,6 +58,17 @@ import { workspaceRepository } from './repositories/WorkspaceRepository';
 import { socialAccountRepository } from './repositories/SocialAccountRepository';
 import { contentRepository } from './repositories/ContentRepository';
 import { analyticsRepository } from './repositories/AnalyticsRepository';
+import {
+  creditTransactionRepository,
+  paymentRepository,
+  subscriptionRepository,
+  addonRepository,
+} from './repositories/BillingRepository';
+import {
+  automationRuleRepository,
+  dmConversationRepository,
+  dmMessageRepository,
+} from './repositories/AutomationRepository';
 
 export class MongoStorage implements IStorage {
   private isConnected = false;
@@ -1152,9 +1163,8 @@ export class MongoStorage implements IStorage {
     try {
       console.log(`[MONGODB DEBUG] getAutomationRules - workspaceId: ${workspaceId} (${typeof workspaceId})`);
       
-      const rules = await AutomationRuleModel.find({ 
-        workspaceId: workspaceId.toString() 
-      });
+      const result = await automationRuleRepository.findByWorkspaceId(workspaceId.toString(), { limit: 10000 });
+      const rules = result.data;
       
       console.log(`[MONGODB DEBUG] Found ${rules.length} automation rules`);
       console.log(`[MONGODB DEBUG] Search query workspaceId: ${workspaceId.toString()}`);
@@ -1211,10 +1221,8 @@ export class MongoStorage implements IStorage {
   async getActiveAutomationRules(): Promise<AutomationRule[]> {
     await this.connect();
     try {
-      const collection = this.db!.collection('automation_rules');
-      const rules = await collection.find({ 
-        isActive: true 
-      }).toArray();
+      const result = await automationRuleRepository.findActiveRules({ limit: 10000 });
+      const rules = result.data;
       
       return rules.map(rule => ({
         id: rule._id.toString(),
@@ -1240,18 +1248,11 @@ export class MongoStorage implements IStorage {
     try {
       console.log(`[MONGODB DEBUG] getAutomationRulesByType - type: ${type}`);
       
-      // Query for rules where trigger.type or action.type matches the requested type
-      const rules = await AutomationRuleModel.find({ 
-        isActive: true,
-        $or: [
-          { 'trigger.type': type },
-          { 'action.type': type },
-          { type: type } // Fallback for rules that might have type at document level
-        ]
-      });
+      const result = await automationRuleRepository.findByType(type, { limit: 10000 });
+      const rules = result.data.filter(rule => rule.isActive !== false);
       
       console.log(`[MONGODB DEBUG] Found ${rules.length} automation rules of type ${type}`);
-      console.log(`[MONGODB DEBUG] Query used: isActive=true AND (trigger.type='${type}' OR action.type='${type}' OR type='${type}')`);
+      console.log(`[MONGODB DEBUG] Query used: type='${type}' (delegated to repository)`);
       
       return rules.map(rule => {
         const trigger = rule.trigger || {};
@@ -1283,7 +1284,6 @@ export class MongoStorage implements IStorage {
     try {
       console.log(`[MONGODB DEBUG] Creating automation rule:`, rule);
       
-      // Create automation rule document using Mongoose model
       const automationRuleData = {
         name: rule.name || 'Instagram Auto-Reply',
         workspaceId: rule.workspaceId.toString(),
@@ -1301,8 +1301,7 @@ export class MongoStorage implements IStorage {
         updatedAt: new Date()
       };
       
-      const newRule = new AutomationRuleModel(automationRuleData);
-      const savedRule = await newRule.save();
+      const savedRule = await automationRuleRepository.create(automationRuleData);
       console.log(`[MONGODB DEBUG] Created automation rule with ID: ${savedRule._id}`);
       
       return {
@@ -1333,20 +1332,15 @@ export class MongoStorage implements IStorage {
     try {
       console.log(`[MONGODB DEBUG] Updating automation rule ${id}:`, updates);
       
-      const updateData = {
+      const updateData: any = {
         ...updates,
         updatedAt: new Date()
       };
       
-      // Remove fields that shouldn't be updated
       delete updateData.id;
       delete updateData.createdAt;
       
-      const result = await AutomationRuleModel.findByIdAndUpdate(
-        id,
-        updateData,
-        { new: true }
-      );
+      const result = await automationRuleRepository.updateById(id, updateData);
       
       if (!result) {
         throw new Error('Automation rule not found');
@@ -1378,9 +1372,9 @@ export class MongoStorage implements IStorage {
     try {
       console.log(`[MONGODB DEBUG] Deleting automation rule: ${id}`);
       
-      const result = await AutomationRuleModel.findByIdAndDelete(id);
+      const deleted = await automationRuleRepository.deleteById(id);
       
-      if (!result) {
+      if (!deleted) {
         throw new Error('Automation rule not found');
       }
       
@@ -1510,23 +1504,8 @@ export class MongoStorage implements IStorage {
     await this.connect();
     
     try {
-      const CreditTransactionModel = mongoose.model('CreditTransaction', CreditTransactionSchema);
-      const transactions = await CreditTransactionModel
-        .find({ userId: userId })
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .exec();
-      
-      return transactions.map(transaction => ({
-        id: transaction.id || transaction._id.toString(),
-        userId: transaction.userId,
-        type: transaction.type,
-        amount: transaction.amount,
-        description: transaction.description || null,
-        workspaceId: transaction.workspaceId || null,
-        referenceId: transaction.referenceId || null,
-        createdAt: transaction.createdAt || new Date()
-      }));
+      const transactions = await creditTransactionRepository.getRecentTransactions(userId.toString(), limit);
+      return transactions.map(transaction => this.convertCreditTransaction(transaction));
     } catch (error) {
       console.log('[MONGODB DEBUG] getCreditTransactions error:', error);
       return [];
@@ -1535,26 +1514,23 @@ export class MongoStorage implements IStorage {
 
   async createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction> {
     await this.connect();
-    
-    const CreditTransactionModel = mongoose.model('CreditTransaction', CreditTransactionSchema);
-    const transactionData = {
+    const created = await creditTransactionRepository.create({
       ...transaction,
-      id: Date.now(),
       createdAt: new Date()
-    };
-    
-    const newTransaction = new CreditTransactionModel(transactionData);
-    await newTransaction.save();
-    
+    });
+    return this.convertCreditTransaction(created);
+  }
+
+  private convertCreditTransaction(doc: any): CreditTransaction {
     return {
-      id: transactionData.id,
-      userId: transaction.userId,
-      type: transaction.type,
-      amount: transaction.amount,
-      description: transaction.description || null,
-      workspaceId: transaction.workspaceId || null,
-      referenceId: transaction.referenceId || null,
-      createdAt: transactionData.createdAt
+      id: doc._id?.toString() || doc.id,
+      userId: doc.userId,
+      type: doc.type,
+      amount: doc.amount,
+      description: doc.description || null,
+      workspaceId: doc.workspaceId || null,
+      referenceId: doc.referenceId || null,
+      createdAt: doc.createdAt || new Date()
     };
   }
 
@@ -1578,26 +1554,24 @@ export class MongoStorage implements IStorage {
     return [];
   }
 
-  // Subscription operations
+  // Subscription operations - delegating to subscriptionRepository
   async getSubscription(userId: number): Promise<Subscription | undefined> {
     await this.connect();
-    const subscription = await SubscriptionModel.findOne({ userId });
+    const subscription = await subscriptionRepository.findByUserId(userId.toString());
     return subscription ? this.convertSubscription(subscription) : undefined;
   }
 
   async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
     await this.connect();
-    const subscription = new SubscriptionModel(insertSubscription);
-    await subscription.save();
+    const subscription = await subscriptionRepository.create(insertSubscription);
     return this.convertSubscription(subscription);
   }
 
   async updateSubscriptionStatus(userId: number, status: string, canceledAt?: Date): Promise<Subscription> {
     await this.connect();
-    const subscription = await SubscriptionModel.findOneAndUpdate(
-      { userId },
-      { status, canceledAt, updatedAt: new Date() },
-      { new: true }
+    const subscription = await subscriptionRepository.updateOne(
+      { userId: userId.toString() },
+      { status, canceledAt, updatedAt: new Date() }
     );
     if (!subscription) throw new Error('Subscription not found');
     return this.convertSubscription(subscription);
@@ -1605,65 +1579,41 @@ export class MongoStorage implements IStorage {
 
   async getActiveSubscription(userId: number): Promise<Subscription | undefined> {
     await this.connect();
-    const subscription = await SubscriptionModel.findOne({ 
-      userId, 
-      status: { $in: ['active', 'trialing'] } 
-    });
+    const subscription = await subscriptionRepository.findActiveByUserId(userId.toString());
     return subscription ? this.convertSubscription(subscription) : undefined;
   }
 
-  // Payment operations
+  // Payment operations - delegating to paymentRepository
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     await this.connect();
-    const payment = new PaymentModel(insertPayment);
-    await payment.save();
+    const payment = await paymentRepository.create(insertPayment);
     return this.convertPayment(payment);
   }
 
   async getPaymentsByUser(userId: number): Promise<Payment[]> {
     await this.connect();
-    const payments = await PaymentModel.find({ userId }).sort({ createdAt: -1 });
-    return payments.map(payment => this.convertPayment(payment));
+    const result = await paymentRepository.findByUserId(userId.toString());
+    return result.data.map(payment => this.convertPayment(payment));
   }
 
-  // Addon operations
+  // Addon operations - delegating to addonRepository
   async getUserAddons(userId: number | string): Promise<Addon[]> {
     await this.connect();
     
     console.log(`[MONGODB DEBUG] getUserAddons - searching for userId: ${userId} (${typeof userId})`);
     
-    // Convert userId to both string and numeric formats for comprehensive lookup
-    const userIdStr = userId.toString();
-    const userIdNum = typeof userId === 'string' ? parseInt(userId.slice(-10)) || parseInt(userId) : userId;
-    
-    // Also try the numeric version extracted from the end of string userId
-    const shortNumeric = 6844027426; // Known numeric format from logs
-    
-    // Comprehensive search including all possible userId formats
-    // The newest addons should be stored with the full string userId format
-    const addons = await AddonModel.find({ 
-      $or: [
-        { userId: userIdStr },
-        { userId: userId },
-        { userId: userIdNum },
-        { userId: shortNumeric }
-      ]
-    }).sort({ createdAt: -1 }); // Sort by newest first to ensure we catch recent purchases
-    
-    // Add additional debug logging for new purchases
-    console.log(`[MONGODB DEBUG] Raw database query returned ${addons.length} total addon records`);
-    console.log(`[MONGODB DEBUG] Query searched for userId formats: ${userIdStr}, ${userId}, ${userIdNum}, ${shortNumeric}`);
+    const result = await addonRepository.findByUserId(userId.toString());
+    const addons = result.data;
     
     console.log(`[MONGODB DEBUG] Found ${addons.length} addons for user ${userId}`);
     if (addons.length > 0) {
       addons.forEach((addon, index) => {
-        console.log(`[MONGODB DEBUG] Addon ${index + 1}: ${addon.type} - ${addon.name}, userId: ${addon.userId} (${typeof addon.userId}), active: ${addon.isActive}`);
+        console.log(`[MONGODB DEBUG] Addon ${index + 1}: ${addon.type} - ${addon.name}, userId: ${addon.userId}, active: ${addon.isActive}`);
       });
     }
     
-    // Filter for active addons after retrieval to ensure we get all potential matches
+    // Filter for active addons after retrieval
     const activeAddons = addons.filter(addon => addon.isActive !== false);
-    
     console.log(`[MONGODB DEBUG] After filtering active: ${activeAddons.length} addons`);
     
     return activeAddons.map(addon => this.convertAddon(addon));
@@ -1671,25 +1621,17 @@ export class MongoStorage implements IStorage {
 
   async getActiveAddonsByUser(userId: number | string): Promise<Addon[]> {
     await this.connect();
-    const now = new Date();
-    // Convert userId to string for MongoDB query since we store user IDs as strings
+    
     const userIdStr = userId.toString();
     console.log('[MONGODB DEBUG] getActiveAddonsByUser - searching for userId:', userIdStr);
     
-    const addons = await AddonModel.find({ 
-      userId: userIdStr, 
-      isActive: true,
-      $or: [
-        { expiresAt: null },
-        { expiresAt: { $gt: now } }
-      ]
-    });
+    const addons = await addonRepository.findActiveByUserId(userIdStr);
     
     console.log('[MONGODB DEBUG] Found addons for user:', addons.length);
     if (addons.length > 0) {
       addons.forEach((addon, index) => {
         console.log(`[MONGODB DEBUG] Addon ${index + 1}:`, {
-          id: addon._id.toString(),
+          id: addon._id?.toString(),
           type: addon.type,
           name: addon.name,
           isActive: addon.isActive,
@@ -2388,81 +2330,59 @@ export class MongoStorage implements IStorage {
     return this.convertUser(updatedUser);
   }
 
-  // DM Conversation Memory Methods
+  // DM Conversation Memory Methods - delegating to dmConversationRepository and dmMessageRepository
   async getDmConversation(workspaceId: string, platform: string, participantId: string): Promise<any> {
     await this.connect();
-    
-    const conversation = await DmConversationModel.findOne({
-      workspaceId,
-      platform,
-      participantId
-    });
-    
-    if (!conversation) return null;
-    
-    return {
-      id: conversation._id.toString(),
-      workspaceId: conversation.workspaceId,
-      platform: conversation.platform,
-      participantId: conversation.participantId,
-      participantUsername: conversation.participantUsername,
-      lastMessageAt: conversation.lastMessageAt,
-      messageCount: conversation.messageCount,
-      isActive: conversation.isActive,
-      createdAt: conversation.createdAt,
-      updatedAt: conversation.updatedAt
-    };
+    const conversation = await dmConversationRepository.findByWorkspaceAndParticipant(workspaceId, participantId);
+    return conversation ? this.convertDmConversation(conversation) : null;
   }
 
   async createDmConversation(data: any): Promise<any> {
     await this.connect();
-    
-    const conversation = new DmConversationModel(data);
-    const saved = await conversation.save();
-    
-    return {
-      id: saved._id.toString(),
-      workspaceId: saved.workspaceId,
-      platform: saved.platform,
-      participantId: saved.participantId,
-      participantUsername: saved.participantUsername,
-      lastMessageAt: saved.lastMessageAt,
-      messageCount: saved.messageCount,
-      isActive: saved.isActive,
-      createdAt: saved.createdAt,
-      updatedAt: saved.updatedAt
-    };
+    const conversation = await dmConversationRepository.create(data);
+    return this.convertDmConversation(conversation);
   }
 
   async createDmMessage(data: any): Promise<any> {
     await this.connect();
-    
-    const message = new DmMessageModel(data);
-    const saved = await message.save();
-    
-    return {
-      id: saved._id.toString(),
-      conversationId: saved.conversationId,
-      messageId: saved.messageId,
-      sender: saved.sender,
-      content: saved.content,
-      messageType: saved.messageType,
-      sentiment: saved.sentiment,
-      topics: saved.topics,
-      aiResponse: saved.aiResponse,
-      automationRuleId: saved.automationRuleId,
-      createdAt: saved.createdAt
-    };
+    const message = await dmMessageRepository.create(data);
+    return this.convertDmMessage(message);
   }
 
   async updateConversationLastMessage(conversationId: string | number): Promise<void> {
     await this.connect();
-    
-    await DmConversationModel.findByIdAndUpdate(conversationId, {
-      lastMessageAt: new Date(),
-      $inc: { messageCount: 1 },
-      updatedAt: new Date()
-    });
+    await dmConversationRepository.incrementMessageCount(conversationId.toString());
+  }
+
+  private convertDmConversation(doc: any): any {
+    return {
+      id: doc._id.toString(),
+      workspaceId: doc.workspaceId,
+      platform: doc.platform,
+      participantId: doc.participantId,
+      participantUsername: doc.participantUsername,
+      lastMessageAt: doc.lastMessageAt,
+      messageCount: doc.messageCount,
+      isActive: doc.isActive,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt
+    };
+  }
+
+  private convertDmMessage(doc: any): any {
+    return {
+      id: doc._id.toString(),
+      conversationId: doc.conversationId,
+      messageId: doc.messageId,
+      sender: doc.sender,
+      content: doc.content,
+      messageType: doc.messageType,
+      sentiment: doc.sentiment,
+      topics: doc.topics,
+      aiResponse: doc.aiResponse,
+      automationRuleId: doc.automationRuleId,
+      createdAt: doc.createdAt
+    };
   }
 
   async getDmMessages(conversationId: number | string, limit: number = 10): Promise<any[]> {
