@@ -35,5 +35,5 @@ const ContentSchema = new Schema<IContent>({
 ContentSchema.index({ workspaceId: 1, status: 1, scheduledAt: 1 });
 ContentSchema.index({ workspaceId: 1, createdAt: -1 });
 
-export const ContentModel: Model<IContent> = mongoose.model<IContent>('Content', ContentSchema, 'contents');
+export const ContentModel: Model<IContent> = mongoose.models.Content as Model<IContent> || mongoose.model<IContent>('Content', ContentSchema, 'contents');
 export { ContentSchema };

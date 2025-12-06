@@ -20,5 +20,5 @@ const CreditTransactionSchema = new Schema<ICreditTransaction>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const CreditTransactionModel = mongoose.model<ICreditTransaction>('CreditTransaction', CreditTransactionSchema);
+export const CreditTransactionModel = mongoose.models.CreditTransaction as mongoose.Model<ICreditTransaction> || mongoose.model<ICreditTransaction>('CreditTransaction', CreditTransactionSchema);
 export { CreditTransactionSchema };

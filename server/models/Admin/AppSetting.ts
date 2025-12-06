@@ -22,5 +22,5 @@ const AppSettingSchema = new Schema<IAppSetting>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const AppSettingModel: Model<IAppSetting> = mongoose.model<IAppSetting>('AppSetting', AppSettingSchema);
+export const AppSettingModel: Model<IAppSetting> = mongoose.models.AppSetting as Model<IAppSetting> || mongoose.model<IAppSetting>('AppSetting', AppSettingSchema);
 export { AppSettingSchema };

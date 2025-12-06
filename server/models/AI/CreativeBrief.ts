@@ -46,4 +46,4 @@ export const CreativeBriefSchema = new Schema<ICreativeBrief>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const CreativeBriefModel: Model<ICreativeBrief> = mongoose.model<ICreativeBrief>('CreativeBrief', CreativeBriefSchema);
+export const CreativeBriefModel: Model<ICreativeBrief> = mongoose.models.CreativeBrief as Model<ICreativeBrief> || mongoose.model<ICreativeBrief>('CreativeBrief', CreativeBriefSchema);

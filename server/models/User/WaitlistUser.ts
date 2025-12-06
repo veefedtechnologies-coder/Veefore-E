@@ -36,4 +36,4 @@ export const WaitlistUserSchema = new Schema<IWaitlistUser>({
   metadata: { type: Schema.Types.Mixed, default: {} }
 });
 
-export const WaitlistUser = mongoose.model<IWaitlistUser>('WaitlistUser', WaitlistUserSchema);
+export const WaitlistUser = mongoose.models.WaitlistUser as mongoose.Model<IWaitlistUser> || mongoose.model<IWaitlistUser>('WaitlistUser', WaitlistUserSchema);

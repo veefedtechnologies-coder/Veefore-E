@@ -18,4 +18,4 @@ export const ChatMessageSchema = new Schema<IChatMessage>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const ChatMessage = mongoose.model<IChatMessage>('ChatMessage', ChatMessageSchema);
+export const ChatMessage = mongoose.models.ChatMessage as mongoose.Model<IChatMessage> || mongoose.model<IChatMessage>('ChatMessage', ChatMessageSchema);

@@ -1,5 +1,10 @@
-export { CreativeBriefSchema, CreativeBriefModel, ICreativeBrief } from './CreativeBrief';
-export { ContentRepurposeSchema, ContentRepurposeModel, IContentRepurpose } from './ContentRepurpose';
-export { CompetitorAnalysisSchema, CompetitorAnalysisModel, ICompetitorAnalysis } from './CompetitorAnalysis';
-export { FeatureUsageSchema, FeatureUsageModel, IFeatureUsage } from './FeatureUsage';
-export { AIUsageLogSchema, AIUsageLogModel, IAIUsageLog } from './AIUsageLog';
+export { CreativeBriefSchema, CreativeBriefModel } from './CreativeBrief';
+export type { ICreativeBrief } from './CreativeBrief';
+export { ContentRepurposeSchema, ContentRepurposeModel } from './ContentRepurpose';
+export type { IContentRepurpose } from './ContentRepurpose';
+export { CompetitorAnalysisSchema, CompetitorAnalysisModel } from './CompetitorAnalysis';
+export type { ICompetitorAnalysis } from './CompetitorAnalysis';
+export { FeatureUsageSchema, FeatureUsageModel } from './FeatureUsage';
+export type { IFeatureUsage } from './FeatureUsage';
+export { AIUsageLogSchema, AIUsageLogModel } from './AIUsageLog';
+export type { IAIUsageLog } from './AIUsageLog';

@@ -8,3 +8,8 @@ export { WorkspaceController, workspaceController } from './WorkspaceController'
 export { ContentController, contentController } from './ContentController';
 export { AnalyticsController, analyticsController } from './AnalyticsController';
 export { SocialAccountController, socialAccountController } from './SocialAccountController';
+export { AIController, aiController } from './AIController';
+export { AutomationController, automationController } from './AutomationController';
+export { BillingController, billingController } from './BillingController';
+export { MediaController, mediaController } from './MediaController';
+export { WebhookController, webhookController } from './WebhookController';

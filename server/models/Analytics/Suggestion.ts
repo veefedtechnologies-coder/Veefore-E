@@ -20,4 +20,4 @@ export const SuggestionSchema = new Schema<ISuggestion>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const SuggestionModel = mongoose.model<ISuggestion>('Suggestion', SuggestionSchema);
+export const SuggestionModel = mongoose.models.Suggestion as mongoose.Model<ISuggestion> || mongoose.model<ISuggestion>('Suggestion', SuggestionSchema);

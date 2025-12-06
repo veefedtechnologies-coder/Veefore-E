@@ -24,4 +24,4 @@ export const DmConversationSchema = new Schema<IDmConversation>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const DmConversationModel = mongoose.model<IDmConversation>('DmConversation', DmConversationSchema);
+export const DmConversationModel = mongoose.models.DmConversation as mongoose.Model<IDmConversation> || mongoose.model<IDmConversation>('DmConversation', DmConversationSchema);

@@ -1,5 +1,10 @@
-export { IAutomationRule, AutomationRuleSchema, AutomationRuleModel } from './AutomationRule';
-export { IDmConversation, DmConversationSchema, DmConversationModel } from './DmConversation';
-export { IDmMessage, DmMessageSchema, DmMessageModel } from './DmMessage';
-export { IConversationContext, ConversationContextSchema, ConversationContextModel } from './ConversationContext';
-export { IDmTemplate, DmTemplateSchema, DmTemplateModel } from './DmTemplate';
+export { AutomationRuleSchema, AutomationRuleModel } from './AutomationRule';
+export type { IAutomationRule } from './AutomationRule';
+export { DmConversationSchema, DmConversationModel } from './DmConversation';
+export type { IDmConversation } from './DmConversation';
+export { DmMessageSchema, DmMessageModel } from './DmMessage';
+export type { IDmMessage } from './DmMessage';
+export { ConversationContextSchema, ConversationContextModel } from './ConversationContext';
+export type { IConversationContext } from './ConversationContext';
+export { DmTemplateSchema, DmTemplateModel } from './DmTemplate';
+export type { IDmTemplate } from './DmTemplate';

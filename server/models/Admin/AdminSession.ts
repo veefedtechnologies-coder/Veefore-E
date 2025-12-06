@@ -18,5 +18,5 @@ const AdminSessionSchema = new Schema<IAdminSession>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const AdminSessionModel: Model<IAdminSession> = mongoose.model<IAdminSession>('AdminSession', AdminSessionSchema);
+export const AdminSessionModel: Model<IAdminSession> = mongoose.models.AdminSession as Model<IAdminSession> || mongoose.model<IAdminSession>('AdminSession', AdminSessionSchema);
 export { AdminSessionSchema };

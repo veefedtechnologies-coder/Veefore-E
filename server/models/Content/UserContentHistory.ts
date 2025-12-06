@@ -18,5 +18,5 @@ const UserContentHistorySchema = new Schema<IUserContentHistory>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const UserContentHistoryModel: Model<IUserContentHistory> = mongoose.model<IUserContentHistory>('UserContentHistory', UserContentHistorySchema);
+export const UserContentHistoryModel: Model<IUserContentHistory> = mongoose.models.UserContentHistory as Model<IUserContentHistory> || mongoose.model<IUserContentHistory>('UserContentHistory', UserContentHistorySchema);
 export { UserContentHistorySchema };

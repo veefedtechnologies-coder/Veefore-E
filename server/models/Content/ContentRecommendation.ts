@@ -44,5 +44,5 @@ const ContentRecommendationSchema = new Schema<IContentRecommendation>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const ContentRecommendationModel: Model<IContentRecommendation> = mongoose.model<IContentRecommendation>('ContentRecommendation', ContentRecommendationSchema);
+export const ContentRecommendationModel: Model<IContentRecommendation> = mongoose.models.ContentRecommendation as Model<IContentRecommendation> || mongoose.model<IContentRecommendation>('ContentRecommendation', ContentRecommendationSchema);
 export { ContentRecommendationSchema };

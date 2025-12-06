@@ -1,5 +1,10 @@
-export { CreditTransactionSchema, CreditTransactionModel, ICreditTransaction } from './CreditTransaction';
-export { ReferralSchema, ReferralModel, IReferral } from './Referral';
-export { SubscriptionSchema, SubscriptionModel, ISubscription } from './Subscription';
-export { PaymentSchema, PaymentModel, IPayment } from './Payment';
-export { AddonSchema, AddonModel, IAddon } from './Addon';
+export { CreditTransactionSchema, CreditTransactionModel } from './CreditTransaction';
+export type { ICreditTransaction } from './CreditTransaction';
+export { ReferralSchema, ReferralModel } from './Referral';
+export type { IReferral } from './Referral';
+export { SubscriptionSchema, SubscriptionModel } from './Subscription';
+export type { ISubscription } from './Subscription';
+export { PaymentSchema, PaymentModel } from './Payment';
+export type { IPayment } from './Payment';
+export { AddonSchema, AddonModel } from './Addon';
+export type { IAddon } from './Addon';

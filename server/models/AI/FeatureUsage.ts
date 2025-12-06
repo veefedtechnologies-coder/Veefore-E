@@ -20,4 +20,4 @@ export const FeatureUsageSchema = new Schema<IFeatureUsage>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const FeatureUsageModel: Model<IFeatureUsage> = mongoose.model<IFeatureUsage>('FeatureUsage', FeatureUsageSchema);
+export const FeatureUsageModel: Model<IFeatureUsage> = mongoose.models.FeatureUsage as Model<IFeatureUsage> || mongoose.model<IFeatureUsage>('FeatureUsage', FeatureUsageSchema);

@@ -18,4 +18,4 @@ export const ConversationContextSchema = new Schema<IConversationContext>({
   expiresAt: Date
 });
 
-export const ConversationContextModel = mongoose.model<IConversationContext>('ConversationContext', ConversationContextSchema);
+export const ConversationContextModel = mongoose.models.ConversationContext as mongoose.Model<IConversationContext> || mongoose.model<IConversationContext>('ConversationContext', ConversationContextSchema);

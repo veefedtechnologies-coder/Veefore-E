@@ -30,4 +30,4 @@ export const WorkspaceSchema = new Schema<IWorkspace>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const WorkspaceModel = mongoose.model<IWorkspace>('Workspace', WorkspaceSchema);
+export const WorkspaceModel = mongoose.models.Workspace as mongoose.Model<IWorkspace> || mongoose.model<IWorkspace>('Workspace', WorkspaceSchema);

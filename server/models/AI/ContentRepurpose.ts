@@ -38,4 +38,4 @@ export const ContentRepurposeSchema = new Schema<IContentRepurpose>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const ContentRepurposeModel: Model<IContentRepurpose> = mongoose.model<IContentRepurpose>('ContentRepurpose', ContentRepurposeSchema);
+export const ContentRepurposeModel: Model<IContentRepurpose> = mongoose.models.ContentRepurpose as Model<IContentRepurpose> || mongoose.model<IContentRepurpose>('ContentRepurpose', ContentRepurposeSchema);

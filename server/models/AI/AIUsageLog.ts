@@ -88,5 +88,5 @@ AIUsageLogSchema.index({ userId: 1, createdAt: -1 });
 AIUsageLogSchema.index({ userId: 1, operationType: 1, createdAt: -1 });
 AIUsageLogSchema.index({ workspaceId: 1, createdAt: -1 });
 
-export const AIUsageLogModel: Model<IAIUsageLog> = mongoose.model<IAIUsageLog>('AIUsageLog', AIUsageLogSchema);
+export const AIUsageLogModel: Model<IAIUsageLog> = mongoose.models.AIUsageLog as Model<IAIUsageLog> || mongoose.model<IAIUsageLog>('AIUsageLog', AIUsageLogSchema);
 export { AIUsageLogSchema };
