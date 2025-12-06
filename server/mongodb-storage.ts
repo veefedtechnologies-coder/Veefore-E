@@ -15,7 +15,6 @@ import {
   InsertCreativeBrief, InsertContentRepurpose, InsertCompetitorAnalysis,
   WaitlistUser, InsertWaitlistUser
 } from "@shared/schema";
-import { tokenEncryption, EncryptedToken } from './security/token-encryption';
 import {
   convertUser,
   convertWorkspace,
@@ -45,41 +44,14 @@ import {
   convertCompetitorAnalysis,
   convertWaitlistUser,
   generateReferralCode,
-  encryptAndStoreToken,
-  getAccessTokenFromAccount,
-  getRefreshTokenFromAccount
+  encryptAndStoreToken
 } from './storage/converters';
 
-// Import models from server/models/ instead of defining inline
+// Import models - only those directly used in this file (others delegated to repositories)
 import { User as UserModel } from './models/User/User';
-import { WaitlistUser as WaitlistUserModel } from './models/User/WaitlistUser';
 import { WorkspaceModel } from './models/Workspace/Workspace';
-import { WorkspaceMemberModel } from './models/Workspace/WorkspaceMember';
-import { TeamInvitationModel } from './models/Workspace/TeamInvitation';
 import { SocialAccountModel } from './models/Social/SocialAccount';
 import { ContentModel } from './models/Content/Content';
-import { ContentRecommendationModel } from './models/Content/ContentRecommendation';
-import { UserContentHistoryModel } from './models/Content/UserContentHistory';
-import { AnalyticsModel } from './models/Analytics/Analytics';
-import { SuggestionModel } from './models/Analytics/Suggestion';
-import { AutomationRuleModel } from './models/Automation/AutomationRule';
-import { DmConversationModel } from './models/Automation/DmConversation';
-import { DmMessageModel } from './models/Automation/DmMessage';
-import { DmTemplateModel } from './models/Automation/DmTemplate';
-import { CreditTransactionModel } from './models/Billing/CreditTransaction';
-import { ReferralModel } from './models/Billing/Referral';
-import { SubscriptionModel } from './models/Billing/Subscription';
-import { PaymentModel } from './models/Billing/Payment';
-import { AddonModel } from './models/Billing/Addon';
-import { AdminModel } from './models/Admin/Admin';
-import { AdminSessionModel } from './models/Admin/AdminSession';
-import { NotificationModel } from './models/Admin/Notification';
-import { PopupModel } from './models/Admin/Popup';
-import { AppSettingModel } from './models/Admin/AppSetting';
-import { AuditLogModel } from './models/Admin/AuditLog';
-import { FeedbackMessageModel } from './models/Admin/FeedbackMessage';
-import { ChatConversation as ChatConversationModel } from './models/Chat/ChatConversation';
-import { ChatMessage as ChatMessageModel } from './models/Chat/ChatMessage';
 
 import { userRepository } from './repositories/UserRepository';
 import { workspaceRepository } from './repositories/WorkspaceRepository';
@@ -232,41 +204,8 @@ export class MongoStorage implements IStorage {
 
   async createUser(userData: InsertUser): Promise<User> {
     await this.connect();
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-      const referralCode = generateReferralCode();
-      const user = new UserModel({
-        ...userData,
-        referralCode,
-        isOnboarded: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      const savedUser = await user.save({ session });
-      const convertedUser = convertUser(savedUser);
-      const existingWorkspaces = await WorkspaceModel.find({ userId: convertedUser.id }).session(session);
-      if (existingWorkspaces.length === 0) {
-        const name = userData.displayName ? `${userData.displayName}'s Workspace` : 'My VeeFore Workspace';
-        const defaultWorkspace = new WorkspaceModel({
-          name,
-          description: 'Default workspace for social media management',
-          userId: convertedUser.id,
-          theme: 'space',
-          isDefault: true,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-        await defaultWorkspace.save({ session });
-      }
-      await session.commitTransaction();
-      session.endSession();
-      return convertUser(savedUser);
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      throw new Error('Workspace creation failed during signup');
-    }
+    const savedUser = await userRepository.createWithDefaultWorkspace(userData);
+    return convertUser(savedUser);
   }
 
   async updateUser(id: number | string, updates: Partial<User>): Promise<User> {
@@ -376,14 +315,7 @@ export class MongoStorage implements IStorage {
 
   async setDefaultWorkspace(userId: number | string, workspaceId: number | string): Promise<void> {
     await this.connect();
-    
-    // First, unset all default workspaces for this user using the model directly
-    await WorkspaceModel.updateMany(
-      { userId: userId.toString() },
-      { isDefault: false }
-    );
-    
-    // Then set the specified workspace as default
+    await workspaceRepository.unsetDefaultForUser(userId.toString());
     await workspaceRepository.updateById(workspaceId.toString(), { isDefault: true });
   }
 
@@ -404,36 +336,7 @@ export class MongoStorage implements IStorage {
 
   async getSocialAccountsByWorkspace(workspaceId: any): Promise<SocialAccount[]> {
     await this.connect();
-    
-    const workspaceIdStr = workspaceId.toString();
-    const workspaceIdFirst6 = workspaceIdStr.substring(0, 6);
-    
-    // Tolerant lookup: Query by multiple workspace ID variations to handle legacy/truncated IDs
-    const accounts = await SocialAccountModel.find({
-      $or: [
-        { workspaceId: workspaceIdStr },
-        { workspaceId: workspaceId },
-        { workspaceId: workspaceIdFirst6 },
-        { workspaceId: parseInt(workspaceIdFirst6) }
-      ]
-    });
-    
-    // Auto-fix workspace IDs that are truncated
-    for (const account of accounts) {
-      const accountWorkspaceId = account.workspaceId?.toString() || '';
-      const expectedWorkspaceId = workspaceIdStr;
-      
-      if (accountWorkspaceId !== expectedWorkspaceId &&
-          (accountWorkspaceId === workspaceIdFirst6 ||
-           accountWorkspaceId === parseInt(workspaceIdFirst6).toString())) {
-        await SocialAccountModel.updateOne(
-          { _id: account._id },
-          { workspaceId: expectedWorkspaceId, updatedAt: new Date() }
-        );
-        account.workspaceId = expectedWorkspaceId;
-      }
-    }
-    
+    const accounts = await socialAccountRepository.findByWorkspaceWithTolerantLookup(workspaceId.toString());
     return accounts.map(account => convertSocialAccount(account));
   }
 
@@ -444,28 +347,7 @@ export class MongoStorage implements IStorage {
    */
   async getSocialAccountsWithTokensInternal(workspaceId: string): Promise<any[]> {
     await this.connect();
-    
-    const accounts = await SocialAccountModel.find({
-      workspaceId: workspaceId.toString(),
-      isActive: true
-    });
-    
-    return accounts.map(account => ({
-      id: account._id.toString(),
-      workspaceId: account.workspaceId,
-      platform: account.platform,
-      username: account.username,
-      accountId: account.accountId,
-      // Decrypt tokens for internal use
-      accessToken: getAccessTokenFromAccount(account),
-      refreshToken: getRefreshTokenFromAccount(account),
-      expiresAt: account.expiresAt,
-      isActive: account.isActive,
-      followersCount: account.followersCount,
-      mediaCount: account.mediaCount,
-      profilePictureUrl: account.profilePictureUrl,
-      lastSyncAt: account.lastSyncAt
-    }));
+    return socialAccountRepository.findActiveWithDecryptedTokens(workspaceId);
   }
 
   async getAllSocialAccounts(): Promise<SocialAccount[]> {
@@ -484,41 +366,15 @@ export class MongoStorage implements IStorage {
 
   async getSocialAccountByPageId(pageId: string): Promise<SocialAccount | undefined> {
     await this.connect();
-    
-    try {
-      // First try to find by pageId field
-      let account = await SocialAccountModel.findOne({ 
-        pageId: pageId,
-        platform: 'instagram',
-        isActive: true 
-      });
-      
-      // If not found, try to find by accountId field (Instagram stores ID here)
-      if (!account) {
-        account = await SocialAccountModel.findOne({ 
-          accountId: pageId,
-          platform: 'instagram',
-          isActive: true 
-        });
-      }
-      
-      return account ? convertSocialAccount(account) : undefined;
-    } catch (error) {
-      return undefined;
-    }
+    const account = await socialAccountRepository.findByPageIdOrAccountId(pageId);
+    return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialConnections(userId: number | string): Promise<SocialAccount[]> {
     await this.connect();
-    // Get all workspaces for this user
     const userWorkspaces = await this.getWorkspacesByUserId(userId);
-    const workspaceIds = userWorkspaces.map(w => w.id);
-    
-    // Get all social accounts for these workspaces
-    const accounts = await SocialAccountModel.find({ 
-      workspaceId: { $in: workspaceIds } 
-    });
-    
+    const workspaceIds = userWorkspaces.map(w => w.id.toString());
+    const accounts = await socialAccountRepository.findByWorkspaceIds(workspaceIds);
     return accounts.map(account => convertSocialAccount(account));
   }
 
@@ -765,27 +621,7 @@ export class MongoStorage implements IStorage {
 
   async clearWorkspaceConversations(workspaceId: string): Promise<void> {
     await this.connect();
-    
-    const ConversationModel = mongoose.models.DmConversation;
-    const MessageModel = mongoose.models.DmMessage;
-    const ContextModel = mongoose.models.ConversationContext;
-    
-    if (ConversationModel) {
-      // Get conversation IDs to clean up related data
-      const conversations = await ConversationModel.find({ workspaceId });
-      const conversationIds = conversations.map(c => c._id.toString());
-      
-      // Delete messages and context for these conversations
-      if (MessageModel) {
-        await MessageModel.deleteMany({ conversationId: { $in: conversationIds } });
-      }
-      if (ContextModel) {
-        await ContextModel.deleteMany({ conversationId: { $in: conversationIds } });
-      }
-      
-      // Delete conversations
-      await ConversationModel.deleteMany({ workspaceId });
-    }
+    await dmConversationRepository.clearWorkspaceData(workspaceId);
   }
 
   async getSuggestions(workspaceId: number, type?: string): Promise<Suggestion[]> {
@@ -951,16 +787,11 @@ export class MongoStorage implements IStorage {
 
   async createAddon(insertAddon: InsertAddon): Promise<Addon> {
     await this.connect();
-    
-    const addonData = {
+    const savedAddon = await addonRepository.create({
       ...insertAddon,
       createdAt: new Date(),
       updatedAt: new Date()
-    };
-    
-    const addon = new AddonModel(addonData);
-    
-    const savedAddon = await addon.save();
+    });
     return convertAddon(savedAddon);
   }
 
@@ -975,15 +806,14 @@ export class MongoStorage implements IStorage {
 
   async getAnalyticsByWorkspace(workspaceId: string | number): Promise<Analytics[]> {
     await this.connect();
-    const analytics = await AnalyticsModel.find({ workspaceId: workspaceId.toString() })
-      .sort({ date: -1 });
+    const analytics = await analyticsRepository.findByWorkspaceId(workspaceId.toString());
     return analytics.map(convertAnalytics);
   }
 
   // Team management operations
   async getWorkspaceByInviteCode(inviteCode: string): Promise<Workspace | undefined> {
     await this.connect();
-    const workspace = await WorkspaceModel.findOne({ inviteCode });
+    const workspace = await workspaceRepository.findByInviteCode(inviteCode);
     return workspace ? convertWorkspace(workspace) : undefined;
   }
 
@@ -999,108 +829,29 @@ export class MongoStorage implements IStorage {
   async getWorkspaceMembers(workspaceId: number | string): Promise<(WorkspaceMember & { user: User })[]> {
     await this.connect();
     
-    try {
-      const members = await workspaceMemberRepository.findByWorkspaceId(workspaceId.toString());
-      
-      const result = [];
-      for (const member of members) {
-        const user = await this.getUser(member.userId);
-        if (user) {
-          result.push({
-            ...convertWorkspaceMember(member),
-            user
-          });
-        }
-      }
-      
-      // If no members found, add the workspace owner as a member (simplified approach)
-      if (result.length === 0) {
-        const workspace = await this.getWorkspace(workspaceId);
-        if (workspace) {
-          const owner = await this.getUser(workspace.userId);
-          if (owner) {
-            const ownerMember: WorkspaceMember & { user: User } = {
-              id: 1,
-              userId: workspace.userId,
-              workspaceId: parseInt(workspaceId.toString()),
-              role: 'Owner',
-              status: 'active',
-              permissions: null,
-              invitedBy: null,
-              joinedAt: workspace.createdAt,
-              createdAt: workspace.createdAt,
-              updatedAt: workspace.updatedAt,
-              user: owner
-            };
-            result.push(ownerMember);
-          }
-        }
-      }
-      
-      return result;
-    } catch (error) {
-      // Return just the owner as fallback
-      const workspace = await this.getWorkspace(workspaceId);
-      if (workspace) {
-        const owner = await this.getUser(workspace.userId);
-        if (owner) {
-          const ownerMember: WorkspaceMember & { user: User } = {
-            id: 1,
-            userId: typeof workspace.userId === 'string' ? parseInt(workspace.userId) : workspace.userId,
-            workspaceId: typeof workspaceId === 'string' ? parseInt(workspaceId) : workspaceId,
-            role: 'Owner',
-            status: 'active',
-            permissions: null,
-            invitedBy: null,
-            joinedAt: workspace.createdAt,
-            createdAt: workspace.createdAt,
-            updatedAt: workspace.updatedAt,
-            user: owner
-          };
-          return [ownerMember];
-        }
-      }
-      return [];
+    const membersWithUsers = await workspaceMemberRepository.getMembersWithOwnerFallback(workspaceId.toString());
+    
+    if (membersWithUsers.length > 0) {
+      return membersWithUsers.map(({ member, user }) => ({
+        ...convertWorkspaceMember(member),
+        user: convertUser(user!)
+      }));
     }
+    
+    const fallback = await workspaceMemberRepository.getOwnerAsFallbackMember(workspaceId.toString());
+    return fallback ? [{ ...fallback, user: convertUser(fallback.user) } as WorkspaceMember & { user: User }] : [];
   }
 
   async addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember> {
     await this.connect();
-    
-    const memberData = {
-      ...member,
-      id: Date.now(),
-      status: 'active',
-      joinedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const newMember = await workspaceMemberRepository.create(memberData);
+    const newMember = await workspaceMemberRepository.createWithDefaults(member);
     return convertWorkspaceMember(newMember);
   }
 
   async updateWorkspaceMember(workspaceId: number | string, userId: number | string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember> {
     await this.connect();
-    
-    const member = await workspaceMemberRepository.findByWorkspaceAndUser(
-      workspaceId.toString(),
-      userId.toString()
-    );
-    
-    if (!member) {
-      throw new Error(`Workspace member not found`);
-    }
-    
-    const updatedMember = await workspaceMemberRepository.updateById(
-      member._id.toString(),
-      { ...updates, updatedAt: new Date() }
-    );
-    
-    if (!updatedMember) {
-      throw new Error(`Workspace member not found`);
-    }
-    
+    const updatedMember = await workspaceMemberRepository.updateByWorkspaceAndUser(workspaceId.toString(), userId.toString(), updates);
+    if (!updatedMember) throw new Error(`Workspace member not found`);
     return convertWorkspaceMember(updatedMember);
   }
 
@@ -1344,84 +1095,7 @@ export class MongoStorage implements IStorage {
 
   async getDmMessages(conversationId: number | string, limit: number = 10): Promise<any[]> {
     await this.connect();
-    
-    // Try multiple message models and collections
-    const messageModels = ['DmMessage', 'Message', 'InstagramMessage', 'ConversationMessage'];
-    let allMessages: any[] = [];
-    
-    for (const modelName of messageModels) {
-      try {
-        const Model = mongoose.models[modelName];
-        if (Model) {
-          const messages = await Model.find({
-            $or: [
-              { conversationId: conversationId },
-              { conversationId: conversationId.toString() },
-              { conversation: conversationId },
-              { conversation: conversationId.toString() }
-            ]
-          }).sort({ createdAt: -1 });
-          
-          allMessages.push(...messages);
-        }
-      } catch (error) {
-        // Continue to next model
-      }
-    }
-    
-    // Also search generic message collections
-    try {
-      const db = mongoose.connection.db;
-      const collections = await db.listCollections().toArray();
-      
-      for (const collection of collections) {
-        if (collection.name.toLowerCase().includes('message') || 
-            collection.name.toLowerCase().includes('dm')) {
-          try {
-            const docs = await db.collection(collection.name).find({
-              $or: [
-                { conversationId: conversationId },
-                { conversationId: conversationId.toString() },
-                { conversation: conversationId },
-                { conversation: conversationId.toString() }
-              ]
-            }).limit(20).toArray();
-            
-            if (docs.length > 0) {
-              allMessages.push(...docs.map(doc => ({
-                ...doc,
-                _id: doc._id,
-                collectionSource: collection.name
-              })));
-            }
-          } catch (err) {
-            // Continue to next collection
-          }
-        }
-      }
-    } catch (error) {
-      // Continue without additional collections
-    }
-    
-    // Sort by creation date and limit
-    const sortedMessages = allMessages
-      .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
-      .slice(0, limit);
-    
-    return sortedMessages.map(msg => ({
-      id: msg._id.toString(),
-      conversationId: msg.conversationId || msg.conversation,
-      messageId: msg.messageId || msg.id,
-      sender: msg.sender || msg.from || 'user',
-      content: msg.content || msg.message || msg.text,
-      messageType: msg.messageType || msg.type || 'text',
-      sentiment: msg.sentiment || 'neutral',
-      topics: msg.topics || [],
-      aiResponse: msg.aiResponse,
-      automationRuleId: msg.automationRuleId,
-      createdAt: msg.createdAt,
-      collectionSource: msg.collectionSource
-    }));
+    return dmMessageRepository.findMessagesForConversation(conversationId, limit);
   }
 
   async getConversationContext(conversationId: number): Promise<any[]> {
@@ -1466,10 +1140,7 @@ export class MongoStorage implements IStorage {
 
   async cleanupOldMessages(cutoffDate: Date): Promise<void> {
     await this.connect();
-    
-    await DmMessageModel.deleteMany({
-      createdAt: { $lt: cutoffDate }
-    });
+    await dmMessageRepository.cleanupOldMessages(cutoffDate);
   }
 
   async getConversationStats(workspaceId: string): Promise<{
@@ -1479,125 +1150,17 @@ export class MongoStorage implements IStorage {
     averageResponseTime: number;
   }> {
     await this.connect();
-    
-    const totalConversations = await DmConversationModel.countDocuments({ workspaceId });
-    const activeConversations = await DmConversationModel.countDocuments({ 
-      workspaceId, 
-      isActive: true,
-      lastMessageAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-    });
-    const totalMessages = await DmMessageModel.countDocuments({
-      conversationId: { $in: await DmConversationModel.find({ workspaceId }).distinct('_id') }
-    });
-    
-    return {
-      totalConversations,
-      activeConversations,
-      totalMessages,
-      averageResponseTime: 0 // Placeholder for now
-    };
+    return dmConversationRepository.getStats(workspaceId);
   }
 
-  // Add missing method for getDmConversations
   async getDmConversations(workspaceId: string, limit: number = 50): Promise<any[]> {
     await this.connect();
-    
-    // Access all DM conversation models to find authentic data
-    const models = ['DmConversation', 'Conversation', 'InstagramConversation'];
-    let allConversations: any[] = [];
-    
-    for (const modelName of models) {
-      try {
-        const Model = mongoose.models[modelName];
-        if (Model) {
-          const conversations = await Model.find({ 
-            $or: [
-              { workspaceId: workspaceId },
-              { workspaceId: workspaceId.toString() }
-            ]
-          }).sort({ createdAt: -1 });
-          
-          allConversations.push(...conversations);
-        }
-      } catch (error) {
-        // Continue to next model
-      }
-    }
-    
-    // Also check generic collections that might contain authentic Instagram DMs
-    try {
-      const db = mongoose.connection.db;
-      const collections = await db.listCollections().toArray();
-      
-      for (const collection of collections) {
-        if (collection.name.toLowerCase().includes('conversation') || 
-            collection.name.toLowerCase().includes('message')) {
-          try {
-            const docs = await db.collection(collection.name).find({
-              $or: [
-                { workspaceId: workspaceId },
-                { workspaceId: workspaceId.toString() }
-              ]
-            }).limit(10).toArray();
-            
-            if (docs.length > 0) {
-              allConversations.push(...docs.map(doc => ({
-                ...doc,
-                _id: doc._id,
-                collectionSource: collection.name
-              })));
-            }
-          } catch (err) {
-            // Continue to next collection
-          }
-        }
-      }
-    } catch (error) {
-      // Continue without additional collections
-    }
-    
-    // Sort and limit results
-    const sortedConversations = allConversations
-      .sort((a, b) => new Date(b.createdAt || b.lastActive || 0).getTime() - new Date(a.createdAt || a.lastActive || 0).getTime())
-      .slice(0, limit);
-    
-    return sortedConversations.map(conv => ({
-      id: conv._id.toString(),
-      workspaceId: conv.workspaceId,
-      platform: conv.platform || 'instagram',
-      participantId: conv.participant?.id || conv.participantId || 'unknown_user',
-      participantUsername: conv.participant?.username || conv.participantUsername || 'Instagram User',
-      lastMessageAt: conv.lastActive || conv.lastMessageAt || conv.createdAt,
-      messageCount: conv.messageCount || 1,
-      isActive: conv.isActive !== false,
-      createdAt: conv.createdAt,
-      updatedAt: conv.updatedAt || conv.lastActive,
-      collectionSource: conv.collectionSource
-    }));
+    return dmConversationRepository.findByWorkspaceFormatted(workspaceId, limit);
   }
 
-  // Add method for getAutomationRulesByTrigger
   async getAutomationRulesByTrigger(triggerType: string): Promise<any[]> {
     await this.connect();
-    
-    const rules = await AutomationRuleModel.find({
-      'trigger.type': triggerType,
-      isActive: true
-    });
-    
-    return rules.map(rule => ({
-      id: rule._id.toString(),
-      name: rule.name,
-      workspaceId: rule.workspaceId,
-      description: rule.description,
-      isActive: rule.isActive,
-      trigger: rule.trigger,
-      action: rule.action,
-      lastRun: rule.lastRun,
-      nextRun: rule.nextRun,
-      createdAt: rule.createdAt,
-      updatedAt: rule.updatedAt
-    }));
+    return automationRuleRepository.findByGlobalTriggerTypeFormatted(triggerType);
   }
 
   // Admin operations - delegating to adminRepository
@@ -1659,65 +1222,20 @@ export class MongoStorage implements IStorage {
     page: number;
     limit: number;
     search?: string;
-    filter?: string;
+    role?: 'admin' | 'superadmin';
+    status?: 'active' | 'inactive';
   }): Promise<any> {
     await this.connect();
     
-    const { page, limit, search, filter } = options;
-    
-    // Build query
-    let query: any = {};
-    
-    if (search) {
-      query.$or = [
-        { username: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { displayName: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    if (filter && filter !== 'all') {
-      switch (filter) {
-        case 'active':
-          query.lastLogin = { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
-          break;
-        case 'premium':
-          query.plan = { $ne: null, $ne: 'free' };
-          break;
-        case 'free':
-          query.$or = [{ plan: 'free' }, { plan: null }];
-          break;
-      }
-    }
-    
-    // Use repository method for pagination
-    const { users, total } = await userRepository.findWithPagination(query, {
-      page,
-      limit,
-      sortBy: 'createdAt',
-      sortOrder: 'desc'
-    });
-    
-    const formattedUsers = users.map((user: any) => ({
-      id: user._id.toString(),
-      username: user.username,
-      email: user.email,
-      displayName: user.displayName,
-      plan: user.plan || 'free',
-      credits: user.credits || 0,
-      lastLogin: user.lastLogin,
-      status: user.isActive !== false ? 'active' : 'inactive',
-      createdAt: user.createdAt,
-      totalWorkspaces: 0 // Will be calculated separately if needed
-    }));
+    const result = await adminRepository.findWithPaginationAndFilters(options);
     
     return {
-      users: formattedUsers,
+      admins: result.admins.map(admin => convertAdmin(admin)),
       pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        pages: result.totalPages
       }
     };
   }
@@ -2051,25 +1569,9 @@ export class MongoStorage implements IStorage {
     return convertUser(user);
   }
 
-  // YouTube workspace data update method
   async updateYouTubeWorkspaceData(updates: any): Promise<any> {
     await this.connect();
-    
-    const result = await SocialAccountModel.updateMany(
-      { platform: 'youtube' },
-      {
-        $set: {
-          workspaceId: updates.workspaceId,
-          subscriberCount: updates.subscriberCount,
-          videoCount: updates.videoCount,
-          viewCount: updates.viewCount,
-          lastSync: updates.lastSync,
-          updatedAt: updates.updatedAt
-        }
-      }
-    );
-
-    return result;
+    return socialAccountRepository.updateYouTubePlatformData(updates);
   }
 
   async verifyUserEmail(id: number | string, data: { password?: string; firstName?: string; lastName?: string; firebaseUid?: string }): Promise<User> {
@@ -2513,87 +2015,7 @@ export class MongoStorage implements IStorage {
     trialDays: number;
   }> {
     await this.connect();
-    
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    
-    try {
-      // Get waitlist user (read operation, session not strictly needed)
-      const waitlistUserDoc = await WaitlistUserModel.findById(id.toString());
-      if (!waitlistUserDoc) {
-        throw new Error('Waitlist user not found');
-      }
-      const waitlistUser = convertWaitlistUser(waitlistUserDoc);
-      
-      // Generate discount code (50% off first month)
-      const discountCode = `EARLY50_${Date.now().toString(36).toUpperCase()}`;
-      const discountExpiry = new Date();
-      discountExpiry.setDate(discountExpiry.getDate() + 30); // 30 days to use discount
-      
-      // Calculate trial period (14 days + 1 day per referral, max 30 days)
-      const trialDays = Math.min(14 + waitlistUser.referralCount, 30);
-      const trialExpiry = new Date();
-      trialExpiry.setDate(trialExpiry.getDate() + trialDays);
-      
-      // Create regular user account with session
-      const referralCode = generateReferralCode();
-      const newUserDoc = new UserModel({
-        email: waitlistUser.email,
-        username: waitlistUser.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now(),
-        displayName: waitlistUser.name,
-        credits: 100 + (waitlistUser.referralCount * 20), // 100 base + 20 per referral
-        plan: 'Free',
-        referredBy: waitlistUser.referredBy,
-        isEmailVerified: true,
-        status: 'early_access',
-        trialExpiresAt: trialExpiry,
-        discountCode,
-        discountExpiresAt: discountExpiry,
-        hasUsedWaitlistBonus: false,
-        referralCode,
-        isOnboarded: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      const savedUser = await newUserDoc.save({ session });
-      const user = convertUser(savedUser);
-      
-      // Create default workspace with session
-      const workspaceName = `${waitlistUser.name}'s Workspace`;
-      const newWorkspaceDoc = new WorkspaceModel({
-        name: workspaceName,
-        description: 'Early access workspace',
-        userId: user.id,
-        theme: 'space',
-        isDefault: true,
-        credits: 50, // Additional workspace credits
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      const savedWorkspace = await newWorkspaceDoc.save({ session });
-      const workspace = convertWorkspace(savedWorkspace);
-      
-      // Update waitlist user status with session
-      await WaitlistUserModel.updateOne(
-        { _id: id.toString() },
-        { status: 'early_access', updatedAt: new Date() },
-        { session }
-      );
-      
-      await session.commitTransaction();
-      session.endSession();
-      
-      return {
-        user,
-        workspace,
-        discountCode,
-        trialDays
-      };
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      throw error;
-    }
+    return waitlistUserRepository.promoteToUser(id.toString());
   }
 
   // Database reset methods for fresh starts
@@ -2633,61 +2055,16 @@ export class MongoStorage implements IStorage {
   // VeeGPT Chat Methods - delegating to chatConversationRepository and chatMessageRepository
   async getChatConversations(userId: string, workspaceId?: string): Promise<ChatConversation[]> {
     await this.connect();
-    
-    // Validate ObjectId format for userId
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return [];
-    }
-    // Validate ObjectId format for workspaceId if provided
-    if (workspaceId && !mongoose.Types.ObjectId.isValid(workspaceId)) {
-      return [];
-    }
-    
-    const conversations = workspaceId
-      ? await chatConversationRepository.findByUserAndWorkspace(userId, workspaceId)
-      : await chatConversationRepository.findByUserId(userId);
-    return conversations.map(doc => ({
-      id: doc.id,
-      userId: doc.userId,
-      workspaceId: doc.workspaceId,
-      title: doc.title,
-      messageCount: doc.messageCount,
-      lastMessageAt: doc.lastMessageAt,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
-    }));
+    return chatConversationRepository.findByUserSorted(userId, workspaceId);
   }
 
   async createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation> {
     await this.connect();
-    
-    // Validate ObjectId format for userId
-    if (!mongoose.Types.ObjectId.isValid(conversation.userId)) {
-      throw new Error('Invalid userId format');
-    }
-    // Validate ObjectId format for workspaceId if provided
-    if (conversation.workspaceId && !mongoose.Types.ObjectId.isValid(conversation.workspaceId)) {
-      throw new Error('Invalid workspaceId format');
-    }
-    
-    const numericId = Date.now() % 1000000000 + Math.floor(Math.random() * 1000);
-    
-    const saved = await chatConversationRepository.create({
-      ...conversation,
-      id: numericId,
-      createdAt: new Date(),
-      updatedAt: new Date()
+    return chatConversationRepository.createWithDefaults({
+      userId: conversation.userId.toString(),
+      workspaceId: conversation.workspaceId.toString(),
+      title: conversation.title
     });
-    return {
-      id: saved.id,
-      userId: saved.userId,
-      workspaceId: saved.workspaceId,
-      title: saved.title,
-      messageCount: saved.messageCount,
-      lastMessageAt: saved.lastMessageAt,
-      createdAt: saved.createdAt,
-      updatedAt: saved.updatedAt
-    };
   }
 
   async getChatMessages(conversationId: number): Promise<ChatMessage[]> {

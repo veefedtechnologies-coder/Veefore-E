@@ -94,6 +94,22 @@ export class WorkspaceRepository extends BaseRepository<IWorkspace> {
     return this.count({ userId });
   }
 
+  async unsetDefaultForUser(userId: string): Promise<void> {
+    const startTime = Date.now();
+    try {
+      await this.model
+        .updateMany(
+          { userId },
+          { $set: { isDefault: false, updatedAt: new Date() } }
+        )
+        .exec();
+      logger.db.query('unsetDefaultForUser', this.entityName, Date.now() - startTime, { userId });
+    } catch (error) {
+      logger.db.error('unsetDefaultForUser', error, { entityName: this.entityName, userId });
+      throw new DatabaseError('Failed to unset default workspaces for user', error as Error);
+    }
+  }
+
   async getWorkspaceStats(workspaceId: string): Promise<{
     credits: number;
     memberCount: number;

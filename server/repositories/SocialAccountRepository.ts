@@ -2,8 +2,25 @@ import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { SocialAccountModel, ISocialAccount } from '../models/Social';
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
+import { getAccessTokenFromAccount, getRefreshTokenFromAccount } from '../storage/converters';
 
 export type Platform = 'instagram' | 'twitter' | 'facebook' | 'youtube' | 'tiktok' | 'linkedin';
+
+export interface SocialAccountWithDecryptedTokens {
+  id: string;
+  workspaceId: any;
+  platform: string;
+  username: string;
+  accountId?: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresAt?: Date;
+  isActive?: boolean;
+  followersCount?: number;
+  mediaCount?: number;
+  profilePictureUrl?: string;
+  lastSyncAt?: Date;
+}
 
 export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   constructor() {
@@ -181,6 +198,148 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
     } catch (error) {
       logger.db.error('getTotalFollowersByWorkspace', error, { entityName: this.entityName, workspaceId });
       throw new DatabaseError('Failed to get total followers', error as Error);
+    }
+  }
+
+  async findByWorkspaceWithTolerantLookup(workspaceId: string): Promise<ISocialAccount[]> {
+    const startTime = Date.now();
+    try {
+      const workspaceIdStr = workspaceId.toString();
+      const workspaceIdFirst6 = workspaceIdStr.substring(0, 6);
+      
+      const accounts = await this.model.find({
+        $or: [
+          { workspaceId: workspaceIdStr },
+          { workspaceId: workspaceId },
+          { workspaceId: workspaceIdFirst6 },
+          { workspaceId: parseInt(workspaceIdFirst6) }
+        ]
+      }).exec();
+      
+      for (const account of accounts) {
+        const accountWorkspaceId = account.workspaceId?.toString() || '';
+        const expectedWorkspaceId = workspaceIdStr;
+        
+        if (accountWorkspaceId !== expectedWorkspaceId &&
+            (accountWorkspaceId === workspaceIdFirst6 ||
+             accountWorkspaceId === parseInt(workspaceIdFirst6).toString())) {
+          await this.model.updateOne(
+            { _id: account._id },
+            { workspaceId: expectedWorkspaceId, updatedAt: new Date() }
+          );
+          account.workspaceId = expectedWorkspaceId;
+        }
+      }
+      
+      logger.db.query('findByWorkspaceWithTolerantLookup', this.entityName, Date.now() - startTime, { workspaceId });
+      return accounts;
+    } catch (error) {
+      logger.db.error('findByWorkspaceWithTolerantLookup', error, { entityName: this.entityName, workspaceId });
+      throw new DatabaseError('Failed to find accounts with tolerant lookup', error as Error);
+    }
+  }
+
+  async findActiveWithDecryptedTokens(workspaceId: string): Promise<SocialAccountWithDecryptedTokens[]> {
+    const startTime = Date.now();
+    try {
+      const accounts = await this.model.find({
+        workspaceId: workspaceId.toString(),
+        isActive: true
+      }).exec();
+      
+      const result = accounts.map(account => ({
+        id: account._id.toString(),
+        workspaceId: account.workspaceId,
+        platform: account.platform,
+        username: account.username,
+        accountId: account.accountId,
+        accessToken: getAccessTokenFromAccount(account),
+        refreshToken: getRefreshTokenFromAccount(account),
+        expiresAt: account.expiresAt,
+        isActive: account.isActive,
+        followersCount: account.followersCount,
+        mediaCount: account.mediaCount,
+        profilePictureUrl: account.profilePictureUrl,
+        lastSyncAt: account.lastSyncAt
+      }));
+      
+      logger.db.query('findActiveWithDecryptedTokens', this.entityName, Date.now() - startTime, { workspaceId });
+      return result;
+    } catch (error) {
+      logger.db.error('findActiveWithDecryptedTokens', error, { entityName: this.entityName, workspaceId });
+      throw new DatabaseError('Failed to find accounts with decrypted tokens', error as Error);
+    }
+  }
+
+  async findByPageIdOrAccountId(pageId: string): Promise<ISocialAccount | null> {
+    const startTime = Date.now();
+    try {
+      let account = await this.model.findOne({ 
+        pageId: pageId,
+        platform: 'instagram',
+        isActive: true 
+      }).exec();
+      
+      if (!account) {
+        account = await this.model.findOne({ 
+          accountId: pageId,
+          platform: 'instagram',
+          isActive: true 
+        }).exec();
+      }
+      
+      logger.db.query('findByPageIdOrAccountId', this.entityName, Date.now() - startTime, { pageId });
+      return account;
+    } catch (error) {
+      logger.db.error('findByPageIdOrAccountId', error, { entityName: this.entityName, pageId });
+      throw new DatabaseError('Failed to find account by page ID or account ID', error as Error);
+    }
+  }
+
+  async findByWorkspaceIds(workspaceIds: string[]): Promise<ISocialAccount[]> {
+    const startTime = Date.now();
+    try {
+      const accounts = await this.model.find({
+        workspaceId: { $in: workspaceIds }
+      }).exec();
+      
+      logger.db.query('findByWorkspaceIds', this.entityName, Date.now() - startTime, { workspaceIdsCount: workspaceIds.length });
+      return accounts;
+    } catch (error) {
+      logger.db.error('findByWorkspaceIds', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to find accounts by workspace IDs', error as Error);
+    }
+  }
+
+  async updateYouTubePlatformData(updates: {
+    workspaceId?: string;
+    subscriberCount?: number;
+    videoCount?: number;
+    viewCount?: number;
+    lastSync?: Date;
+    updatedAt?: Date;
+  }): Promise<any> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model.updateMany(
+        { platform: 'youtube' },
+        {
+          $set: {
+            workspaceId: updates.workspaceId,
+            subscriberCount: updates.subscriberCount,
+            videoCount: updates.videoCount,
+            viewCount: updates.viewCount,
+            lastSync: updates.lastSync,
+            updatedAt: updates.updatedAt || new Date()
+          }
+        }
+      ).exec();
+      
+      logger.db.query('updateYouTubePlatformData', this.entityName, Date.now() - startTime);
+      return result;
+    } catch (error) {
+      logger.db.error('updateYouTubePlatformData', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to update YouTube platform data', error as Error);
     }
   }
 }

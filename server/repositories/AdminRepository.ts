@@ -18,6 +18,24 @@ import {
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
 
+export interface AdminPaginationFilterOptions {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: 'admin' | 'superadmin';
+  status?: 'active' | 'inactive';
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface AdminPaginatedResult {
+  admins: IAdmin[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export class AdminRepository extends BaseRepository<IAdmin> {
   constructor() {
     super(AdminModel, 'Admin');
@@ -49,6 +67,63 @@ export class AdminRepository extends BaseRepository<IAdmin> {
 
   async deactivateAdmin(adminId: string): Promise<IAdmin | null> {
     return this.updateById(adminId, { isActive: false, updatedAt: new Date() });
+  }
+
+  async findWithPaginationAndFilters(options: AdminPaginationFilterOptions): Promise<AdminPaginatedResult> {
+    const startTime = Date.now();
+    const { 
+      page = 1, 
+      limit = 20, 
+      search, 
+      role, 
+      status,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = options;
+    const skip = (page - 1) * limit;
+
+    try {
+      const query: any = {};
+
+      if (search) {
+        query.$or = [
+          { email: { $regex: search, $options: 'i' } },
+          { username: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      if (role) {
+        query.role = role;
+      }
+
+      if (status) {
+        query.isActive = status === 'active';
+      }
+
+      const [admins, total] = await Promise.all([
+        this.model
+          .find(query)
+          .sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 })
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        this.model.countDocuments(query).exec(),
+      ]);
+
+      const totalPages = Math.ceil(total / limit);
+      logger.db.query('findWithPaginationAndFilters', this.entityName, Date.now() - startTime, { total });
+
+      return {
+        admins,
+        total,
+        page,
+        limit,
+        totalPages,
+      };
+    } catch (error) {
+      logger.db.error('findWithPaginationAndFilters', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to find admins with pagination and filters', error as Error);
+    }
   }
 }
 

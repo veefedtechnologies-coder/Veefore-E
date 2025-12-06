@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { BaseRepository, PaginationOptions } from './BaseRepository';
 import {
   ChatConversation,
@@ -6,7 +7,8 @@ import {
   IChatMessage,
 } from '../models/Chat';
 import { logger } from '../config/logger';
-import { DatabaseError } from '../errors';
+import { DatabaseError, ValidationError } from '../errors';
+import type { ChatConversation as ChatConversationType } from '@shared/schema';
 
 export class ChatConversationRepository extends BaseRepository<IChatConversation> {
   constructor() {
@@ -98,6 +100,115 @@ export class ChatConversationRepository extends BaseRepository<IChatConversation
     } catch (error) {
       logger.db.error('deleteConversationWithMessages', error, { entityName: this.entityName, conversationId });
       throw new DatabaseError('Failed to delete conversation with messages', error as Error);
+    }
+  }
+
+  private formatConversation(doc: IChatConversation): ChatConversationType {
+    return {
+      id: doc.id,
+      userId: doc.userId as unknown as number,
+      workspaceId: doc.workspaceId as unknown as number,
+      title: doc.title,
+      messageCount: doc.messageCount,
+      lastMessageAt: doc.lastMessageAt ?? null,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt
+    };
+  }
+
+  async findByWorkspaceSorted(workspaceId: string, userId?: string): Promise<ChatConversationType[]> {
+    const startTime = Date.now();
+    try {
+      if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
+        return [];
+      }
+      if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+        return [];
+      }
+
+      const query = userId 
+        ? { workspaceId, userId }
+        : { workspaceId };
+
+      const conversations = await this.model
+        .find(query)
+        .sort({ updatedAt: -1 })
+        .exec();
+
+      logger.db.query('findByWorkspaceSorted', this.entityName, Date.now() - startTime, { 
+        workspaceId, 
+        userId, 
+        count: conversations.length 
+      });
+
+      return conversations.map(doc => this.formatConversation(doc));
+    } catch (error) {
+      logger.db.error('findByWorkspaceSorted', error, { entityName: this.entityName, workspaceId, userId });
+      throw new DatabaseError('Failed to find conversations by workspace', error as Error);
+    }
+  }
+
+  async findByUserSorted(userId: string, workspaceId?: string): Promise<ChatConversationType[]> {
+    const startTime = Date.now();
+    try {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return [];
+      }
+      if (workspaceId && !mongoose.Types.ObjectId.isValid(workspaceId)) {
+        return [];
+      }
+
+      const conversations = workspaceId
+        ? await this.findMany({ userId, workspaceId }, { sortBy: 'updatedAt', sortOrder: 'desc' })
+        : await this.findMany({ userId }, { sortBy: 'updatedAt', sortOrder: 'desc' });
+
+      logger.db.query('findByUserSorted', this.entityName, Date.now() - startTime, { 
+        userId, 
+        workspaceId, 
+        count: conversations.length 
+      });
+
+      return conversations.map(doc => this.formatConversation(doc));
+    } catch (error) {
+      logger.db.error('findByUserSorted', error, { entityName: this.entityName, userId, workspaceId });
+      throw new DatabaseError('Failed to find conversations by user', error as Error);
+    }
+  }
+
+  async createWithDefaults(data: { userId: string; workspaceId: string; title?: string }): Promise<ChatConversationType> {
+    const startTime = Date.now();
+    try {
+      if (!mongoose.Types.ObjectId.isValid(data.userId)) {
+        throw new ValidationError('Invalid userId format');
+      }
+      if (data.workspaceId && !mongoose.Types.ObjectId.isValid(data.workspaceId)) {
+        throw new ValidationError('Invalid workspaceId format');
+      }
+
+      const numericId = Date.now() % 1000000000 + Math.floor(Math.random() * 1000);
+
+      const conversationData = {
+        id: numericId,
+        userId: data.userId,
+        workspaceId: data.workspaceId,
+        title: data.title || 'New chat',
+        messageCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const saved = await this.create(conversationData);
+
+      logger.db.query('createWithDefaults', this.entityName, Date.now() - startTime, { 
+        userId: data.userId, 
+        workspaceId: data.workspaceId 
+      });
+
+      return this.formatConversation(saved);
+    } catch (error) {
+      if (error instanceof ValidationError) throw error;
+      logger.db.error('createWithDefaults', error, { entityName: this.entityName, data });
+      throw new DatabaseError('Failed to create conversation', error as Error);
     }
   }
 }
