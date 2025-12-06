@@ -43,15 +43,13 @@ import {
   convertContentRepurpose,
   convertCompetitorAnalysis,
   convertWaitlistUser,
-  generateReferralCode,
-  encryptAndStoreToken
+  generateReferralCode
 } from './storage/converters';
 
 // Import models - only those directly used in this file (others delegated to repositories)
 import { User as UserModel } from './models/User/User';
 import { WorkspaceModel } from './models/Workspace/Workspace';
 import { SocialAccountModel } from './models/Social/SocialAccount';
-import { ContentModel } from './models/Content/Content';
 
 import { userRepository } from './repositories/UserRepository';
 import { workspaceRepository } from './repositories/WorkspaceRepository';
@@ -180,7 +178,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const user = await userRepository.findByFirebaseUid(firebaseId);
     if (user) {
-      await userRepository.updateById(user._id.toString(), { lastLoginAt: new Date(), updatedAt: new Date() });
+      await userRepository.updateById(user._id.toString(), { lastLoginAt: new Date() });
     }
   }
 
@@ -210,7 +208,7 @@ export class MongoStorage implements IStorage {
 
   async updateUser(id: number | string, updates: Partial<User>): Promise<User> {
     await this.connect();
-    const user = await userRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const user = await userRepository.updateById(id.toString(), updates);
     if (!user) {
       throw new Error('User not found');
     }
@@ -278,17 +276,13 @@ export class MongoStorage implements IStorage {
 
   async createWorkspace(workspaceData: InsertWorkspace): Promise<Workspace> {
     await this.connect();
-    const workspace = await workspaceRepository.create({
-      ...workspaceData,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    const workspace = await workspaceRepository.createWithDefaults(workspaceData);
     return convertWorkspace(workspace);
   }
 
   async updateWorkspace(id: number | string, updates: Partial<Workspace>): Promise<Workspace> {
     await this.connect();
-    const workspace = await workspaceRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const workspace = await workspaceRepository.updateById(id.toString(), updates);
     if (!workspace) throw new Error('Workspace not found');
     return convertWorkspace(workspace);
   }
@@ -296,7 +290,7 @@ export class MongoStorage implements IStorage {
   async updateWorkspaceCredits(id: number | string, credits: number): Promise<void> {
     await this.connect();
     
-    const result = await workspaceRepository.updateById(id.toString(), { credits, updatedAt: new Date() });
+    const result = await workspaceRepository.updateById(id.toString(), { credits });
     
     if (!result) {
       throw new Error('Workspace not found for credit update');
@@ -380,61 +374,13 @@ export class MongoStorage implements IStorage {
 
   async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
     await this.connect();
-    
-    // SECURITY: Encrypt tokens before storing in database
-    const socialAccountData: any = {
-      ...account,
-      isActive: true,
-      totalShares: 0,
-      totalSaves: 0,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    // Remove any id or _id fields that might have been passed in
-    delete socialAccountData.id;
-    delete socialAccountData._id;
-
-    // Encrypt access token if provided
-    if (account.accessToken) {
-      socialAccountData.encryptedAccessToken = encryptAndStoreToken(account.accessToken);
-      delete socialAccountData.accessToken;
-    }
-
-    // Encrypt refresh token if provided  
-    if (account.refreshToken) {
-      socialAccountData.encryptedRefreshToken = encryptAndStoreToken(account.refreshToken);
-      delete socialAccountData.refreshToken;
-    }
-
-    const newAccount = await socialAccountRepository.create(socialAccountData);
+    const newAccount = await socialAccountRepository.createWithEncryptedTokens(account);
     return convertSocialAccount(newAccount);
   }
 
   async updateSocialAccount(id: number | string, updates: Partial<SocialAccount>): Promise<SocialAccount> {
     await this.connect();
-    
-    // SECURITY: Prepare encrypted updates for tokens
-    const encryptedUpdates: any = { ...updates, updatedAt: new Date() };
-
-    // Encrypt access token if being updated
-    if (updates.accessToken) {
-      encryptedUpdates.encryptedAccessToken = encryptAndStoreToken(updates.accessToken);
-      delete encryptedUpdates.accessToken;
-    }
-
-    // Encrypt refresh token if being updated
-    if (updates.refreshToken) {
-      encryptedUpdates.encryptedRefreshToken = encryptAndStoreToken(updates.refreshToken);
-      delete encryptedUpdates.refreshToken;
-    }
-    
-    const updatedAccount = await socialAccountRepository.updateById(id.toString(), encryptedUpdates);
-    
-    if (!updatedAccount) {
-      throw new Error('Social account not found');
-    }
-    
+    const updatedAccount = await socialAccountRepository.updateWithEncryptedTokens(id.toString(), updates);
     return convertSocialAccount(updatedAccount);
   }
 
@@ -472,57 +418,33 @@ export class MongoStorage implements IStorage {
 
   async createContent(content: InsertContent): Promise<Content> {
     await this.connect();
-    
-    const contentData = {
-      workspaceId: content.workspaceId.toString(),
-      type: content.type,
-      title: content.title,
-      description: content.description,
-      contentData: content.contentData || {},
-      platform: content.platform,
-      status: content.status || (content.scheduledAt ? 'scheduled' : 'ready'),
-      scheduledAt: content.scheduledAt,
-      creditsUsed: content.creditsUsed || 0,
-      prompt: content.prompt,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const saved = await contentRepository.create(contentData);
-    
+    const saved = await contentRepository.createWithDefaults(content);
     return convertContent(saved);
   }
 
   async updateContent(id: number, updates: Partial<Content>): Promise<Content> {
     await this.connect();
-    const content = await contentRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const content = await contentRepository.updateById(id.toString(), updates);
     if (!content) throw new Error('Content not found');
     return convertContent(content);
   }
 
   async createPost(postData: any): Promise<any> {
     await this.connect();
-    
-    const post = {
-      workspaceId: postData.workspaceId.toString(),
-      content: postData.content,
-      media: postData.media || [],
-      hashtags: postData.hashtags || '',
-      firstComment: postData.firstComment || '',
-      location: postData.location || '',
-      accounts: postData.accounts || [],
-      status: postData.status || 'draft',
-      publishedAt: postData.publishedAt || null,
-      createdAt: postData.createdAt || new Date(),
-      updatedAt: new Date()
-    };
-
-    const postDoc = new ContentModel(post);
-    const saved = await postDoc.save();
-    
+    const saved = await contentRepository.createPostWithDefaults(postData);
     return {
       id: saved._id.toString(),
-      ...post
+      workspaceId: saved.workspaceId,
+      content: (saved as any).content,
+      media: (saved as any).media || [],
+      hashtags: (saved as any).hashtags || '',
+      firstComment: (saved as any).firstComment || '',
+      location: (saved as any).location || '',
+      accounts: (saved as any).accounts || [],
+      status: saved.status,
+      publishedAt: (saved as any).publishedAt,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt
     };
   }
 
@@ -539,33 +461,13 @@ export class MongoStorage implements IStorage {
   // Analytics operations - delegating to analyticsRepository
   async getAnalytics(workspaceId: number | string, platform?: string, days?: number): Promise<Analytics[]> {
     await this.connect();
-    
-    const workspaceIdStr = workspaceId.toString();
-    
-    let analyticsData;
-    if (platform) {
-      const result = await analyticsRepository.findByWorkspaceAndPlatform(workspaceIdStr, platform);
-      analyticsData = result;
-    } else {
-      const result = await analyticsRepository.findByWorkspaceId(workspaceIdStr);
-      analyticsData = result;
-    }
-    
-    if (days && analyticsData.length > 0) {
-      const daysAgo = new Date();
-      daysAgo.setDate(daysAgo.getDate() - days);
-      analyticsData = analyticsData.filter(doc => doc.date >= daysAgo);
-    }
-    
+    const analyticsData = await analyticsRepository.findByWorkspaceWithDaysFilter(workspaceId.toString(), platform, days);
     return analyticsData.map(doc => convertAnalytics(doc));
   }
 
   async createAnalytics(analytics: InsertAnalytics): Promise<Analytics> {
     await this.connect();
-    const analyticsDoc = await analyticsRepository.create({
-      ...analytics,
-      createdAt: new Date()
-    });
+    const analyticsDoc = await analyticsRepository.createWithDefaults(analytics);
     return convertAnalytics(analyticsDoc);
   }
 
@@ -636,30 +538,13 @@ export class MongoStorage implements IStorage {
 
   async getValidSuggestions(workspaceId: number): Promise<Suggestion[]> {
     await this.connect();
-    
-    const suggestions = await suggestionRepository.findUnusedByWorkspace(workspaceId.toString());
-    
-    const now = new Date();
-    const validSuggestions = suggestions.filter(s => 
-      !s.validUntil || new Date(s.validUntil) > now
-    );
-    
-    return validSuggestions.map(doc => convertSuggestion(doc));
+    const suggestions = await suggestionRepository.findValidByWorkspace(workspaceId.toString());
+    return suggestions.map(doc => convertSuggestion(doc));
   }
 
   async createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion> {
     await this.connect();
-    
-    const saved = await suggestionRepository.create({
-      workspaceId: suggestion.workspaceId.toString(),
-      type: suggestion.type,
-      data: suggestion.data,
-      confidence: suggestion.confidence,
-      isUsed: false,
-      validUntil: suggestion.validUntil,
-      createdAt: new Date()
-    });
-    
+    const saved = await suggestionRepository.createWithDefaults(suggestion);
     return convertSuggestion(saved);
   }
 
@@ -694,10 +579,7 @@ export class MongoStorage implements IStorage {
 
   async createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction> {
     await this.connect();
-    const created = await creditTransactionRepository.create({
-      ...transaction,
-      createdAt: new Date()
-    });
+    const created = await creditTransactionRepository.createWithDefaults(transaction);
     return convertCreditTransaction(created);
   }
 
@@ -738,7 +620,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const subscription = await subscriptionRepository.updateOne(
       { userId: userId.toString() },
-      { status, canceledAt, updatedAt: new Date() }
+      { status, canceledAt }
     );
     if (!subscription) throw new Error('Subscription not found');
     return convertSubscription(subscription);
@@ -766,14 +648,8 @@ export class MongoStorage implements IStorage {
   // Addon operations - delegating to addonRepository
   async getUserAddons(userId: number | string): Promise<Addon[]> {
     await this.connect();
-    
-    const result = await addonRepository.findByUserId(userId.toString());
-    const addons = result.data;
-    
-    // Filter for active addons after retrieval
-    const activeAddons = addons.filter(addon => addon.isActive !== false);
-    
-    return activeAddons.map(addon => convertAddon(addon));
+    const addons = await addonRepository.findActiveByUserId(userId.toString());
+    return addons.map(addon => convertAddon(addon));
   }
 
   async getActiveAddonsByUser(userId: number | string): Promise<Addon[]> {
@@ -787,11 +663,7 @@ export class MongoStorage implements IStorage {
 
   async createAddon(insertAddon: InsertAddon): Promise<Addon> {
     await this.connect();
-    const savedAddon = await addonRepository.create({
-      ...insertAddon,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    const savedAddon = await addonRepository.createWithDefaults(insertAddon);
     return convertAddon(savedAddon);
   }
 
@@ -868,15 +740,7 @@ export class MongoStorage implements IStorage {
 
   async createTeamInvitation(invitation: InsertTeamInvitation): Promise<TeamInvitation> {
     await this.connect();
-    
-    const invitationData = {
-      ...invitation,
-      id: Date.now(),
-      status: 'pending',
-      createdAt: new Date()
-    };
-
-    const newInvitation = await teamInvitationRepository.create(invitationData);
+    const newInvitation = await teamInvitationRepository.createWithDefaults(invitation);
     return convertTeamInvitation(newInvitation);
   }
 
@@ -978,12 +842,7 @@ export class MongoStorage implements IStorage {
 
   async createContentRecommendation(insertRecommendation: InsertContentRecommendation): Promise<ContentRecommendation> {
     await this.connect();
-    const saved = await contentRecommendationRepository.create({
-      ...insertRecommendation,
-      workspaceId: insertRecommendation.workspaceId.toString(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    const saved = await contentRecommendationRepository.createWithDefaults(insertRecommendation);
     return convertContentRecommendation(saved);
   }
 
@@ -991,7 +850,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const updated = await contentRecommendationRepository.updateById(
       id.toString(),
-      { ...updates, updatedAt: new Date() }
+      updates
     );
     if (!updated) {
       throw new Error(`Content recommendation ${id} not found`);
@@ -1018,12 +877,7 @@ export class MongoStorage implements IStorage {
 
   async createUserContentHistory(insertHistory: InsertUserContentHistory): Promise<UserContentHistory> {
     await this.connect();
-    const saved = await userContentHistoryRepository.create({
-      ...insertHistory,
-      userId: insertHistory.userId.toString(),
-      workspaceId: insertHistory.workspaceId.toString(),
-      createdAt: new Date()
-    });
+    const saved = await userContentHistoryRepository.createWithDefaults(insertHistory);
     return convertUserContentHistory(saved);
   }
 
@@ -1208,7 +1062,7 @@ export class MongoStorage implements IStorage {
 
   async updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin> {
     await this.connect();
-    const admin = await adminRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const admin = await adminRepository.updateById(id.toString(), updates);
     if (!admin) throw new Error('Admin not found');
     return convertAdmin(admin);
   }
@@ -1323,7 +1177,7 @@ export class MongoStorage implements IStorage {
 
   async updateNotification(id: number, updates: Partial<any>): Promise<any> {
     await this.connect();
-    const notification = await notificationRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const notification = await notificationRepository.updateById(id.toString(), updates);
     if (!notification) throw new Error('Notification not found');
     return convertNotification(notification);
   }
@@ -1363,7 +1217,7 @@ export class MongoStorage implements IStorage {
 
   async updatePopup(id: number, updates: Partial<any>): Promise<any> {
     await this.connect();
-    const popup = await popupRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const popup = await popupRepository.updateById(id.toString(), updates);
     if (!popup) throw new Error('Popup not found');
     return convertPopup(popup);
   }
@@ -1461,7 +1315,7 @@ export class MongoStorage implements IStorage {
 
   async updateFeedbackMessage(id: number, updates: Partial<any>): Promise<any> {
     await this.connect();
-    const message = await feedbackMessageRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const message = await feedbackMessageRepository.updateById(id.toString(), updates);
     if (!message) throw new Error('Feedback message not found');
     return convertFeedbackMessage(message);
   }
@@ -1497,8 +1351,8 @@ export class MongoStorage implements IStorage {
     
     const [userCount, workspaceCount, contentCount] = await Promise.all([
       userRepository.countAll(),
-      WorkspaceModel.countDocuments({}),
-      ContentModel.countDocuments({})
+      workspaceRepository.countAll(),
+      contentRepository.countAll()
     ]);
 
     return {
@@ -1816,7 +1670,7 @@ export class MongoStorage implements IStorage {
 
   async updateCreativeBrief(id: number, updates: Partial<CreativeBrief>): Promise<CreativeBrief> {
     await this.connect();
-    const updated = await creativeBriefRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const updated = await creativeBriefRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Creative brief not found');
     return convertCreativeBrief(updated);
   }
@@ -1848,7 +1702,7 @@ export class MongoStorage implements IStorage {
 
   async updateContentRepurpose(id: number, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose> {
     await this.connect();
-    const updated = await contentRepurposeRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const updated = await contentRepurposeRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Content repurpose not found');
     return convertContentRepurpose(updated);
   }
@@ -1880,7 +1734,7 @@ export class MongoStorage implements IStorage {
 
   async updateCompetitorAnalysis(id: number, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis> {
     await this.connect();
-    const updated = await competitorAnalysisRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const updated = await competitorAnalysisRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Competitor analysis not found');
     return convertCompetitorAnalysis(updated);
   }
@@ -1969,7 +1823,7 @@ export class MongoStorage implements IStorage {
 
   async updateWaitlistUser(id: number | string, updates: Partial<WaitlistUser>): Promise<WaitlistUser> {
     await this.connect();
-    const user = await waitlistUserRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const user = await waitlistUserRepository.updateById(id.toString(), updates);
     if (!user) throw new Error('Waitlist user not found');
     return convertWaitlistUser(user);
   }
@@ -2122,7 +1976,7 @@ export class MongoStorage implements IStorage {
       throw new Error('Invalid conversation id format');
     }
     
-    const updated = await chatConversationRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
+    const updated = await chatConversationRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Conversation not found');
     return {
       id: updated.id,

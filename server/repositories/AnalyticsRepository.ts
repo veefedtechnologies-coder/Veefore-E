@@ -8,6 +8,13 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     super(AnalyticsModel, 'Analytics');
   }
 
+  async createWithDefaults(data: Partial<IAnalytics>): Promise<IAnalytics> {
+    return this.create({
+      ...data,
+      createdAt: new Date()
+    });
+  }
+
   async findByWorkspaceId(workspaceId: string, options?: PaginationOptions) {
     return this.findMany({ workspaceId }, { ...options, sortBy: 'date', sortOrder: 'desc' });
   }
@@ -21,6 +28,26 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
       { workspaceId, platform },
       { ...options, sortBy: 'date', sortOrder: 'desc' }
     );
+  }
+
+  async findByWorkspaceWithDaysFilter(
+    workspaceId: string,
+    platform?: string,
+    days?: number
+  ): Promise<IAnalytics[]> {
+    const filter: any = { workspaceId };
+    
+    if (platform) {
+      filter.platform = platform;
+    }
+    
+    if (days) {
+      const daysAgo = new Date();
+      daysAgo.setDate(daysAgo.getDate() - days);
+      filter.date = { $gte: daysAgo };
+    }
+    
+    return this.findAll(filter);
   }
 
   async findByWorkspaceAndDateRange(

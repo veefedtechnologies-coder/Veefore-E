@@ -32,6 +32,14 @@ export class WorkspaceRepository extends BaseRepository<IWorkspace> {
     });
   }
 
+  async createWithDefaults(data: Partial<IWorkspace>): Promise<IWorkspace> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async updateCredits(workspaceId: string, creditDelta: number): Promise<IWorkspace | null> {
     const startTime = Date.now();
     try {
@@ -129,6 +137,18 @@ export class WorkspaceRepository extends BaseRepository<IWorkspace> {
     } catch (error) {
       logger.db.error('getWorkspaceStats', error, { entityName: this.entityName, workspaceId });
       throw new DatabaseError('Failed to get workspace stats', error as Error);
+    }
+  }
+
+  async countAll(): Promise<number> {
+    const startTime = Date.now();
+    try {
+      const count = await this.model.countDocuments({}).exec();
+      logger.db.query('countAll', this.entityName, Date.now() - startTime);
+      return count;
+    } catch (error) {
+      logger.db.error('countAll', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to count all workspaces', error as Error);
     }
   }
 }

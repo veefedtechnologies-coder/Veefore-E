@@ -35,6 +35,23 @@ export class UserContentHistoryRepository extends BaseRepository<IUserContentHis
       throw new DatabaseError('Failed to get recent history', error as Error);
     }
   }
+
+  async createWithDefaults(data: {
+    userId: number | string;
+    workspaceId: number | string;
+    recommendationId?: number | string;
+    action: string;
+    metadata?: Record<string, any>;
+  }): Promise<IUserContentHistory> {
+    return this.create({
+      userId: data.userId.toString(),
+      workspaceId: data.workspaceId.toString(),
+      recommendationId: data.recommendationId?.toString(),
+      action: data.action,
+      metadata: data.metadata || {},
+      createdAt: new Date()
+    });
+  }
 }
 
 export const userContentHistoryRepository = new UserContentHistoryRepository();
