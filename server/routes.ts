@@ -8433,18 +8433,6 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
     }
   });
 
-  // ✅ META-COMPLIANT INSTAGRAM WEBHOOK SYSTEM
-  // Implements Meta's exact webhook requirements for Instagram automation
-  app.get('/webhook/instagram', async (req, res) => {
-    console.log('[META WEBHOOK] Instagram webhook verification from Meta');
-    await metaWebhook.handleVerification(req, res);
-  });
-
-  app.post('/webhook/instagram', async (req, res) => {
-    console.log('[META WEBHOOK] 🎯 Real Instagram webhook event from Meta');
-    await metaWebhook.handleEvent(req, res);
-  });
-
   // 🔧 UPDATE INSTAGRAM TOKEN ENDPOINT
   app.post('/api/update-instagram-token', requireAuth, async (req, res) => {
     try {
@@ -14686,36 +14674,6 @@ Create a detailed growth strategy in JSON format:
       res.status(500).json({ 
         error: 'Failed to claim welcome bonus',
         message: error.message || 'An error occurred while claiming your welcome bonus'
-      });
-    }
-  });
-
-  // Health check endpoint for deployment
-  // P1-5 SECURITY: CORS health check endpoint
-  app.get('/api/cors-health', corsHealthCheck);
-
-  // P1-7 SECURITY: Security metrics endpoint
-  app.get('/api/security/metrics', securityMetricsHandler);
-
-  app.get('/api/health', async (req: any, res: Response) => {
-    try {
-      const healthStatus = {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        uptime: process.uptime(),
-        version: '1.0.0',
-        services: {
-          database: 'connected',
-          server: 'running'
-        }
-      };
-      
-      res.status(200).json(healthStatus);
-    } catch (error) {
-      res.status(500).json({ 
-        status: 'unhealthy',
-        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });

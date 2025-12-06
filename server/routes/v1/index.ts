@@ -11,6 +11,8 @@ import thumbnailsRoutes from './thumbnails.routes';
 import trendsRoutes from './trends.routes';
 import automationRoutes from './automation.routes';
 import billingRoutes from './billing.routes';
+import webhooksRoutes from './webhooks.routes';
+import healthRoutes from './health.routes';
 
 export { default as authRoutes } from './auth.routes';
 export { default as userRoutes } from './user.routes';
@@ -24,6 +26,8 @@ export { default as thumbnailsRoutes } from './thumbnails.routes';
 export { default as trendsRoutes } from './trends.routes';
 export { default as automationRoutes } from './automation.routes';
 export { default as billingRoutes } from './billing.routes';
+export { default as webhooksRoutes } from './webhooks.routes';
+export { default as healthRoutes } from './health.routes';
 
 export function mountV1Routes(app: Application, basePath: string = '/api/v1'): void {
   app.use(`${basePath}/auth`, authRoutes);
@@ -38,6 +42,8 @@ export function mountV1Routes(app: Application, basePath: string = '/api/v1'): v
   app.use(`${basePath}/trends`, trendsRoutes);
   app.use(`${basePath}/automation`, automationRoutes);
   app.use(`${basePath}/billing`, billingRoutes);
+  app.use('/webhook', webhooksRoutes);
+  app.use('/api', healthRoutes);
 }
 
 const v1Router = Router();
