@@ -1,4 +1,5 @@
-export { BaseController, TypedRequest, ApiResponse } from './BaseController';
+export { BaseController } from './BaseController';
+export type { TypedRequest, ApiResponse } from './BaseController';
 export type { ParamsDictionary } from 'express-serve-static-core';
 export type { ParsedQs } from 'qs';
 

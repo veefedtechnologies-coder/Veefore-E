@@ -73,6 +73,7 @@ import {
 } from './security/workspace-isolation';
 import { sentryCaptureException, sentryCaptureMessage, isSentryReady, sentryDirectTest } from './monitoring/sentry-init';
 import { defaultWorkspaceEnforcer } from './middleware/default-workspace-enforcer';
+import { mountV1Routes } from './routes/v1/index';
 
 export async function registerRoutes(app: Express, storage: IStorage, upload?: any): Promise<Server> {
   // Configure multer for file uploads
@@ -127,6 +128,9 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
   accountMonitor.startMonitoring();
   console.log('[ACCOUNT MONITOR] 👀 Starting Instagram account monitoring...');
   console.log('[SMART POLLING] ✅ Hybrid system active - webhooks for comments/mentions, polling for likes/followers');
+
+  // Mount v1 API routes
+  mountV1Routes(app, '/api');
 
   // TEST ROUTE - Optimized generation test (early placement to avoid middleware issues)
   app.post('/api/thumbnails/test-optimized-generation', validateRequest({ body: z.object({ title: z.string().min(1).max(200) }).passthrough() }), async (req: any, res: Response) => {
