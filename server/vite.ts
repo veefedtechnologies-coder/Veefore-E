@@ -32,9 +32,16 @@ export async function setupVite(app: Express, server: Server) {
 
   const viteLogger = createLogger();
 
+  // Configure HMR for Replit's proxy environment
+  const isReplit = !!process.env.REPLIT_DEV_DOMAIN;
   const serverOptions = {
     middlewareMode: true,
-    hmr: {
+    hmr: isReplit ? {
+      server: server,
+      clientPort: 443,
+      protocol: 'wss',
+      host: process.env.REPLIT_DEV_DOMAIN,
+    } : {
       server: server,
     },
     allowedHosts: true,
