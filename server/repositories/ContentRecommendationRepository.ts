@@ -25,6 +25,33 @@ export class ContentRecommendationRepository extends BaseRepository<IContentReco
   async toggleActive(recommendationId: string, isActive: boolean): Promise<IContentRecommendation | null> {
     return this.updateById(recommendationId, { isActive, updatedAt: new Date() });
   }
+
+  async createWithDefaults(data: {
+    workspaceId: number | string;
+    type: string;
+    title: string;
+    description?: string;
+    thumbnailUrl?: string;
+    mediaUrl?: string;
+    duration?: number;
+    category: string;
+    country: string;
+    tags?: string[];
+    engagement?: {
+      expectedViews?: number;
+      expectedLikes?: number;
+      expectedShares?: number;
+    };
+    sourceUrl?: string;
+    isActive?: boolean;
+  }): Promise<IContentRecommendation> {
+    return this.create({
+      ...data,
+      workspaceId: data.workspaceId.toString(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
 }
 
 export const contentRecommendationRepository = new ContentRecommendationRepository();

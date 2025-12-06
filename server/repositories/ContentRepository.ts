@@ -258,6 +258,75 @@ export class ContentRepository extends BaseRepository<IContent> {
       options
     );
   }
+
+  async createWithDefaults(content: {
+    workspaceId: string | number;
+    type: string;
+    title?: string;
+    description?: string;
+    contentData?: Record<string, any>;
+    platform?: string;
+    status?: string;
+    scheduledAt?: Date | null;
+    creditsUsed?: number;
+    prompt?: string;
+  }): Promise<IContent> {
+    const contentData = {
+      workspaceId: content.workspaceId.toString(),
+      type: content.type,
+      title: content.title,
+      description: content.description,
+      contentData: content.contentData || {},
+      platform: content.platform,
+      status: content.status || (content.scheduledAt ? 'scheduled' : 'ready'),
+      scheduledAt: content.scheduledAt,
+      creditsUsed: content.creditsUsed || 0,
+      prompt: content.prompt,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    return this.create(contentData);
+  }
+
+  async createPostWithDefaults(postData: {
+    workspaceId: string | number;
+    content?: string;
+    media?: any[];
+    hashtags?: string;
+    firstComment?: string;
+    location?: string;
+    accounts?: any[];
+    status?: string;
+    publishedAt?: Date | null;
+    createdAt?: Date;
+  }): Promise<IContent> {
+    const post = {
+      workspaceId: postData.workspaceId.toString(),
+      content: postData.content,
+      media: postData.media || [],
+      hashtags: postData.hashtags || '',
+      firstComment: postData.firstComment || '',
+      location: postData.location || '',
+      accounts: postData.accounts || [],
+      status: postData.status || 'draft',
+      publishedAt: postData.publishedAt || null,
+      createdAt: postData.createdAt || new Date(),
+      updatedAt: new Date()
+    };
+    return this.create(post);
+  }
+
+  async countAll(): Promise<number> {
+    const startTime = Date.now();
+    try {
+      const count = await this.model.countDocuments({}).exec();
+      logger.db.query('countAll', this.entityName, Date.now() - startTime);
+      return count;
+    } catch (error) {
+      logger.db.error('countAll', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to count all content', error as Error);
+    }
+  }
 }
 
 export const contentRepository = new ContentRepository();

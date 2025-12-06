@@ -2,7 +2,8 @@ import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { SocialAccountModel, ISocialAccount } from '../models/Social';
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
-import { getAccessTokenFromAccount, getRefreshTokenFromAccount } from '../storage/converters';
+import { getAccessTokenFromAccount, getRefreshTokenFromAccount, encryptAndStoreToken } from '../storage/converters';
+import { InsertSocialAccount, SocialAccount } from '@shared/schema';
 
 export type Platform = 'instagram' | 'twitter' | 'facebook' | 'youtube' | 'tiktok' | 'linkedin';
 
@@ -29,6 +30,69 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
 
   async findByWorkspaceId(workspaceId: string): Promise<ISocialAccount[]> {
     return this.findAll({ workspaceId });
+  }
+
+  async createWithEncryptedTokens(account: InsertSocialAccount): Promise<ISocialAccount> {
+    const startTime = Date.now();
+    try {
+      const socialAccountData: any = {
+        ...account,
+        isActive: true,
+        totalShares: 0,
+        totalSaves: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      delete socialAccountData.id;
+      delete socialAccountData._id;
+
+      if (account.accessToken) {
+        socialAccountData.encryptedAccessToken = encryptAndStoreToken(account.accessToken);
+        delete socialAccountData.accessToken;
+      }
+
+      if (account.refreshToken) {
+        socialAccountData.encryptedRefreshToken = encryptAndStoreToken(account.refreshToken);
+        delete socialAccountData.refreshToken;
+      }
+
+      const result = await this.create(socialAccountData);
+      logger.db.query('createWithEncryptedTokens', this.entityName, Date.now() - startTime);
+      return result;
+    } catch (error) {
+      logger.db.error('createWithEncryptedTokens', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to create social account with encrypted tokens', error as Error);
+    }
+  }
+
+  async updateWithEncryptedTokens(id: string, updates: Partial<SocialAccount>): Promise<ISocialAccount> {
+    const startTime = Date.now();
+    try {
+      const encryptedUpdates: any = { ...updates, updatedAt: new Date() };
+
+      if (updates.accessToken) {
+        encryptedUpdates.encryptedAccessToken = encryptAndStoreToken(updates.accessToken);
+        delete encryptedUpdates.accessToken;
+      }
+
+      if (updates.refreshToken) {
+        encryptedUpdates.encryptedRefreshToken = encryptAndStoreToken(updates.refreshToken);
+        delete encryptedUpdates.refreshToken;
+      }
+
+      const result = await this.updateById(id, encryptedUpdates);
+      
+      if (!result) {
+        throw new Error('Social account not found');
+      }
+
+      logger.db.query('updateWithEncryptedTokens', this.entityName, Date.now() - startTime, { id });
+      return result;
+    } catch (error) {
+      logger.db.error('updateWithEncryptedTokens', error, { entityName: this.entityName, id });
+      throw new DatabaseError('Failed to update social account with encrypted tokens', error as Error);
+    }
   }
 
   async findByWorkspaceAndPlatform(

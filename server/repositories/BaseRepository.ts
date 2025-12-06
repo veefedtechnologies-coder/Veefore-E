@@ -124,8 +124,9 @@ export abstract class BaseRepository<T extends Document> {
   async updateById(id: string, data: UpdateQuery<T>): Promise<T | null> {
     const startTime = Date.now();
     try {
+      const updateData = { ...data, updatedAt: new Date() };
       const result = await this.model
-        .findByIdAndUpdate(id, data, { new: true, runValidators: true })
+        .findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
         .exec();
       logger.db.query('updateById', this.entityName, Date.now() - startTime, { id });
       return result;
@@ -146,8 +147,9 @@ export abstract class BaseRepository<T extends Document> {
   async updateOne(filter: FilterQuery<T>, data: UpdateQuery<T>): Promise<T | null> {
     const startTime = Date.now();
     try {
+      const updateData = { ...data, updatedAt: new Date() };
       const result = await this.model
-        .findOneAndUpdate(filter, data, { new: true, runValidators: true })
+        .findOneAndUpdate(filter, updateData, { new: true, runValidators: true })
         .exec();
       logger.db.query('updateOne', this.entityName, Date.now() - startTime);
       return result;
@@ -160,7 +162,8 @@ export abstract class BaseRepository<T extends Document> {
   async updateMany(filter: FilterQuery<T>, data: UpdateQuery<T>): Promise<number> {
     const startTime = Date.now();
     try {
-      const result = await this.model.updateMany(filter, data).exec();
+      const updateData = { ...data, updatedAt: new Date() };
+      const result = await this.model.updateMany(filter, updateData).exec();
       logger.db.query('updateMany', this.entityName, Date.now() - startTime, {
         modified: result.modifiedCount,
       });

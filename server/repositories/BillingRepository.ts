@@ -65,6 +65,13 @@ export class CreditTransactionRepository extends BaseRepository<ICreditTransacti
       throw new DatabaseError('Failed to get total credits used', error as Error);
     }
   }
+
+  async createWithDefaults(data: Partial<ICreditTransaction>): Promise<ICreditTransaction> {
+    return this.create({
+      ...data,
+      createdAt: new Date()
+    });
+  }
 }
 
 export class PaymentRepository extends BaseRepository<IPayment> {
@@ -226,6 +233,14 @@ export class AddonRepository extends BaseRepository<IAddon> {
       { isActive: true, expiresAt: { $lte: new Date() } },
       { isActive: false, updatedAt: new Date() }
     );
+  }
+
+  async createWithDefaults(data: Partial<IAddon>): Promise<IAddon> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 }
 

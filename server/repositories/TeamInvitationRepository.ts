@@ -1,9 +1,21 @@
 import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { TeamInvitationModel, ITeamInvitation } from '../models/Workspace/TeamInvitation';
+import { InsertTeamInvitation } from '@shared/schema';
 
 export class TeamInvitationRepository extends BaseRepository<ITeamInvitation> {
   constructor() {
     super(TeamInvitationModel, 'TeamInvitation');
+  }
+
+  async createWithDefaults(invitation: InsertTeamInvitation): Promise<ITeamInvitation> {
+    const invitationData = {
+      ...invitation,
+      id: Date.now(),
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    return this.create(invitationData);
   }
 
   async findByWorkspaceId(workspaceId: string, options?: PaginationOptions) {
