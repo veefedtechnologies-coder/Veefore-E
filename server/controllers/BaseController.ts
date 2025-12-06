@@ -102,11 +102,15 @@ export abstract class BaseController {
     res.status(204).send();
   }
 
-  protected wrapAsync(
-    fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
+  protected wrapAsync<
+    P extends ParamsDictionary = ParamsDictionary,
+    B = any,
+    Q extends ParsedQs = ParsedQs
+  >(
+    fn: (req: TypedRequest<P, B, Q>, res: Response, next: NextFunction) => Promise<void>
   ): RequestHandler {
     return (req: Request, res: Response, next: NextFunction) => {
-      Promise.resolve(fn(req, res, next)).catch(next);
+      Promise.resolve(fn(req as TypedRequest<P, B, Q>, res, next)).catch(next);
     };
   }
 }
