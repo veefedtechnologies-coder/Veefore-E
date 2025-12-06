@@ -721,188 +721,27 @@ export class MongoStorage implements IStorage {
 
   async getAutomationRules(workspaceId: number | string): Promise<AutomationRule[]> {
     await this.connect();
-    try {
-      const result = await automationRuleRepository.findByWorkspaceId(workspaceId.toString(), { limit: 10000 });
-      const rules = result.data;
-      
-      return rules.map(rule => {
-        const trigger = rule.trigger || {};
-        const action = rule.action || {};
-        
-        let displayResponses = [];
-        let displayDmResponses = [];
-        let targetMediaIds = [];
-        
-        if (rule.responses) {
-          if (typeof rule.responses === 'object' && rule.responses.responses) {
-            displayResponses = rule.responses.responses || [];
-            displayDmResponses = rule.responses.dmResponses || [];
-          } else if (Array.isArray(rule.responses)) {
-            displayResponses = rule.responses;
-          }
-        }
-        
-        if (rule.targetMediaIds) {
-          targetMediaIds = rule.targetMediaIds || [];
-        }
-        
-        return {
-          id: rule._id.toString(),
-          name: rule.name || '',
-          workspaceId: typeof workspaceId === 'string' ? workspaceId : parseInt(rule.workspaceId),
-          description: rule.description || null,
-          isActive: rule.isActive !== false,
-          type: rule.type || trigger.type || action.type || 'dm',
-          postInteraction: rule.postInteraction,
-          trigger: trigger,
-          triggers: rule.triggers || trigger,
-          action: action,
-          keywords: rule.keywords || [],
-          responses: displayResponses,
-          dmResponses: displayDmResponses,
-          targetMediaIds: targetMediaIds,
-          lastRun: rule.lastRun ? new Date(rule.lastRun) : null,
-          nextRun: rule.nextRun ? new Date(rule.nextRun) : null,
-          createdAt: rule.createdAt ? new Date(rule.createdAt) : new Date(),
-          updatedAt: rule.updatedAt ? new Date(rule.updatedAt) : new Date()
-        };
-      });
-    } catch (error: any) {
-      return [];
-    }
+    return automationRuleRepository.findByWorkspaceIdFormatted(workspaceId.toString());
   }
 
   async getActiveAutomationRules(): Promise<AutomationRule[]> {
     await this.connect();
-    try {
-      const result = await automationRuleRepository.findActiveRules({ limit: 10000 });
-      const rules = result.data;
-      
-      return rules.map(rule => ({
-        id: rule._id.toString(),
-        name: rule.name || '',
-        workspaceId: parseInt(rule.workspaceId),
-        description: rule.description || null,
-        isActive: rule.isActive !== false,
-        trigger: rule.trigger || {},
-        action: rule.action || {},
-        lastRun: rule.lastRun ? new Date(rule.lastRun) : null,
-        nextRun: rule.nextRun ? new Date(rule.nextRun) : null,
-        createdAt: rule.createdAt ? new Date(rule.createdAt) : new Date(),
-        updatedAt: rule.updatedAt ? new Date(rule.updatedAt) : new Date()
-      }));
-    } catch (error: any) {
-      return [];
-    }
+    return automationRuleRepository.findActiveRulesFormatted();
   }
 
   async getAutomationRulesByType(type: string): Promise<AutomationRule[]> {
     await this.connect();
-    try {
-      const result = await automationRuleRepository.findByType(type, { limit: 10000 });
-      const rules = result.data.filter(rule => rule.isActive !== false);
-      
-      return rules.map(rule => {
-        const trigger = rule.trigger || {};
-        const action = rule.action || {};
-        
-        return {
-          id: rule._id.toString(),
-          name: rule.name || '',
-          workspaceId: rule.workspaceId,
-          description: rule.description || null,
-          isActive: rule.isActive !== false,
-          type: trigger.type || action.type || rule.type || type,
-          trigger: trigger,
-          action: action,
-          lastRun: rule.lastRun ? new Date(rule.lastRun) : null,
-          nextRun: rule.nextRun ? new Date(rule.nextRun) : null,
-          createdAt: rule.createdAt ? new Date(rule.createdAt) : new Date(),
-          updatedAt: rule.updatedAt ? new Date(rule.updatedAt) : new Date()
-        };
-      });
-    } catch (error: any) {
-      return [];
-    }
+    return automationRuleRepository.findByTypeFormatted(type);
   }
 
   async createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule> {
     await this.connect();
-    try {
-      const automationRuleData = {
-        name: rule.name || 'Instagram Auto-Reply',
-        workspaceId: rule.workspaceId.toString(),
-        description: rule.description || null,
-        isActive: rule.isActive !== false,
-        type: rule.type || 'comment_dm',
-        trigger: rule.trigger || {},
-        action: rule.action || {},
-        keywords: rule.keywords || [],
-        responses: rule.responses || {},
-        targetMediaIds: rule.targetMediaIds || [],
-        lastRun: null,
-        nextRun: rule.nextRun || null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      const savedRule = await automationRuleRepository.create(automationRuleData);
-      
-      return {
-        id: savedRule._id.toString(),
-        name: savedRule.name,
-        workspaceId: parseInt(savedRule.workspaceId),
-        description: savedRule.description,
-        isActive: savedRule.isActive,
-        type: savedRule.type,
-        trigger: savedRule.trigger,
-        action: savedRule.action,
-        keywords: savedRule.keywords,
-        responses: savedRule.responses,
-        targetMediaIds: savedRule.targetMediaIds,
-        lastRun: savedRule.lastRun,
-        nextRun: savedRule.nextRun,
-        createdAt: savedRule.createdAt,
-        updatedAt: savedRule.updatedAt
-      };
-    } catch (error: any) {
-      throw new Error(`Failed to create automation rule: ${error.message}`);
-    }
+    return automationRuleRepository.createWithDefaults(rule);
   }
 
   async updateAutomationRule(id: string, updates: Partial<AutomationRule>): Promise<AutomationRule> {
     await this.connect();
-    try {
-      const updateData: any = {
-        ...updates,
-        updatedAt: new Date()
-      };
-      
-      delete updateData.id;
-      delete updateData.createdAt;
-      
-      const result = await automationRuleRepository.updateById(id, updateData);
-      
-      if (!result) {
-        throw new Error('Automation rule not found');
-      }
-      
-      return {
-        id: result._id.toString(),
-        name: result.name,
-        workspaceId: parseInt(result.workspaceId),
-        description: result.description || null,
-        isActive: result.isActive !== false,
-        trigger: result.trigger || {},
-        action: result.action || {},
-        lastRun: result.lastRun ? new Date(result.lastRun) : null,
-        nextRun: result.nextRun ? new Date(result.nextRun) : null,
-        createdAt: result.createdAt ? new Date(result.createdAt) : new Date(),
-        updatedAt: result.updatedAt ? new Date(result.updatedAt) : new Date()
-      };
-    } catch (error: any) {
-      throw new Error(`Failed to update automation rule: ${error.message}`);
-    }
+    return automationRuleRepository.updateWithCleanup(id, updates);
   }
 
   async deleteAutomationRule(id: string): Promise<void> {
