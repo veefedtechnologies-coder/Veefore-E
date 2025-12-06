@@ -1,9 +1,68 @@
 import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { WaitlistUser, IWaitlistUser } from '../models/User/WaitlistUser';
+import { logger } from '../config/logger';
+import { DatabaseError } from '../errors';
 
 export class WaitlistUserRepository extends BaseRepository<IWaitlistUser> {
   constructor() {
     super(WaitlistUser, 'WaitlistUser');
+  }
+
+  async countAll(): Promise<number> {
+    return this.count({});
+  }
+
+  async countSince(date: Date): Promise<number> {
+    return this.count({ createdAt: { $gte: date } });
+  }
+
+  async getStats(): Promise<{ totalReferrals: number; avgReferrals: number }> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalReferrals: { $sum: '$referralCount' },
+            avgReferrals: { $avg: '$referralCount' }
+          }
+        }
+      ]).exec();
+      
+      logger.db.query('getStats', this.entityName, Date.now() - startTime);
+      return {
+        totalReferrals: result[0]?.totalReferrals || 0,
+        avgReferrals: result[0]?.avgReferrals || 0
+      };
+    } catch (error) {
+      logger.db.error('getStats', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to get waitlist stats', error as Error);
+    }
+  }
+
+  async getStatusBreakdown(): Promise<Record<string, number>> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model.aggregate([
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]).exec();
+      
+      const breakdown: Record<string, number> = {};
+      result.forEach((item: { _id: string; count: number }) => {
+        breakdown[item._id] = item.count;
+      });
+      
+      logger.db.query('getStatusBreakdown', this.entityName, Date.now() - startTime);
+      return breakdown;
+    } catch (error) {
+      logger.db.error('getStatusBreakdown', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to get waitlist status breakdown', error as Error);
+    }
   }
 
   async findByEmail(email: string): Promise<IWaitlistUser | null> {

@@ -65,7 +65,6 @@ import { SuggestionModel } from './models/Analytics/Suggestion';
 import { AutomationRuleModel } from './models/Automation/AutomationRule';
 import { DmConversationModel } from './models/Automation/DmConversation';
 import { DmMessageModel } from './models/Automation/DmMessage';
-import { ConversationContextModel } from './models/Automation/ConversationContext';
 import { DmTemplateModel } from './models/Automation/DmTemplate';
 import { CreditTransactionModel } from './models/Billing/CreditTransaction';
 import { ReferralModel } from './models/Billing/Referral';
@@ -79,10 +78,6 @@ import { PopupModel } from './models/Admin/Popup';
 import { AppSettingModel } from './models/Admin/AppSetting';
 import { AuditLogModel } from './models/Admin/AuditLog';
 import { FeedbackMessageModel } from './models/Admin/FeedbackMessage';
-import { CreativeBriefModel } from './models/AI/CreativeBrief';
-import { ContentRepurposeModel } from './models/AI/ContentRepurpose';
-import { CompetitorAnalysisModel } from './models/AI/CompetitorAnalysis';
-import { FeatureUsageModel } from './models/AI/FeatureUsage';
 import { ChatConversation as ChatConversationModel } from './models/Chat/ChatConversation';
 import { ChatMessage as ChatMessageModel } from './models/Chat/ChatMessage';
 
@@ -101,6 +96,7 @@ import {
   automationRuleRepository,
   dmConversationRepository,
   dmMessageRepository,
+  conversationContextRepository,
 } from './repositories/AutomationRepository';
 import { workspaceMemberRepository } from './repositories/WorkspaceMemberRepository';
 import { teamInvitationRepository } from './repositories/TeamInvitationRepository';
@@ -1453,41 +1449,18 @@ export class MongoStorage implements IStorage {
   async updateUserSubscription(userId: number | string, planId: string): Promise<User> {
     await this.connect();
     
-    let user;
-    try {
-      // Try by MongoDB _id first (ObjectId format)
-      user = await UserModel.findById(userId);
-    } catch (objectIdError) {
-      // If ObjectId fails, try by the 'id' field
-      const userIdStr = userId.toString();
-      user = await UserModel.findOne({ id: userIdStr });
-    }
-    
-    if (!user) {
-      throw new Error(`User with id ${userId} not found`);
-    }
-    
     // Get plan credits from pricing config
-    const { SUBSCRIPTION_PLANS } = await import('./pricing-config');
     const plan = SUBSCRIPTION_PLANS[planId];
     
     if (!plan) {
       throw new Error(`Invalid plan ID: ${planId}`);
     }
     
-    // Update the user's subscription plan AND ADD the monthly credits (additive)
-    const updatedUser = await UserModel.findByIdAndUpdate(
-      user._id,
-      { 
-        plan: planId, 
-        $inc: { credits: plan.credits },  // Add to existing credits instead of replacing
-        updatedAt: new Date() 
-      },
-      { new: true }
-    );
+    // Use repository method that handles both _id and id field lookups
+    const updatedUser = await userRepository.updateSubscription(userId.toString(), planId, plan.credits);
     
     if (!updatedUser) {
-      throw new Error(`Failed to update user subscription for id ${userId}`);
+      throw new Error(`User with id ${userId} not found or failed to update subscription`);
     }
     
     return convertUser(updatedUser);
@@ -1496,42 +1469,11 @@ export class MongoStorage implements IStorage {
   async addCreditsToUser(userId: number | string, credits: number): Promise<User> {
     await this.connect();
     
-    let user;
-    try {
-      // Try by MongoDB _id first (ObjectId format)
-      user = await UserModel.findById(userId);
-    } catch (objectIdError) {
-      // If ObjectId fails, try by the 'id' field
-      const userIdStr = userId.toString();
-      user = await UserModel.findOne({ id: userIdStr });
-    }
-    
-    if (!user) {
-      throw new Error(`User with id ${userId} not found`);
-    }
-    
-    const currentCredits = user.credits || 0;
-    const newCredits = currentCredits + credits;
-    
-    let updatedUser;
-    try {
-      // Try updating by MongoDB _id first
-      updatedUser = await UserModel.findByIdAndUpdate(
-        user._id,
-        { credits: newCredits, updatedAt: new Date() },
-        { new: true }
-      );
-    } catch (error) {
-      // Fallback to updating by id field
-      updatedUser = await UserModel.findOneAndUpdate(
-        { id: user.id },
-        { credits: newCredits, updatedAt: new Date() },
-        { new: true }
-      );
-    }
+    // Use repository method that handles both _id and id field lookups atomically
+    const updatedUser = await userRepository.addCreditsAtomic(userId.toString(), credits);
     
     if (!updatedUser) {
-      throw new Error(`Failed to update credits for user ${userId}`);
+      throw new Error(`User with id ${userId} not found or failed to update credits`);
     }
     
     return convertUser(updatedUser);
@@ -1646,16 +1588,9 @@ export class MongoStorage implements IStorage {
   async getConversationContext(conversationId: number): Promise<any[]> {
     await this.connect();
     
-    const context = await ConversationContextModel.find({
-      conversationId,
-      $or: [
-        { expiresAt: { $exists: false } },
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } }
-      ]
-    }).sort({ extractedAt: -1 });
+    const contexts = await conversationContextRepository.findActiveContexts(conversationId.toString());
     
-    return context.map(ctx => ({
+    return contexts.map(ctx => ({
       id: ctx._id.toString(),
       conversationId: ctx.conversationId,
       contextType: ctx.contextType,
@@ -1669,8 +1604,7 @@ export class MongoStorage implements IStorage {
   async createConversationContext(data: any): Promise<any> {
     await this.connect();
     
-    const context = new ConversationContextModel(data);
-    const saved = await context.save();
+    const saved = await conversationContextRepository.create(data);
     
     return {
       id: saved._id.toString(),
@@ -1686,7 +1620,7 @@ export class MongoStorage implements IStorage {
   async cleanupExpiredContext(cutoffDate: Date): Promise<void> {
     await this.connect();
     
-    await ConversationContextModel.deleteMany({
+    await conversationContextRepository.deleteMany({
       expiresAt: { $lt: cutoffDate }
     });
   }
@@ -1891,7 +1825,6 @@ export class MongoStorage implements IStorage {
     await this.connect();
     
     const { page, limit, search, filter } = options;
-    const skip = (page - 1) * limit;
     
     // Build query
     let query: any = {};
@@ -1918,16 +1851,15 @@ export class MongoStorage implements IStorage {
       }
     }
     
-    const [users, total] = await Promise.all([
-      UserModel.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      UserModel.countDocuments(query)
-    ]);
+    // Use repository method for pagination
+    const { users, total } = await userRepository.findWithPagination(query, {
+      page,
+      limit,
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    });
     
-    const formattedUsers = users.map(user => ({
+    const formattedUsers = users.map((user: any) => ({
       id: user._id.toString(),
       username: user.username,
       email: user.email,
@@ -2198,7 +2130,7 @@ export class MongoStorage implements IStorage {
   // Get all users method for cleanup operations
   async getAllUsers(): Promise<any[]> {
     await this.connect();
-    const users = await UserModel.find({}).lean();
+    const users = await userRepository.findAll({});
     return users.map(user => convertUser(user));
   }
 
@@ -2207,7 +2139,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     
     const [userCount, workspaceCount, contentCount] = await Promise.all([
-      UserModel.countDocuments({}),
+      userRepository.countAll(),
       WorkspaceModel.countDocuments({}),
       ContentModel.countDocuments({})
     ]);
@@ -2225,50 +2157,17 @@ export class MongoStorage implements IStorage {
   // Email verification methods
   async storeEmailVerificationCode(email: string, code: string, expiry: Date): Promise<void> {
     await this.connect();
-    await UserModel.updateOne(
-      { email },
-      { 
-        emailVerificationCode: code,
-        emailVerificationExpiry: expiry,
-        updatedAt: new Date()
-      }
-    );
+    await userRepository.storeEmailVerificationCode(email, code, expiry);
   }
 
   async verifyEmailCode(email: string, code: string): Promise<boolean> {
     await this.connect();
-    const user = await UserModel.findOne({
-      email,
-      emailVerificationCode: code,
-      emailVerificationExpiry: { $gt: new Date() }
-    });
-
-    if (user) {
-      // Mark email as verified and clear verification data
-      await UserModel.updateOne(
-        { email },
-        {
-          isEmailVerified: true,
-          emailVerificationCode: null,
-          emailVerificationExpiry: null,
-          updatedAt: new Date()
-        }
-      );
-      return true;
-    }
-    return false;
+    return userRepository.verifyEmailCodeAndMarkVerified(email, code);
   }
 
   async clearEmailVerificationCode(email: string): Promise<void> {
     await this.connect();
-    await UserModel.updateOne(
-      { email },
-      {
-        emailVerificationCode: null,
-        emailVerificationExpiry: null,
-        updatedAt: new Date()
-      }
-    );
+    await userRepository.clearEmailVerificationCode(email);
   }
 
   // Create unverified user for email verification flow
@@ -2296,8 +2195,7 @@ export class MongoStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    const user = new UserModel(userData);
-    const savedUser = await user.save();
+    const savedUser = await userRepository.create(userData);
     return convertUser(savedUser);
   }
 
@@ -2305,15 +2203,7 @@ export class MongoStorage implements IStorage {
   async updateUserEmailVerification(id: number | string, token: string, expires: Date): Promise<User> {
     await this.connect();
     
-    const user = await UserModel.findByIdAndUpdate(
-      id,
-      {
-        emailVerificationCode: token,
-        emailVerificationExpiry: expires,
-        updatedAt: new Date()
-      },
-      { new: true }
-    );
+    const user = await userRepository.updateEmailVerificationData(id.toString(), token, expires);
 
     if (!user) {
       throw new Error('User not found');
@@ -2346,22 +2236,12 @@ export class MongoStorage implements IStorage {
   async verifyUserEmail(id: number | string, data: { password?: string; firstName?: string; lastName?: string; firebaseUid?: string }): Promise<User> {
     await this.connect();
     
-    const updateData: any = {
-      isEmailVerified: true,
-      emailVerificationCode: null,
-      emailVerificationExpiry: null,
-      updatedAt: new Date()
-    };
+    const additionalData: { displayName?: string; passwordHash?: string; firebaseUid?: string } = {};
+    if (data.firstName) additionalData.displayName = data.firstName;
+    if (data.password) additionalData.passwordHash = data.password; // Should be hashed before calling this
+    if (data.firebaseUid) additionalData.firebaseUid = data.firebaseUid;
 
-    if (data.firstName) updateData.displayName = data.firstName;
-    if (data.password) updateData.passwordHash = data.password; // Should be hashed before calling this
-    if (data.firebaseUid) updateData.firebaseUid = data.firebaseUid;
-
-    const user = await UserModel.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    );
+    const user = await userRepository.markEmailVerified(id.toString(), additionalData);
 
     if (!user) {
       throw new Error('User not found');
@@ -2573,119 +2453,108 @@ export class MongoStorage implements IStorage {
 
   // AI Features CRUD operations
   
-  // Creative Brief operations
+  // Creative Brief operations - delegating to creativeBriefRepository
   async createCreativeBrief(brief: InsertCreativeBrief): Promise<CreativeBrief> {
     await this.connect();
-    const newBrief = new CreativeBriefModel(brief);
-    const saved = await newBrief.save();
+    const saved = await creativeBriefRepository.create(brief);
     return convertCreativeBrief(saved);
   }
 
   async getCreativeBrief(id: number): Promise<CreativeBrief | undefined> {
     await this.connect();
-    const brief = await CreativeBriefModel.findById(id.toString());
+    const brief = await creativeBriefRepository.findById(id.toString());
     return brief ? convertCreativeBrief(brief) : undefined;
   }
 
   async getCreativeBriefsByWorkspace(workspaceId: number): Promise<CreativeBrief[]> {
     await this.connect();
-    const briefs = await CreativeBriefModel.find({ workspaceId: workspaceId.toString() }).sort({ createdAt: -1 });
+    const result = await creativeBriefRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
+    const briefs = result.data || [];
     return briefs.map(brief => convertCreativeBrief(brief));
   }
 
   async updateCreativeBrief(id: number, updates: Partial<CreativeBrief>): Promise<CreativeBrief> {
     await this.connect();
-    const updated = await CreativeBriefModel.findByIdAndUpdate(
-      id.toString(),
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    const updated = await creativeBriefRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!updated) throw new Error('Creative brief not found');
     return convertCreativeBrief(updated);
   }
 
   async deleteCreativeBrief(id: number): Promise<void> {
     await this.connect();
-    await CreativeBriefModel.findByIdAndDelete(id.toString());
+    await creativeBriefRepository.deleteById(id.toString());
   }
 
-  // Content Repurpose operations
+  // Content Repurpose operations - delegating to contentRepurposeRepository
   async createContentRepurpose(repurpose: InsertContentRepurpose): Promise<ContentRepurpose> {
     await this.connect();
-    const newRepurpose = new ContentRepurposeModel(repurpose);
-    const saved = await newRepurpose.save();
+    const saved = await contentRepurposeRepository.create(repurpose);
     return convertContentRepurpose(saved);
   }
 
   async getContentRepurpose(id: number): Promise<ContentRepurpose | undefined> {
     await this.connect();
-    const repurpose = await ContentRepurposeModel.findById(id.toString());
+    const repurpose = await contentRepurposeRepository.findById(id.toString());
     return repurpose ? convertContentRepurpose(repurpose) : undefined;
   }
 
   async getContentRepurposesByWorkspace(workspaceId: number): Promise<ContentRepurpose[]> {
     await this.connect();
-    const repurposes = await ContentRepurposeModel.find({ workspaceId: workspaceId.toString() }).sort({ createdAt: -1 });
+    const result = await contentRepurposeRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
+    const repurposes = result.data || [];
     return repurposes.map(repurpose => convertContentRepurpose(repurpose));
   }
 
   async updateContentRepurpose(id: number, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose> {
     await this.connect();
-    const updated = await ContentRepurposeModel.findByIdAndUpdate(
-      id.toString(),
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    const updated = await contentRepurposeRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!updated) throw new Error('Content repurpose not found');
     return convertContentRepurpose(updated);
   }
 
   async deleteContentRepurpose(id: number): Promise<void> {
     await this.connect();
-    await ContentRepurposeModel.findByIdAndDelete(id.toString());
+    await contentRepurposeRepository.deleteById(id.toString());
   }
 
-  // Competitor Analysis operations
+  // Competitor Analysis operations - delegating to competitorAnalysisRepository
   async createCompetitorAnalysis(analysis: InsertCompetitorAnalysis): Promise<CompetitorAnalysis> {
     await this.connect();
-    const newAnalysis = new CompetitorAnalysisModel(analysis);
-    const saved = await newAnalysis.save();
+    const saved = await competitorAnalysisRepository.create(analysis);
     return convertCompetitorAnalysis(saved);
   }
 
   async getCompetitorAnalysis(id: number): Promise<CompetitorAnalysis | undefined> {
     await this.connect();
-    const analysis = await CompetitorAnalysisModel.findById(id.toString());
+    const analysis = await competitorAnalysisRepository.findById(id.toString());
     return analysis ? convertCompetitorAnalysis(analysis) : undefined;
   }
 
   async getCompetitorAnalysesByWorkspace(workspaceId: number): Promise<CompetitorAnalysis[]> {
     await this.connect();
-    const analyses = await CompetitorAnalysisModel.find({ workspaceId: workspaceId.toString() }).sort({ createdAt: -1 });
+    const result = await competitorAnalysisRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
+    const analyses = result.data || [];
     return analyses.map(analysis => convertCompetitorAnalysis(analysis));
   }
 
   async updateCompetitorAnalysis(id: number, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis> {
     await this.connect();
-    const updated = await CompetitorAnalysisModel.findByIdAndUpdate(
-      id.toString(),
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    const updated = await competitorAnalysisRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!updated) throw new Error('Competitor analysis not found');
     return convertCompetitorAnalysis(updated);
   }
 
   async deleteCompetitorAnalysis(id: number): Promise<void> {
     await this.connect();
-    await CompetitorAnalysisModel.findByIdAndDelete(id.toString());
+    await competitorAnalysisRepository.deleteById(id.toString());
   }
 
   // Feature usage tracking methods
   async getFeatureUsage(userId: number | string): Promise<any[]> {
     await this.connect();
     try {
-      const docs = await FeatureUsageModel.find({ userId }).sort({ createdAt: -1 });
+      const result = await featureUsageRepository.findByUserId(userId.toString());
+      const docs = result.data || [];
       return docs.map(doc => ({
         id: doc._id.toString(),
         userId: doc.userId,
@@ -2704,18 +2573,10 @@ export class MongoStorage implements IStorage {
   async trackFeatureUsage(userId: number | string, featureId: string, usage: any): Promise<void> {
     await this.connect();
     try {
-      await FeatureUsageModel.findOneAndUpdate(
-        { userId, featureId },
-        {
-          $inc: { usageCount: 1 },
-          $set: { 
-            lastUsed: new Date(),
-            metadata: usage,
-            updatedAt: new Date()
-          }
-        },
-        { upsert: true }
-      );
+      const updated = await featureUsageRepository.incrementUsage(userId.toString(), featureId);
+      if (updated && usage) {
+        await featureUsageRepository.updateById(updated._id.toString(), { metadata: usage });
+      }
     } catch (error) {
       // Silently fail - feature usage tracking is non-critical
     }
@@ -2790,40 +2651,19 @@ export class MongoStorage implements IStorage {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const [total, todayCount, pipeline] = await Promise.all([
-      WaitlistUserModel.countDocuments(),
-      WaitlistUserModel.countDocuments({ createdAt: { $gte: today } }),
-      WaitlistUserModel.aggregate([
-        {
-          $group: {
-            _id: null,
-            totalReferrals: { $sum: '$referralCount' },
-            avgReferrals: { $avg: '$referralCount' }
-          }
-        }
-      ])
+    const [total, todayCount, stats, statusBreakdown] = await Promise.all([
+      waitlistUserRepository.countAll(),
+      waitlistUserRepository.countSince(today),
+      waitlistUserRepository.getStats(),
+      waitlistUserRepository.getStatusBreakdown()
     ]);
-    
-    const statusBreakdown = await WaitlistUserModel.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-    
-    const statusMap = statusBreakdown.reduce((acc, item) => {
-      acc[item._id] = item.count;
-      return acc;
-    }, {} as { [key: string]: number });
     
     return {
       totalUsers: total,
       todaySignups: todayCount,
-      totalReferrals: pipeline[0]?.totalReferrals || 0,
-      averageReferrals: pipeline[0]?.avgReferrals || 0,
-      statusBreakdown: statusMap
+      totalReferrals: stats.totalReferrals,
+      averageReferrals: stats.avgReferrals,
+      statusBreakdown
     };
   }
 
@@ -2920,8 +2760,7 @@ export class MongoStorage implements IStorage {
   // Database reset methods for fresh starts
   async clearAllUsers(): Promise<number> {
     await this.connect();
-    const result = await UserModel.deleteMany({});
-    return result.deletedCount || 0;
+    return await userRepository.deleteMany({});
   }
 
   async clearAllWaitlistUsers(): Promise<number> {
@@ -2939,20 +2778,17 @@ export class MongoStorage implements IStorage {
 
   async clearAllWorkspaces(): Promise<number> {
     await this.connect();
-    const result = await WorkspaceModel.deleteMany({});
-    return result.deletedCount || 0;
+    return await workspaceRepository.deleteMany({});
   }
 
   async clearAllSocialAccounts(): Promise<number> {
     await this.connect();
-    const result = await SocialAccountModel.deleteMany({});
-    return result.deletedCount || 0;
+    return await socialAccountRepository.deleteMany({});
   }
 
   async clearAllContent(): Promise<number> {
     await this.connect();
-    const result = await ContentModel.deleteMany({});
-    return result.deletedCount || 0;
+    return await contentRepository.deleteMany({});
   }
 
   // VeeGPT Chat Methods - delegating to chatConversationRepository and chatMessageRepository
