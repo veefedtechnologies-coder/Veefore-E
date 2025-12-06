@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config();
+dotenv.config({ path: 'server/.env' });
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
@@ -26,7 +28,8 @@ import {
   uploadRateLimiter,
   bruteForceMiddleware,
   passwordResetRateLimiter,
-  socialMediaRateLimiter
+  socialMediaRateLimiter,
+  aiRateLimiter
 } from "./middleware/rate-limiting-working";
 import { xssProtectionMiddleware, enhancedXssHeaders } from "./middleware/xss-protection";
 import { cleanupTempFiles } from "./middleware/file-upload-security";
@@ -54,6 +57,9 @@ import { threatDetectionMiddleware } from "./middleware/threat-detection";
 import securityRoutes from "./routes/security";
 import healthRoutes from "./routes/health";
 import { initializeGracefulShutdown } from "./middleware/graceful-shutdown";
+import { validateRequest, workspaceIdSchema } from './middleware/validation';
+import { z } from 'zod';
+import { initializeSentry } from './monitoring/sentry-init';
 
 // Production-safe log function
 let log: (message: string, source?: string) => void;
@@ -110,16 +116,23 @@ import { initializeGDPRCompliance } from './security/gdpr-compliance';
 initializeGDPRCompliance();
 
 const app = express();
+// Disable ETag to prevent 304 responses on API JSON endpoints
+app.set('etag', false);
+// Force no-cache headers for API endpoints in production
+app.use((req, res, next) => {
+  try {
+    if (req.path && req.path.startsWith('/api')) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  } catch {}
+  next();
+});
 
 // P4 SECURITY: Initialize Reliability & Observability System
-import { 
-  initializeReliabilitySystem, 
-  applyMonitoringMiddleware,
-  applyErrorTrackingMiddleware,
-  createMonitoringEndpoints,
-  recordStartupMetrics,
-  setupGracefulShutdown
-} from './monitoring';
+import { initializeReliabilitySystem, applyMonitoringMiddleware, applyErrorTrackingMiddleware, createMonitoringEndpoints, recordStartupMetrics, setupGracefulShutdown } from './monitoring';
+import { attachSentryExpressHandlers, attachSentryRequestMiddleware } from './monitoring/sentry-init';
 
 // P5 PERFORMANCE: Initialize comprehensive performance & scalability system
 import { 
@@ -130,10 +143,14 @@ import {
   performStartupOptimizations
 } from './performance';
 
-initializeReliabilitySystem(app);
+  initializeReliabilitySystem(app);
+  initializeSentry();
+  try { attachSentryRequestMiddleware(app); } catch {}
+  try { attachSentryExpressHandlers(app); } catch {}
 
 // P4 MONITORING: Apply monitoring middleware early
 applyMonitoringMiddleware(app);
+applyErrorTrackingMiddleware(app);
 
 // P5 PERFORMANCE: Initialize and apply performance optimization system
 await initializePerformanceSystem(app);
@@ -180,7 +197,7 @@ app.use(helmet({
   frameguard: false, // Disable completely for iframe compatibility
 
   // P1-2: Enhanced Content Security Policy - Disabled completely for iframe compatibility
-  contentSecurityPolicy: false, // Disabled for iframe embedding
+  contentSecurityPolicy: isProduction && process.env.ENABLE_CSP === 'true' ? undefined : false,
   
   // P1-2: Enhanced cross-origin policies - Disabled for iframe compatibility
   crossOriginResourcePolicy: false, // Allow all resources for iframe
@@ -212,7 +229,12 @@ app.use((req: any, res, next) => {
   res.removeHeader('X-Frame-Options');
   
   // Set iframe-friendly headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowedOrigin = process.env.CORS_ORIGIN || '*';
+  if (isProduction && !process.env.ENABLE_IFRAME_COMPAT) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
   
@@ -254,6 +276,7 @@ app.use((req: any, res, next) => {
 // P1-3 SECURITY: Apply global rate limiting to all requests
 // P1-3 SECURITY: Apply global rate limiting only to API routes, not static assets
 app.use('/api', globalRateLimiter);
+app.use('/api', aiRateLimiter);
 
 // P1-5 SECURITY: API-specific CORS protection with enhanced validation
 app.use('/api', apiCorsMiddleware);
@@ -392,7 +415,8 @@ app.use((req, res, next) => {
   const storage = new MongoStorage();
   await storage.connect();
   
-  // Database reset endpoint for fresh starts
+  // Database reset endpoint (development only)
+  if (!isProduction) {
   app.post('/api/admin/reset-database', async (req, res) => {
     try {
       console.log('🔄 Starting complete database reset...');
@@ -483,6 +507,7 @@ app.use((req, res, next) => {
       });
     }
   });
+  }
   
   // Start the background scheduler service
   startSchedulerService(storage as any);
@@ -501,7 +526,9 @@ app.use((req, res, next) => {
   
   // P8 SECURITY: Register advanced security and threat intelligence routes
   app.use('/api/security', securityRoutes);
-  app.use('/api/testing', testingRoutes);
+  if (!(process.env.NODE_ENV === 'production' && process.env.ENABLE_TEST_FIXTURES !== 'true')) {
+    app.use('/api/testing', testingRoutes);
+  }
   app.use('/api/cicd', cicdRoutes);
   app.use('/api/production', productionRoutes);
   app.use('/api/audit', auditRoutes);
@@ -513,8 +540,10 @@ app.use((req, res, next) => {
   // Additional webhook route to match Meta Console configuration
   app.use('/webhook', webhooksRoutes);
   
-  // P4 MONITORING: Create monitoring endpoints
-  createMonitoringEndpoints(app);
+  const enableMetrics = process.env.ENABLE_PROMETHEUS_METRICS !== 'false';
+  if (enableMetrics) {
+    createMonitoringEndpoints(app);
+  }
   
   // P5 PERFORMANCE: Create performance monitoring endpoints
   createPerformanceEndpoints(app);
@@ -524,6 +553,13 @@ app.use((req, res, next) => {
   
   // P5 PERFORMANCE: Run startup optimizations
   await performStartupOptimizations();
+
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    const id = (req as any).correlationId || '';
+    const status = err?.status || 500;
+    const message = status === 500 ? 'Internal server error' : (err?.message || 'Error');
+    res.status(status).json({ error: message, correlationId: id });
+  });
 
   // Instagram account management routes
   app.post('/api/instagram/cleanup-duplicates', async (req: any, res: Response) => {
@@ -549,7 +585,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/ensure-account', async (req: any, res: Response) => {
+  app.post('/api/instagram/ensure-account', validateRequest({ body: z.object({ instagramAccountId: z.string().min(1), instagramUsername: z.string().min(1), workspaceId: z.string().min(1) }) }), async (req: any, res: Response) => {
     try {
       const { instagramAccountId, instagramUsername, workspaceId } = req.body;
       
@@ -612,7 +648,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/disconnect', async (req: any, res: Response) => {
+  app.post('/api/instagram/disconnect', validateRequest({ body: z.object({ accountId: z.string().optional(), workspaceId: workspaceIdSchema.shape.workspaceId.optional() }).refine(d => !!d.accountId || !!d.workspaceId, { message: 'accountId or workspaceId is required' }) }), async (req: any, res: Response) => {
     try {
       const { accountId, workspaceId } = req.body || {};
       const { SocialAccountModel } = await import('./mongodb-storage');
@@ -638,7 +674,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/reconnect/start', async (req: any, res: Response) => {
+  app.post('/api/instagram/reconnect/start', validateRequest({ body: workspaceIdSchema }), async (req: any, res: Response) => {
     try {
       const { workspaceId } = req.body || {};
       if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
@@ -1123,6 +1159,17 @@ app.use((req, res, next) => {
           etag: true,
           lastModified: true
         }));
+        // Prevent caching of JS chunks to avoid stale asset mismatches
+        app.use((req, res, next) => {
+          try {
+            if (req.path && req.path.startsWith('/assets/') && req.path.endsWith('.js')) {
+              res.setHeader('Cache-Control', 'no-store');
+              res.setHeader('Pragma', 'no-cache');
+              res.setHeader('Expires', '0');
+            }
+          } catch {}
+          next();
+        });
         
         // Handle SPA routes - serve index.html for all non-API routes
         app.get('*', (req, res, next) => {
@@ -1133,6 +1180,7 @@ app.use((req, res, next) => {
           
           const indexPath = path.join(staticPath, 'index.html');
           if (fs.existsSync(indexPath)) {
+            try { res.setHeader('Cache-Control', 'no-store'); res.setHeader('Pragma', 'no-cache'); res.setHeader('Expires', '0') } catch {}
             res.sendFile(indexPath);
           } else {
             res.status(404).json({ error: 'Application not found' });

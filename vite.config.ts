@@ -1,13 +1,32 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const forceClean = () => {
+  let outDirResolved: string | undefined
+  return {
+    name: 'force-clean-outdir',
+    apply: 'build',
+    configResolved(config) {
+      outDirResolved = (config.build as any)?.outDir
+    },
+    buildStart() {
+      try {
+        if (outDirResolved && fs.existsSync(outDirResolved)) {
+          fs.rmSync(outDirResolved, { recursive: true, force: true })
+        }
+      } catch {}
+    }
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [forceClean(), react()],
   root: path.resolve(__dirname, "client"),
   resolve: {
     preserveSymlinks: false,
@@ -23,7 +42,7 @@ export default defineConfig({
   },
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
-    emptyOutDir: true,
+    emptyOutDir: false,
   },
   server: {
     port: 5173,

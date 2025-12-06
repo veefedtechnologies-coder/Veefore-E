@@ -90,6 +90,15 @@ export class SchedulerService {
 
   private async publishScheduledContent(content: any) {
     try {
+      const maxAttempts = parseInt(process.env.SCHEDULER_MAX_ATTEMPTS || '3', 10);
+      const attempts = (content.contentData?.publishAttempts || 0);
+      if (content.status === 'published' || content.instagramPostId) {
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        await this.updateContentStatus(content.id, 'failed', 'Max publish attempts reached');
+        return;
+      }
       console.log(`[SCHEDULER] Publishing scheduled content: ${content.title} (ID: ${content.id})`);
       
       if (content.platform !== 'instagram') {
@@ -158,12 +167,27 @@ export class SchedulerService {
         await this.updateContentStatus(content.id, 'published', '', directResult.id);
       } else {
         console.error(`[SCHEDULER] ✗ Publishing failed with ${directResult.approach}: ${directResult.error}`);
-        throw new Error(directResult.error || 'Publishing failed');
+        const nextAttempts = attempts + 1;
+        const updates: any = { contentData: { ...(content.contentData || {}), publishAttempts: nextAttempts } };
+        await this.storage.updateContent(content.id, updates);
+        if (nextAttempts >= maxAttempts) {
+          await this.updateContentStatus(content.id, 'failed', directResult.error || 'Publishing failed');
+        } else {
+          console.log(`[SCHEDULER] Will retry content ${content.id} on next interval (attempt ${nextAttempts}/${maxAttempts})`);
+        }
       }
 
     } catch (error: any) {
       console.error(`[SCHEDULER] Failed to publish content ${content.id}:`, error);
-      await this.updateContentStatus(content.id, 'failed', error.message);
+      const maxAttempts = parseInt(process.env.SCHEDULER_MAX_ATTEMPTS || '3', 10);
+      const attempts = (content.contentData?.publishAttempts || 0) + 1;
+      const updates: any = { contentData: { ...(content.contentData || {}), publishAttempts: attempts } };
+      await this.storage.updateContent(content.id, updates);
+      if (attempts >= maxAttempts) {
+        await this.updateContentStatus(content.id, 'failed', error.message);
+      } else {
+        console.log(`[SCHEDULER] Will retry content ${content.id} on next interval (attempt ${attempts}/${maxAttempts})`);
+      }
     }
   }
 

@@ -296,14 +296,21 @@ export class ErrorTracker {
    * P4-4.3e: Send to external monitoring (placeholder for Sentry/etc)
    */
   private static sendToExternalMonitoring(trackedError: TrackedError): void {
-    // This would integrate with Sentry, Bugsnag, or other external services
-    // For now, we'll log that it would be sent
-    logger.debug({
-      event: 'EXTERNAL_MONITORING_SEND',
-      errorId: trackedError.id,
-      service: 'sentry',
-      severity: trackedError.severity
-    }, `📤 Would send to external monitoring: ${trackedError.id}`);
+    const dsn = process.env.SENTRY_DSN || '';
+    if (dsn) {
+      logger.debug({
+        event: 'EXTERNAL_MONITORING_SEND',
+        errorId: trackedError.id,
+        service: 'sentry',
+        severity: trackedError.severity
+      });
+    } else {
+      logger.debug({
+        event: 'EXTERNAL_MONITORING_SKIP',
+        errorId: trackedError.id,
+        service: 'sentry'
+      });
+    }
   }
 
   /**

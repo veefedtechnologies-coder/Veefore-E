@@ -6,11 +6,11 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: Infinity, // Never consider data stale
+      staleTime: 30000,
       retry: false,
-      refetchOnWindowFocus: false, // Don't refetch when window gains focus
-      refetchOnReconnect: false, // Don't refetch when network reconnects
-      refetchOnMount: false, // Don't refetch when component mounts
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchOnMount: 'always',
       refetchInterval: false, // Disable automatic polling
       refetchIntervalInBackground: false, // Disable background polling
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
@@ -34,18 +34,29 @@ persistQueryClient({
 function getApiBaseUrl(): string {
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
   if (envUrl) return envUrl as string;
-  const host = window.location.hostname;
-  if (host === 'veefore-webhook.veefore.com') {
-    return 'https://veefore-webhook.veefore.com';
-  }
-  return 'http://localhost:5000';
+  return window.location.origin;
 }
 
 // API request function with authentication
 export async function apiRequest(url: string, options: RequestInit = {}) {
-  const { getAuth } = await import('firebase/auth')
+  const { getAuth, onAuthStateChanged } = await import('firebase/auth')
   const auth = getAuth()
-  const user = auth.currentUser
+
+  const ensureUser = async (): Promise<any> => {
+    if (auth.currentUser) return auth.currentUser
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        unsubscribe();
+        reject(new Error('auth-timeout'))
+      }, 2000)
+      const unsubscribe = onAuthStateChanged(auth, (u) => {
+        clearTimeout(timer)
+        unsubscribe()
+        if (u) resolve(u); else reject(new Error('no-user'))
+      }, (err) => { clearTimeout(timer); unsubscribe(); reject(err) })
+    })
+  }
+  const user = await ensureUser().catch(() => null)
 
   // Ensure URL is absolute
   if (!url.startsWith('http')) {
@@ -55,13 +66,15 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
 
   let headers = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
     ...options.headers,
   }
 
   // Add auth token if user is authenticated
   if (user) {
     try {
-      const token = await user.getIdToken()
+      const token = await user.getIdToken(true)
       headers = {
         ...headers,
         'Authorization': `Bearer ${token}`,
@@ -76,11 +89,26 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
     throw new Error('Please sign in to continue')
   }
 
+  const controller = new AbortController()
+  let timeoutMs = 15000
+  const pathname = (() => {
+    try { const u = new URL(url); return u.pathname || '' } catch { return url }
+  })()
+  if (pathname.includes('/api/user') || pathname.includes('/api/social-accounts') || pathname.includes('/api/workspaces')) {
+    timeoutMs = 45000
+  }
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   const response = await fetch(url, {
     ...options,
+    cache: 'no-store',
     headers,
+    signal: controller.signal,
   })
+  clearTimeout(timeout)
 
+  if (response.status === 304) {
+    return []
+  }
   if (!response.ok) {
     const errorData = await response.text()
     console.error('API Error:', response.status, response.statusText, errorData)

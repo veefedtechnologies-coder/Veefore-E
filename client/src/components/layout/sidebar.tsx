@@ -38,6 +38,7 @@ const sidebarGroups = [
       { icon: Users, label: 'Workspaces', key: 'workspaces', url: '/workspaces' },
       { icon: Shield, label: 'Admin Panel', key: 'admin', url: '/admin' },
       { icon: Globe, label: 'Landing', key: 'landing', url: '/landing' },
+      { icon: Shield, label: 'Security Health', key: 'encryption-health', url: '/encryption-health' },
       { icon: Settings, label: 'Test Fixtures', key: 'test-fixtures', url: '/test-fixtures' },
     ]
   }
@@ -75,6 +76,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
     if (loc === '/admin') return 'admin'
     if (loc === '/landing') return 'landing'
     if (loc === '/test-fixtures') return 'test-fixtures'
+    if (loc === '/encryption-health') return 'encryption-health'
     return 'home'
   }
 

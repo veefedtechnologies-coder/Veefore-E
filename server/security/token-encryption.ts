@@ -19,12 +19,15 @@ const KEY_LENGTH = 32; // 256 bits
 const IV_LENGTH = 12;  // 96 bits (correct for GCM mode)
 const SALT_LENGTH = 32; // 256 bits
 const TAG_LENGTH = 16;  // 128 bits
+const DEFAULT_KDF_ITERATIONS = parseInt(process.env.TOKEN_KDF_ITERATIONS || '100000', 10);
+const GLOBAL_SALT_STRING = process.env.TOKEN_ENCRYPTION_GLOBAL_SALT || '';
 
 interface EncryptedToken {
   encryptedData: string;
   iv: string;
   salt: string;
   tag: string;
+  kdf?: number;
 }
 
 export class TokenEncryptionService {
@@ -60,8 +63,10 @@ export class TokenEncryptionService {
   /**
    * Derive encryption key from master key using PBKDF2
    */
-  private deriveKey(salt: Buffer): Buffer {
-    return crypto.pbkdf2Sync(this.masterKey, salt, 100000, KEY_LENGTH, 'sha256');
+  private deriveKey(salt: Buffer, iterations: number): Buffer {
+    const globalSalt = GLOBAL_SALT_STRING ? Buffer.from(GLOBAL_SALT_STRING, 'utf8') : null;
+    const effectiveSalt = globalSalt ? Buffer.concat([salt, globalSalt]) : salt;
+    return crypto.pbkdf2Sync(this.masterKey, effectiveSalt, iterations, KEY_LENGTH, 'sha256');
   }
 
   /**
@@ -80,7 +85,8 @@ export class TokenEncryptionService {
       const iv = crypto.randomBytes(IV_LENGTH);
       
       // Derive encryption key from master key + salt
-      const key = this.deriveKey(salt);
+      const iterations = DEFAULT_KDF_ITERATIONS;
+      const key = this.deriveKey(salt, iterations);
       
       // SECURITY FIX: Create cipher with proper AES-256-GCM using IV
       const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -97,7 +103,8 @@ export class TokenEncryptionService {
         encryptedData,
         iv: iv.toString('base64'),
         salt: salt.toString('base64'),
-        tag: tag.toString('base64')
+        tag: tag.toString('base64'),
+        kdf: iterations
       };
     } catch (error) {
       console.error('🚨 TOKEN ENCRYPTION ERROR:', error);
@@ -146,7 +153,8 @@ export class TokenEncryptionService {
       }
       
       // Derive the same encryption key
-      const key = this.deriveKey(saltBuffer);
+      const iterations = typeof (encryptedToken as any).kdf === 'number' ? Number((encryptedToken as any).kdf) : DEFAULT_KDF_ITERATIONS;
+      const key = this.deriveKey(saltBuffer, iterations);
       
       // Create decipher with proper AES-256-GCM
       const decipher = crypto.createDecipheriv(ALGORITHM, key, ivBuffer);
@@ -234,12 +242,18 @@ export class TokenEncryptionService {
     keyLength: number;
     hasEnvironmentKey: boolean;
     version: string;
+    kdfIterations: number;
+    rotationDays: number;
+    rotationActive: boolean;
   } {
     return {
       algorithm: ALGORITHM,
       keyLength: KEY_LENGTH * 8, // Convert to bits
       hasEnvironmentKey: !!process.env.TOKEN_ENCRYPTION_KEY,
-      version: '1.0.0'
+      version: '1.0.0',
+      kdfIterations: DEFAULT_KDF_ITERATIONS,
+      rotationDays: parseInt(process.env.TOKEN_ROTATION_DAYS || '0', 10),
+      rotationActive: (process.env.NODE_ENV === 'production') && parseInt(process.env.TOKEN_ROTATION_DAYS || '0', 10) > 0
     };
   }
 }

@@ -368,3 +368,25 @@ export const checkRateLimitHealth = async (): Promise<boolean> => {
     return false;
   }
 };
+
+export const aiRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  const path = req.path.toLowerCase();
+  const isAi = path.includes('/ai') || path.includes('openai') || path.includes('thumbnail') || path.includes('story') || path.includes('caption');
+  if (!isAi) return next();
+  const user = (req as any).user;
+  const key = user?.id ? `ai_rl:user:${user.id}` : `ai_rl:ip:${req.ip}`;
+  const windowMs = 60 * 1000;
+  let maxRequests = 10;
+  if (user?.plan === 'business') maxRequests = 60;
+  else if (user?.plan === 'pro') maxRequests = 30;
+  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
+  if (rateLimitInfo.blocked) {
+    return res.status(429).json({
+      error: 'AI rate limit exceeded',
+      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
+      limit: maxRequests,
+      remaining: 0
+    });
+  }
+  next();
+};

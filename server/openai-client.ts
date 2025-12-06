@@ -127,6 +127,7 @@ CRITICAL: Respond with JSON in this EXACT format:
   }
 }`;
 
+      const maxTokensEnv = parseInt(process.env.OPENAI_MAX_TOKENS || '1200', 10);
       const response = await this.getClient().chat.completions.create({
         model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         messages: [
@@ -135,12 +136,17 @@ CRITICAL: Respond with JSON in this EXACT format:
         ],
         response_format: { type: "json_object" },
         temperature: 0.8,
-        max_tokens: 3000
+        max_tokens: Math.max(400, Math.min(3000, maxTokensEnv))
       });
 
       console.log('[OPENAI] Raw response received:', response.choices[0].message.content);
       
-      const script = JSON.parse(response.choices[0].message.content || '{}');
+      const rawContent = response.choices[0].message.content || '{}';
+      const script = JSON.parse(rawContent);
+      try {
+        const logLine = JSON.stringify({ type: 'ai_generation', prompt: prompt.slice(0, 500), title: script?.title || '' });
+        console.log(logLine);
+      } catch {}
       console.log('[OPENAI] Parsed script:', JSON.stringify(script, null, 2));
       
       // Ensure all scenes have unique IDs and complete structure

@@ -276,7 +276,7 @@ export function useCurrentWorkspace() {
   const { data: workspaces = [], isLoading: workspacesLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: () => apiRequest('/api/workspaces'),
-    staleTime: 5 * 60 * 1000
+    staleTime: 5 * 60 * 1000 // 5 minutes
   })
 
   // ✅ PRODUCTION FIX: Validate workspace ID on mount and when workspaces change
@@ -340,6 +340,31 @@ export function useCurrentWorkspace() {
 
     validateWorkspace();
   }, [workspaces, workspacesLoading, isValidating, queryClient]);
+
+  // Auto-create a default workspace in production if none exists
+  useEffect(() => {
+    if (workspacesLoading) return;
+    const safe = Array.isArray(workspaces) ? workspaces as Workspace[] : [];
+    if (safe.length === 0) {
+      const autoCreate = (import.meta as any).env?.VITE_AUTO_CREATE_WORKSPACE === 'true' && !(import.meta as any).env?.PROD;
+      if (!autoCreate) return;
+      (async () => {
+        try {
+          const created = await apiRequest('/api/workspaces', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'My Workspace' })
+          });
+          localStorage.setItem('currentWorkspaceId', created.id);
+          setCurrentWorkspaceId(created.id);
+          window.dispatchEvent(new Event('workspace-changed'));
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] }),
+            queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] })
+          ]);
+        } catch {}
+      })();
+    }
+  }, [workspaces, workspacesLoading, queryClient]);
   
   // Listen for localStorage changes to keep hook reactive
   useEffect(() => {

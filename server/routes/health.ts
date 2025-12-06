@@ -6,6 +6,7 @@
 import express from 'express';
 // import { connectDB, disconnectDB } from '../config/database.js'; // Not needed for health checks
 import mongoose from 'mongoose';
+import { tokenEncryption } from '../security/token-encryption';
 
 const router = express.Router();
 
@@ -224,6 +225,22 @@ router.get('/health/metrics', async (req, res) => {
       error: 'Failed to collect metrics',
       timestamp: new Date().toISOString()
     });
+  }
+});
+
+router.get('/health/encryption', (req, res) => {
+  try {
+    const status = tokenEncryption.getEncryptionStatus();
+    res.json({
+      algorithm: status.algorithm,
+      keyBits: status.keyLength,
+      kdfIterations: status.kdfIterations,
+      rotationDays: status.rotationDays,
+      rotationActive: status.rotationActive,
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to get encryption status' });
   }
 });
 

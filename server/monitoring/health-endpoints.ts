@@ -46,7 +46,8 @@ export class HealthChecks {
     
     try {
       // Import mongoose dynamically to avoid circular dependencies
-      const mongoose = require('mongoose');
+      const mongooseMod = await import('mongoose');
+      const mongoose = mongooseMod.default || (mongooseMod as any);
       
       if (mongoose.connection.readyState !== 1) {
         return {
@@ -99,7 +100,8 @@ export class HealthChecks {
       }
 
       // Import redis dynamically
-      const { createClient } = require('redis');
+      const redisMod = await import('redis');
+      const createClient = (redisMod as any).createClient;
       const client = createClient({ url: process.env.REDIS_URL });
       
       await client.connect();
@@ -129,8 +131,10 @@ export class HealthChecks {
     const startTime = Date.now();
     
     try {
-      const fs = require('fs').promises;
-      const path = require('path');
+      const fsMod = await import('fs');
+      const fs = (fsMod as any).promises;
+      const pathMod = await import('path');
+      const path = pathMod.default || (pathMod as any);
       
       // Test write/read/delete in temp directory
       const testFile = path.join(process.cwd(), 'temp-health-check.txt');
@@ -217,7 +221,8 @@ export class HealthChecks {
     
     try {
       // Test basic internet connectivity with a lightweight request
-      const https = require('https');
+      const httpsMod = await import('https');
+      const https = httpsMod.default || (httpsMod as any);
       
       return new Promise<HealthCheck>((resolve) => {
         const req = https.get('https://httpbin.org/status/200', { timeout: 5000 }, (res: any) => {

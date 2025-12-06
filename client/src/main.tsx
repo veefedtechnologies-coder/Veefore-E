@@ -6,12 +6,21 @@ import TestMinimal from './TestMinimal'
 import TestApp from './TestApp'
 import SimpleTest from './SimpleTest'
 import App from './App'
+import ErrorBoundary from './components/ErrorBoundary'
+import { Suspense } from 'react'
+import RouteSuspense from './components/RouteSuspense'
 import './index.css'
 import { queryClient } from './lib/queryClient'
 import { initializeTheme } from './lib/theme'
+import { initSentryBrowser } from './lib/sentry'
+import { addBasicBreadcrumbs } from './lib/sentry'
 
 // Initialize theme before rendering
 initializeTheme()
+try {
+  const dsn = (import.meta as any).env?.VITE_SENTRY_DSN
+  if (dsn) { initSentryBrowser(dsn); addBasicBreadcrumbs() }
+} catch {}
 
 // Comprehensive React availability check
 console.log('React availability check:', {
@@ -34,7 +43,11 @@ if (!React || !React.useState || !createRoot) {
     console.log('Rendering React app...')
     createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
-        <App />
+        <ErrorBoundary>
+          <RouteSuspense>
+            <App />
+          </RouteSuspense>
+        </ErrorBoundary>
       </QueryClientProvider>
     )
     console.log('React app rendered successfully')

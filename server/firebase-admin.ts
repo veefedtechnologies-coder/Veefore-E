@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import * as admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
 let firebaseAdmin: admin.app.App | null = null;
@@ -43,8 +43,16 @@ try {
         throw initError;
       }
     } else {
-      console.log('[FIREBASE ADMIN] No service account key found, skipping Firebase initialization');
-      firebaseAdmin = null;
+      // Fallback: initialize app without explicit credentials
+      try {
+        firebaseAdmin = admin.initializeApp({
+          projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID
+        });
+        console.log('[FIREBASE ADMIN] Initialized using default application credentials');
+      } catch (fallbackError: any) {
+        console.log('[FIREBASE ADMIN] No service account key found and default init failed:', fallbackError.message);
+        firebaseAdmin = null;
+      }
     }
   } else {
     firebaseAdmin = admin.app();
