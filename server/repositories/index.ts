@@ -70,3 +70,33 @@ export {
   ChatMessageRepository,
   chatMessageRepository,
 } from './ChatRepository';
+
+export {
+  WorkspaceMemberRepository,
+  workspaceMemberRepository,
+} from './WorkspaceMemberRepository';
+
+export {
+  TeamInvitationRepository,
+  teamInvitationRepository,
+} from './TeamInvitationRepository';
+
+export {
+  SuggestionRepository,
+  suggestionRepository,
+} from './SuggestionRepository';
+
+export {
+  ContentRecommendationRepository,
+  contentRecommendationRepository,
+} from './ContentRecommendationRepository';
+
+export {
+  UserContentHistoryRepository,
+  userContentHistoryRepository,
+} from './UserContentHistoryRepository';
+
+export {
+  WaitlistUserRepository,
+  waitlistUserRepository,
+} from './WaitlistUserRepository';
