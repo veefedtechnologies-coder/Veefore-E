@@ -9,6 +9,8 @@ import schedulerRoutes from './scheduler.routes';
 import aiRoutes from './ai.routes';
 import thumbnailsRoutes from './thumbnails.routes';
 import trendsRoutes from './trends.routes';
+import automationRoutes from './automation.routes';
+import billingRoutes from './billing.routes';
 
 export { default as authRoutes } from './auth.routes';
 export { default as userRoutes } from './user.routes';
@@ -20,6 +22,8 @@ export { default as schedulerRoutes } from './scheduler.routes';
 export { default as aiRoutes } from './ai.routes';
 export { default as thumbnailsRoutes } from './thumbnails.routes';
 export { default as trendsRoutes } from './trends.routes';
+export { default as automationRoutes } from './automation.routes';
+export { default as billingRoutes } from './billing.routes';
 
 export function mountV1Routes(app: Application, basePath: string = '/api/v1'): void {
   app.use(`${basePath}/auth`, authRoutes);
@@ -32,6 +36,8 @@ export function mountV1Routes(app: Application, basePath: string = '/api/v1'): v
   app.use(`${basePath}/ai`, aiRoutes);
   app.use(`${basePath}/thumbnails`, thumbnailsRoutes);
   app.use(`${basePath}/trends`, trendsRoutes);
+  app.use(`${basePath}/automation`, automationRoutes);
+  app.use(`${basePath}/billing`, billingRoutes);
 }
 
 const v1Router = Router();
@@ -46,5 +52,7 @@ v1Router.use('/scheduler', schedulerRoutes);
 v1Router.use('/ai', aiRoutes);
 v1Router.use('/thumbnails', thumbnailsRoutes);
 v1Router.use('/trends', trendsRoutes);
+v1Router.use('/automation', automationRoutes);
+v1Router.use('/billing', billingRoutes);
 
 export default v1Router;
