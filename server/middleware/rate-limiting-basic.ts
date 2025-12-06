@@ -275,6 +275,40 @@ export const socialMediaRateLimiter: RateLimitRequestHandler = rateLimit({
 });
 
 /**
+ * P1-3: AI endpoints rate limiter - Cost protection for AI API calls
+ * Stricter limits to prevent credit/cost overruns from OpenAI/Claude/Gemini
+ */
+export const aiRateLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 10, // Only 10 AI requests per 5 minutes per user
+  
+  keyGenerator: (req: Request) => {
+    // Key by user ID for authenticated requests, IP for anonymous
+    return (req as any).user?.id || req.ip || 'unknown';
+  },
+  
+  handler: (req: Request, res: Response) => {
+    const userId = (req as any).user?.id || 'anonymous';
+    console.log(`🚨 AI RATE LIMIT: Exceeded from user: ${userId}, IP: ${req.ip}`);
+    
+    // Track AI rate limit violations for monitoring
+    if (redisClient) {
+      const today = new Date().toISOString().slice(0, 10);
+      redisClient.incr(`ai_rate_limit_violations:${today}`).catch(console.error);
+      // Also track per-user for abuse detection
+      redisClient.incr(`ai_rate_limit:${userId}:${today}`).catch(console.error);
+    }
+    
+    res.status(429).json({
+      error: 'AI rate limit exceeded',
+      message: 'Too many AI requests. Please wait 5 minutes before generating more content.',
+      retryAfter: 300,
+      securityNote: 'This limit protects against excessive AI usage and helps manage costs.'
+    });
+  }
+});
+
+/**
  * P1-3: Security analytics and monitoring
  */
 export const getRateLimitStats = async (): Promise<any> => {
@@ -286,11 +320,13 @@ export const getRateLimitStats = async (): Promise<any> => {
     const [
       globalViolations,
       authBruteForce, 
-      progressiveBlocks
+      progressiveBlocks,
+      aiRateLimitViolations
     ] = await Promise.all([
       redisClient.get(`rate_limit_violations:${today}`),
       redisClient.get(`auth_brute_force:${today}`),
-      redisClient.get(`progressive_blocks:${today}`)
+      redisClient.get(`progressive_blocks:${today}`),
+      redisClient.get(`ai_rate_limit_violations:${today}`)
     ]);
     
     return {
@@ -298,9 +334,11 @@ export const getRateLimitStats = async (): Promise<any> => {
       globalViolations: parseInt(globalViolations || '0'),
       authBruteForce: parseInt(authBruteForce || '0'),
       progressiveBlocks: parseInt(progressiveBlocks || '0'),
+      aiRateLimitViolations: parseInt(aiRateLimitViolations || '0'),
       totalSecurityEvents: parseInt(globalViolations || '0') + 
                           parseInt(authBruteForce || '0') + 
-                          parseInt(progressiveBlocks || '0')
+                          parseInt(progressiveBlocks || '0') +
+                          parseInt(aiRateLimitViolations || '0')
     };
   } catch (error) {
     console.error('❌ Error getting rate limit stats:', error);
@@ -366,6 +404,16 @@ export const checkSecurityAlerts = async (): Promise<Array<{
       severity: 'HIGH', 
       message: `Persistent attack attempts: ${stats.progressiveBlocks} progressive blocks today`,
       count: stats.progressiveBlocks
+    });
+  }
+  
+  // AI abuse detection - cost protection alert
+  if (stats.aiRateLimitViolations > 30) {
+    alerts.push({
+      type: 'AI_ABUSE_DETECTED',
+      severity: 'HIGH',
+      message: `High AI rate limit violations: ${stats.aiRateLimitViolations} attempts today - potential credit abuse`,
+      count: stats.aiRateLimitViolations
     });
   }
   

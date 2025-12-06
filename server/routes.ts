@@ -45,7 +45,8 @@ import {
   uploadRateLimiter,
   bruteForceMiddleware,
   passwordResetRateLimiter,
-  socialMediaRateLimiter
+  socialMediaRateLimiter,
+  aiRateLimiter
 } from './middleware/rate-limiting-working';
 import { 
   validateRequest,
@@ -109,6 +110,10 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
   const thumbnailAIService = new ThumbnailAIService(storage);
   const trendingTopicsAPI = TrendingTopicsAPI.getInstance();
   app.use('/api', defaultWorkspaceEnforcer(storage));
+  
+  // P1-3 SECURITY: Apply AI rate limiting to all /api/ai/* routes for cost protection
+  // Must be mounted BEFORE routes are registered to properly intercept requests
+  app.use('/api/ai', aiRateLimiter);
   
   // CLEAN AUTOMATION SYSTEM INSTANCES
   const automationSystem = new AutomationSystem(storage);
@@ -1666,8 +1671,8 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
   });
 
 
-  // AI Growth Insights endpoint
-  app.get('/api/ai-growth-insights', requireAuth, async (req: any, res) => {
+  // AI Growth Insights endpoint - with AI rate limiting for cost protection
+  app.get('/api/ai-growth-insights', requireAuth, aiRateLimiter, async (req: any, res) => {
     try {
       console.log('[AI INSIGHTS API] Generating comprehensive growth insights for user:', req.user.id);
       

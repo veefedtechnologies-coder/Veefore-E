@@ -33,12 +33,12 @@ console.log('🔧 Using authDomain:', firebaseConfig.authDomain)
 console.log('🔧 Full URL:', window.location.href)
 
 // Validate the authDomain configuration
-if (window.location.hostname === 'localhost') {
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
   console.log('✅ Running on localhost - Firebase authDomain configured correctly')
-  console.log('ℹ️ Firebase will handle OAuth on firebaseapp.com, then redirect back to localhost:5000')
-} else if (window.location.hostname === 'veefore-webhook.veefore.com') {
-  console.log('✅ Running on Cloudflare tunnel - Firebase authDomain configured correctly')
-  console.log('ℹ️ Firebase will handle OAuth on firebaseapp.com, then redirect back to veefore-webhook.veefore.com')
+  console.log('ℹ️ Firebase will handle OAuth on firebaseapp.com, then redirect back to', window.location.origin)
+} else if (window.location.hostname.includes('veefore.com')) {
+  console.log('✅ Running on production domain - Firebase authDomain configured correctly')
+  console.log('ℹ️ Firebase will handle OAuth on firebaseapp.com, then redirect back to', window.location.origin)
 } else {
   console.log('ℹ️ Running on custom domain:', window.location.hostname)
   console.log('ℹ️ Firebase authDomain is always firebaseapp.com for OAuth flows')

@@ -3827,7 +3827,17 @@ export class MongoStorage implements IStorage {
   // Audit log operations
   async createAuditLog(log: any): Promise<any> {
     await this.connect();
-    const newLog = new AuditLogModel(log);
+    
+    // Backward compatibility: derive actorType and actorId from adminId if not provided
+    const enrichedLog = { ...log };
+    if (!enrichedLog.actorType) {
+      enrichedLog.actorType = enrichedLog.adminId ? 'admin' : 'system';
+    }
+    if (!enrichedLog.actorId) {
+      enrichedLog.actorId = enrichedLog.adminId ? String(enrichedLog.adminId) : 'system';
+    }
+    
+    const newLog = new AuditLogModel(enrichedLog);
     const savedLog = await newLog.save();
     return this.convertAuditLog(savedLog);
   }
