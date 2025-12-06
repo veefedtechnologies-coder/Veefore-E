@@ -188,6 +188,235 @@ export class UserRepository extends BaseRepository<IUser> {
       throw new DatabaseError('Failed to count users by plan', error as Error);
     }
   }
+
+  async updateSubscription(userId: string, planId: string, planCredits: number): Promise<IUser | null> {
+    const startTime = Date.now();
+    try {
+      let result = await this.model
+        .findByIdAndUpdate(
+          userId,
+          { 
+            plan: planId, 
+            $inc: { credits: planCredits },
+            updatedAt: new Date() 
+          },
+          { new: true, runValidators: true }
+        )
+        .exec();
+
+      if (!result) {
+        result = await this.model
+          .findOneAndUpdate(
+            { id: userId },
+            { 
+              plan: planId, 
+              $inc: { credits: planCredits },
+              updatedAt: new Date() 
+            },
+            { new: true, runValidators: true }
+          )
+          .exec();
+      }
+
+      logger.db.query('updateSubscription', this.entityName, Date.now() - startTime, { userId, planId, planCredits });
+      return result;
+    } catch (error) {
+      logger.db.error('updateSubscription', error, { entityName: this.entityName, userId, planId });
+      throw new DatabaseError('Failed to update user subscription', error as Error);
+    }
+  }
+
+  async addCreditsAtomic(userId: string, credits: number): Promise<IUser | null> {
+    const startTime = Date.now();
+    try {
+      let result = await this.model
+        .findByIdAndUpdate(
+          userId,
+          { $inc: { credits }, $set: { updatedAt: new Date() } },
+          { new: true, runValidators: true }
+        )
+        .exec();
+
+      if (!result) {
+        result = await this.model
+          .findOneAndUpdate(
+            { id: userId },
+            { $inc: { credits }, $set: { updatedAt: new Date() } },
+            { new: true, runValidators: true }
+          )
+          .exec();
+      }
+
+      logger.db.query('addCreditsAtomic', this.entityName, Date.now() - startTime, { userId, credits });
+      return result;
+    } catch (error) {
+      logger.db.error('addCreditsAtomic', error, { entityName: this.entityName, userId });
+      throw new DatabaseError('Failed to add credits to user', error as Error);
+    }
+  }
+
+  async findWithPagination(
+    query: FilterQuery<IUser>,
+    options: { page: number; limit: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+  ): Promise<{ users: IUser[]; total: number }> {
+    const startTime = Date.now();
+    const { page, limit, sortBy = 'createdAt', sortOrder = 'desc' } = options;
+    const skip = (page - 1) * limit;
+
+    try {
+      const [users, total] = await Promise.all([
+        this.model
+          .find(query)
+          .sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean()
+          .exec(),
+        this.model.countDocuments(query).exec(),
+      ]);
+
+      logger.db.query('findWithPagination', this.entityName, Date.now() - startTime, { page, limit, total });
+      return { users: users as IUser[], total };
+    } catch (error) {
+      logger.db.error('findWithPagination', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to find users with pagination', error as Error);
+    }
+  }
+
+  async countAll(): Promise<number> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model.countDocuments({}).exec();
+      logger.db.query('countAll', this.entityName, Date.now() - startTime);
+      return result;
+    } catch (error) {
+      logger.db.error('countAll', error, { entityName: this.entityName });
+      throw new DatabaseError('Failed to count all users', error as Error);
+    }
+  }
+
+  async storeEmailVerificationCode(email: string, code: string, expiry: Date): Promise<boolean> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model
+        .updateOne(
+          { email: email.toLowerCase() },
+          { 
+            emailVerificationCode: code,
+            emailVerificationExpiry: expiry,
+            updatedAt: new Date()
+          }
+        )
+        .exec();
+      logger.db.query('storeEmailVerificationCode', this.entityName, Date.now() - startTime, { email });
+      return result.modifiedCount > 0;
+    } catch (error) {
+      logger.db.error('storeEmailVerificationCode', error, { entityName: this.entityName, email });
+      throw new DatabaseError('Failed to store email verification code', error as Error);
+    }
+  }
+
+  async verifyEmailCodeAndMarkVerified(email: string, code: string): Promise<boolean> {
+    const startTime = Date.now();
+    try {
+      const user = await this.model.findOne({
+        email: email.toLowerCase(),
+        emailVerificationCode: code,
+        emailVerificationExpiry: { $gt: new Date() }
+      }).exec();
+
+      if (user) {
+        await this.model.updateOne(
+          { email: email.toLowerCase() },
+          {
+            isEmailVerified: true,
+            emailVerificationCode: null,
+            emailVerificationExpiry: null,
+            updatedAt: new Date()
+          }
+        ).exec();
+        logger.db.query('verifyEmailCodeAndMarkVerified', this.entityName, Date.now() - startTime, { email, success: true });
+        return true;
+      }
+
+      logger.db.query('verifyEmailCodeAndMarkVerified', this.entityName, Date.now() - startTime, { email, success: false });
+      return false;
+    } catch (error) {
+      logger.db.error('verifyEmailCodeAndMarkVerified', error, { entityName: this.entityName, email });
+      throw new DatabaseError('Failed to verify email code', error as Error);
+    }
+  }
+
+  async clearEmailVerificationCode(email: string): Promise<boolean> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model
+        .updateOne(
+          { email: email.toLowerCase() },
+          {
+            emailVerificationCode: null,
+            emailVerificationExpiry: null,
+            updatedAt: new Date()
+          }
+        )
+        .exec();
+      logger.db.query('clearEmailVerificationCode', this.entityName, Date.now() - startTime, { email });
+      return result.modifiedCount > 0;
+    } catch (error) {
+      logger.db.error('clearEmailVerificationCode', error, { entityName: this.entityName, email });
+      throw new DatabaseError('Failed to clear email verification code', error as Error);
+    }
+  }
+
+  async updateEmailVerificationData(id: string, token: string, expires: Date): Promise<IUser | null> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model
+        .findByIdAndUpdate(
+          id,
+          {
+            emailVerificationCode: token,
+            emailVerificationExpiry: expires,
+            updatedAt: new Date()
+          },
+          { new: true }
+        )
+        .exec();
+      logger.db.query('updateEmailVerificationData', this.entityName, Date.now() - startTime, { id });
+      return result;
+    } catch (error) {
+      logger.db.error('updateEmailVerificationData', error, { entityName: this.entityName, id });
+      throw new DatabaseError('Failed to update email verification data', error as Error);
+    }
+  }
+
+  async markEmailVerified(
+    id: string, 
+    additionalData?: { displayName?: string; passwordHash?: string; firebaseUid?: string }
+  ): Promise<IUser | null> {
+    const startTime = Date.now();
+    try {
+      const updateData: any = {
+        isEmailVerified: true,
+        emailVerificationCode: null,
+        emailVerificationExpiry: null,
+        updatedAt: new Date()
+      };
+
+      if (additionalData?.displayName) updateData.displayName = additionalData.displayName;
+      if (additionalData?.passwordHash) updateData.passwordHash = additionalData.passwordHash;
+      if (additionalData?.firebaseUid) updateData.firebaseUid = additionalData.firebaseUid;
+
+      const result = await this.model
+        .findByIdAndUpdate(id, updateData, { new: true })
+        .exec();
+      logger.db.query('markEmailVerified', this.entityName, Date.now() - startTime, { id });
+      return result;
+    } catch (error) {
+      logger.db.error('markEmailVerified', error, { entityName: this.entityName, id });
+      throw new DatabaseError('Failed to mark email as verified', error as Error);
+    }
+  }
 }
 
 export const userRepository = new UserRepository();
