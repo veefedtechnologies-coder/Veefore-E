@@ -5,12 +5,50 @@ import { Menu, X, Lock, ArrowRight, Play, Instagram, Youtube, CheckCircle, Zap, 
 const GlobalLandingPage = React.memo(() => {
   const [isLoading, setIsLoading] = useState(true)
   const [splineLoaded, setSplineLoaded] = useState(false)
+  const [shouldLoadSpline, setShouldLoadSpline] = useState(false)
+  const [isSlowNetwork, setIsSlowNetwork] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isHolding, setIsHolding] = useState(false)
   const [keyHoldProgress, setKeyHoldProgress] = useState(0)
   const [isActivated, setIsActivated] = useState(false)
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null)
+  const splineContainerRef = React.useRef<HTMLDivElement>(null)
+  const initRef = React.useRef(false)
+
+  useEffect(() => {
+    if (initRef.current) return
+    initRef.current = true
+
+    const nav = (navigator as any)
+    const conn = nav.connection || nav.mozConnection || nav.webkitConnection
+    const effectiveType = conn?.effectiveType || '4g'
+    const slowConnection = effectiveType === '2g' || effectiveType === 'slow-2g' || effectiveType === '3g'
+    
+    if (slowConnection) {
+      setIsSlowNetwork(true)
+      setIsLoading(false)
+      return
+    }
+
+    setIsLoading(false)
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !shouldLoadSpline) {
+          setTimeout(() => setShouldLoadSpline(true), 500)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (splineContainerRef.current) {
+      observer.observe(splineContainerRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [])
 
   // Memoized animation variants to prevent recreation on re-renders
   const navItemVariants = useMemo(() => ({
@@ -183,23 +221,35 @@ const GlobalLandingPage = React.memo(() => {
         }
       `}</style>
 
-      {/* 3D Spline Model - Full Screen Coverage */}
-      <div className="spline-container">
-        <iframe
-          ref={iframeRef}
-          src="https://my.spline.design/landingpagepageglobal-SHtJNWPOGOGxOIGjpxtg8hG7/"
-          frameBorder="0"
-          allow="fullscreen"
-          className="spline-iframe"
-          onLoad={() => {
-            setSplineLoaded(true)
-            setIsLoading(false)
-          }}
-          onError={() => {
-            setSplineLoaded(false)
-            setIsLoading(false)
-          }}
-        />
+      {/* 3D Spline Model - Full Screen Coverage - Smart Loading */}
+      <div className="spline-container" ref={splineContainerRef}>
+        {isSlowNetwork ? (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/30 via-transparent to-transparent" />
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+          </div>
+        ) : shouldLoadSpline ? (
+          <iframe
+            ref={iframeRef}
+            src="https://my.spline.design/landingpagepageglobal-SHtJNWPOGOGxOIGjpxtg8hG7/"
+            frameBorder="0"
+            allow="fullscreen"
+            className="spline-iframe"
+            onLoad={() => {
+              setSplineLoaded(true)
+            }}
+            onError={() => {
+              setSplineLoaded(false)
+            }}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation Bar */}

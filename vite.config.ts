@@ -47,8 +47,12 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0',
-    hmr: process.env.REPL_SLUG
-      ? { protocol: 'wss', clientPort: 443 }
+    hmr: process.env.REPLIT_DEV_DOMAIN
+      ? { 
+          protocol: 'wss', 
+          clientPort: 443,
+          host: process.env.REPLIT_DEV_DOMAIN 
+        }
       : { protocol: 'ws' },
   },
 });
