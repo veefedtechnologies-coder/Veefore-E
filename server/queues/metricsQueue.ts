@@ -4,74 +4,47 @@ import IORedis from 'ioredis';
 // Redis connection status tracking
 let redisConnection: IORedis | null = null;
 let redisAvailable = false;
-let redisQuotaExceeded = false;
+let redisDisabledPermanently = false;
 
-// Initialize Redis connection with graceful fallback
+// Initialize Redis connection with graceful fallback - NO RETRIES
 function initializeRedisConnection(): IORedis | null {
+  // CRITICAL: Skip Redis entirely if no REDIS_URL is configured
+  // This prevents constant retry spam when Redis isn't available
+  if (!process.env.REDIS_URL) {
+    console.log('ℹ️  Redis: No REDIS_URL configured, using in-memory fallback (no retries)');
+    redisDisabledPermanently = true;
+    return null;
+  }
+  
+  // If already permanently disabled, don't try again
+  if (redisDisabledPermanently) {
+    return null;
+  }
+  
   try {
-    console.log('🔧 Initializing Redis connection...');
-    console.log('🔍 REDIS_URL available:', !!process.env.REDIS_URL);
+    console.log('🔧 Initializing Redis connection (single attempt, no retries)...');
     
-    // If quota was already exceeded, don't try to reconnect
-    if (redisQuotaExceeded) {
-      console.log('⚠️  Redis: Quota exceeded, using smart polling system instead');
-      return null;
-    }
+    // Configuration for Upstash Redis with BullMQ compatibility
+    // CRITICAL: Disable ALL retries to prevent connection spam
+    const redisConfig = {
+      maxRetriesPerRequest: null, // Required for BullMQ
+      connectTimeout: 5000, // Short timeout - fail fast
+      commandTimeout: 5000,
+      lazyConnect: true, // Don't connect until needed
+      enableOfflineQueue: false, // Don't queue commands when offline
+      enableReadyCheck: true,
+      // CRITICAL: Disable all automatic reconnection
+      retryStrategy: () => null, // Never retry - return null to stop retrying
+      reconnectOnError: () => false, // Never reconnect on error
+      // TLS configuration for Upstash Redis
+      tls: {},
+    };
     
-    let connection: IORedis;
-    
-    if (process.env.REDIS_URL) {
-      console.log('🌐 Using Upstash Redis URL configuration');
-      
-      // Configuration for Upstash Redis with BullMQ compatibility
-      const redisConfig = {
-        maxRetriesPerRequest: null, // Required for BullMQ
-        connectTimeout: 10000, // Increased for cloud Redis reliability
-        commandTimeout: 15000, // Increased for cloud Redis reliability
-        lazyConnect: false, // Connect immediately
-        retryDelayOnFailover: 2000,
-        enableOfflineQueue: true, // Enable for better background job reliability
-        // Disable automatic reconnection - we'll handle it manually
-        retryStrategy: (times: number) => {
-          // Stop retrying if quota is exceeded
-          if (redisQuotaExceeded) {
-            return null;
-          }
-          // Otherwise retry with exponential backoff
-          return Math.min(times * 1000, 30000);
-        },
-        // TLS configuration for Upstash Redis - secure by default
-        tls: {
-          // Use default certificate validation for production security
-          // Upstash Redis supports standard CA trust chains
-        },
-      };
-      
-      // Create connection with URL and configuration
-      connection = new IORedis(process.env.REDIS_URL, redisConfig);
-      console.log('✅ Redis connection created with Upstash URL');
-    } else {
-      console.log('🏠 Using localhost Redis configuration');
-      
-      // Traditional connection parameters for local Redis
-      const redisConfig = {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-        password: process.env.REDIS_PASSWORD,
-        tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
-        maxRetriesPerRequest: null, // Required for BullMQ
-        connectTimeout: 10000, // Increased timeout for reliability
-        commandTimeout: 15000, // Increased timeout for reliability
-        lazyConnect: false,
-        retryDelayOnFailover: 2000,
-        enableOfflineQueue: true, // Enable for better reliability
-      };
-      
-      connection = new IORedis(redisConfig);
-      console.log('✅ Redis connection created with localhost config');
-    }
+    // Create connection with URL and configuration
+    const connection = new IORedis(process.env.REDIS_URL, redisConfig);
+    console.log('✅ Redis connection created (lazy connect mode)');
 
-    // Redis connection event handlers for status monitoring
+    // Redis connection event handlers - SINGLE ATTEMPT ONLY
     connection.on('connect', () => {
       console.log('🔗 Redis connected for job queues');
     });
@@ -81,44 +54,51 @@ function initializeRedisConnection(): IORedis | null {
       redisAvailable = true;
     });
 
-    connection.on('error', (error) => {
-      // Check if this is a quota exceeded error
-      if (error.message && error.message.includes('max requests limit exceeded')) {
-        if (!redisQuotaExceeded) {
-          console.log('❌ Redis: Quota limit exceeded - permanently disabling Redis');
-          console.log('ℹ️  Redis: App will function normally using smart polling system');
-          redisQuotaExceeded = true;
-          // Disconnect and don't retry
-          connection.disconnect(false);
-        }
-      } else {
+    connection.on('error', (error: Error) => {
+      // Log once and disable permanently
+      if (!redisDisabledPermanently) {
         console.log('❌ Redis: Connection failed -', error.message);
-        console.log('ℹ️  Redis: Falling back to existing smart polling system');
+        console.log('ℹ️  Redis: Permanently disabled, using in-memory fallback');
+        redisDisabledPermanently = true;
+        redisAvailable = false;
+        // Disconnect completely and prevent reconnection
+        try {
+          connection.disconnect(false);
+        } catch (e) {
+          // Ignore disconnect errors
+        }
+      }
+    });
+
+    connection.on('close', () => {
+      if (!redisDisabledPermanently) {
+        console.log('🔌 Redis connection closed');
       }
       redisAvailable = false;
     });
 
-    connection.on('close', () => {
-      console.log('🔌 Redis connection closed');
-      redisAvailable = false;
-    });
-
+    // Prevent any reconnection attempts
     connection.on('reconnecting', () => {
-      // Only allow reconnection if quota wasn't exceeded
-      if (redisQuotaExceeded) {
+      console.log('⚠️  Redis: Reconnection attempt blocked - using fallback');
+      redisDisabledPermanently = true;
+      try {
         connection.disconnect(false);
+      } catch (e) {
+        // Ignore
       }
     });
 
     return connection;
   } catch (error) {
-    console.log('❌ Redis: Failed to initialize connection -', error);
+    console.log('❌ Redis: Failed to initialize -', (error as Error).message);
+    console.log('ℹ️  Redis: Permanently disabled, using in-memory fallback');
+    redisDisabledPermanently = true;
     redisAvailable = false;
     return null;
   }
 }
 
-// Initialize Redis connection
+// Initialize Redis connection (single attempt)
 redisConnection = initializeRedisConnection();
 
 // Create connection configuration for BullMQ
@@ -535,36 +515,30 @@ export class MetricsQueueManager {
   }
 }
 
-// Error handling for queues (only if they exist)
-if (metricsQueue) {
+// Error handling for queues (only if they exist) - SILENT when Redis is disabled
+if (metricsQueue && !redisDisabledPermanently) {
   metricsQueue.on('error', (err) => {
-    console.error('🚨 Metrics Queue Error:', err);
+    if (!redisDisabledPermanently) {
+      console.error('🚨 Metrics Queue Error:', err);
+    }
   });
 }
 
-if (webhookQueue) {
+if (webhookQueue && !redisDisabledPermanently) {
   webhookQueue.on('error', (err) => {
-    console.error('🚨 Webhook Queue Error:', err);
+    if (!redisDisabledPermanently) {
+      console.error('🚨 Webhook Queue Error:', err);
+    }
   });
 }
 
-if (tokenRefreshQueue) {
+if (tokenRefreshQueue && !redisDisabledPermanently) {
   tokenRefreshQueue.on('error', (err) => {
-    console.error('🚨 Token Refresh Queue Error:', err);
+    if (!redisDisabledPermanently) {
+      console.error('🚨 Token Refresh Queue Error:', err);
+    }
   });
 }
 
-// Connection event handlers (only if Redis connection exists)
-if (redisConnection) {
-  redisConnection.on('connect', () => {
-    console.log('🔗 Redis connected for job queues');
-  });
-
-  redisConnection.on('error', (err) => {
-    console.error('🚨 Redis connection error:', err);
-  });
-
-  redisConnection.on('close', () => {
-    console.log('🔌 Redis connection closed');
-  });
-}
+// Note: Connection event handlers are already set up in initializeRedisConnection()
+// No duplicate handlers needed here
