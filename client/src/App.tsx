@@ -280,7 +280,8 @@ function App() {
 
   // Pre-fetch social accounts for current workspace to eliminate loading on Integration page
   // ✅ PRODUCTION FIX: Use localStorage workspace ID (now validated)
-  const currentWorkspaceId = localStorage.getItem('currentWorkspaceId') || workspaces?.find((w: any) => w.isDefault)?.id || workspaces?.[0]?.id;
+  const safeWorkspacesForPrefetch = Array.isArray(workspaces) ? workspaces : [];
+  const currentWorkspaceId = localStorage.getItem('currentWorkspaceId') || safeWorkspacesForPrefetch.find((w: any) => w.isDefault)?.id || safeWorkspacesForPrefetch[0]?.id;
   useQuery({
     queryKey: ['/api/social-accounts', currentWorkspaceId],
     queryFn: () => currentWorkspaceId ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspaceId}`) : Promise.resolve([]),
