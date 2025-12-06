@@ -1,24 +1,19 @@
-import { 
-  users, workspaces, workspaceMembers, teamInvitations, socialAccounts, content, analytics, 
-  automationRules, suggestions, creditTransactions, referrals,
-  subscriptions, payments, addons, contentRecommendations, userContentHistory,
-  admins, adminSessions, notifications, popups, appSettings, auditLogs, feedbackMessages,
-  creativeBriefs, contentRepurposes, competitorAnalyses, chatConversations, chatMessages,
-  type User, type Workspace, type WorkspaceMember, type TeamInvitation, type SocialAccount, type Content,
-  type Analytics, type AutomationRule, type Suggestion,
-  type CreditTransaction, type Referral, type Subscription, 
-  type Payment, type Addon, type ContentRecommendation, type UserContentHistory,
-  type Admin, type AdminSession, type Notification, type Popup, type AppSetting, type AuditLog, type FeedbackMessage,
-  type CreativeBrief, type ContentRepurpose, type CompetitorAnalysis,
-  type ChatConversation, type ChatMessage,
-  type InsertUser, type InsertWorkspace, type InsertWorkspaceMember, type InsertTeamInvitation,
-  type InsertSocialAccount, type InsertContent, type InsertAutomationRule, type InsertAnalytics,
-  type InsertSuggestion, type InsertCreditTransaction, type InsertReferral,
-  type InsertSubscription, type InsertPayment, type InsertAddon,
-  type InsertContentRecommendation, type InsertUserContentHistory,
-  type InsertAdmin, type InsertNotification, type InsertPopup, type InsertAppSetting, type InsertAuditLog, type InsertFeedbackMessage,
-  type InsertCreativeBrief, type InsertContentRepurpose, type InsertCompetitorAnalysis,
-  type InsertChatConversation, type InsertChatMessage
+import type { 
+  User, Workspace, WorkspaceMember, TeamInvitation, SocialAccount, Content,
+  Analytics, AutomationRule, Suggestion,
+  CreditTransaction, Referral, Subscription, 
+  Payment, Addon, ContentRecommendation, UserContentHistory,
+  Admin, AdminSession, Notification, Popup, AppSetting, AuditLog, FeedbackMessage,
+  CreativeBrief, ContentRepurpose, CompetitorAnalysis,
+  ChatConversation, ChatMessage,
+  InsertUser, InsertWorkspace, InsertWorkspaceMember, InsertTeamInvitation,
+  InsertSocialAccount, InsertContent, InsertAutomationRule, InsertAnalytics,
+  InsertSuggestion, InsertCreditTransaction, InsertReferral,
+  InsertSubscription, InsertPayment, InsertAddon,
+  InsertContentRecommendation, InsertUserContentHistory,
+  InsertAdmin, InsertNotification, InsertPopup, InsertAppSetting, InsertAuditLog, InsertFeedbackMessage,
+  InsertCreativeBrief, InsertContentRepurpose, InsertCompetitorAnalysis,
+  InsertChatConversation, InsertChatMessage
 } from "@shared/schema";
 
 export interface IStorage {
