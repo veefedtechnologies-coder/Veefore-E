@@ -14,3 +14,4 @@ export { AutomationController, automationController } from './AutomationControll
 export { BillingController, billingController } from './BillingController';
 export { MediaController, mediaController } from './MediaController';
 export { WebhookController, webhookController } from './WebhookController';
+export { SchedulerController, schedulerController } from './SchedulerController';

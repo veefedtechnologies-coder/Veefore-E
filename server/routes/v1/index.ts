@@ -5,6 +5,7 @@ import workspaceRoutes from './workspace.routes';
 import contentRoutes from './content.routes';
 import analyticsRoutes from './analytics.routes';
 import socialAccountRoutes from './social-accounts.routes';
+import schedulerRoutes from './scheduler.routes';
 
 export { default as authRoutes } from './auth.routes';
 export { default as userRoutes } from './user.routes';
@@ -12,6 +13,7 @@ export { default as workspaceRoutes } from './workspace.routes';
 export { default as contentRoutes } from './content.routes';
 export { default as analyticsRoutes } from './analytics.routes';
 export { default as socialAccountRoutes } from './social-accounts.routes';
+export { default as schedulerRoutes } from './scheduler.routes';
 
 export function mountV1Routes(app: Application, basePath: string = '/api/v1'): void {
   app.use(`${basePath}/auth`, authRoutes);
@@ -20,6 +22,7 @@ export function mountV1Routes(app: Application, basePath: string = '/api/v1'): v
   app.use(`${basePath}/content`, contentRoutes);
   app.use(`${basePath}/analytics`, analyticsRoutes);
   app.use(`${basePath}/social-accounts`, socialAccountRoutes);
+  app.use(`${basePath}/scheduler`, schedulerRoutes);
 }
 
 const v1Router = Router();
@@ -30,5 +33,6 @@ v1Router.use('/workspaces', workspaceRoutes);
 v1Router.use('/content', contentRoutes);
 v1Router.use('/analytics', analyticsRoutes);
 v1Router.use('/social-accounts', socialAccountRoutes);
+v1Router.use('/scheduler', schedulerRoutes);
 
 export default v1Router;

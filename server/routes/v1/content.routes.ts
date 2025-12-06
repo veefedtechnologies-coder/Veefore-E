@@ -1,18 +1,93 @@
 import { Router } from 'express';
 import { contentController } from '../../controllers';
+import { requireAuth } from '../../middleware/require-auth';
+import { validateRequest } from '../../middleware/validation';
+import { z } from 'zod';
 
 const router = Router();
 
-router.get('/drafts', contentController.getDrafts);
-router.get('/scheduled', contentController.getScheduled);
-router.get('/:contentId', contentController.getContent);
-router.get('/', contentController.getByWorkspace);
-router.post('/', contentController.createContent);
-router.put('/:contentId', contentController.updateContent);
-router.post('/:contentId/schedule', contentController.scheduleContent);
-router.put('/:contentId/reschedule', contentController.rescheduleContent);
-router.post('/:contentId/cancel-schedule', contentController.cancelSchedule);
-router.post('/:contentId/archive', contentController.archiveContent);
-router.delete('/:contentId', contentController.deleteContent);
+const ContentIdParams = z.object({
+  contentId: z.string().min(1),
+});
+
+const WorkspaceIdParams = z.object({
+  workspaceId: z.string().min(1),
+});
+
+const WorkspaceAndContentParams = z.object({
+  workspaceId: z.string().min(1),
+  contentId: z.string().min(1),
+});
+
+const PaginationQuery = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+router.get('/workspace/:workspaceId/drafts', 
+  requireAuth,
+  validateRequest({ params: WorkspaceIdParams, query: PaginationQuery }),
+  contentController.getDrafts
+);
+
+router.get('/workspace/:workspaceId/scheduled', 
+  requireAuth,
+  validateRequest({ params: WorkspaceIdParams }),
+  contentController.getScheduled
+);
+
+router.get('/workspace/:workspaceId', 
+  requireAuth,
+  validateRequest({ params: WorkspaceIdParams, query: PaginationQuery }),
+  contentController.getByWorkspace
+);
+
+router.post('/workspace/:workspaceId', 
+  requireAuth,
+  validateRequest({ params: WorkspaceIdParams }),
+  contentController.createContent
+);
+
+router.get('/:contentId', 
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  contentController.getContent
+);
+
+router.put('/:contentId', 
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  contentController.updateContent
+);
+
+router.post('/:contentId/schedule', 
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  contentController.scheduleContent
+);
+
+router.put('/:contentId/reschedule', 
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  contentController.rescheduleContent
+);
+
+router.post('/:contentId/cancel-schedule', 
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  contentController.cancelSchedule
+);
+
+router.post('/:contentId/archive', 
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  contentController.archiveContent
+);
+
+router.delete('/:contentId', 
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  contentController.deleteContent
+);
 
 export default router;
