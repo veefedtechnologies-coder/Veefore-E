@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development SPLIT_DEV=1 tsx server/index.ts",
+    "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "client:dev": "vite --config vite.client.config.ts --port 5173 --host",
     "tunnel": "cloudflared tunnel --config cloudflared/config.yml run",
     "build": "vite build && cross-env NODE_ENV=production esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --external:vite",
