@@ -16,6 +16,39 @@ import {
   WaitlistUser, InsertWaitlistUser
 } from "@shared/schema";
 import { tokenEncryption, EncryptedToken } from './security/token-encryption';
+import {
+  convertUser,
+  convertWorkspace,
+  convertAnalytics,
+  convertContent,
+  convertSocialAccount,
+  convertCreditTransaction,
+  convertSubscription,
+  convertPayment,
+  convertSuggestion,
+  convertAddon,
+  convertWorkspaceMember,
+  convertTeamInvitation,
+  convertContentRecommendation,
+  convertUserContentHistory,
+  convertDmConversation,
+  convertDmMessage,
+  convertAdmin,
+  convertAdminSession,
+  convertNotification,
+  convertPopup,
+  convertAppSetting,
+  convertAuditLog,
+  convertFeedbackMessage,
+  convertCreativeBrief,
+  convertContentRepurpose,
+  convertCompetitorAnalysis,
+  convertWaitlistUser,
+  generateReferralCode,
+  encryptAndStoreToken,
+  getAccessTokenFromAccount,
+  getRefreshTokenFromAccount
+} from './storage/converters';
 
 // Import models from server/models/ instead of defining inline
 import { User as UserModel } from './models/User/User';
@@ -72,141 +105,6 @@ import {
 
 export class MongoStorage implements IStorage {
   private isConnected = false;
-
-  // SECURITY: Token encryption helper methods
-  /**
-   * Securely store a social media token by encrypting it
-   */
-  private encryptAndStoreToken(plainToken: string | null): EncryptedToken | null {
-    if (!plainToken || typeof plainToken !== 'string') {
-      return null;
-    }
-    
-    try {
-      return tokenEncryption.encryptToken(plainToken);
-    } catch (error) {
-      console.error('🚨 SECURITY: Failed to encrypt token:', error);
-      throw new Error('Token encryption failed');
-    }
-  }
-
-  /**
-   * Securely retrieve and decrypt a social media token with comprehensive error handling
-   */
-  private decryptStoredToken(encryptedToken: any): string | null {
-    if (!encryptedToken) {
-      return null;
-    }
-    
-    try {
-      // Handle both string (JSON) and object formats
-      let tokenData: EncryptedToken;
-      
-      if (typeof encryptedToken === 'string') {
-        try {
-          // Parse JSON string from database
-          tokenData = JSON.parse(encryptedToken);
-        } catch (parseError) {
-          console.warn('🚨 P2-FIX: Failed to parse JSON token data, invalid format');
-          return null;
-        }
-      } else if (typeof encryptedToken === 'object') {
-        // Already an object
-        tokenData = encryptedToken;
-      } else {
-        console.warn('🚨 P2-FIX: Invalid encrypted token format, expected string or object');
-        return null;
-      }
-      
-      // Validate required fields exist
-      if (!tokenData.encryptedData || !tokenData.iv || !tokenData.salt || !tokenData.tag) {
-        console.warn('🚨 P2-FIX: Incomplete encrypted token data, missing required fields:', {
-          hasEncryptedData: !!tokenData.encryptedData,
-          hasIV: !!tokenData.iv,
-          hasSalt: !!tokenData.salt,
-          hasTag: !!tokenData.tag
-        });
-        return null;
-      }
-      
-      // Attempt decryption with detailed error handling
-      const decryptedToken = tokenEncryption.decryptToken(tokenData);
-      
-      if (!decryptedToken || decryptedToken.trim().length === 0) {
-        console.warn('🚨 P2-FIX: Decryption returned empty token');
-        return null;
-      }
-      
-      return decryptedToken;
-    } catch (error) {
-      // Enhanced error logging for debugging
-      console.warn('🚨 P2-FIX: Token decryption failed:', {
-        error: error.message,
-        tokenType: typeof encryptedToken,
-        tokenLength: typeof encryptedToken === 'string' ? encryptedToken.length : 'N/A',
-        hasBasicStructure: !!(encryptedToken && typeof encryptedToken === 'object')
-      });
-      return null;
-    }
-  }
-
-  /**
-   * Get access token from social account with automatic migration from plain text
-   */
-  private getAccessTokenFromAccount(account: any): string | null {
-    console.log(`[TOKEN DEBUG] Checking access token for account: ${account.username}`);
-    console.log(`[TOKEN DEBUG] Has encryptedAccessToken: ${!!account.encryptedAccessToken}`);
-    console.log(`[TOKEN DEBUG] Has plain accessToken: ${!!account.accessToken}`);
-    
-    // First try encrypted token
-    if (account.encryptedAccessToken) {
-      console.log(`[TOKEN DEBUG] Attempting to decrypt encrypted token for ${account.username}`);
-      try {
-        const decryptedToken = this.decryptStoredToken(account.encryptedAccessToken);
-        if (decryptedToken) {
-          console.log(`[TOKEN DEBUG] ✅ Successfully decrypted token for ${account.username}`);
-          return decryptedToken;
-        }
-        console.warn(`[TOKEN DEBUG] ❌ Decryption returned null for ${account.username}`);
-      } catch (error) {
-        console.error(`[TOKEN DEBUG] ❌ Decryption failed for ${account.username}:`, error.message);
-      }
-      // If decryption failed, log and continue to fallback
-      console.warn(`🚨 P2-FIX: Failed to decrypt access token for account ${account.username}, falling back to plain text`);
-    }
-    
-    // Fallback to legacy plain text token
-    if (account.accessToken) {
-      console.log('📊 SECURITY: Found legacy plain text token, should migrate to encrypted storage');
-      return account.accessToken;
-    }
-    
-    console.log(`[TOKEN DEBUG] ❌ No valid access token found for ${account.username}`);
-    return null;
-  }
-
-  /**
-   * Get refresh token from social account with automatic migration from plain text
-   */
-  private getRefreshTokenFromAccount(account: any): string | null {
-    // First try encrypted token  
-    if (account.encryptedRefreshToken) {
-      const decryptedToken = this.decryptStoredToken(account.encryptedRefreshToken);
-      if (decryptedToken) {
-        return decryptedToken;
-      }
-      // If decryption failed, log and continue to fallback
-      console.warn(`🚨 P2-FIX: Failed to decrypt refresh token for account ${account.username}, falling back to plain text`);
-    }
-    
-    // Fallback to legacy plain text token
-    if (account.refreshToken) {
-      console.log('📊 SECURITY: Found legacy plain text refresh token, should migrate to encrypted storage');
-      return account.refreshToken;
-    }
-    
-    return null;
-  }
 
   async connect() {
     // Don't reconnect if already connected and healthy
@@ -269,7 +167,7 @@ export class MongoStorage implements IStorage {
   async getUser(id: number | string): Promise<User | undefined> {
     await this.connect();
     const user = await userRepository.findById(id.toString());
-    return user ? this.convertUser(user) : undefined;
+    return user ? convertUser(user) : undefined;
   }
 
   async getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined> {
@@ -287,13 +185,13 @@ export class MongoStorage implements IStorage {
     } else {
       console.log(`[MONGODB DEBUG] No user found with firebaseUid: ${firebaseUid}`);
     }
-    return user ? this.convertUser(user) : undefined;
+    return user ? convertUser(user) : undefined;
   }
 
   async getUserByFirebaseId(firebaseId: string): Promise<User | undefined> {
     await this.connect();
     const user = await userRepository.findByFirebaseUid(firebaseId);
-    return user ? this.convertUser(user) : undefined;
+    return user ? convertUser(user) : undefined;
   }
 
   async updateUserLastLogin(firebaseId: string): Promise<void> {
@@ -307,19 +205,19 @@ export class MongoStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     await this.connect();
     const user = await userRepository.findByEmail(email);
-    return user ? this.convertUser(user) : undefined;
+    return user ? convertUser(user) : undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     await this.connect();
     const user = await userRepository.findByUsername(username);
-    return user ? this.convertUser(user) : undefined;
+    return user ? convertUser(user) : undefined;
   }
 
   async getUserByReferralCode(referralCode: string): Promise<User | undefined> {
     await this.connect();
     const user = await userRepository.findByReferralCode(referralCode);
-    return user ? this.convertUser(user) : undefined;
+    return user ? convertUser(user) : undefined;
   }
 
   async createUser(userData: InsertUser): Promise<User> {
@@ -327,7 +225,7 @@ export class MongoStorage implements IStorage {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
-      const referralCode = this.generateReferralCode();
+      const referralCode = generateReferralCode();
       const user = new UserModel({
         ...userData,
         referralCode,
@@ -336,7 +234,7 @@ export class MongoStorage implements IStorage {
         updatedAt: new Date()
       });
       const savedUser = await user.save({ session });
-      const convertedUser = this.convertUser(savedUser);
+      const convertedUser = convertUser(savedUser);
       const existingWorkspaces = await WorkspaceModel.find({ userId: convertedUser.id }).session(session);
       if (existingWorkspaces.length === 0) {
         const name = userData.displayName ? `${userData.displayName}'s Workspace` : 'My VeeFore Workspace';
@@ -354,7 +252,7 @@ export class MongoStorage implements IStorage {
       }
       await session.commitTransaction();
       session.endSession();
-      return this.convertUser(savedUser);
+      return convertUser(savedUser);
     } catch (error) {
       console.error('[USER CREATION] Atomic creation failed - rolling back:', error);
       await session.abortTransaction();
@@ -377,7 +275,7 @@ export class MongoStorage implements IStorage {
     }
     
     console.log(`[MONGODB DEBUG] Successfully updated user: ${user._id}, isOnboarded: ${user.isOnboarded}`);
-    return this.convertUser(user);
+    return convertUser(user);
   }
 
   async updateUserCredits(id: number | string, credits: number): Promise<User> {
@@ -417,7 +315,7 @@ export class MongoStorage implements IStorage {
       
       if (workspace) {
         console.log('[MONGODB DEBUG] Workspace found:', workspace._id);
-        return this.convertWorkspace(workspace);
+        return convertWorkspace(workspace);
       } else {
         console.log('[MONGODB DEBUG] No workspace found for ID:', idString);
         return undefined;
@@ -436,7 +334,7 @@ export class MongoStorage implements IStorage {
     try {
       const workspaces = await workspaceRepository.findByUserId(userId.toString());
       console.log('[MONGODB DEBUG] Found workspaces:', workspaces.length);
-      return workspaces.map(ws => this.convertWorkspace(ws));
+      return workspaces.map(ws => convertWorkspace(ws));
     } catch (error) {
       console.error('[MONGODB DEBUG] getWorkspacesByUserId error:', error);
       throw error;
@@ -458,7 +356,7 @@ export class MongoStorage implements IStorage {
       console.log('[MONGODB DEBUG] Any workspace found:', !!workspace);
     }
     
-    return workspace ? this.convertWorkspace(workspace) : undefined;
+    return workspace ? convertWorkspace(workspace) : undefined;
   }
 
   async createWorkspace(workspaceData: InsertWorkspace): Promise<Workspace> {
@@ -468,14 +366,14 @@ export class MongoStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     });
-    return this.convertWorkspace(workspace);
+    return convertWorkspace(workspace);
   }
 
   async updateWorkspace(id: number | string, updates: Partial<Workspace>): Promise<Workspace> {
     await this.connect();
     const workspace = await workspaceRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!workspace) throw new Error('Workspace not found');
-    return this.convertWorkspace(workspace);
+    return convertWorkspace(workspace);
   }
 
   async updateWorkspaceCredits(id: number | string, credits: number): Promise<void> {
@@ -516,177 +414,19 @@ export class MongoStorage implements IStorage {
 
 
 
-  // Helper methods for data conversion
-  private convertUser(mongoUser: any): User {
-    console.log(`[USER CONVERT] Raw MongoDB user isOnboarded:`, mongoUser.isOnboarded, `(type: ${typeof mongoUser.isOnboarded})`);
-    const converted = {
-      id: mongoUser._id.toString(),
-      firebaseUid: mongoUser.firebaseUid,
-      email: mongoUser.email,
-      username: mongoUser.username,
-      displayName: mongoUser.displayName || null,
-      avatar: mongoUser.avatar || null,
-      credits: mongoUser.credits ?? 0, // SECURITY FIX: No automatic credit allocation - use exact database value
-      plan: mongoUser.plan || 'Free',
-      stripeCustomerId: mongoUser.stripeCustomerId || null,
-      stripeSubscriptionId: mongoUser.stripeSubscriptionId || null,
-      referralCode: mongoUser.referralCode || null,
-      totalReferrals: mongoUser.totalReferrals || 0,
-      totalEarned: mongoUser.totalEarned || 0,
-      referredBy: mongoUser.referredBy || null,
-      preferences: mongoUser.preferences || {},
-      isOnboarded: mongoUser.isOnboarded === true,
-      isEmailVerified: mongoUser.isEmailVerified || false,
-      emailVerificationCode: mongoUser.emailVerificationCode || null,
-      emailVerificationExpiry: mongoUser.emailVerificationExpiry || null,
-      createdAt: mongoUser.createdAt,
-      updatedAt: mongoUser.updatedAt
-    };
-    console.log(`[USER CONVERT] Converted user isOnboarded:`, converted.isOnboarded);
-    console.log(`[CREDIT SECURITY] User ${converted.id} credits: ${converted.credits} (exact database value - no automatic allocation)`);
-    return converted;
-  }
-
-  private convertWorkspace(mongoWorkspace: any): Workspace {
-    return {
-      id: mongoWorkspace._id.toString(),
-      userId: mongoWorkspace.userId,
-      name: mongoWorkspace.name,
-      description: mongoWorkspace.description || null,
-      avatar: mongoWorkspace.avatar || null,
-      credits: mongoWorkspace.credits || 0,
-      theme: mongoWorkspace.theme || 'space',
-      aiPersonality: mongoWorkspace.aiPersonality || 'professional',
-      isDefault: mongoWorkspace.isDefault || false,
-      maxTeamMembers: mongoWorkspace.maxTeamMembers || 1,
-      inviteCode: mongoWorkspace.inviteCode || null,
-      createdAt: mongoWorkspace.createdAt,
-      updatedAt: mongoWorkspace.updatedAt
-    };
-  }
-
-  private convertAnalytics(mongoAnalytics: any): Analytics {
-    const metrics = mongoAnalytics.metrics || {};
-    return {
-      id: mongoAnalytics._id.toString(),
-      workspaceId: mongoAnalytics.workspaceId,
-      platform: mongoAnalytics.platform,
-      date: mongoAnalytics.date,
-      metrics: metrics,
-      createdAt: mongoAnalytics.createdAt || new Date()
-    };
-  }
-
-  private convertContent(mongoContent: any): Content {
-    return {
-      id: mongoContent._id.toString(),
-      workspaceId: mongoContent.workspaceId,
-      type: mongoContent.type,
-      title: mongoContent.title,
-      description: mongoContent.description || null,
-      contentData: mongoContent.contentData || null,
-      platform: mongoContent.platform || null,
-      status: mongoContent.status || 'draft',
-      scheduledAt: mongoContent.scheduledAt || null,
-      publishedAt: mongoContent.publishedAt || null,
-      creditsUsed: mongoContent.creditsUsed || null,
-      prompt: mongoContent.prompt || null,
-      createdAt: mongoContent.createdAt,
-      updatedAt: mongoContent.updatedAt
-    };
-  }
-
-  private convertSocialAccount(mongoAccount: any): SocialAccount {
-    console.log(`[CONVERT DEBUG] Converting social account: ${mongoAccount.username}`);
-    console.log(`[CONVERT DEBUG] Raw mongoAccount pageId:`, mongoAccount.pageId);
-    console.log(`[CONVERT DEBUG] Raw mongoAccount accountId:`, mongoAccount.accountId);
-    console.log(`[CONVERT DEBUG] All available fields:`, Object.keys(mongoAccount.toObject ? mongoAccount.toObject() : mongoAccount));
-    
-    const hasToken = this.getAccessTokenFromAccount(mongoAccount) !== null;
-    const hasEncryptedField = !!mongoAccount.encryptedAccessToken;
-    const isExpired = mongoAccount.expiresAt ? (new Date(mongoAccount.expiresAt).getTime() < Date.now()) : false;
-    const normalizedTokenStatus = ((): string => {
-      if (isExpired) return 'expired';
-      if (hasToken) return 'valid';
-      if (hasEncryptedField && !hasToken) return 'invalid';
-      return 'missing';
-    })();
-
-    return {
-      id: mongoAccount._id.toString(),
-      workspaceId: mongoAccount.workspaceId,
-      platform: mongoAccount.platform,
-      username: mongoAccount.username,
-      accountId: mongoAccount.accountId || null,
-      pageId: mongoAccount.pageId || null,
-      // SECURITY: Never expose actual tokens in API responses - return boolean flags only
-      hasAccessToken: hasToken,
-      hasRefreshToken: this.getRefreshTokenFromAccount(mongoAccount) !== null,
-      tokenStatus: mongoAccount.tokenStatus ?? normalizedTokenStatus,
-      expiresAt: mongoAccount.expiresAt || null,
-      isActive: mongoAccount.isActive !== false,
-      // Platform-specific sync data fields
-      followersCount: mongoAccount.followersCount ?? 0,
-      followingCount: mongoAccount.followingCount ?? null,
-      mediaCount: mongoAccount.mediaCount ?? null,
-      biography: mongoAccount.biography ?? null,
-      website: mongoAccount.website ?? null,
-      profilePictureUrl: mongoAccount.profilePictureUrl ?? null,
-      // YouTube-specific fields
-      subscriberCount: mongoAccount.subscriberCount ?? null,
-      videoCount: mongoAccount.videoCount ?? null,
-      viewCount: mongoAccount.viewCount ?? null,
-      channelDescription: mongoAccount.channelDescription ?? null,
-      channelThumbnail: mongoAccount.channelThumbnail ?? null,
-      accountType: mongoAccount.accountType ?? null,
-      isBusinessAccount: mongoAccount.isBusinessAccount ?? null,
-      isVerified: mongoAccount.isVerified ?? null,
-      avgLikes: mongoAccount.avgLikes ?? null,
-      avgComments: mongoAccount.avgComments ?? null,
-      avgReach: mongoAccount.avgReach ?? null,
-      engagementRate: mongoAccount.engagementRate ?? null,
-      // Critical engagement fields for analytics
-      totalLikes: mongoAccount.totalLikes ?? 0,
-      totalComments: mongoAccount.totalComments ?? 0,
-      // ✅ CRITICAL FIX: Include shares/saves fields that were missing!
-      totalShares: mongoAccount.totalShares ?? 0,
-      totalSaves: mongoAccount.totalSaves ?? 0,
-      postsAnalyzed: mongoAccount.postsAnalyzed ?? null,
-      totalReach: mongoAccount.totalReach ?? null,
-      avgEngagement: mongoAccount.avgEngagement ?? null,
-      // 🚀 Comprehensive reach data
-      accountLevelReach: mongoAccount.accountLevelReach ?? null,
-      postLevelReach: mongoAccount.postLevelReach ?? null,
-      reachSource: mongoAccount.reachSource ?? null,
-      reachByPeriod: mongoAccount.reachByPeriod ?? null,
-      lastSyncAt: mongoAccount.lastSyncAt ?? null,
-      createdAt: mongoAccount.createdAt || new Date(),
-      updatedAt: mongoAccount.updatedAt || new Date()
-    };
-  }
-
-  private generateReferralCode(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 8; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  }
-
   // Social account operations - delegating to socialAccountRepository
   async getSocialAccount(id: number | string): Promise<SocialAccount | undefined> {
     await this.connect();
     console.log(`[MONGODB DEBUG] Getting social account with ID: ${id} (type: ${typeof id})`);
     const account = await socialAccountRepository.findById(id.toString());
     console.log(`[MONGODB DEBUG] Find result:`, account ? 'Found' : 'Not found');
-    return account ? this.convertSocialAccount(account) : undefined;
+    return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialAccountByWorkspaceAndPlatform(workspaceId: number, platform: string): Promise<SocialAccount | undefined> {
     await this.connect();
     const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId.toString(), platform as any);
-    return account ? this.convertSocialAccount(account) : undefined;
+    return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialAccountsByWorkspace(workspaceId: any): Promise<SocialAccount[]> {
@@ -790,7 +530,7 @@ export class MongoStorage implements IStorage {
       }
     }
     
-    return accounts.map(account => this.convertSocialAccount(account));
+    return accounts.map(account => convertSocialAccount(account));
   }
 
   /**
@@ -813,8 +553,8 @@ export class MongoStorage implements IStorage {
       username: account.username,
       accountId: account.accountId,
       // Decrypt tokens for internal use
-      accessToken: this.getAccessTokenFromAccount(account),
-      refreshToken: this.getRefreshTokenFromAccount(account),
+      accessToken: getAccessTokenFromAccount(account),
+      refreshToken: getRefreshTokenFromAccount(account),
       expiresAt: account.expiresAt,
       isActive: account.isActive,
       followersCount: account.followersCount,
@@ -829,7 +569,7 @@ export class MongoStorage implements IStorage {
     console.log('[MONGODB DEBUG] getAllSocialAccounts called');
     const accounts = await socialAccountRepository.findAll({ isActive: true });
     console.log(`[MONGODB DEBUG] Active accounts returned: ${accounts.length}`);
-    return accounts.map(account => this.convertSocialAccount(account));
+    return accounts.map(account => convertSocialAccount(account));
   }
 
 
@@ -839,7 +579,7 @@ export class MongoStorage implements IStorage {
     console.log(`[MONGODB DEBUG] Looking for social account with workspaceId: ${workspaceId} (${typeof workspaceId}), platform: ${platform}`);
     const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId.toString(), platform as any);
     console.log(`[MONGODB DEBUG] Found social account:`, account ? `${account.platform} @${account.username}` : 'none');
-    return account ? this.convertSocialAccount(account) : undefined;
+    return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialAccountByPageId(pageId: string): Promise<SocialAccount | undefined> {
@@ -876,7 +616,7 @@ export class MongoStorage implements IStorage {
         });
       }
       
-      return account ? this.convertSocialAccount(account) : undefined;
+      return account ? convertSocialAccount(account) : undefined;
     } catch (error) {
       console.error(`[MONGODB DEBUG] getSocialAccountByPageId error:`, error);
       return undefined;
@@ -894,7 +634,7 @@ export class MongoStorage implements IStorage {
       workspaceId: { $in: workspaceIds } 
     });
     
-    return accounts.map(account => this.convertSocialAccount(account));
+    return accounts.map(account => convertSocialAccount(account));
   }
 
   async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
@@ -922,20 +662,20 @@ export class MongoStorage implements IStorage {
 
     // Encrypt access token if provided
     if (account.accessToken) {
-      socialAccountData.encryptedAccessToken = this.encryptAndStoreToken(account.accessToken);
+      socialAccountData.encryptedAccessToken = encryptAndStoreToken(account.accessToken);
       delete socialAccountData.accessToken;
       console.log('🔒 SECURITY: Access token encrypted and stored securely');
     }
 
     // Encrypt refresh token if provided  
     if (account.refreshToken) {
-      socialAccountData.encryptedRefreshToken = this.encryptAndStoreToken(account.refreshToken);
+      socialAccountData.encryptedRefreshToken = encryptAndStoreToken(account.refreshToken);
       delete socialAccountData.refreshToken;
       console.log('🔒 SECURITY: Refresh token encrypted and stored securely');
     }
 
     const newAccount = await socialAccountRepository.create(socialAccountData);
-    return this.convertSocialAccount(newAccount);
+    return convertSocialAccount(newAccount);
   }
 
   async updateSocialAccount(id: number | string, updates: Partial<SocialAccount>): Promise<SocialAccount> {
@@ -952,14 +692,14 @@ export class MongoStorage implements IStorage {
 
     // Encrypt access token if being updated
     if (updates.accessToken) {
-      encryptedUpdates.encryptedAccessToken = this.encryptAndStoreToken(updates.accessToken);
+      encryptedUpdates.encryptedAccessToken = encryptAndStoreToken(updates.accessToken);
       delete encryptedUpdates.accessToken;
       console.log('🔒 SECURITY: Access token encrypted for update');
     }
 
     // Encrypt refresh token if being updated
     if (updates.refreshToken) {
-      encryptedUpdates.encryptedRefreshToken = this.encryptAndStoreToken(updates.refreshToken);
+      encryptedUpdates.encryptedRefreshToken = encryptAndStoreToken(updates.refreshToken);
       delete encryptedUpdates.refreshToken;
       console.log('🔒 SECURITY: Refresh token encrypted for update');
     }
@@ -972,7 +712,7 @@ export class MongoStorage implements IStorage {
     }
     
     console.log(`[MONGODB DEBUG] Successfully updated social account: ${updatedAccount._id}`);
-    return this.convertSocialAccount(updatedAccount);
+    return convertSocialAccount(updatedAccount);
   }
 
   async deleteSocialAccount(id: number | string): Promise<void> {
@@ -993,7 +733,7 @@ export class MongoStorage implements IStorage {
   async getContent(id: number): Promise<Content | undefined> {
     await this.connect();
     const content = await contentRepository.findById(id.toString());
-    return content ? this.convertContent(content) : undefined;
+    return content ? convertContent(content) : undefined;
   }
 
   async getContentByWorkspace(workspaceId: number, limit?: number): Promise<Content[]> {
@@ -1002,7 +742,7 @@ export class MongoStorage implements IStorage {
       workspaceId.toString(),
       limit ? { limit, sortBy: 'createdAt', sortOrder: 'desc' } : { sortBy: 'createdAt', sortOrder: 'desc' }
     );
-    return contents.map(content => this.convertContent(content));
+    return contents.map(content => convertContent(content));
   }
 
   async getScheduledContent(workspaceId?: number): Promise<Content[]> {
@@ -1023,7 +763,7 @@ export class MongoStorage implements IStorage {
       });
     }
     
-    return contents.map(content => this.convertContent(content));
+    return contents.map(content => convertContent(content));
   }
 
   async createContent(content: InsertContent): Promise<Content> {
@@ -1052,14 +792,14 @@ export class MongoStorage implements IStorage {
     
     console.log('[MONGODB DEBUG] Content saved successfully with ID:', saved._id.toString());
     
-    return this.convertContent(saved);
+    return convertContent(saved);
   }
 
   async updateContent(id: number, updates: Partial<Content>): Promise<Content> {
     await this.connect();
     const content = await contentRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!content) throw new Error('Content not found');
-    return this.convertContent(content);
+    return convertContent(content);
   }
 
   async createPost(postData: any): Promise<any> {
@@ -1138,7 +878,7 @@ export class MongoStorage implements IStorage {
     
     console.log('[MONGO DEBUG] Found analytics records:', analyticsData.length);
     
-    return analyticsData.map(doc => this.convertAnalytics(doc));
+    return analyticsData.map(doc => convertAnalytics(doc));
   }
 
   async createAnalytics(analytics: InsertAnalytics): Promise<Analytics> {
@@ -1149,13 +889,13 @@ export class MongoStorage implements IStorage {
       createdAt: new Date()
     });
     console.log('[STORAGE DEBUG] Saved analytics doc metrics:', JSON.stringify((analyticsDoc as any).metrics, null, 2));
-    return this.convertAnalytics(analyticsDoc);
+    return convertAnalytics(analyticsDoc);
   }
 
   async getLatestAnalytics(workspaceId: number, platform: string): Promise<Analytics | undefined> {
     await this.connect();
     const analytics = await analyticsRepository.findLatestByPlatform(workspaceId.toString(), platform);
-    return analytics ? this.convertAnalytics(analytics) : undefined;
+    return analytics ? convertAnalytics(analytics) : undefined;
   }
 
   async getAutomationRules(workspaceId: number | string): Promise<AutomationRule[]> {
@@ -1444,7 +1184,7 @@ export class MongoStorage implements IStorage {
       createdAt: s.createdAt
     })));
     
-    return suggestions.map(doc => this.convertSuggestion(doc));
+    return suggestions.map(doc => convertSuggestion(doc));
   }
 
   async getValidSuggestions(workspaceId: number): Promise<Suggestion[]> {
@@ -1460,7 +1200,7 @@ export class MongoStorage implements IStorage {
       ]
     }).sort({ createdAt: -1 });
     
-    return suggestions.map(doc => this.convertSuggestion(doc));
+    return suggestions.map(doc => convertSuggestion(doc));
   }
 
   async createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion> {
@@ -1475,7 +1215,7 @@ export class MongoStorage implements IStorage {
       createdAt: new Date()
     });
     const saved = await newSuggestion.save();
-    return this.convertSuggestion(saved);
+    return convertSuggestion(saved);
   }
 
   async markSuggestionUsed(id: number): Promise<Suggestion> {
@@ -1488,7 +1228,7 @@ export class MongoStorage implements IStorage {
     if (!updated) {
       throw new Error('Suggestion not found');
     }
-    return this.convertSuggestion(updated);
+    return convertSuggestion(updated);
   }
 
   async clearSuggestionsByWorkspace(workspaceId: string | number): Promise<void> {
@@ -1505,7 +1245,7 @@ export class MongoStorage implements IStorage {
     
     try {
       const transactions = await creditTransactionRepository.getRecentTransactions(userId.toString(), limit);
-      return transactions.map(transaction => this.convertCreditTransaction(transaction));
+      return transactions.map(transaction => convertCreditTransaction(transaction));
     } catch (error) {
       console.log('[MONGODB DEBUG] getCreditTransactions error:', error);
       return [];
@@ -1518,20 +1258,7 @@ export class MongoStorage implements IStorage {
       ...transaction,
       createdAt: new Date()
     });
-    return this.convertCreditTransaction(created);
-  }
-
-  private convertCreditTransaction(doc: any): CreditTransaction {
-    return {
-      id: doc._id?.toString() || doc.id,
-      userId: doc.userId,
-      type: doc.type,
-      amount: doc.amount,
-      description: doc.description || null,
-      workspaceId: doc.workspaceId || null,
-      referenceId: doc.referenceId || null,
-      createdAt: doc.createdAt || new Date()
-    };
+    return convertCreditTransaction(created);
   }
 
   async getReferrals(referrerId: number): Promise<Referral[]> {
@@ -1558,13 +1285,13 @@ export class MongoStorage implements IStorage {
   async getSubscription(userId: number): Promise<Subscription | undefined> {
     await this.connect();
     const subscription = await subscriptionRepository.findByUserId(userId.toString());
-    return subscription ? this.convertSubscription(subscription) : undefined;
+    return subscription ? convertSubscription(subscription) : undefined;
   }
 
   async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
     await this.connect();
     const subscription = await subscriptionRepository.create(insertSubscription);
-    return this.convertSubscription(subscription);
+    return convertSubscription(subscription);
   }
 
   async updateSubscriptionStatus(userId: number, status: string, canceledAt?: Date): Promise<Subscription> {
@@ -1574,26 +1301,26 @@ export class MongoStorage implements IStorage {
       { status, canceledAt, updatedAt: new Date() }
     );
     if (!subscription) throw new Error('Subscription not found');
-    return this.convertSubscription(subscription);
+    return convertSubscription(subscription);
   }
 
   async getActiveSubscription(userId: number): Promise<Subscription | undefined> {
     await this.connect();
     const subscription = await subscriptionRepository.findActiveByUserId(userId.toString());
-    return subscription ? this.convertSubscription(subscription) : undefined;
+    return subscription ? convertSubscription(subscription) : undefined;
   }
 
   // Payment operations - delegating to paymentRepository
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     await this.connect();
     const payment = await paymentRepository.create(insertPayment);
-    return this.convertPayment(payment);
+    return convertPayment(payment);
   }
 
   async getPaymentsByUser(userId: number): Promise<Payment[]> {
     await this.connect();
     const result = await paymentRepository.findByUserId(userId.toString());
-    return result.data.map(payment => this.convertPayment(payment));
+    return result.data.map(payment => convertPayment(payment));
   }
 
   // Addon operations - delegating to addonRepository
@@ -1616,7 +1343,7 @@ export class MongoStorage implements IStorage {
     const activeAddons = addons.filter(addon => addon.isActive !== false);
     console.log(`[MONGODB DEBUG] After filtering active: ${activeAddons.length} addons`);
     
-    return activeAddons.map(addon => this.convertAddon(addon));
+    return activeAddons.map(addon => convertAddon(addon));
   }
 
   async getActiveAddonsByUser(userId: number | string): Promise<Addon[]> {
@@ -1640,7 +1367,7 @@ export class MongoStorage implements IStorage {
       });
     }
     
-    return addons.map(addon => this.convertAddon(addon));
+    return addons.map(addon => convertAddon(addon));
   }
 
   async createAddon(insertAddon: InsertAddon): Promise<Addon> {
@@ -1659,49 +1386,11 @@ export class MongoStorage implements IStorage {
     try {
       const savedAddon = await addon.save();
       console.log('[MONGODB DEBUG] Addon saved successfully:', savedAddon);
-      return this.convertAddon(savedAddon);
+      return convertAddon(savedAddon);
     } catch (error) {
       console.error('[MONGODB ERROR] Failed to save addon:', error);
       throw error;
     }
-  }
-
-  // Conversion methods for subscription system
-  private convertSubscription(doc: any): Subscription {
-    return {
-      id: doc._id?.toString() || doc.id,
-      userId: doc.userId,
-      plan: doc.plan,
-      status: doc.status,
-      priceId: doc.priceId || null,
-      subscriptionId: doc.subscriptionId || null,
-      currentPeriodStart: doc.currentPeriodStart || null,
-      currentPeriodEnd: doc.currentPeriodEnd || null,
-      trialEnd: doc.trialEnd || null,
-      monthlyCredits: doc.monthlyCredits || null,
-      extraCredits: doc.extraCredits || null,
-      autoRenew: doc.autoRenew || null,
-      canceledAt: doc.canceledAt || null,
-      createdAt: doc.createdAt || null,
-      updatedAt: doc.updatedAt || null
-    };
-  }
-
-  private convertPayment(doc: any): Payment {
-    return {
-      id: doc._id?.toString() || doc.id,
-      userId: doc.userId,
-      amount: doc.amount,
-      currency: doc.currency || null,
-      status: doc.status || null,
-      razorpayOrderId: doc.razorpayOrderId,
-      razorpayPaymentId: doc.razorpayPaymentId || null,
-      razorpaySignature: doc.razorpaySignature || null,
-      purpose: doc.purpose,
-      metadata: doc.metadata || null,
-      createdAt: doc.createdAt || null,
-      updatedAt: doc.updatedAt || null
-    };
   }
 
   async getSuggestionsByWorkspace(workspaceId: string | number): Promise<Suggestion[]> {
@@ -1728,49 +1417,21 @@ export class MongoStorage implements IStorage {
       createdAt: s.createdAt
     })));
     
-    return suggestions.map(doc => this.convertSuggestion(doc));
+    return suggestions.map(doc => convertSuggestion(doc));
   }
 
   async getAnalyticsByWorkspace(workspaceId: string | number): Promise<Analytics[]> {
     await this.connect();
     const analytics = await AnalyticsModel.find({ workspaceId: workspaceId.toString() })
       .sort({ date: -1 });
-    return analytics.map(this.convertAnalytics);
-  }
-
-  private convertSuggestion(doc: any): Suggestion {
-    return {
-      id: doc._id?.toString() || doc.id,
-      workspaceId: parseInt(doc.workspaceId),
-      type: doc.type,
-      data: doc.data || null,
-      confidence: doc.confidence || null,
-      isUsed: doc.isUsed || false,
-      validUntil: doc.validUntil || null,
-      createdAt: doc.createdAt || null
-    };
-  }
-
-  private convertAddon(doc: any): Addon {
-    return {
-      id: doc._id?.toString() || doc.id,
-      userId: doc.userId,
-      type: doc.type,
-      name: doc.name,
-      price: doc.price,
-      isActive: doc.isActive || null,
-      expiresAt: doc.expiresAt || null,
-      metadata: doc.metadata || null,
-      createdAt: doc.createdAt || null,
-      updatedAt: doc.updatedAt || null
-    };
+    return analytics.map(convertAnalytics);
   }
 
   // Team management operations
   async getWorkspaceByInviteCode(inviteCode: string): Promise<Workspace | undefined> {
     await this.connect();
     const workspace = await WorkspaceModel.findOne({ inviteCode });
-    return workspace ? this.convertWorkspace(workspace) : undefined;
+    return workspace ? convertWorkspace(workspace) : undefined;
   }
 
   async getWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<WorkspaceMember | undefined> {
@@ -1779,7 +1440,7 @@ export class MongoStorage implements IStorage {
       workspaceId: workspaceId.toString(), 
       userId: userId.toString() 
     });
-    return member ? this.convertWorkspaceMember(member) : undefined;
+    return member ? convertWorkspaceMember(member) : undefined;
   }
 
   async getWorkspaceMembers(workspaceId: number | string): Promise<(WorkspaceMember & { user: User })[]> {
@@ -1798,7 +1459,7 @@ export class MongoStorage implements IStorage {
         const user = await this.getUser(member.userId);
         if (user) {
           result.push({
-            ...this.convertWorkspaceMember(member),
+            ...convertWorkspaceMember(member),
             user
           });
         }
@@ -1874,7 +1535,7 @@ export class MongoStorage implements IStorage {
     const newMember = new WorkspaceMemberModel(memberData);
     await newMember.save();
     
-    return this.convertWorkspaceMember(newMember);
+    return convertWorkspaceMember(newMember);
   }
 
   async updateWorkspaceMember(workspaceId: number | string, userId: number | string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember> {
@@ -1890,7 +1551,7 @@ export class MongoStorage implements IStorage {
       throw new Error(`Workspace member not found`);
     }
     
-    return this.convertWorkspaceMember(updatedMember);
+    return convertWorkspaceMember(updatedMember);
   }
 
   async removeWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<void> {
@@ -1921,7 +1582,7 @@ export class MongoStorage implements IStorage {
       id: newInvitation._id
     });
     
-    return this.convertTeamInvitation(newInvitation);
+    return convertTeamInvitation(newInvitation);
   }
 
   async getWorkspaceInvitations(workspaceId: number): Promise<TeamInvitation[]> {
@@ -1939,19 +1600,19 @@ export class MongoStorage implements IStorage {
     
     console.log(`[MONGODB DEBUG] Found ${invitations.length} pending invitations`);
     
-    return invitations.map(doc => this.convertTeamInvitation(doc));
+    return invitations.map(doc => convertTeamInvitation(doc));
   }
 
   async getTeamInvitation(id: number): Promise<TeamInvitation | undefined> {
     await this.connect();
     const invitation = await TeamInvitationModel.findOne({ id });
-    return invitation ? this.convertTeamInvitation(invitation) : undefined;
+    return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
   async getTeamInvitationByToken(token: string): Promise<TeamInvitation | undefined> {
     await this.connect();
     const invitation = await TeamInvitationModel.findOne({ token });
-    return invitation ? this.convertTeamInvitation(invitation) : undefined;
+    return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
   async getTeamInvitations(workspaceId: number | string, status?: string): Promise<TeamInvitation[]> {
@@ -1964,7 +1625,7 @@ export class MongoStorage implements IStorage {
     const invitations = await TeamInvitationModel.find(query)
       .sort({ createdAt: -1 });
     
-    return invitations.map(this.convertTeamInvitation);
+    return invitations.map(convertTeamInvitation);
   }
 
   async updateTeamInvitation(id: number, updates: Partial<TeamInvitation>): Promise<TeamInvitation> {
@@ -1980,45 +1641,14 @@ export class MongoStorage implements IStorage {
       throw new Error(`Team invitation with id ${id} not found`);
     }
     
-    return this.convertTeamInvitation(updatedInvitation);
-  }
-
-  private convertWorkspaceMember(doc: any): WorkspaceMember {
-    return {
-      id: parseInt(doc._id?.toString() || doc.id || "0"),
-      userId: parseInt(doc.userId?.toString() || "0"),
-      workspaceId: parseInt(doc.workspaceId?.toString() || "0"),
-      role: doc.role || "Viewer",
-      status: doc.status || "active",
-      permissions: doc.permissions || {},
-      invitedBy: doc.invitedBy ? parseInt(doc.invitedBy.toString()) : null,
-      joinedAt: doc.joinedAt || new Date(),
-      createdAt: doc.createdAt || new Date(),
-      updatedAt: doc.updatedAt || new Date()
-    };
-  }
-
-  private convertTeamInvitation(doc: any): TeamInvitation {
-    return {
-      id: doc._id?.toString() || doc.id,
-      workspaceId: parseInt(doc.workspaceId),
-      email: doc.email,
-      role: doc.role,
-      status: doc.status || null,
-      token: doc.token,
-      expiresAt: doc.expiresAt,
-      invitedBy: doc.invitedBy,
-      permissions: doc.permissions || null,
-      acceptedAt: doc.acceptedAt || null,
-      createdAt: doc.createdAt || null
-    };
+    return convertTeamInvitation(updatedInvitation);
   }
 
   // Content recommendation operations
   async getContentRecommendation(id: number): Promise<ContentRecommendation | undefined> {
     await this.connect();
     const recommendation = await ContentRecommendationModel.findById(id);
-    return recommendation ? this.convertContentRecommendation(recommendation) : undefined;
+    return recommendation ? convertContentRecommendation(recommendation) : undefined;
   }
 
   async getContentRecommendations(workspaceId: number, type?: string, limit?: number): Promise<ContentRecommendation[]> {
@@ -2036,7 +1666,7 @@ export class MongoStorage implements IStorage {
     }
 
     const recommendations = await queryBuilder.exec();
-    return recommendations.map(rec => this.convertContentRecommendation(rec));
+    return recommendations.map(rec => convertContentRecommendation(rec));
   }
 
   async createContentRecommendation(insertRecommendation: InsertContentRecommendation): Promise<ContentRecommendation> {
@@ -2048,7 +1678,7 @@ export class MongoStorage implements IStorage {
       updatedAt: new Date()
     });
     const saved = await recommendation.save();
-    return this.convertContentRecommendation(saved);
+    return convertContentRecommendation(saved);
   }
 
   async updateContentRecommendation(id: number, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation> {
@@ -2061,7 +1691,7 @@ export class MongoStorage implements IStorage {
     if (!updated) {
       throw new Error(`Content recommendation ${id} not found`);
     }
-    return this.convertContentRecommendation(updated);
+    return convertContentRecommendation(updated);
   }
 
   async deleteContentRecommendation(id: number): Promise<void> {
@@ -2078,7 +1708,7 @@ export class MongoStorage implements IStorage {
       userId: userId.toString(),
       workspaceId: workspaceId.toString()
     }).sort({ createdAt: -1 });
-    return history.map(h => this.convertUserContentHistory(h));
+    return history.map(h => convertUserContentHistory(h));
   }
 
   async createUserContentHistory(insertHistory: InsertUserContentHistory): Promise<UserContentHistory> {
@@ -2090,40 +1720,7 @@ export class MongoStorage implements IStorage {
       createdAt: new Date()
     });
     const saved = await history.save();
-    return this.convertUserContentHistory(saved);
-  }
-
-  private convertContentRecommendation(doc: any): ContentRecommendation {
-    return {
-      id: doc._id?.toString() || doc.id,
-      workspaceId: parseInt(doc.workspaceId),
-      type: doc.type,
-      title: doc.title,
-      description: doc.description || null,
-      duration: doc.duration || null,
-      category: doc.category,
-      country: doc.country,
-      tags: doc.tags || [],
-      engagement: doc.engagement || { expectedViews: 0, expectedLikes: 0, expectedShares: 0 },
-      thumbnailUrl: doc.thumbnailUrl || null,
-      mediaUrl: doc.mediaUrl || null,
-      sourceUrl: doc.sourceUrl || null,
-      isActive: doc.isActive !== false,
-      createdAt: doc.createdAt || null,
-      updatedAt: doc.updatedAt || null
-    };
-  }
-
-  private convertUserContentHistory(doc: any): UserContentHistory {
-    return {
-      id: doc._id?.toString() || doc.id,
-      userId: parseInt(doc.userId),
-      workspaceId: parseInt(doc.workspaceId),
-      action: doc.action,
-      recommendationId: doc.recommendationId || null,
-      metadata: doc.metadata || {},
-      createdAt: doc.createdAt || null
-    };
+    return convertUserContentHistory(saved);
   }
 
   // Pricing and plan operations
@@ -2276,7 +1873,7 @@ export class MongoStorage implements IStorage {
     }
     
     console.log(`[SUBSCRIPTION UPDATE] Successfully updated user ${userId} to plan ${planId} with ${plan.credits} credits`);
-    return this.convertUser(updatedUser);
+    return convertUser(updatedUser);
   }
 
   async addCreditsToUser(userId: number | string, credits: number): Promise<User> {
@@ -2327,62 +1924,31 @@ export class MongoStorage implements IStorage {
     }
     
     console.log(`[CREDIT ADD] Successfully updated user ${userId} credits to ${newCredits}`);
-    return this.convertUser(updatedUser);
+    return convertUser(updatedUser);
   }
 
   // DM Conversation Memory Methods - delegating to dmConversationRepository and dmMessageRepository
   async getDmConversation(workspaceId: string, platform: string, participantId: string): Promise<any> {
     await this.connect();
     const conversation = await dmConversationRepository.findByWorkspaceAndParticipant(workspaceId, participantId);
-    return conversation ? this.convertDmConversation(conversation) : null;
+    return conversation ? convertDmConversation(conversation) : null;
   }
 
   async createDmConversation(data: any): Promise<any> {
     await this.connect();
     const conversation = await dmConversationRepository.create(data);
-    return this.convertDmConversation(conversation);
+    return convertDmConversation(conversation);
   }
 
   async createDmMessage(data: any): Promise<any> {
     await this.connect();
     const message = await dmMessageRepository.create(data);
-    return this.convertDmMessage(message);
+    return convertDmMessage(message);
   }
 
   async updateConversationLastMessage(conversationId: string | number): Promise<void> {
     await this.connect();
     await dmConversationRepository.incrementMessageCount(conversationId.toString());
-  }
-
-  private convertDmConversation(doc: any): any {
-    return {
-      id: doc._id.toString(),
-      workspaceId: doc.workspaceId,
-      platform: doc.platform,
-      participantId: doc.participantId,
-      participantUsername: doc.participantUsername,
-      lastMessageAt: doc.lastMessageAt,
-      messageCount: doc.messageCount,
-      isActive: doc.isActive,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
-    };
-  }
-
-  private convertDmMessage(doc: any): any {
-    return {
-      id: doc._id.toString(),
-      conversationId: doc.conversationId,
-      messageId: doc.messageId,
-      sender: doc.sender,
-      content: doc.content,
-      messageType: doc.messageType,
-      sentiment: doc.sentiment,
-      topics: doc.topics,
-      aiResponse: doc.aiResponse,
-      automationRuleId: doc.automationRuleId,
-      createdAt: doc.createdAt
-    };
   }
 
   async getDmMessages(conversationId: number | string, limit: number = 10): Promise<any[]> {
@@ -2670,7 +2236,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     try {
       const admin = await AdminModel.findById(id);
-      return admin ? this.convertAdmin(admin) : undefined;
+      return admin ? convertAdmin(admin) : undefined;
     } catch (error) {
       return undefined;
     }
@@ -2679,19 +2245,19 @@ export class MongoStorage implements IStorage {
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
     await this.connect();
     const admin = await AdminModel.findOne({ email });
-    return admin ? this.convertAdmin(admin) : undefined;
+    return admin ? convertAdmin(admin) : undefined;
   }
 
   async getAdminByUsername(username: string): Promise<Admin | undefined> {
     await this.connect();
     const admin = await AdminModel.findOne({ username });
-    return admin ? this.convertAdmin(admin) : undefined;
+    return admin ? convertAdmin(admin) : undefined;
   }
 
   async getAllAdmins(): Promise<Admin[]> {
     await this.connect();
     const admins = await AdminModel.find({ isActive: true });
-    return admins.map(admin => this.convertAdmin(admin));
+    return admins.map(admin => convertAdmin(admin));
   }
 
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
@@ -2704,7 +2270,7 @@ export class MongoStorage implements IStorage {
       isActive: true
     });
     const savedAdmin = await newAdmin.save();
-    return this.convertAdmin(savedAdmin);
+    return convertAdmin(savedAdmin);
   }
 
   async updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin> {
@@ -2715,7 +2281,7 @@ export class MongoStorage implements IStorage {
       { new: true }
     );
     if (!admin) throw new Error('Admin not found');
-    return this.convertAdmin(admin);
+    return convertAdmin(admin);
   }
 
   async deleteAdmin(id: number): Promise<void> {
@@ -2807,7 +2373,7 @@ export class MongoStorage implements IStorage {
       expiresAt: session.expiresAt
     });
     const savedSession = await newSession.save();
-    return this.convertAdminSession(savedSession);
+    return convertAdminSession(savedSession);
   }
 
   async getAdminSession(token: string): Promise<any | undefined> {
@@ -2816,7 +2382,7 @@ export class MongoStorage implements IStorage {
       token, 
       expiresAt: { $gt: new Date() } 
     }).populate('adminId');
-    return session ? this.convertAdminSession(session) : undefined;
+    return session ? convertAdminSession(session) : undefined;
   }
 
   async deleteAdminSession(token: string): Promise<void> {
@@ -2914,7 +2480,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const query = userId ? { userId } : {};
     const notifications = await NotificationModel.find(query).sort({ createdAt: -1 });
-    return notifications.map(notif => this.convertNotification(notif));
+    return notifications.map(notif => convertNotification(notif));
   }
 
   async updateNotification(id: number, updates: Partial<any>): Promise<any> {
@@ -2925,7 +2491,7 @@ export class MongoStorage implements IStorage {
       { new: true }
     );
     if (!notification) throw new Error('Notification not found');
-    return this.convertNotification(notification);
+    return convertNotification(notification);
   }
 
   async deleteNotification(id: number): Promise<void> {
@@ -2943,7 +2509,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const newPopup = new PopupModel(popup);
     const savedPopup = await newPopup.save();
-    return this.convertPopup(savedPopup);
+    return convertPopup(savedPopup);
   }
 
   async getActivePopups(): Promise<any[]> {
@@ -2959,13 +2525,13 @@ export class MongoStorage implements IStorage {
         { endDate: { $gte: new Date() } }
       ]
     });
-    return popups.map(popup => this.convertPopup(popup));
+    return popups.map(popup => convertPopup(popup));
   }
 
   async getPopup(id: number): Promise<any | undefined> {
     await this.connect();
     const popup = await PopupModel.findById(id);
-    return popup ? this.convertPopup(popup) : undefined;
+    return popup ? convertPopup(popup) : undefined;
   }
 
   async updatePopup(id: number, updates: Partial<any>): Promise<any> {
@@ -2976,7 +2542,7 @@ export class MongoStorage implements IStorage {
       { new: true }
     );
     if (!popup) throw new Error('Popup not found');
-    return this.convertPopup(popup);
+    return convertPopup(popup);
   }
 
   async deletePopup(id: number): Promise<void> {
@@ -2989,25 +2555,25 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const newSetting = new AppSettingModel(setting);
     const savedSetting = await newSetting.save();
-    return this.convertAppSetting(savedSetting);
+    return convertAppSetting(savedSetting);
   }
 
   async getAppSetting(key: string): Promise<any | undefined> {
     await this.connect();
     const setting = await AppSettingModel.findOne({ key });
-    return setting ? this.convertAppSetting(setting) : undefined;
+    return setting ? convertAppSetting(setting) : undefined;
   }
 
   async getAllAppSettings(): Promise<any[]> {
     await this.connect();
     const settings = await AppSettingModel.find({});
-    return settings.map(setting => this.convertAppSetting(setting));
+    return settings.map(setting => convertAppSetting(setting));
   }
 
   async getPublicAppSettings(): Promise<any[]> {
     await this.connect();
     const settings = await AppSettingModel.find({ isPublic: true });
-    return settings.map(setting => this.convertAppSetting(setting));
+    return settings.map(setting => convertAppSetting(setting));
   }
 
   async updateAppSetting(key: string, value: string, updatedBy?: number): Promise<any> {
@@ -3017,7 +2583,7 @@ export class MongoStorage implements IStorage {
       { value, updatedBy, updatedAt: new Date() },
       { new: true, upsert: true }
     );
-    return this.convertAppSetting(setting);
+    return convertAppSetting(setting);
   }
 
   async deleteAppSetting(key: string): Promise<void> {
@@ -3040,7 +2606,7 @@ export class MongoStorage implements IStorage {
     
     const newLog = new AuditLogModel(enrichedLog);
     const savedLog = await newLog.save();
-    return this.convertAuditLog(savedLog);
+    return convertAuditLog(savedLog);
   }
 
   async getAuditLogs(limit?: number, adminId?: number): Promise<any[]> {
@@ -3049,7 +2615,7 @@ export class MongoStorage implements IStorage {
     const logs = await AuditLogModel.find(query)
       .sort({ createdAt: -1 })
       .limit(limit || 100);
-    return logs.map(log => this.convertAuditLog(log));
+    return logs.map(log => convertAuditLog(log));
   }
 
   // Feedback operations
@@ -3057,14 +2623,14 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const newFeedback = new FeedbackMessageModel(feedback);
     const savedFeedback = await newFeedback.save();
-    return this.convertFeedbackMessage(savedFeedback);
+    return convertFeedbackMessage(savedFeedback);
   }
 
   async getFeedbackMessages(status?: string): Promise<any[]> {
     await this.connect();
     const query = status ? { status } : {};
     const messages = await FeedbackMessageModel.find(query).sort({ createdAt: -1 });
-    return messages.map(msg => this.convertFeedbackMessage(msg));
+    return messages.map(msg => convertFeedbackMessage(msg));
   }
 
   async updateFeedbackMessage(id: number, updates: Partial<any>): Promise<any> {
@@ -3075,7 +2641,7 @@ export class MongoStorage implements IStorage {
       { new: true }
     );
     if (!message) throw new Error('Feedback message not found');
-    return this.convertFeedbackMessage(message);
+    return convertFeedbackMessage(message);
   }
 
   async deleteFeedbackMessage(id: number): Promise<void> {
@@ -3100,7 +2666,7 @@ export class MongoStorage implements IStorage {
   async getAllUsers(): Promise<any[]> {
     await this.connect();
     const users = await UserModel.find({}).lean();
-    return users.map(user => this.convertUser(user));
+    return users.map(user => convertUser(user));
   }
 
   // Admin stats method
@@ -3120,115 +2686,6 @@ export class MongoStorage implements IStorage {
       totalCreditsUsed: 0,
       revenueThisMonth: 0,
       activeUsers: userCount
-    };
-  }
-
-  // Converter methods for admin entities
-  private convertAdmin(mongoAdmin: any): any {
-    return {
-      id: mongoAdmin._id.toString(),
-      email: mongoAdmin.email,
-      username: mongoAdmin.username,
-      password: mongoAdmin.password, // Include password for authentication
-      role: mongoAdmin.role,
-      isActive: mongoAdmin.isActive,
-      lastLogin: mongoAdmin.lastLogin,
-      createdAt: mongoAdmin.createdAt,
-      updatedAt: mongoAdmin.updatedAt
-    };
-  }
-
-  private convertAdminSession(mongoSession: any): any {
-    return {
-      id: mongoSession._id.toString(),
-      adminId: mongoSession.adminId,
-      token: mongoSession.token,
-      ipAddress: mongoSession.ipAddress,
-      userAgent: mongoSession.userAgent,
-      expiresAt: mongoSession.expiresAt,
-      createdAt: mongoSession.createdAt
-    };
-  }
-
-  private convertNotification(mongoNotification: any): any {
-    return {
-      id: mongoNotification._id.toString(),
-      userId: mongoNotification.userId,
-      title: mongoNotification.title,
-      message: mongoNotification.message,
-      type: mongoNotification.type,
-      priority: mongoNotification.priority,
-      isRead: mongoNotification.isRead,
-      actionUrl: mongoNotification.actionUrl,
-      data: mongoNotification.data,
-      expiresAt: mongoNotification.expiresAt,
-      createdAt: mongoNotification.createdAt,
-      updatedAt: mongoNotification.updatedAt
-    };
-  }
-
-  private convertPopup(mongoPopup: any): any {
-    return {
-      id: mongoPopup._id.toString(),
-      title: mongoPopup.title,
-      content: mongoPopup.content,
-      type: mongoPopup.type,
-      priority: mongoPopup.priority,
-      isActive: mongoPopup.isActive,
-      targetUserType: mongoPopup.targetUserType,
-      displayConditions: mongoPopup.displayConditions,
-      actionButton: mongoPopup.actionButton,
-      startDate: mongoPopup.startDate,
-      endDate: mongoPopup.endDate,
-      createdAt: mongoPopup.createdAt,
-      updatedAt: mongoPopup.updatedAt
-    };
-  }
-
-  private convertAppSetting(mongoSetting: any): any {
-    return {
-      id: mongoSetting._id.toString(),
-      key: mongoSetting.key,
-      value: mongoSetting.value,
-      description: mongoSetting.description,
-      category: mongoSetting.category,
-      isPublic: mongoSetting.isPublic,
-      updatedBy: mongoSetting.updatedBy,
-      createdAt: mongoSetting.createdAt,
-      updatedAt: mongoSetting.updatedAt
-    };
-  }
-
-  private convertAuditLog(mongoLog: any): any {
-    return {
-      id: mongoLog._id.toString(),
-      adminId: mongoLog.adminId,
-      action: mongoLog.action,
-      resource: mongoLog.resource,
-      resourceId: mongoLog.resourceId,
-      oldValues: mongoLog.oldValues,
-      newValues: mongoLog.newValues,
-      ipAddress: mongoLog.ipAddress,
-      userAgent: mongoLog.userAgent,
-      createdAt: mongoLog.createdAt
-    };
-  }
-
-  private convertFeedbackMessage(mongoMessage: any): any {
-    return {
-      id: mongoMessage._id.toString(),
-      userId: mongoMessage.userId,
-      name: mongoMessage.name,
-      email: mongoMessage.email,
-      subject: mongoMessage.subject,
-      message: mongoMessage.message,
-      type: mongoMessage.type,
-      status: mongoMessage.status,
-      adminResponse: mongoMessage.adminResponse,
-      respondedBy: mongoMessage.respondedBy,
-      respondedAt: mongoMessage.respondedAt,
-      createdAt: mongoMessage.createdAt,
-      updatedAt: mongoMessage.updatedAt
     };
   }
 
@@ -3301,19 +2758,14 @@ export class MongoStorage implements IStorage {
       emailVerificationExpiry: data.emailVerificationExpiry,
       isOnboarded: false,
       credits: 10, // Initial credits for new users
-      referralCode: this.generateReferralCode(),
+      referralCode: generateReferralCode(),
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
     const user = new UserModel(userData);
     const savedUser = await user.save();
-    return this.convertUser(savedUser);
-  }
-
-  // Generate unique referral code
-  private generateReferralCode(): string {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    return convertUser(savedUser);
   }
 
   // Email verification helper methods
@@ -3334,7 +2786,7 @@ export class MongoStorage implements IStorage {
       throw new Error('User not found');
     }
 
-    return this.convertUser(user);
+    return convertUser(user);
   }
 
   // YouTube workspace data update method
@@ -3389,7 +2841,7 @@ export class MongoStorage implements IStorage {
       throw new Error('User not found');
     }
 
-    return this.convertUser(user);
+    return convertUser(user);
   }
 
   // THUMBNAIL GENERATION SYSTEM METHODS
@@ -3600,19 +3052,19 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const newBrief = new CreativeBriefModel(brief);
     const saved = await newBrief.save();
-    return this.convertCreativeBrief(saved);
+    return convertCreativeBrief(saved);
   }
 
   async getCreativeBrief(id: number): Promise<CreativeBrief | undefined> {
     await this.connect();
     const brief = await CreativeBriefModel.findById(id.toString());
-    return brief ? this.convertCreativeBrief(brief) : undefined;
+    return brief ? convertCreativeBrief(brief) : undefined;
   }
 
   async getCreativeBriefsByWorkspace(workspaceId: number): Promise<CreativeBrief[]> {
     await this.connect();
     const briefs = await CreativeBriefModel.find({ workspaceId: workspaceId.toString() }).sort({ createdAt: -1 });
-    return briefs.map(brief => this.convertCreativeBrief(brief));
+    return briefs.map(brief => convertCreativeBrief(brief));
   }
 
   async updateCreativeBrief(id: number, updates: Partial<CreativeBrief>): Promise<CreativeBrief> {
@@ -3623,7 +3075,7 @@ export class MongoStorage implements IStorage {
       { new: true }
     );
     if (!updated) throw new Error('Creative brief not found');
-    return this.convertCreativeBrief(updated);
+    return convertCreativeBrief(updated);
   }
 
   async deleteCreativeBrief(id: number): Promise<void> {
@@ -3636,19 +3088,19 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const newRepurpose = new ContentRepurposeModel(repurpose);
     const saved = await newRepurpose.save();
-    return this.convertContentRepurpose(saved);
+    return convertContentRepurpose(saved);
   }
 
   async getContentRepurpose(id: number): Promise<ContentRepurpose | undefined> {
     await this.connect();
     const repurpose = await ContentRepurposeModel.findById(id.toString());
-    return repurpose ? this.convertContentRepurpose(repurpose) : undefined;
+    return repurpose ? convertContentRepurpose(repurpose) : undefined;
   }
 
   async getContentRepurposesByWorkspace(workspaceId: number): Promise<ContentRepurpose[]> {
     await this.connect();
     const repurposes = await ContentRepurposeModel.find({ workspaceId: workspaceId.toString() }).sort({ createdAt: -1 });
-    return repurposes.map(repurpose => this.convertContentRepurpose(repurpose));
+    return repurposes.map(repurpose => convertContentRepurpose(repurpose));
   }
 
   async updateContentRepurpose(id: number, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose> {
@@ -3659,7 +3111,7 @@ export class MongoStorage implements IStorage {
       { new: true }
     );
     if (!updated) throw new Error('Content repurpose not found');
-    return this.convertContentRepurpose(updated);
+    return convertContentRepurpose(updated);
   }
 
   async deleteContentRepurpose(id: number): Promise<void> {
@@ -3672,19 +3124,19 @@ export class MongoStorage implements IStorage {
     await this.connect();
     const newAnalysis = new CompetitorAnalysisModel(analysis);
     const saved = await newAnalysis.save();
-    return this.convertCompetitorAnalysis(saved);
+    return convertCompetitorAnalysis(saved);
   }
 
   async getCompetitorAnalysis(id: number): Promise<CompetitorAnalysis | undefined> {
     await this.connect();
     const analysis = await CompetitorAnalysisModel.findById(id.toString());
-    return analysis ? this.convertCompetitorAnalysis(analysis) : undefined;
+    return analysis ? convertCompetitorAnalysis(analysis) : undefined;
   }
 
   async getCompetitorAnalysesByWorkspace(workspaceId: number): Promise<CompetitorAnalysis[]> {
     await this.connect();
     const analyses = await CompetitorAnalysisModel.find({ workspaceId: workspaceId.toString() }).sort({ createdAt: -1 });
-    return analyses.map(analysis => this.convertCompetitorAnalysis(analysis));
+    return analyses.map(analysis => convertCompetitorAnalysis(analysis));
   }
 
   async updateCompetitorAnalysis(id: number, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis> {
@@ -3695,86 +3147,12 @@ export class MongoStorage implements IStorage {
       { new: true }
     );
     if (!updated) throw new Error('Competitor analysis not found');
-    return this.convertCompetitorAnalysis(updated);
+    return convertCompetitorAnalysis(updated);
   }
 
   async deleteCompetitorAnalysis(id: number): Promise<void> {
     await this.connect();
     await CompetitorAnalysisModel.findByIdAndDelete(id.toString());
-  }
-
-  // Conversion helpers for AI features
-  private convertCreativeBrief(doc: any): CreativeBrief {
-    return {
-      id: parseInt(doc._id.toString()),
-      workspaceId: parseInt(doc.workspaceId),
-      userId: parseInt(doc.userId),
-      title: doc.title,
-      targetAudience: doc.targetAudience,
-      platforms: doc.platforms,
-      campaignGoals: doc.campaignGoals,
-      tone: doc.tone,
-      style: doc.style,
-      industry: doc.industry,
-      deadline: doc.deadline,
-      budget: doc.budget,
-      briefContent: doc.briefContent,
-      keyMessages: doc.keyMessages,
-      contentFormats: doc.contentFormats,
-      hashtags: doc.hashtags,
-      references: doc.references,
-      status: doc.status,
-      creditsUsed: doc.creditsUsed,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
-    };
-  }
-
-  private convertContentRepurpose(doc: any): ContentRepurpose {
-    return {
-      id: parseInt(doc._id.toString()),
-      workspaceId: parseInt(doc.workspaceId),
-      userId: parseInt(doc.userId),
-      originalContentId: doc.originalContentId ? parseInt(doc.originalContentId) : null,
-      sourceLanguage: doc.sourceLanguage,
-      targetLanguage: doc.targetLanguage,
-      sourceContent: doc.sourceContent,
-      repurposedContent: doc.repurposedContent,
-      contentType: doc.contentType,
-      culturalAdaptations: doc.culturalAdaptations,
-      toneAdjustments: doc.toneAdjustments,
-      platform: doc.platform,
-      qualityScore: doc.qualityScore,
-      isApproved: doc.isApproved,
-      creditsUsed: doc.creditsUsed,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
-    };
-  }
-
-  private convertCompetitorAnalysis(doc: any): CompetitorAnalysis {
-    return {
-      id: parseInt(doc._id.toString()),
-      workspaceId: parseInt(doc.workspaceId),
-      userId: parseInt(doc.userId),
-      competitorUsername: doc.competitorUsername,
-      platform: doc.platform,
-      analysisType: doc.analysisType,
-      scrapedData: doc.scrapedData,
-      analysisResults: doc.analysisResults,
-      topPerformingPosts: doc.topPerformingPosts,
-      contentPatterns: doc.contentPatterns,
-      hashtags: doc.hashtags,
-      postingSchedule: doc.postingSchedule,
-      engagementRate: doc.engagementRate,
-      growthRate: doc.growthRate,
-      recommendations: doc.recommendations,
-      competitorScore: doc.competitorScore,
-      lastScraped: doc.lastScraped,
-      creditsUsed: doc.creditsUsed,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
-    };
   }
 
   // Feature usage tracking methods
@@ -3823,7 +3201,7 @@ export class MongoStorage implements IStorage {
     await this.connect();
     
     // Generate unique referral code
-    const referralCode = this.generateReferralCode();
+    const referralCode = generateReferralCode();
     
     // Check if referred by someone
     let referredByUserId = null;
@@ -3850,7 +3228,7 @@ export class MongoStorage implements IStorage {
     });
     
     const savedUser = await waitlistUser.save();
-    return this.convertWaitlistUser(savedUser);
+    return convertWaitlistUser(savedUser);
   }
 
   async getWaitlistUser(id: number | string): Promise<WaitlistUser | undefined> {
@@ -3864,19 +3242,19 @@ export class MongoStorage implements IStorage {
     }
     
     const user = await WaitlistUserModel.findOne(query);
-    return user ? this.convertWaitlistUser(user) : undefined;
+    return user ? convertWaitlistUser(user) : undefined;
   }
 
   async getWaitlistUserByEmail(email: string): Promise<WaitlistUser | undefined> {
     await this.connect();
     const user = await WaitlistUserModel.findOne({ email });
-    return user ? this.convertWaitlistUser(user) : undefined;
+    return user ? convertWaitlistUser(user) : undefined;
   }
 
   async getWaitlistUserByReferralCode(referralCode: string): Promise<WaitlistUser | undefined> {
     await this.connect();
     const user = await WaitlistUserModel.findOne({ referralCode });
-    return user ? this.convertWaitlistUser(user) : undefined;
+    return user ? convertWaitlistUser(user) : undefined;
   }
 
   async updateWaitlistUser(id: number | string, updates: Partial<WaitlistUser>): Promise<WaitlistUser> {
@@ -3898,13 +3276,13 @@ export class MongoStorage implements IStorage {
     }
     
     if (!user) throw new Error('Waitlist user not found');
-    return this.convertWaitlistUser(user);
+    return convertWaitlistUser(user);
   }
 
   async getAllWaitlistUsers(): Promise<WaitlistUser[]> {
     await this.connect();
     const users = await WaitlistUserModel.find({}).sort({ createdAt: -1 });
-    return users.map(user => this.convertWaitlistUser(user));
+    return users.map(user => convertWaitlistUser(user));
   }
 
   async getWaitlistStats(): Promise<{ 
@@ -4018,27 +3396,6 @@ export class MongoStorage implements IStorage {
       workspace,
       discountCode,
       trialDays
-    };
-  }
-
-  private convertWaitlistUser(mongoUser: any): WaitlistUser {
-    return {
-      id: mongoUser._id.toString(),
-      name: mongoUser.name,
-      email: mongoUser.email,
-      referralCode: mongoUser.referralCode,
-      referredBy: mongoUser.referredBy,
-      referralCount: mongoUser.referralCount || 0,
-      credits: mongoUser.credits || 0,
-      status: mongoUser.status || 'waitlisted',
-      discountCode: mongoUser.discountCode,
-      discountExpiresAt: mongoUser.discountExpiresAt,
-      dailyLogins: mongoUser.dailyLogins || 0,
-      feedbackSubmitted: mongoUser.feedbackSubmitted || false,
-      joinedAt: mongoUser.joinedAt || mongoUser.createdAt,
-      createdAt: mongoUser.createdAt,
-      updatedAt: mongoUser.updatedAt,
-      metadata: mongoUser.metadata || {}
     };
   }
 
