@@ -107,6 +107,26 @@ import { teamInvitationRepository } from './repositories/TeamInvitationRepositor
 import { suggestionRepository } from './repositories/SuggestionRepository';
 import { contentRecommendationRepository } from './repositories/ContentRecommendationRepository';
 import { userContentHistoryRepository } from './repositories/UserContentHistoryRepository';
+import {
+  adminRepository,
+  adminSessionRepository,
+  notificationRepository,
+  popupRepository,
+  appSettingRepository,
+  auditLogRepository,
+  feedbackMessageRepository,
+} from './repositories/AdminRepository';
+import {
+  creativeBriefRepository,
+  contentRepurposeRepository,
+  competitorAnalysisRepository,
+  featureUsageRepository,
+} from './repositories/AIRepository';
+import {
+  chatConversationRepository,
+  chatMessageRepository,
+} from './repositories/ChatRepository';
+import { waitlistUserRepository } from './repositories/WaitlistUserRepository';
 
 export class MongoStorage implements IStorage {
   private isConnected = false;
@@ -1000,7 +1020,6 @@ export class MongoStorage implements IStorage {
       const transactions = await creditTransactionRepository.getRecentTransactions(userId.toString(), limit);
       return transactions.map(transaction => convertCreditTransaction(transaction));
     } catch (error) {
-      console.log('[MONGODB DEBUG] getCreditTransactions error:', error);
       return [];
     }
   }
@@ -1080,21 +1099,11 @@ export class MongoStorage implements IStorage {
   async getUserAddons(userId: number | string): Promise<Addon[]> {
     await this.connect();
     
-    console.log(`[MONGODB DEBUG] getUserAddons - searching for userId: ${userId} (${typeof userId})`);
-    
     const result = await addonRepository.findByUserId(userId.toString());
     const addons = result.data;
     
-    console.log(`[MONGODB DEBUG] Found ${addons.length} addons for user ${userId}`);
-    if (addons.length > 0) {
-      addons.forEach((addon, index) => {
-        console.log(`[MONGODB DEBUG] Addon ${index + 1}: ${addon.type} - ${addon.name}, userId: ${addon.userId}, active: ${addon.isActive}`);
-      });
-    }
-    
     // Filter for active addons after retrieval
     const activeAddons = addons.filter(addon => addon.isActive !== false);
-    console.log(`[MONGODB DEBUG] After filtering active: ${activeAddons.length} addons`);
     
     return activeAddons.map(addon => convertAddon(addon));
   }
@@ -1103,29 +1112,13 @@ export class MongoStorage implements IStorage {
     await this.connect();
     
     const userIdStr = userId.toString();
-    console.log('[MONGODB DEBUG] getActiveAddonsByUser - searching for userId:', userIdStr);
-    
     const addons = await addonRepository.findActiveByUserId(userIdStr);
-    
-    console.log('[MONGODB DEBUG] Found addons for user:', addons.length);
-    if (addons.length > 0) {
-      addons.forEach((addon, index) => {
-        console.log(`[MONGODB DEBUG] Addon ${index + 1}:`, {
-          id: addon._id?.toString(),
-          type: addon.type,
-          name: addon.name,
-          isActive: addon.isActive,
-          expiresAt: addon.expiresAt
-        });
-      });
-    }
     
     return addons.map(addon => convertAddon(addon));
   }
 
   async createAddon(insertAddon: InsertAddon): Promise<Addon> {
     await this.connect();
-    console.log('[MONGODB DEBUG] Creating addon with data:', insertAddon);
     
     const addonData = {
       ...insertAddon,
@@ -1134,16 +1127,9 @@ export class MongoStorage implements IStorage {
     };
     
     const addon = new AddonModel(addonData);
-    console.log('[MONGODB DEBUG] Addon model created:', addon);
     
-    try {
-      const savedAddon = await addon.save();
-      console.log('[MONGODB DEBUG] Addon saved successfully:', savedAddon);
-      return convertAddon(savedAddon);
-    } catch (error) {
-      console.error('[MONGODB ERROR] Failed to save addon:', error);
-      throw error;
-    }
+    const savedAddon = await addon.save();
+    return convertAddon(savedAddon);
   }
 
   async getSuggestionsByWorkspace(workspaceId: string | number): Promise<Suggestion[]> {
@@ -1564,20 +1550,15 @@ export class MongoStorage implements IStorage {
 
   async updateUserSubscription(userId: number | string, planId: string): Promise<User> {
     await this.connect();
-    console.log(`[SUBSCRIPTION UPDATE] Looking for user with ID: ${userId} (type: ${typeof userId})`);
     
     let user;
     try {
       // Try by MongoDB _id first (ObjectId format)
       user = await UserModel.findById(userId);
-      console.log(`[SUBSCRIPTION UPDATE] Find by _id result:`, user ? 'Found' : 'Not found');
     } catch (objectIdError) {
-      console.log(`[SUBSCRIPTION UPDATE] ObjectId lookup failed, trying by 'id' field`);
-      
       // If ObjectId fails, try by the 'id' field
       const userIdStr = userId.toString();
       user = await UserModel.findOne({ id: userIdStr });
-      console.log(`[SUBSCRIPTION UPDATE] Find by id field result:`, user ? 'Found' : 'Not found');
     }
     
     if (!user) {
@@ -1607,26 +1588,20 @@ export class MongoStorage implements IStorage {
       throw new Error(`Failed to update user subscription for id ${userId}`);
     }
     
-    console.log(`[SUBSCRIPTION UPDATE] Successfully updated user ${userId} to plan ${planId} with ${plan.credits} credits`);
     return convertUser(updatedUser);
   }
 
   async addCreditsToUser(userId: number | string, credits: number): Promise<User> {
     await this.connect();
-    console.log(`[CREDIT ADD] Looking for user with ID: ${userId} (type: ${typeof userId})`);
     
     let user;
     try {
       // Try by MongoDB _id first (ObjectId format)
       user = await UserModel.findById(userId);
-      console.log(`[CREDIT ADD] Find by _id result:`, user ? 'Found' : 'Not found');
     } catch (objectIdError) {
-      console.log(`[CREDIT ADD] ObjectId lookup failed, trying by 'id' field`);
-      
       // If ObjectId fails, try by the 'id' field
       const userIdStr = userId.toString();
       user = await UserModel.findOne({ id: userIdStr });
-      console.log(`[CREDIT ADD] Find by id field result:`, user ? 'Found' : 'Not found');
     }
     
     if (!user) {
@@ -1635,7 +1610,6 @@ export class MongoStorage implements IStorage {
     
     const currentCredits = user.credits || 0;
     const newCredits = currentCredits + credits;
-    console.log(`[CREDIT ADD] Current credits: ${currentCredits}, adding: ${credits}, new total: ${newCredits}`);
     
     let updatedUser;
     try {
@@ -1658,7 +1632,6 @@ export class MongoStorage implements IStorage {
       throw new Error(`Failed to update credits for user ${userId}`);
     }
     
-    console.log(`[CREDIT ADD] Successfully updated user ${userId} credits to ${newCredits}`);
     return convertUser(updatedUser);
   }
 
@@ -1966,11 +1939,11 @@ export class MongoStorage implements IStorage {
     }));
   }
 
-  // Admin operations
+  // Admin operations - delegating to adminRepository
   async getAdmin(id: number): Promise<Admin | undefined> {
     await this.connect();
     try {
-      const admin = await AdminModel.findById(id);
+      const admin = await adminRepository.findById(id.toString());
       return admin ? convertAdmin(admin) : undefined;
     } catch (error) {
       return undefined;
@@ -1979,49 +1952,46 @@ export class MongoStorage implements IStorage {
 
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
     await this.connect();
-    const admin = await AdminModel.findOne({ email });
+    const admin = await adminRepository.findByEmail(email);
     return admin ? convertAdmin(admin) : undefined;
   }
 
   async getAdminByUsername(username: string): Promise<Admin | undefined> {
     await this.connect();
-    const admin = await AdminModel.findOne({ username });
+    const admin = await adminRepository.findByUsername(username);
     return admin ? convertAdmin(admin) : undefined;
   }
 
   async getAllAdmins(): Promise<Admin[]> {
     await this.connect();
-    const admins = await AdminModel.find({ isActive: true });
+    const admins = await adminRepository.findActiveAdmins();
     return admins.map(admin => convertAdmin(admin));
   }
 
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
     await this.connect();
-    const newAdmin = new AdminModel({
+    const savedAdmin = await adminRepository.create({
       email: admin.email,
       username: admin.username,
       password: admin.password,
       role: admin.role || 'admin',
-      isActive: true
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
-    const savedAdmin = await newAdmin.save();
     return convertAdmin(savedAdmin);
   }
 
   async updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin> {
     await this.connect();
-    const admin = await AdminModel.findByIdAndUpdate(
-      id,
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    const admin = await adminRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!admin) throw new Error('Admin not found');
     return convertAdmin(admin);
   }
 
   async deleteAdmin(id: number): Promise<void> {
     await this.connect();
-    await AdminModel.findByIdAndUpdate(id, { isActive: false });
+    await adminRepository.deactivateAdmin(id.toString());
   }
 
   async getAdminUsers(options: {
@@ -2097,44 +2067,45 @@ export class MongoStorage implements IStorage {
 
 
 
-  // Admin session operations
+  // Admin session operations - delegating to adminSessionRepository
   async createAdminSession(session: any): Promise<any> {
     await this.connect();
-    const newSession = new AdminSessionModel({
+    const savedSession = await adminSessionRepository.create({
       adminId: session.adminId,
       token: session.token,
       ipAddress: session.ipAddress,
       userAgent: session.userAgent,
-      expiresAt: session.expiresAt
+      expiresAt: session.expiresAt,
+      createdAt: new Date()
     });
-    const savedSession = await newSession.save();
     return convertAdminSession(savedSession);
   }
 
   async getAdminSession(token: string): Promise<any | undefined> {
     await this.connect();
-    const session = await AdminSessionModel.findOne({ 
-      token, 
-      expiresAt: { $gt: new Date() } 
-    }).populate('adminId');
-    return session ? convertAdminSession(session) : undefined;
+    const session = await adminSessionRepository.findByToken(token);
+    if (!session || new Date(session.expiresAt) <= new Date()) {
+      return undefined;
+    }
+    return convertAdminSession(session);
   }
 
   async deleteAdminSession(token: string): Promise<void> {
     await this.connect();
-    await AdminSessionModel.deleteOne({ token });
+    const session = await adminSessionRepository.findByToken(token);
+    if (session) {
+      await adminSessionRepository.deleteById(session._id.toString());
+    }
   }
 
   async cleanupExpiredSessions(): Promise<void> {
     await this.connect();
-    await AdminSessionModel.deleteMany({ expiresAt: { $lt: new Date() } });
+    await adminSessionRepository.deleteExpiredSessions();
   }
 
-  // Notification operations
+  // Notification operations - delegating to notificationRepository
   async createNotification(notification: any): Promise<any> {
     await this.connect();
-    
-    console.log('[MONGODB DEBUG] Creating notification:', notification);
     
     const notificationData = {
       userId: notification.userId || null,
@@ -2145,193 +2116,134 @@ export class MongoStorage implements IStorage {
       scheduledFor: notification.scheduledFor || null,
       sentAt: notification.scheduledFor ? null : new Date(),
       isRead: false,
-      createdAt: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     
-    const newNotification = new NotificationModel(notificationData);
-    const savedNotification = await newNotification.save();
-    
-    console.log('[MONGODB DEBUG] Notification created with ID:', savedNotification._id);
-    
-    return {
-      id: savedNotification._id.toString(),
-      userId: savedNotification.userId,
-      title: savedNotification.title,
-      message: savedNotification.message,
-      type: savedNotification.type,
-      targetUsers: savedNotification.targetUsers,
-      scheduledFor: savedNotification.scheduledFor,
-      sentAt: savedNotification.sentAt,
-      isRead: savedNotification.isRead,
-      createdAt: savedNotification.createdAt
-    };
+    const savedNotification = await notificationRepository.create(notificationData);
+    return convertNotification(savedNotification);
   }
 
   async getUserNotifications(userId: string): Promise<any[]> {
     await this.connect();
     
-    console.log('[NOTIFICATIONS] Fetching notifications for user:', userId);
-    
-    // Find notifications targeted to this user or to all users
-    // Note: We exclude userId field check since admin notifications use targetUsers field
-    const notifications = await NotificationModel.find({
-      targetUsers: 'all'
-    }).sort({ createdAt: -1 }).limit(50);
-    
-    console.log('[NOTIFICATIONS] Found notifications:', notifications.length);
-    
-    return notifications.map(notification => ({
-      id: notification._id.toString(),
-      userId: notification.userId,
-      title: notification.title,
-      message: notification.message,
-      type: notification.type,
-      targetUsers: notification.targetUsers,
-      scheduledFor: notification.scheduledFor,
-      sentAt: notification.sentAt,
-      isRead: notification.isRead,
-      createdAt: notification.createdAt
-    }));
+    const notifications = await notificationRepository.findActiveNotifications({ limit: 50 });
+    return notifications.map(notification => convertNotification(notification));
   }
 
   async markNotificationAsRead(notificationId: string, userId: string): Promise<void> {
     await this.connect();
-    
-    console.log('[NOTIFICATIONS] Marking notification as read:', notificationId, 'for user:', userId);
-    
-    await NotificationModel.updateOne(
-      { 
-        _id: notificationId,
-        $or: [
-          { targetUsers: 'all' },
-          { targetUsers: { $in: [userId] } }
-        ]
-      },
-      { $set: { isRead: true } }
-    );
+    await notificationRepository.markAsRead(notificationId);
   }
 
   async getNotifications(userId?: number): Promise<any[]> {
     await this.connect();
-    const query = userId ? { userId } : {};
-    const notifications = await NotificationModel.find(query).sort({ createdAt: -1 });
+    const notifications = userId 
+      ? await notificationRepository.findByUserId(userId)
+      : await notificationRepository.findAll({});
     return notifications.map(notif => convertNotification(notif));
   }
 
   async updateNotification(id: number, updates: Partial<any>): Promise<any> {
     await this.connect();
-    const notification = await NotificationModel.findByIdAndUpdate(
-      id,
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    const notification = await notificationRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!notification) throw new Error('Notification not found');
     return convertNotification(notification);
   }
 
   async deleteNotification(id: number): Promise<void> {
     await this.connect();
-    await NotificationModel.findByIdAndDelete(id);
+    await notificationRepository.deleteById(id.toString());
   }
 
   async markNotificationRead(id: number): Promise<void> {
     await this.connect();
-    await NotificationModel.findByIdAndUpdate(id, { isRead: true });
+    await notificationRepository.markAsRead(id.toString());
   }
 
-  // Popup operations
+  // Popup operations - delegating to popupRepository
   async createPopup(popup: any): Promise<any> {
     await this.connect();
-    const newPopup = new PopupModel(popup);
-    const savedPopup = await newPopup.save();
+    const savedPopup = await popupRepository.create({
+      ...popup,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
     return convertPopup(savedPopup);
   }
 
   async getActivePopups(): Promise<any[]> {
     await this.connect();
-    const popups = await PopupModel.find({ 
-      isActive: true,
-      $or: [
-        { startDate: { $exists: false } },
-        { startDate: { $lte: new Date() } }
-      ],
-      $or: [
-        { endDate: { $exists: false } },
-        { endDate: { $gte: new Date() } }
-      ]
-    });
+    const popups = await popupRepository.findActivePopups();
     return popups.map(popup => convertPopup(popup));
   }
 
   async getPopup(id: number): Promise<any | undefined> {
     await this.connect();
-    const popup = await PopupModel.findById(id);
+    const popup = await popupRepository.findById(id.toString());
     return popup ? convertPopup(popup) : undefined;
   }
 
   async updatePopup(id: number, updates: Partial<any>): Promise<any> {
     await this.connect();
-    const popup = await PopupModel.findByIdAndUpdate(
-      id,
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    const popup = await popupRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!popup) throw new Error('Popup not found');
     return convertPopup(popup);
   }
 
   async deletePopup(id: number): Promise<void> {
     await this.connect();
-    await PopupModel.findByIdAndDelete(id);
+    await popupRepository.deleteById(id.toString());
   }
 
-  // App settings operations
+  // App settings operations - delegating to appSettingRepository
   async createAppSetting(setting: any): Promise<any> {
     await this.connect();
-    const newSetting = new AppSettingModel(setting);
-    const savedSetting = await newSetting.save();
+    const savedSetting = await appSettingRepository.create({
+      ...setting,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
     return convertAppSetting(savedSetting);
   }
 
   async getAppSetting(key: string): Promise<any | undefined> {
     await this.connect();
-    const setting = await AppSettingModel.findOne({ key });
+    const setting = await appSettingRepository.findByKey(key);
     return setting ? convertAppSetting(setting) : undefined;
   }
 
   async getAllAppSettings(): Promise<any[]> {
     await this.connect();
-    const settings = await AppSettingModel.find({});
+    const settings = await appSettingRepository.findAll({});
     return settings.map(setting => convertAppSetting(setting));
   }
 
   async getPublicAppSettings(): Promise<any[]> {
     await this.connect();
-    const settings = await AppSettingModel.find({ isPublic: true });
+    const settings = await appSettingRepository.findPublicSettings();
     return settings.map(setting => convertAppSetting(setting));
   }
 
   async updateAppSetting(key: string, value: string, updatedBy?: number): Promise<any> {
     await this.connect();
-    const setting = await AppSettingModel.findOneAndUpdate(
-      { key },
-      { value, updatedBy, updatedAt: new Date() },
-      { new: true, upsert: true }
-    );
+    const setting = await appSettingRepository.upsertSetting(key, value, { updatedBy });
     return convertAppSetting(setting);
   }
 
   async deleteAppSetting(key: string): Promise<void> {
     await this.connect();
-    await AppSettingModel.deleteOne({ key });
+    const setting = await appSettingRepository.findByKey(key);
+    if (setting) {
+      await appSettingRepository.deleteById(setting._id.toString());
+    }
   }
 
-  // Audit log operations
+  // Audit log operations - delegating to auditLogRepository
   async createAuditLog(log: any): Promise<any> {
     await this.connect();
     
-    // Backward compatibility: derive actorType and actorId from adminId if not provided
-    const enrichedLog = { ...log };
+    const enrichedLog = { ...log, createdAt: new Date() };
     if (!enrichedLog.actorType) {
       enrichedLog.actorType = enrichedLog.adminId ? 'admin' : 'system';
     }
@@ -2339,49 +2251,47 @@ export class MongoStorage implements IStorage {
       enrichedLog.actorId = enrichedLog.adminId ? String(enrichedLog.adminId) : 'system';
     }
     
-    const newLog = new AuditLogModel(enrichedLog);
-    const savedLog = await newLog.save();
+    const savedLog = await auditLogRepository.create(enrichedLog);
     return convertAuditLog(savedLog);
   }
 
   async getAuditLogs(limit?: number, adminId?: number): Promise<any[]> {
     await this.connect();
-    const query = adminId ? { adminId } : {};
-    const logs = await AuditLogModel.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit || 100);
+    const logs = adminId 
+      ? await auditLogRepository.findByActorId(String(adminId), { limit: limit || 100 })
+      : await auditLogRepository.getRecentAuditLogs(limit || 100);
     return logs.map(log => convertAuditLog(log));
   }
 
-  // Feedback operations
+  // Feedback operations - delegating to feedbackMessageRepository
   async createFeedbackMessage(feedback: any): Promise<any> {
     await this.connect();
-    const newFeedback = new FeedbackMessageModel(feedback);
-    const savedFeedback = await newFeedback.save();
+    const savedFeedback = await feedbackMessageRepository.create({
+      ...feedback,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
     return convertFeedbackMessage(savedFeedback);
   }
 
   async getFeedbackMessages(status?: string): Promise<any[]> {
     await this.connect();
-    const query = status ? { status } : {};
-    const messages = await FeedbackMessageModel.find(query).sort({ createdAt: -1 });
+    const messages = status 
+      ? await feedbackMessageRepository.findByStatus(status)
+      : await feedbackMessageRepository.findAll({});
     return messages.map(msg => convertFeedbackMessage(msg));
   }
 
   async updateFeedbackMessage(id: number, updates: Partial<any>): Promise<any> {
     await this.connect();
-    const message = await FeedbackMessageModel.findByIdAndUpdate(
-      id,
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    const message = await feedbackMessageRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!message) throw new Error('Feedback message not found');
     return convertFeedbackMessage(message);
   }
 
   async deleteFeedbackMessage(id: number): Promise<void> {
     await this.connect();
-    await FeedbackMessageModel.findByIdAndDelete(id);
+    await feedbackMessageRepository.deleteById(id.toString());
   }
 
   // Missing automation log methods
@@ -2528,8 +2438,6 @@ export class MongoStorage implements IStorage {
   async updateYouTubeWorkspaceData(updates: any): Promise<any> {
     await this.connect();
     
-    console.log('[YOUTUBE UPDATE] Updating YouTube accounts with data:', updates);
-    
     const result = await SocialAccountModel.updateMany(
       { platform: 'youtube' },
       {
@@ -2543,11 +2451,6 @@ export class MongoStorage implements IStorage {
         }
       }
     );
-
-    console.log('[YOUTUBE UPDATE] Update result:', {
-      matched: result.matchedCount,
-      modified: result.modifiedCount
-    });
 
     return result;
   }
@@ -2931,30 +2834,22 @@ export class MongoStorage implements IStorage {
     }
   }
 
-  // Waitlist Management Methods
+  // Waitlist Management Methods - delegating to waitlistUserRepository
   async createWaitlistUser(insertWaitlistUser: InsertWaitlistUser): Promise<WaitlistUser> {
     await this.connect();
     
-    // Generate unique referral code
     const referralCode = generateReferralCode();
     
-    // Check if referred by someone
     let referredByUserId = null;
     if (insertWaitlistUser.referredBy) {
-      const referrer = await WaitlistUserModel.findOne({ 
-        referralCode: insertWaitlistUser.referredBy 
-      });
+      const referrer = await waitlistUserRepository.findByReferralCode(insertWaitlistUser.referredBy);
       if (referrer) {
         referredByUserId = referrer._id;
-        // Increment referrer's count
-        await WaitlistUserModel.findByIdAndUpdate(
-          referrer._id,
-          { $inc: { referralCount: 1 } }
-        );
+        await waitlistUserRepository.incrementReferralCount(referrer._id.toString());
       }
     }
     
-    const waitlistUser = new WaitlistUserModel({
+    const savedUser = await waitlistUserRepository.create({
       ...insertWaitlistUser,
       referralCode,
       referredBy: referredByUserId,
@@ -2962,61 +2857,37 @@ export class MongoStorage implements IStorage {
       updatedAt: new Date()
     });
     
-    const savedUser = await waitlistUser.save();
     return convertWaitlistUser(savedUser);
   }
 
   async getWaitlistUser(id: number | string): Promise<WaitlistUser | undefined> {
     await this.connect();
-    
-    let query;
-    if (typeof id === 'string' && id.length === 24) {
-      query = { _id: id };
-    } else {
-      query = { $or: [{ id: id }, { _id: id.toString() }] };
-    }
-    
-    const user = await WaitlistUserModel.findOne(query);
+    const user = await waitlistUserRepository.findById(id.toString());
     return user ? convertWaitlistUser(user) : undefined;
   }
 
   async getWaitlistUserByEmail(email: string): Promise<WaitlistUser | undefined> {
     await this.connect();
-    const user = await WaitlistUserModel.findOne({ email });
+    const user = await waitlistUserRepository.findByEmail(email);
     return user ? convertWaitlistUser(user) : undefined;
   }
 
   async getWaitlistUserByReferralCode(referralCode: string): Promise<WaitlistUser | undefined> {
     await this.connect();
-    const user = await WaitlistUserModel.findOne({ referralCode });
+    const user = await waitlistUserRepository.findByReferralCode(referralCode);
     return user ? convertWaitlistUser(user) : undefined;
   }
 
   async updateWaitlistUser(id: number | string, updates: Partial<WaitlistUser>): Promise<WaitlistUser> {
     await this.connect();
-    
-    let user;
-    if (typeof id === 'string' && id.length === 24) {
-      user = await WaitlistUserModel.findByIdAndUpdate(
-        id,
-        { ...updates, updatedAt: new Date() },
-        { new: true }
-      );
-    } else {
-      user = await WaitlistUserModel.findOneAndUpdate(
-        { _id: id },
-        { ...updates, updatedAt: new Date() },
-        { new: true }
-      );
-    }
-    
+    const user = await waitlistUserRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!user) throw new Error('Waitlist user not found');
     return convertWaitlistUser(user);
   }
 
   async getAllWaitlistUsers(): Promise<WaitlistUser[]> {
     await this.connect();
-    const users = await WaitlistUserModel.find({}).sort({ createdAt: -1 });
+    const users = await waitlistUserRepository.findAll({});
     return users.map(user => convertWaitlistUser(user));
   }
 
@@ -3077,61 +2948,86 @@ export class MongoStorage implements IStorage {
   }> {
     await this.connect();
     
-    const waitlistUser = await this.getWaitlistUser(id);
-    if (!waitlistUser) {
-      throw new Error('Waitlist user not found');
-    }
+    const session = await mongoose.startSession();
+    session.startTransaction();
     
-    // Generate discount code (50% off first month)
-    const discountCode = `EARLY50_${Date.now().toString(36).toUpperCase()}`;
-    const discountExpiry = new Date();
-    discountExpiry.setDate(discountExpiry.getDate() + 30); // 30 days to use discount
-    
-    // Calculate trial period (14 days + 1 day per referral, max 30 days)
-    const trialDays = Math.min(14 + waitlistUser.referralCount, 30);
-    const trialExpiry = new Date();
-    trialExpiry.setDate(trialExpiry.getDate() + trialDays);
-    
-    // Create regular user account
-    const user = await this.createUser({
-      email: waitlistUser.email,
-      username: waitlistUser.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now(),
-      displayName: waitlistUser.name,
-      credits: 100 + (waitlistUser.referralCount * 20), // 100 base + 20 per referral
-      plan: 'Free',
-      referredBy: waitlistUser.referredBy,
-      isEmailVerified: true,
-      status: 'early_access',
-      trialExpiresAt: trialExpiry,
-      discountCode,
-      discountExpiresAt: discountExpiry,
-      hasUsedWaitlistBonus: false
-    });
-    
-    // Get or create default workspace
-    let workspace = await this.getDefaultWorkspace(user.id);
-    if (!workspace) {
-      workspace = await this.createWorkspace({
-        name: `${waitlistUser.name}'s Workspace`,
+    try {
+      // Get waitlist user (read operation, session not strictly needed)
+      const waitlistUserDoc = await WaitlistUserModel.findById(id.toString());
+      if (!waitlistUserDoc) {
+        throw new Error('Waitlist user not found');
+      }
+      const waitlistUser = convertWaitlistUser(waitlistUserDoc);
+      
+      // Generate discount code (50% off first month)
+      const discountCode = `EARLY50_${Date.now().toString(36).toUpperCase()}`;
+      const discountExpiry = new Date();
+      discountExpiry.setDate(discountExpiry.getDate() + 30); // 30 days to use discount
+      
+      // Calculate trial period (14 days + 1 day per referral, max 30 days)
+      const trialDays = Math.min(14 + waitlistUser.referralCount, 30);
+      const trialExpiry = new Date();
+      trialExpiry.setDate(trialExpiry.getDate() + trialDays);
+      
+      // Create regular user account with session
+      const referralCode = generateReferralCode();
+      const newUserDoc = new UserModel({
+        email: waitlistUser.email,
+        username: waitlistUser.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now(),
+        displayName: waitlistUser.name,
+        credits: 100 + (waitlistUser.referralCount * 20), // 100 base + 20 per referral
+        plan: 'Free',
+        referredBy: waitlistUser.referredBy,
+        isEmailVerified: true,
+        status: 'early_access',
+        trialExpiresAt: trialExpiry,
+        discountCode,
+        discountExpiresAt: discountExpiry,
+        hasUsedWaitlistBonus: false,
+        referralCode,
+        isOnboarded: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      const savedUser = await newUserDoc.save({ session });
+      const user = convertUser(savedUser);
+      
+      // Create default workspace with session
+      const workspaceName = `${waitlistUser.name}'s Workspace`;
+      const newWorkspaceDoc = new WorkspaceModel({
+        name: workspaceName,
         description: 'Early access workspace',
         userId: user.id,
         theme: 'space',
         isDefault: true,
-        credits: 50 // Additional workspace credits
+        credits: 50, // Additional workspace credits
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
+      const savedWorkspace = await newWorkspaceDoc.save({ session });
+      const workspace = convertWorkspace(savedWorkspace);
+      
+      // Update waitlist user status with session
+      await WaitlistUserModel.updateOne(
+        { _id: id.toString() },
+        { status: 'early_access', updatedAt: new Date() },
+        { session }
+      );
+      
+      await session.commitTransaction();
+      session.endSession();
+      
+      return {
+        user,
+        workspace,
+        discountCode,
+        trialDays
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
     }
-    
-    // Update waitlist user status
-    await this.updateWaitlistUser(id, {
-      status: 'early_access'
-    });
-    
-    return {
-      user,
-      workspace,
-      discountCode,
-      trialDays
-    };
   }
 
   // Database reset methods for fresh starts
@@ -3143,15 +3039,13 @@ export class MongoStorage implements IStorage {
 
   async clearAllWaitlistUsers(): Promise<number> {
     await this.connect();
-    const result = await WaitlistUserModel.deleteMany({});
-    return result.deletedCount || 0;
+    return await waitlistUserRepository.deleteMany({});
   }
 
   async deleteWaitlistUser(id: number | string): Promise<void> {
     await this.connect();
-    const objectId = typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id;
-    const result = await WaitlistUserModel.findByIdAndDelete(objectId);
-    if (!result) {
+    const deleted = await waitlistUserRepository.deleteById(id.toString());
+    if (!deleted) {
       throw new Error('Waitlist user not found');
     }
   }
@@ -3174,17 +3068,24 @@ export class MongoStorage implements IStorage {
     return result.deletedCount || 0;
   }
 
-  // VeeGPT Chat Methods
+  // VeeGPT Chat Methods - delegating to chatConversationRepository and chatMessageRepository
   async getChatConversations(userId: string, workspaceId?: string): Promise<ChatConversation[]> {
     await this.connect();
-    const query: any = { userId };
-    if (workspaceId) {
-      query.workspaceId = workspaceId;
+    
+    // Validate ObjectId format for userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return [];
     }
-    const conversations = await ChatConversationModel.find(query)
-      .sort({ updatedAt: -1 });
+    // Validate ObjectId format for workspaceId if provided
+    if (workspaceId && !mongoose.Types.ObjectId.isValid(workspaceId)) {
+      return [];
+    }
+    
+    const conversations = workspaceId
+      ? await chatConversationRepository.findByUserAndWorkspace(userId, workspaceId)
+      : await chatConversationRepository.findByUserId(userId);
     return conversations.map(doc => ({
-      id: doc.id, // Use the stored numeric ID
+      id: doc.id,
       userId: doc.userId,
       workspaceId: doc.workspaceId,
       title: doc.title,
@@ -3198,16 +3099,23 @@ export class MongoStorage implements IStorage {
   async createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation> {
     await this.connect();
     
-    // Generate a unique numeric ID based on timestamp and random component
+    // Validate ObjectId format for userId
+    if (!mongoose.Types.ObjectId.isValid(conversation.userId)) {
+      throw new Error('Invalid userId format');
+    }
+    // Validate ObjectId format for workspaceId if provided
+    if (conversation.workspaceId && !mongoose.Types.ObjectId.isValid(conversation.workspaceId)) {
+      throw new Error('Invalid workspaceId format');
+    }
+    
     const numericId = Date.now() % 1000000000 + Math.floor(Math.random() * 1000);
     
-    const doc = new ChatConversationModel({
+    const saved = await chatConversationRepository.create({
       ...conversation,
       id: numericId,
       createdAt: new Date(),
       updatedAt: new Date()
     });
-    const saved = await doc.save();
     return {
       id: saved.id,
       userId: saved.userId,
@@ -3222,10 +3130,9 @@ export class MongoStorage implements IStorage {
 
   async getChatMessages(conversationId: number): Promise<ChatMessage[]> {
     await this.connect();
-    const messages = await ChatMessageModel.find({ conversationId })
-      .sort({ createdAt: 1 });
+    const messages = await chatMessageRepository.findByConversationId(conversationId);
     return messages.map(doc => ({
-      id: doc.id, // Use the stored numeric ID
+      id: doc.id,
       conversationId: doc.conversationId,
       role: doc.role,
       content: doc.content,
@@ -3237,15 +3144,13 @@ export class MongoStorage implements IStorage {
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     await this.connect();
     
-    // Generate a unique numeric ID
     const numericId = Date.now() % 1000000000 + Math.floor(Math.random() * 1000);
     
-    const doc = new ChatMessageModel({
+    const saved = await chatMessageRepository.create({
       ...message,
       id: numericId,
       createdAt: new Date()
     });
-    const saved = await doc.save();
     return {
       id: saved.id,
       conversationId: saved.conversationId,
@@ -3258,11 +3163,7 @@ export class MongoStorage implements IStorage {
 
   async updateChatMessage(id: number, updates: Partial<ChatMessage>): Promise<ChatMessage> {
     await this.connect();
-    const updated = await ChatMessageModel.findOneAndUpdate(
-      { id: id },
-      { ...updates },
-      { new: true }
-    );
+    const updated = await chatMessageRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Message not found');
     return {
       id: updated.id,
@@ -3276,11 +3177,13 @@ export class MongoStorage implements IStorage {
 
   async updateChatConversation(id: string | number, updates: Partial<ChatConversation>): Promise<ChatConversation> {
     await this.connect();
-    const updated = await ChatConversationModel.findOneAndUpdate(
-      { id: id },
-      { ...updates, updatedAt: new Date() },
-      { new: true }
-    );
+    
+    // Validate ObjectId format if id is a string
+    if (typeof id === 'string' && !mongoose.Types.ObjectId.isValid(id)) {
+      throw new Error('Invalid conversation id format');
+    }
+    
+    const updated = await chatConversationRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
     if (!updated) throw new Error('Conversation not found');
     return {
       id: updated.id,
@@ -3296,10 +3199,14 @@ export class MongoStorage implements IStorage {
 
   async deleteChatConversation(id: string | number): Promise<void> {
     await this.connect();
-    // Delete all messages in the conversation first
-    await ChatMessageModel.deleteMany({ conversationId: id });
-    // Delete the conversation
-    await ChatConversationModel.findOneAndDelete({ id: id });
+    
+    // Validate ObjectId format if id is a string
+    if (typeof id === 'string' && !mongoose.Types.ObjectId.isValid(id)) {
+      throw new Error('Invalid conversation id format');
+    }
+    
+    await chatMessageRepository.deleteMessagesByConversationId(Number(id));
+    await chatConversationRepository.deleteById(id.toString());
   }
 }
 
