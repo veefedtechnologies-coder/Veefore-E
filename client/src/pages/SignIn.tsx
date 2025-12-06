@@ -1,7 +1,7 @@
-import React, { useState, useEffect, memo } from 'react'
+import React, { useState, memo } from 'react'
 import AuthFailureBanner from '@/components/AuthFailureBanner'
 import { Button } from '@/components/ui/button'
-import { Eye, EyeOff, ArrowLeft, Sparkles, Brain, Play, Pause } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, Sparkles, Brain, Play } from 'lucide-react'
 import { Link, useLocation } from 'wouter'
 import { signInWithEmailAndPassword, signInWithPopup, auth, googleProvider } from '@/lib/firebase'
 import { useToast } from '@/hooks/use-toast'
@@ -11,7 +11,6 @@ interface SignInProps {
   onNavigate: (view: string) => void
 }
 
-// Memoized button components to prevent unnecessary re-renders
 const MemoizedSignInButton = memo(({ isLoading, onSubmit }: { isLoading: boolean, onSubmit: (e: React.FormEvent) => void }) => (
   <Button 
     type="submit" 
@@ -49,148 +48,45 @@ const MemoizedGoogleButton = memo(({ isLoading, onClick }: { isLoading: boolean,
   </Button>
 ))
 
+const demoScenarios = [
+  {
+    title: "AI Content Generation",
+    description: "Watch VeeGPT create engaging social media content",
+    gradient: "from-violet-600 via-purple-600 to-blue-600",
+    icon: Brain,
+    metrics: { engagement: "+284%", reach: "2.4M", conversion: "+67%" }
+  },
+  {
+    title: "Smart Automation",
+    description: "Automated scheduling and optimization in action",
+    gradient: "from-blue-600 via-cyan-600 to-emerald-600",
+    icon: Play,
+    metrics: { efficiency: "+340%", saved: "15h/week", posts: "847" }
+  },
+  {
+    title: "Analytics Intelligence",
+    description: "Real-time insights and performance tracking",
+    gradient: "from-emerald-600 via-teal-600 to-cyan-600",
+    icon: Brain,
+    metrics: { accuracy: "94.8%", insights: "156", trends: "+45%" }
+  }
+]
+
 const SignIn = ({ onNavigate }: SignInProps) => {
   const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  })
-  const [errors, setErrors] = useState({
-    email: '',
-    password: ''
-  })
+  const [formData, setFormData] = useState({ email: '', password: '' })
+  const [errors, setErrors] = useState({ email: '', password: '' })
   const { toast } = useToast()
   const [, setLocation] = useLocation()
   const [isLoading, setIsLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
-  // Remove all unnecessary state variables that cause re-renders
-  // const [currentDemo, setCurrentDemo] = useState(0)
-  // const [isPlaying, setIsPlaying] = useState(true)
-  // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  // const [isTyping, setIsTyping] = useState(false)
-  // const [typedText, setTypedText] = useState('')
-  // const [focusedField, setFocusedField] = useState('')
-  // const particleCount = 0
-
-  // Advanced interactive demo data
-  const demoScenarios = [
-    {
-      title: "AI Content Generation",
-      description: "Watch VeeGPT create engaging social media content",
-      gradient: "from-violet-600 via-purple-600 to-blue-600",
-      icon: Brain,
-      metrics: { engagement: "+284%", reach: "2.4M", conversion: "+67%" }
-    },
-    {
-      title: "Smart Automation",
-      description: "Automated scheduling and optimization in action",
-      gradient: "from-blue-600 via-cyan-600 to-emerald-600",
-      icon: Play,
-      metrics: { efficiency: "+340%", saved: "15h/week", posts: "847" }
-    },
-    {
-      title: "Analytics Intelligence",
-      description: "Real-time insights and performance tracking",
-      gradient: "from-emerald-600 via-teal-600 to-cyan-600",
-      icon: Brain,
-      metrics: { accuracy: "94.8%", insights: "156", trends: "+45%" }
-    }
-  ]
-
-  // Remove mouse tracking to prevent re-renders
-  // useEffect(() => {
-  //   let timeoutId: NodeJS.Timeout
-  //   const handleMouseMove = (e: MouseEvent) => {
-  //     clearTimeout(timeoutId)
-  //     timeoutId = setTimeout(() => {
-  //       setMousePosition({ x: e.clientX, y: e.clientY })
-  //     }, 100)
-  //   }
-  //   window.addEventListener('mousemove', handleMouseMove)
-  //   return () => {
-  //     window.removeEventListener('mousemove', handleMouseMove)
-  //     clearTimeout(timeoutId)
-  //   }
-  // }, [])
-
-  // Remove auto-advance demo to prevent re-renders
-  // useEffect(() => {
-  //   if (!isPlaying) return
-  //   const interval = setInterval(() => {
-  //     setCurrentDemo((prev) => (prev + 1) % demoScenarios.length)
-  //   }, 4000)
-  //   return () => clearInterval(interval)
-  // }, [isPlaying, demoScenarios.length])
-
-  // Remove typing animation to prevent re-renders
-  // useEffect(() => {
-  //   const messages = [
-  //     "Welcome back to VeeFore AI",
-  //     "Your intelligent workspace awaits",
-  //     "AI-powered content creation ready",
-  //     "Advanced analytics at your fingertips"
-  //   ]
-  //   
-  //   let messageIndex = 0
-  //   let charIndex = 0
-  //   let isDeleting = false
-  //   let timeoutId: NodeJS.Timeout
-  //   
-  //   const typeWriter = () => {
-  //     const currentMessage = messages[messageIndex]
-  //     
-  //     if (!isDeleting && charIndex < currentMessage.length) {
-  //       setTypedText(currentMessage.substring(0, charIndex + 1))
-  //       setIsTyping(true)
-  //       charIndex++
-  //       timeoutId = setTimeout(typeWriter, 150)
-  //     } else if (isDeleting && charIndex > 0) {
-  //       setTypedText(currentMessage.substring(0, charIndex - 1))
-  //       charIndex--
-  //       timeoutId = setTimeout(typeWriter, 75)
-  //     } else if (!isDeleting && charIndex === currentMessage.length) {
-  //       setIsTyping(false)
-  //       timeoutId = setTimeout(() => {
-  //         isDeleting = true
-  //         typeWriter()
-  //       }, 2000)
-  //     } else if (isDeleting && charIndex === 0) {
-  //       isDeleting = false
-  //       messageIndex = (messageIndex + 1) % messages.length
-  //       timeoutId = setTimeout(typeWriter, 500)
-  //     }
-  //   }
-  //   
-  //   timeoutId = setTimeout(typeWriter, 1000)
-  //   return () => clearTimeout(timeoutId)
-  // }, [])
-
-  // Remove ripple effects to prevent button blinking
-  // const createRipple = (e: React.MouseEvent) => {
-  //   const rect = e.currentTarget.getBoundingClientRect()
-  //   const x = e.clientX - rect.left
-  //   const y = e.clientY - rect.top
-  //   const newRipple = { id: Date.now(), x, y }
-  //   
-  //   setRipples(prev => [...prev, newRipple])
-  //   setTimeout(() => {
-  //     setRipples(prev => prev.filter(ripple => ripple.id !== newRipple.id))
-  //   }, 1000)
-  // }
-  
-  // Interactive effects removed to prevent re-renders
-
-
 
   const handleBackToLanding = () => {
-    // Use the prop function for smooth SPA navigation
     onNavigate('')
   }
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    
-    // Clear error when user starts typing
     if (errors[field as keyof typeof errors]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
@@ -199,19 +95,14 @@ const SignIn = ({ onNavigate }: SignInProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    const newErrors = {
-      email: '',
-      password: ''
-    }
+    const newErrors = { email: '', password: '' }
 
-    // Validate email
     if (!formData.email.trim()) {
       newErrors.email = 'Please enter your email'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address'
     }
 
-    // Validate password
     if (!formData.password.trim()) {
       newErrors.password = 'Please enter your password'
     }
@@ -221,29 +112,21 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     if (!newErrors.email && !newErrors.password) {
       setIsLoading(true)
       try {
-        // Sign in with Firebase
         await signInWithEmailAndPassword(formData.email, formData.password)
         
-        // Send user data to backend - with error handling
         const signinResponse = await fetch('/api/auth/signin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email
-          })
+          body: JSON.stringify({ email: formData.email })
         })
 
-        // Check if backend signin was successful
         if (!signinResponse.ok) {
           const errorData = await signinResponse.json().catch(() => ({ message: 'Backend signin failed' }))
           console.warn('Backend signin issue:', errorData.message)
-          // Don't block user - Firebase auth succeeded, backend will auto-create user on next request
         }
         
         setAuthError(null)
         toast({ title: "Success", description: "Signed in successfully!" })
-        
-        // Redirect to home page
         setLocation('/')
       } catch (error: any) {
         console.error('Sign in error:', error)
@@ -257,32 +140,10 @@ const SignIn = ({ onNavigate }: SignInProps) => {
   const handleGoogleSignIn = async () => {
     setIsLoading(true)
     try {
-      console.log('🚀 Starting Google sign-in process...')
+      if (!auth) throw new Error('Firebase authentication is not available')
+      if (!googleProvider) throw new Error('Google provider is not available')
       
-      // Validate Firebase auth is available
-      if (!auth) {
-        throw new Error('Firebase authentication is not available')
-      }
-      
-      if (!googleProvider) {
-        throw new Error('Google provider is not available')
-      }
-      
-      console.log('✅ Firebase auth and Google provider are available')
-      
-      // Use popup method for better localhost compatibility
-      console.log('🔄 Starting popup authentication...')
       const result = await signInWithPopup(auth, googleProvider)
-      
-      console.log('✅ Google sign-in successful:', result.user.email)
-      console.log('User details:', {
-        email: result.user.email,
-        displayName: result.user.displayName,
-        uid: result.user.uid
-      })
-      
-      // Link Firebase user with backend MongoDB database
-      console.log('🔗 Linking Firebase user with backend...')
       const idToken = await result.user.getIdToken()
       
       const linkResponse = await fetch('/api/auth/link-firebase', {
@@ -301,7 +162,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
 
       const linkJson = await linkResponse.json().catch(() => ({}))
       if (!linkResponse.ok) {
-        console.error('❌ Backend linking failed:', linkJson)
         setAuthError(linkJson?.message || 'Failed to link user account')
         return
       }
@@ -311,27 +171,14 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         setAuthError(null)
       }
 
-      console.log('✅ User linked with backend successfully')
-      
-      toast({
-        title: "Success",
-        description: "Signed in with Google successfully!",
-      })
-      
-      // Wait a moment for Firebase to persist the session
-      console.log('⏳ Waiting for Firebase session to persist...')
+      toast({ title: "Success", description: "Signed in with Google successfully!" })
       await new Promise(resolve => setTimeout(resolve, 500))
-      
-      console.log('🔄 Redirecting to dashboard...')
-      // Force a full page reload to ensure fresh auth state
       window.location.href = '/'
       
     } catch (error: any) {
-      console.error('❌ Google sign in error:', error)
+      console.error('Google sign in error:', error)
       
       let errorMessage = "Failed to sign in with Google. Please try again."
-      
-      // Handle popup errors
       if (error.code === 'auth/popup-closed-by-user') {
         errorMessage = "Sign-in popup was closed. Please try again."
       } else if (error.code === 'auth/popup-blocked') {
@@ -346,60 +193,34 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     }
   }
 
-  // Add a test function to check Firebase
-  const testFirebase = () => {
-    console.log('🧪 Testing Firebase...')
-    console.log('Auth object:', auth)
-    console.log('Current user:', auth.currentUser)
-    
-    if (auth) {
-      console.log('✅ Firebase Auth is working')
-    } else {
-      console.log('❌ Firebase Auth is not working')
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900/30 relative overflow-hidden">
-      {/* Animated background gradients */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-purple-50/30 dark:from-blue-900/20 dark:via-transparent dark:to-purple-900/20" />
       
-      {/* Floating animated elements */}
       <div 
         className="absolute w-96 h-96 rounded-full bg-gradient-to-r from-blue-100/40 to-purple-100/30 dark:from-blue-900/20 dark:to-purple-900/20 blur-3xl animate-pulse"
-        style={{ 
-          top: '20%', 
-          left: '10%',
-          animationDelay: '0s'
-        }} 
+        style={{ top: '20%', left: '10%' }} 
       />
       <div 
-        className="absolute w-80 h-80 rounded-full bg-gradient-to-r from-violet-100/30 to-blue-100/40 dark:from-violet-900/20 dark:to-blue-900/20 blur-2xl animate-pulse delay-1000"
-        style={{ 
-          top: '60%', 
-          right: '15%',
-          animationDelay: '1s'
-        }} 
+        className="absolute w-80 h-80 rounded-full bg-gradient-to-r from-violet-100/30 to-blue-100/40 dark:from-violet-900/20 dark:to-blue-900/20 blur-2xl animate-pulse"
+        style={{ top: '60%', right: '15%', animationDelay: '1s' }} 
       />
 
-      {/* Advanced animated grid pattern */}
       <div className="absolute inset-0 opacity-[0.02]" style={{
         backgroundImage: `
           radial-gradient(circle at 2px 2px, rgba(99, 102, 241, 0.3) 1px, transparent 0),
           linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px),
           linear-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px)
         `,
-        backgroundSize: '60px 60px, 30px 30px, 30px 30px',
-        animation: 'gridMove 30s linear infinite'
+        backgroundSize: '60px 60px, 30px 30px, 30px 30px'
       }} />
 
-      {/* Interactive floating particles */}
-      {[...Array(15)].map((_, i) => (
+      {[...Array(10)].map((_, i) => (
         <div
           key={i}
           className="absolute w-1 h-1 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full opacity-30"
           style={{
-            left: `${10 + (i * 6)}%`,
+            left: `${10 + (i * 8)}%`,
             top: `${20 + Math.sin(i) * 30}%`,
             animation: `particles-float ${3 + (i % 3)}s ease-in-out infinite`,
             animationDelay: `${i * 0.5}s`
@@ -407,7 +228,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         />
       ))}
 
-      {/* Dynamic mesh overlay */}
       <div 
         className="absolute inset-0 opacity-5"
         style={{
@@ -418,7 +238,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         }}
       />
 
-      {/* Professional Navigation */}
       <nav className="relative z-50 w-full px-6 py-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <button 
@@ -442,18 +261,14 @@ const SignIn = ({ onNavigate }: SignInProps) => {
       </nav>
 
       <div className="flex min-h-[calc(100vh-140px)] relative z-40">
-        {/* Left Side - Professional Content Preview */}
         <div className="lg:w-3/5 flex flex-col justify-center p-8 lg:p-16 relative">
-          {/* Hero Content */}
           <div className="max-w-2xl mb-16">
-            {/* Advanced Status Badge with Typing Effect */}
             <div className="inline-flex items-center bg-white/95 backdrop-blur-xl rounded-full px-8 py-4 mb-12 border border-gray-200/50 shadow-xl group hover:scale-105 transition-all duration-500 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-purple-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="flex items-center space-x-3 relative z-10">
                 <div className="relative">
                   <div className="w-4 h-4 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full animate-pulse" />
                   <div className="absolute inset-0 w-4 h-4 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full animate-ping opacity-40" />
-                  <div className="absolute -inset-1 w-6 h-6 bg-gradient-to-r from-emerald-400/20 to-blue-400/20 rounded-full animate-pulse delay-300" />
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-gray-800 font-semibold text-lg min-w-[300px] text-left">
@@ -470,15 +285,9 @@ const SignIn = ({ onNavigate }: SignInProps) => {
             </div>
 
             <h1 className="text-6xl lg:text-7xl font-black mb-8 leading-[0.9]">
-              <span className="block text-gray-900 mb-4">
-                Continue Your
-              </span>
-              <span className="block bg-gradient-to-r from-blue-600 via-purple-600 to-violet-600 bg-clip-text text-transparent mb-4">
-                AI Journey
-              </span>
-              <span className="block text-gray-600 text-4xl lg:text-5xl font-light">
-                with Professional Excellence
-              </span>
+              <span className="block text-gray-900 mb-4">Continue Your</span>
+              <span className="block bg-gradient-to-r from-blue-600 via-purple-600 to-violet-600 bg-clip-text text-transparent mb-4">AI Journey</span>
+              <span className="block text-gray-600 text-4xl lg:text-5xl font-light">with Professional Excellence</span>
             </h1>
 
             <p className="text-2xl text-gray-600 leading-relaxed font-light mb-12 max-w-xl">
@@ -486,10 +295,8 @@ const SignIn = ({ onNavigate }: SignInProps) => {
             </p>
           </div>
 
-          {/* Professional Preview Panel */}
           <div className="relative">
             <div className="bg-white/90 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-2xl overflow-hidden">
-              {/* Panel Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200/50">
                 <div className="flex items-center space-x-4">
                   <div className="flex space-x-2">
@@ -500,9 +307,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   <span className="text-gray-900 font-semibold text-lg">VeeFore AI Workspace</span>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div
-                    className="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600"
-                  >
+                  <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
                     <Play className="w-4 h-4" />
                   </div>
                   <div className="flex space-x-1">
@@ -518,13 +323,12 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                 </div>
               </div>
 
-              {/* Panel Content */}
               <div className="p-8">
                 <div className="flex items-center space-x-4 mb-6">
                   <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${demoScenarios[0].gradient} flex items-center justify-center shadow-lg`}>
                     {(() => {
-                      const IconComponent = demoScenarios[0].icon;
-                      return <IconComponent className="w-8 h-8 text-white" />;
+                      const IconComponent = demoScenarios[0].icon
+                      return <IconComponent className="w-8 h-8 text-white" />
                     })()}
                   </div>
                   <div>
@@ -533,7 +337,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   </div>
                 </div>
 
-                {/* Clean Professional Metrics */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                   {Object.entries(demoScenarios[0].metrics).map(([key, value], index) => (
                     <div key={key} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
@@ -545,14 +348,10 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                           style={{ width: `${60 + index * 15}%` }}
                         />
                       </div>
-                      <div className="flex items-center justify-end mt-1">
-                        <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
-                      </div>
                     </div>
                   ))}
                 </div>
 
-                {/* AI Content Engine Section */}
                 <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-3">
@@ -590,7 +389,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                     ))}
                   </div>
                   
-                  {/* Simple Bottom Stats */}
                   <div className="mt-6 grid grid-cols-3 gap-3">
                     <div className="text-center p-3 bg-white rounded-lg border border-gray-200">
                       <div className="text-lg font-bold text-purple-600">42</div>
@@ -611,49 +409,28 @@ const SignIn = ({ onNavigate }: SignInProps) => {
           </div>
         </div>
 
-
-
-        {/* Right Side - Professional Sign In */}
         <div className="lg:w-2/5 flex items-center justify-center p-8 lg:p-16">
           <div className="w-full max-w-lg">
-            {/* Professional Sign In Card */}
             <div className="relative">
-              {/* Subtle glow effect */}
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-200/50 via-purple-200/50 to-violet-200/50 rounded-3xl blur-xl opacity-60" />
               
               <div className="relative bg-white/95 backdrop-blur-xl rounded-3xl p-10 border border-gray-200/60 shadow-2xl overflow-hidden">
-                {/* Removed ripple effects to prevent button blinking */}
-                
-                {/* Clean Professional Header */}
                 <div className="text-center mb-10 relative z-10">
-                  {/* Simple Elegant VeeFore Logo */}
                   <div className="mb-8 flex justify-center">
                     <div className="relative p-6 rounded-2xl hover:scale-105 transition-all duration-500 ease-out group">
                       <img 
                         src={veeforceLogo} 
                         alt="VeeFore" 
                         className="w-24 h-24 transform hover:scale-110 transition-all duration-500 ease-out filter drop-shadow-lg hover:drop-shadow-xl animate-[simpleEntrance_1s_ease-out_forwards]" 
-                        style={{
-                          animationDelay: '0.5s',
-                          opacity: 0,
-                          transform: 'translateY(20px) scale(0.9)'
-                        }}
+                        style={{ animationDelay: '0.5s', opacity: 0, transform: 'translateY(20px) scale(0.9)' }}
                       />
                     </div>
                   </div>
 
-                  {/* Clean Welcome Text */}
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                    Welcome Back
-                  </h1>
-                  
-                  {/* Simple subtitle */}
-                  <p className="text-lg text-gray-600 mb-8">
-                    Sign in to your VeeFore workspace
-                  </p>
+                  <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome Back</h1>
+                  <p className="text-lg text-gray-600 mb-8">Sign in to your VeeFore workspace</p>
                 </div>
 
-                {/* Auth failure banner */}
                 {authError && (
                   <AuthFailureBanner
                     message={authError}
@@ -664,10 +441,8 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   />
                 )}
 
-                {/* Completely New Card-Style Sign In Form */}
                 <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/30 dark:to-indigo-900/30 p-8 rounded-3xl border border-blue-100/50 dark:border-blue-600/50 shadow-xl backdrop-blur-sm">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Card-Style Email Field */}
                     <div className="space-y-3">
                       <label className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
                         Email Address
@@ -691,7 +466,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                           placeholder="Enter your email address"
                         />
                         
-                        {/* Success/Error Icon */}
                         {formData.email && (
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
                             {formData.email.includes('@') && formData.email.includes('.') ? (
@@ -711,20 +485,16 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                         )}
                       </div>
                       
-                      {/* Enhanced Error Display */}
                       {errors.email && (
                         <div className="bg-red-100/80 dark:bg-red-900/30 border border-red-300/50 dark:border-red-600/50 rounded-xl p-3 flex items-start space-x-3">
                           <svg className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                           </svg>
-                          <div>
-                            <p className="text-red-800 dark:text-red-200 text-sm font-medium">{errors.email}</p>
-                          </div>
+                          <p className="text-red-800 dark:text-red-200 text-sm font-medium">{errors.email}</p>
                         </div>
                       )}
                     </div>
 
-                    {/* Card-Style Password Field */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
@@ -757,7 +527,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                           placeholder="Enter your password"
                         />
                         
-                        {/* Enhanced Password Toggle */}
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
@@ -767,7 +536,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                         </button>
                       </div>
                       
-                      {/* Enhanced Password Strength */}
                       {formData.password && (
                         <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 border border-gray-200/50 dark:border-gray-600/50">
                           <div className="flex items-center justify-between mb-2">
@@ -811,48 +579,31 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                         </div>
                       )}
                       
-                      {/* Enhanced Error Display */}
                       {errors.password && (
                         <div className="bg-red-100/80 dark:bg-red-900/30 border border-red-300/50 dark:border-red-600/50 rounded-xl p-3 flex items-start space-x-3">
                           <svg className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                           </svg>
-                          <div>
-                            <p className="text-red-800 dark:text-red-200 text-sm font-medium">{errors.password}</p>
-                          </div>
+                          <p className="text-red-800 dark:text-red-200 text-sm font-medium">{errors.password}</p>
                         </div>
                       )}
                     </div>
 
-                    {/* Clean Professional Sign In Button */}
-                  <MemoizedSignInButton isLoading={isLoading} onSubmit={handleSubmit} />
+                    <MemoizedSignInButton isLoading={isLoading} onSubmit={handleSubmit} />
 
-                  {/* Clean Divider */}
-                  <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-200 dark:border-gray-600" />
+                    <div className="relative my-6">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200 dark:border-gray-600" />
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-4 text-gray-500 dark:text-gray-400 font-medium bg-white dark:bg-gray-800">or</span>
+                      </div>
                     </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 text-gray-500 dark:text-gray-400 font-medium bg-white dark:bg-gray-800">or</span>
-                    </div>
-                  </div>
 
-                  {/* Google Sign In */}
-                  <MemoizedGoogleButton isLoading={isLoading} onClick={handleGoogleSignIn} />
-
-                  {/* Test Firebase Button */}
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={testFirebase}
-                    className="w-full mt-4 bg-yellow-100/90 dark:bg-yellow-900/30 border-2 border-yellow-300/60 dark:border-yellow-600/60 text-yellow-800 dark:text-yellow-200 py-3 rounded-xl font-medium hover:bg-yellow-200/90 dark:hover:bg-yellow-800/30 transition-all duration-200"
-                  >
-                    🧪 Test Firebase Connection
-                  </Button>
+                    <MemoizedGoogleButton isLoading={isLoading} onClick={handleGoogleSignIn} />
                   </form>
                 </div>
 
-                {/* Sign Up Link */}
                 <div className="text-center mt-10">
                   <p className="text-gray-600 dark:text-gray-400 text-lg">
                     Don't have an account?{' '}
@@ -865,7 +616,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   </p>
                 </div>
 
-                {/* Terms */}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-8 text-center leading-relaxed">
                   By signing in, you agree to our{' '}
                   <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline">Terms of Service</a>{' '}
@@ -877,8 +627,6 @@ const SignIn = ({ onNavigate }: SignInProps) => {
           </div>
         </div>
       </div>
-
-      {/* Custom animations are handled by Tailwind */}
     </div>
   )
 }
