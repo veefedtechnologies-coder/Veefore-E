@@ -102,6 +102,11 @@ import {
   dmConversationRepository,
   dmMessageRepository,
 } from './repositories/AutomationRepository';
+import { workspaceMemberRepository } from './repositories/WorkspaceMemberRepository';
+import { teamInvitationRepository } from './repositories/TeamInvitationRepository';
+import { suggestionRepository } from './repositories/SuggestionRepository';
+import { contentRecommendationRepository } from './repositories/ContentRecommendationRepository';
+import { userContentHistoryRepository } from './repositories/UserContentHistoryRepository';
 
 export class MongoStorage implements IStorage {
   private isConnected = false;
@@ -1004,53 +1009,30 @@ export class MongoStorage implements IStorage {
   async getSuggestions(workspaceId: number, type?: string): Promise<Suggestion[]> {
     await this.connect();
     
-    let query: any = { workspaceId: workspaceId.toString() };
-    if (type) {
-      query.type = type;
-    }
+    const suggestions = await suggestionRepository.findByWorkspaceId(workspaceId.toString());
     
-    console.log('[MONGODB DEBUG] getSuggestions query:', JSON.stringify(query));
-    console.log('[MONGODB DEBUG] Searching for workspace ID:', workspaceId, 'as string:', workspaceId.toString());
+    const filtered = type ? suggestions.filter(s => s.type === type) : suggestions;
     
-    const suggestions = await SuggestionModel.find(query)
-      .sort({ createdAt: -1 });
-    
-    console.log('[MONGODB DEBUG] Found suggestions count:', suggestions.length);
-    if (suggestions.length > 0) {
-      console.log('[MONGODB DEBUG] First suggestion workspaceId:', suggestions[0].workspaceId);
-    }
-    
-    // Also check all suggestions to see what workspace IDs exist
-    const allSuggestions = await SuggestionModel.find({}).limit(10);
-    console.log('[MONGODB DEBUG] All suggestions in DB (first 10):', allSuggestions.map(s => ({
-      id: s._id,
-      workspaceId: s.workspaceId,
-      type: s.type,
-      createdAt: s.createdAt
-    })));
-    
-    return suggestions.map(doc => convertSuggestion(doc));
+    return filtered.map(doc => convertSuggestion(doc));
   }
 
   async getValidSuggestions(workspaceId: number): Promise<Suggestion[]> {
     await this.connect();
     
-    const now = new Date();
-    const suggestions = await SuggestionModel.find({
-      workspaceId: workspaceId.toString(),
-      isUsed: false,
-      $or: [
-        { validUntil: { $gt: now } },
-        { validUntil: null }
-      ]
-    }).sort({ createdAt: -1 });
+    const suggestions = await suggestionRepository.findUnusedByWorkspace(workspaceId.toString());
     
-    return suggestions.map(doc => convertSuggestion(doc));
+    const now = new Date();
+    const validSuggestions = suggestions.filter(s => 
+      !s.validUntil || new Date(s.validUntil) > now
+    );
+    
+    return validSuggestions.map(doc => convertSuggestion(doc));
   }
 
   async createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion> {
     await this.connect();
-    const newSuggestion = new SuggestionModel({
+    
+    const saved = await suggestionRepository.create({
       workspaceId: suggestion.workspaceId.toString(),
       type: suggestion.type,
       data: suggestion.data,
@@ -1059,30 +1041,26 @@ export class MongoStorage implements IStorage {
       validUntil: suggestion.validUntil,
       createdAt: new Date()
     });
-    const saved = await newSuggestion.save();
+    
     return convertSuggestion(saved);
   }
 
   async markSuggestionUsed(id: number): Promise<Suggestion> {
     await this.connect();
-    const updated = await SuggestionModel.findByIdAndUpdate(
-      id,
-      { isUsed: true },
-      { new: true }
-    );
+    
+    const updated = await suggestionRepository.markAsUsed(id.toString());
+    
     if (!updated) {
       throw new Error('Suggestion not found');
     }
+    
     return convertSuggestion(updated);
   }
 
   async clearSuggestionsByWorkspace(workspaceId: string | number): Promise<void> {
     await this.connect();
-    const query = { workspaceId: workspaceId.toString() };
-    console.log(`[MONGODB DEBUG] Clearing suggestions for workspace ${workspaceId}`);
     
-    const result = await SuggestionModel.deleteMany(query);
-    console.log(`[MONGODB DEBUG] Deleted ${result.deletedCount} suggestions for workspace ${workspaceId}`);
+    await suggestionRepository.deleteMany({ workspaceId: workspaceId.toString() });
   }
 
   async getCreditTransactions(userId: number, limit = 50): Promise<CreditTransaction[]> {
@@ -1240,28 +1218,10 @@ export class MongoStorage implements IStorage {
 
   async getSuggestionsByWorkspace(workspaceId: string | number): Promise<Suggestion[]> {
     await this.connect();
-    
-    const query = { workspaceId: workspaceId.toString() };
-    console.log('[MONGODB DEBUG] getSuggestionsByWorkspace query:', JSON.stringify(query));
-    console.log('[MONGODB DEBUG] Searching for workspace ID:', workspaceId, 'as string:', workspaceId.toString());
-    
-    const suggestions = await SuggestionModel.find(query)
-      .sort({ createdAt: -1 });
-    
-    console.log('[MONGODB DEBUG] Found suggestions count:', suggestions.length);
-    if (suggestions.length > 0) {
-      console.log('[MONGODB DEBUG] First suggestion workspaceId:', suggestions[0].workspaceId);
-    }
-    
-    // Also check all suggestions to see what workspace IDs exist
-    const allSuggestions = await SuggestionModel.find({}).limit(10);
-    console.log('[MONGODB DEBUG] All suggestions in DB (first 10):', allSuggestions.map(s => ({
-      id: s._id,
-      workspaceId: s.workspaceId,
-      type: s.type,
-      createdAt: s.createdAt
-    })));
-    
+    const suggestions = await suggestionRepository.findByWorkspaceId(
+      workspaceId.toString(),
+      { sortBy: 'createdAt', sortOrder: 'desc' }
+    );
     return suggestions.map(doc => convertSuggestion(doc));
   }
 
@@ -1281,23 +1241,18 @@ export class MongoStorage implements IStorage {
 
   async getWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<WorkspaceMember | undefined> {
     await this.connect();
-    const member = await WorkspaceMemberModel.findOne({ 
-      workspaceId: workspaceId.toString(), 
-      userId: userId.toString() 
-    });
+    const member = await workspaceMemberRepository.findByWorkspaceAndUser(
+      workspaceId.toString(),
+      userId.toString()
+    );
     return member ? convertWorkspaceMember(member) : undefined;
   }
 
   async getWorkspaceMembers(workspaceId: number | string): Promise<(WorkspaceMember & { user: User })[]> {
     await this.connect();
-    console.log('[MONGODB DEBUG] Getting workspace members for workspace:', workspaceId);
     
     try {
-      const members = await WorkspaceMemberModel.find({ 
-        workspaceId: workspaceId.toString() 
-      }).maxTimeMS(5000); // 5 second timeout
-      
-      console.log('[MONGODB DEBUG] Found workspace members:', members.length);
+      const members = await workspaceMemberRepository.findByWorkspaceId(workspaceId.toString());
       
       const result = [];
       for (const member of members) {
@@ -1312,7 +1267,6 @@ export class MongoStorage implements IStorage {
       
       // If no members found, add the workspace owner as a member (simplified approach)
       if (result.length === 0) {
-        console.log('[MONGODB DEBUG] No members found, adding workspace owner');
         const workspace = await this.getWorkspace(workspaceId);
         if (workspace) {
           const owner = await this.getUser(workspace.userId);
@@ -1331,15 +1285,12 @@ export class MongoStorage implements IStorage {
               user: owner
             };
             result.push(ownerMember);
-            console.log('[MONGODB DEBUG] Added owner as member:', owner.username);
           }
         }
       }
       
-      console.log('[MONGODB DEBUG] Returning members:', result.length);
       return result;
     } catch (error) {
-      console.error('[MONGODB DEBUG] Error getting workspace members:', error);
       // Return just the owner as fallback
       const workspace = await this.getWorkspace(workspaceId);
       if (workspace) {
@@ -1377,19 +1328,25 @@ export class MongoStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    const newMember = new WorkspaceMemberModel(memberData);
-    await newMember.save();
-    
+    const newMember = await workspaceMemberRepository.create(memberData);
     return convertWorkspaceMember(newMember);
   }
 
   async updateWorkspaceMember(workspaceId: number | string, userId: number | string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember> {
     await this.connect();
     
-    const updatedMember = await WorkspaceMemberModel.findOneAndUpdate(
-      { workspaceId: workspaceId.toString(), userId: userId.toString() },
-      { ...updates, updatedAt: new Date() },
-      { new: true }
+    const member = await workspaceMemberRepository.findByWorkspaceAndUser(
+      workspaceId.toString(),
+      userId.toString()
+    );
+    
+    if (!member) {
+      throw new Error(`Workspace member not found`);
+    }
+    
+    const updatedMember = await workspaceMemberRepository.updateById(
+      member._id.toString(),
+      { ...updates, updatedAt: new Date() }
     );
     
     if (!updatedMember) {
@@ -1401,10 +1358,13 @@ export class MongoStorage implements IStorage {
 
   async removeWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<void> {
     await this.connect();
-    await WorkspaceMemberModel.deleteOne({ 
-      workspaceId: workspaceId.toString(), 
-      userId: userId.toString() 
-    });
+    const member = await workspaceMemberRepository.findByWorkspaceAndUser(
+      workspaceId.toString(),
+      userId.toString()
+    );
+    if (member) {
+      await workspaceMemberRepository.deleteById(member._id.toString());
+    }
   }
 
   async createTeamInvitation(invitation: InsertTeamInvitation): Promise<TeamInvitation> {
@@ -1417,58 +1377,50 @@ export class MongoStorage implements IStorage {
       createdAt: new Date()
     };
 
-    const newInvitation = new TeamInvitationModel(invitationData);
-    await newInvitation.save();
-    
-    console.log(`[MONGODB DEBUG] Created team invitation:`, {
-      email: newInvitation.email,
-      workspaceId: newInvitation.workspaceId,
-      status: newInvitation.status,
-      id: newInvitation._id
-    });
-    
+    const newInvitation = await teamInvitationRepository.create(invitationData);
     return convertTeamInvitation(newInvitation);
   }
 
   async getWorkspaceInvitations(workspaceId: number): Promise<TeamInvitation[]> {
     await this.connect();
     
-    console.log(`[MONGODB DEBUG] Getting invitations for workspace: ${workspaceId}`);
-    
-    const invitations = await TeamInvitationModel.find({
-      $or: [
-        { workspaceId: workspaceId.toString() },
-        { workspaceId: workspaceId }
-      ],
-      status: 'pending'
-    }).sort({ createdAt: -1 });
-    
-    console.log(`[MONGODB DEBUG] Found ${invitations.length} pending invitations`);
+    const invitations = await teamInvitationRepository.findPendingByWorkspace(
+      workspaceId.toString(),
+      { sortBy: 'createdAt', sortOrder: 'desc' }
+    );
     
     return invitations.map(doc => convertTeamInvitation(doc));
   }
 
   async getTeamInvitation(id: number): Promise<TeamInvitation | undefined> {
     await this.connect();
-    const invitation = await TeamInvitationModel.findOne({ id });
+    const invitation = await teamInvitationRepository.findOne({ id });
     return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
   async getTeamInvitationByToken(token: string): Promise<TeamInvitation | undefined> {
     await this.connect();
-    const invitation = await TeamInvitationModel.findOne({ token });
+    const invitation = await teamInvitationRepository.findByToken(token);
     return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
   async getTeamInvitations(workspaceId: number | string, status?: string): Promise<TeamInvitation[]> {
     await this.connect();
-    const query: any = { workspaceId: workspaceId.toString() };
-    if (status) {
-      query.status = status;
-    }
     
-    const invitations = await TeamInvitationModel.find(query)
-      .sort({ createdAt: -1 });
+    const options = { sortBy: 'createdAt' as const, sortOrder: 'desc' as const };
+    let invitations;
+    
+    if (status) {
+      invitations = await teamInvitationRepository.findMany(
+        { workspaceId: workspaceId.toString(), status },
+        options
+      );
+    } else {
+      invitations = await teamInvitationRepository.findByWorkspaceId(
+        workspaceId.toString(),
+        options
+      );
+    }
     
     return invitations.map(convertTeamInvitation);
   }
@@ -1476,10 +1428,15 @@ export class MongoStorage implements IStorage {
   async updateTeamInvitation(id: number, updates: Partial<TeamInvitation>): Promise<TeamInvitation> {
     await this.connect();
     
-    const updatedInvitation = await TeamInvitationModel.findOneAndUpdate(
-      { id },
-      updates,
-      { new: true }
+    const invitation = await teamInvitationRepository.findOne({ id });
+    
+    if (!invitation) {
+      throw new Error(`Team invitation with id ${id} not found`);
+    }
+    
+    const updatedInvitation = await teamInvitationRepository.updateById(
+      invitation._id.toString(),
+      updates
     );
     
     if (!updatedInvitation) {
@@ -1492,46 +1449,50 @@ export class MongoStorage implements IStorage {
   // Content recommendation operations
   async getContentRecommendation(id: number): Promise<ContentRecommendation | undefined> {
     await this.connect();
-    const recommendation = await ContentRecommendationModel.findById(id);
+    const recommendation = await contentRecommendationRepository.findById(id.toString());
     return recommendation ? convertContentRecommendation(recommendation) : undefined;
   }
 
   async getContentRecommendations(workspaceId: number, type?: string, limit?: number): Promise<ContentRecommendation[]> {
     await this.connect();
-    const query: any = { workspaceId: workspaceId.toString(), isActive: true };
     
-    if (type) {
-      query.type = type;
-    }
-
-    const queryBuilder = ContentRecommendationModel.find(query).sort({ createdAt: -1 });
-    
+    const options: any = { sortBy: 'createdAt', sortOrder: 'desc' };
     if (limit) {
-      queryBuilder.limit(limit);
+      options.limit = limit;
     }
-
-    const recommendations = await queryBuilder.exec();
+    
+    let recommendations;
+    if (type) {
+      recommendations = await contentRecommendationRepository.findMany(
+        { workspaceId: workspaceId.toString(), isActive: true, type },
+        options
+      );
+    } else {
+      recommendations = await contentRecommendationRepository.findActiveByWorkspace(
+        workspaceId.toString(),
+        options
+      );
+    }
+    
     return recommendations.map(rec => convertContentRecommendation(rec));
   }
 
   async createContentRecommendation(insertRecommendation: InsertContentRecommendation): Promise<ContentRecommendation> {
     await this.connect();
-    const recommendation = new ContentRecommendationModel({
+    const saved = await contentRecommendationRepository.create({
       ...insertRecommendation,
       workspaceId: insertRecommendation.workspaceId.toString(),
       createdAt: new Date(),
       updatedAt: new Date()
     });
-    const saved = await recommendation.save();
     return convertContentRecommendation(saved);
   }
 
   async updateContentRecommendation(id: number, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation> {
     await this.connect();
-    const updated = await ContentRecommendationModel.findByIdAndUpdate(
-      id,
-      { ...updates, updatedAt: new Date() },
-      { new: true }
+    const updated = await contentRecommendationRepository.updateById(
+      id.toString(),
+      { ...updates, updatedAt: new Date() }
     );
     if (!updated) {
       throw new Error(`Content recommendation ${id} not found`);
@@ -1541,30 +1502,29 @@ export class MongoStorage implements IStorage {
 
   async deleteContentRecommendation(id: number): Promise<void> {
     await this.connect();
-    const result = await ContentRecommendationModel.deleteOne({ _id: id });
-    if (result.deletedCount === 0) {
+    const deleted = await contentRecommendationRepository.deleteById(id.toString());
+    if (!deleted) {
       throw new Error(`Content recommendation ${id} not found`);
     }
   }
 
   async getUserContentHistory(userId: number, workspaceId: number): Promise<UserContentHistory[]> {
     await this.connect();
-    const history = await UserContentHistoryModel.find({
-      userId: userId.toString(),
-      workspaceId: workspaceId.toString()
-    }).sort({ createdAt: -1 });
+    const history = await userContentHistoryRepository.findMany(
+      { userId: userId.toString(), workspaceId: workspaceId.toString() },
+      { sortBy: 'createdAt', sortOrder: 'desc' }
+    );
     return history.map(h => convertUserContentHistory(h));
   }
 
   async createUserContentHistory(insertHistory: InsertUserContentHistory): Promise<UserContentHistory> {
     await this.connect();
-    const history = new UserContentHistoryModel({
+    const saved = await userContentHistoryRepository.create({
       ...insertHistory,
       userId: insertHistory.userId.toString(),
       workspaceId: insertHistory.workspaceId.toString(),
       createdAt: new Date()
     });
-    const saved = await history.save();
     return convertUserContentHistory(saved);
   }
 
