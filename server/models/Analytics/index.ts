@@ -1,2 +1,4 @@
-export { AnalyticsSchema, AnalyticsModel, IAnalytics } from './Analytics';
-export { SuggestionSchema, SuggestionModel, ISuggestion } from './Suggestion';
+export { AnalyticsSchema, AnalyticsModel } from './Analytics';
+export type { IAnalytics } from './Analytics';
+export { SuggestionSchema, SuggestionModel } from './Suggestion';
+export type { ISuggestion } from './Suggestion';

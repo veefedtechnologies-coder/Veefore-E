@@ -33,4 +33,4 @@ export const AnalyticsSchema = new Schema<IAnalytics>({
 AnalyticsSchema.index({ workspaceId: 1, platform: 1, date: -1 });
 AnalyticsSchema.index({ workspaceId: 1, date: -1 });
 
-export const AnalyticsModel = mongoose.model<IAnalytics>('Analytics', AnalyticsSchema);
+export const AnalyticsModel = mongoose.models.Analytics as mongoose.Model<IAnalytics> || mongoose.model<IAnalytics>('Analytics', AnalyticsSchema);

@@ -24,5 +24,5 @@ const AddonSchema = new Schema<IAddon>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const AddonModel = mongoose.model<IAddon>('Addon', AddonSchema);
+export const AddonModel = mongoose.models.Addon as mongoose.Model<IAddon> || mongoose.model<IAddon>('Addon', AddonSchema);
 export { AddonSchema };

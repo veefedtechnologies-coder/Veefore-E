@@ -40,4 +40,4 @@ export const AutomationRuleSchema = new Schema<IAutomationRule>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const AutomationRuleModel = mongoose.model<IAutomationRule>('AutomationRule', AutomationRuleSchema);
+export const AutomationRuleModel = mongoose.models.AutomationRule as mongoose.Model<IAutomationRule> || mongoose.model<IAutomationRule>('AutomationRule', AutomationRuleSchema);

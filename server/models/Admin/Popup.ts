@@ -30,5 +30,5 @@ const PopupSchema = new Schema<IPopup>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const PopupModel: Model<IPopup> = mongoose.model<IPopup>('Popup', PopupSchema);
+export const PopupModel: Model<IPopup> = mongoose.models.Popup as Model<IPopup> || mongoose.model<IPopup>('Popup', PopupSchema);
 export { PopupSchema };

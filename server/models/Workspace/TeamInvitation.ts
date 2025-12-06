@@ -26,4 +26,4 @@ export const TeamInvitationSchema = new Schema<ITeamInvitation>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const TeamInvitationModel = mongoose.model<ITeamInvitation>('TeamInvitation', TeamInvitationSchema);
+export const TeamInvitationModel = mongoose.models.TeamInvitation as mongoose.Model<ITeamInvitation> || mongoose.model<ITeamInvitation>('TeamInvitation', TeamInvitationSchema);

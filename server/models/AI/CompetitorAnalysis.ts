@@ -44,4 +44,4 @@ export const CompetitorAnalysisSchema = new Schema<ICompetitorAnalysis>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const CompetitorAnalysisModel: Model<ICompetitorAnalysis> = mongoose.model<ICompetitorAnalysis>('CompetitorAnalysis', CompetitorAnalysisSchema);
+export const CompetitorAnalysisModel: Model<ICompetitorAnalysis> = mongoose.models.CompetitorAnalysis as Model<ICompetitorAnalysis> || mongoose.model<ICompetitorAnalysis>('CompetitorAnalysis', CompetitorAnalysisSchema);

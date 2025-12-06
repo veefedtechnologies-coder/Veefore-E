@@ -365,37 +365,4 @@ app.use('/api/ai/', aiLimiter);
 
 ***
 
-## **📋 Implementation Roadmap**
-
-Prioritize tasks as follows to systematically move towards production-readiness:
-
-1. **Stability & Build (Immediate):**
-   * Fix the Dockerfile build (see Dockerfile example above).
-   * Enable Redis and switch scheduler to BullMQ.
-   * Apply the critical index on **`SocialAccount.instagramAccountId`**.
-   * Configure environment variable validation (stop on missing keys).
-2. **Architecture Refactoring:**
-   * Split the backend into models, services, controllers, and route modules.
-   * Merge the admin panel into the main app (unify ports and DB).
-   * Remove Postgres/Drizzle code and config.
-   * Improve TypeScript types (no more **`any`**).
-3. **Security Enhancements:**
-   * Fully switch to **`firebase-admin.auth().verifyIdToken()`** for auth.
-   * Apply rate limiting on login/registration.
-   * Encrypt any remaining plaintext tokens and rotate keys.
-4. **Infrastructure & CI/CD:**
-   * Add the remaining database indexes for scheduler and analytics.
-   * Set up a structured logger with shipping (Winston/Pino).
-   * Implement CI (lint, tests) and CD pipelines to deploy containers.
-5. **Frontend Refinements:**
-   * Refactor large components into smaller ones with hooks.
-   * Replace hardcoded URLs with **`import.meta.env.VITE_API_URL`**.
-   * (Optional) Migrate routing to React Router for complex flows.
-   * Implement optimistic UI and error boundaries for robustness.
-6. **Product Features & AI Controls:**
-   * Integrate real trend APIs and remove “hallucinated” trends.
-   * Build out missing product features (persona builder, affiliate, legal).
-   * Complete the Inbox 2.0 functionality.
-   * Add the AI credit system as described above.
-
 Following this structured plan and adapting the provided code examples will transform Veefore into a **secure, scalable, and production-ready** application. Each step addresses a specific weakness or gap identified in the codebase audit. Implement them sequentially, verifying each change, and the app will steadily evolve into a robust platform..

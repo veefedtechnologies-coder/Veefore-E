@@ -22,4 +22,4 @@ export const DmTemplateSchema = new Schema<IDmTemplate>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const DmTemplateModel = mongoose.model<IDmTemplate>('DmTemplate', DmTemplateSchema, 'dm_templates');
+export const DmTemplateModel = mongoose.models.DmTemplate as mongoose.Model<IDmTemplate> || mongoose.model<IDmTemplate>('DmTemplate', DmTemplateSchema, 'dm_templates');

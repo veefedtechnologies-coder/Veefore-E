@@ -28,5 +28,5 @@ const PaymentSchema = new Schema<IPayment>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const PaymentModel = mongoose.model<IPayment>('Payment', PaymentSchema);
+export const PaymentModel = mongoose.models.Payment as mongoose.Model<IPayment> || mongoose.model<IPayment>('Payment', PaymentSchema);
 export { PaymentSchema };

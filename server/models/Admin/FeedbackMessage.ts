@@ -30,5 +30,5 @@ const FeedbackMessageSchema = new Schema<IFeedbackMessage>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const FeedbackMessageModel: Model<IFeedbackMessage> = mongoose.model<IFeedbackMessage>('FeedbackMessage', FeedbackMessageSchema);
+export const FeedbackMessageModel: Model<IFeedbackMessage> = mongoose.models.FeedbackMessage as Model<IFeedbackMessage> || mongoose.model<IFeedbackMessage>('FeedbackMessage', FeedbackMessageSchema);
 export { FeedbackMessageSchema };

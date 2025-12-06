@@ -26,4 +26,4 @@ export const DmMessageSchema = new Schema<IDmMessage>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const DmMessageModel = mongoose.model<IDmMessage>('DmMessage', DmMessageSchema);
+export const DmMessageModel = mongoose.models.DmMessage as mongoose.Model<IDmMessage> || mongoose.model<IDmMessage>('DmMessage', DmMessageSchema);

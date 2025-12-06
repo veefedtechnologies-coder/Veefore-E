@@ -22,5 +22,5 @@ const ReferralSchema = new Schema<IReferral>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const ReferralModel = mongoose.model<IReferral>('Referral', ReferralSchema);
+export const ReferralModel = mongoose.models.Referral as mongoose.Model<IReferral> || mongoose.model<IReferral>('Referral', ReferralSchema);
 export { ReferralSchema };

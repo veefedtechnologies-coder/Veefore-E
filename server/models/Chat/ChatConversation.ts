@@ -22,4 +22,4 @@ export const ChatConversationSchema = new Schema<IChatConversation>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const ChatConversation = mongoose.model<IChatConversation>('ChatConversation', ChatConversationSchema);
+export const ChatConversation = mongoose.models.ChatConversation as mongoose.Model<IChatConversation> || mongoose.model<IChatConversation>('ChatConversation', ChatConversationSchema);

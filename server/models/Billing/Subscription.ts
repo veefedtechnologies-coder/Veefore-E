@@ -32,5 +32,5 @@ const SubscriptionSchema = new Schema<ISubscription>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const SubscriptionModel = mongoose.model<ISubscription>('Subscription', SubscriptionSchema);
+export const SubscriptionModel = mongoose.models.Subscription as mongoose.Model<ISubscription> || mongoose.model<ISubscription>('Subscription', SubscriptionSchema);
 export { SubscriptionSchema };
