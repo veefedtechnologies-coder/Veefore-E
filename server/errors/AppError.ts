@@ -49,6 +49,15 @@ export class ConflictError extends AppError {
   }
 }
 
+export class PaymentRequiredError extends AppError {
+  public readonly details?: Record<string, any>;
+
+  constructor(message: string, details?: Record<string, any>) {
+    super(message, 402, 'PAYMENT_REQUIRED');
+    this.details = details;
+  }
+}
+
 export class RateLimitError extends AppError {
   public readonly retryAfter: number;
 

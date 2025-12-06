@@ -1,8 +1,11 @@
-export { BaseRepository, PaginationOptions, PaginatedResult } from './BaseRepository';
+export { BaseRepository } from './BaseRepository';
+export type { PaginationOptions, PaginatedResult } from './BaseRepository';
 export { UserRepository, userRepository } from './UserRepository';
 export { WorkspaceRepository, workspaceRepository } from './WorkspaceRepository';
-export { SocialAccountRepository, socialAccountRepository, Platform } from './SocialAccountRepository';
-export { ContentRepository, contentRepository, ContentStatus } from './ContentRepository';
+export { SocialAccountRepository, socialAccountRepository } from './SocialAccountRepository';
+export type { Platform } from './SocialAccountRepository';
+export { ContentRepository, contentRepository } from './ContentRepository';
+export type { ContentStatus } from './ContentRepository';
 export { AnalyticsRepository, analyticsRepository } from './AnalyticsRepository';
 
 export {
