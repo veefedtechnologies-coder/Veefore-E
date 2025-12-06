@@ -149,6 +149,10 @@ const SocialAccountSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// Critical indexes for SocialAccount
+SocialAccountSchema.index({ accountId: 1 }); // For webhook queries (instagramAccountId lookup)
+SocialAccountSchema.index({ workspaceId: 1, platform: 1 }); // For workspace-specific queries
+
 const ContentSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.Mixed, required: true },
   type: { type: String, required: true },
@@ -165,6 +169,10 @@ const ContentSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// Critical indexes for Content
+ContentSchema.index({ workspaceId: 1, status: 1, scheduledAt: 1 }); // For scheduler queries
+ContentSchema.index({ workspaceId: 1, createdAt: -1 }); // For listing content by workspace
+
 const AnalyticsSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.Mixed, required: true },
   platform: { type: String, required: true },
@@ -180,7 +188,9 @@ const AnalyticsSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-
+// Critical indexes for Analytics
+AnalyticsSchema.index({ workspaceId: 1, platform: 1, date: -1 }); // For analytics queries by date range
+AnalyticsSchema.index({ workspaceId: 1, date: -1 }); // For workspace-wide analytics
 
 const SuggestionSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.Mixed, required: true },

@@ -5,6 +5,8 @@ dotenv.config({ path: 'server/.env' });
 import { validateEnv, isProduction as isProd, isDevelopment as isDev } from './config/env';
 const validatedEnv = validateEnv();
 
+import logger from './config/logger';
+
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
@@ -1219,18 +1221,20 @@ app.use((req, res, next) => {
 
   // Add error handling for HTTP server
   httpServer.on('error', (err) => {
-    console.error('❌ HTTP Server Error:', err);
+    logger.fatal('HTTP Server Error', err, { component: 'HTTPServer' });
     process.exit(1);
   });
 
   // Use HTTP server with WebSocket support instead of Express server directly
   // Bind to all interfaces for Replit external access
-  console.log(`🚀 Attempting to bind HTTP server to port ${port}...`);
+  logger.startup('HTTPServer', 'starting', { port });
   // Listen on IPv6 to accept both IPv4 and IPv6 loopback (fixes cloudflared ::1 origin)
   httpServer.listen(port, "0.0.0.0", async () => {
-    console.log(`✅ HTTP Server successfully bound to port ${port}`);
+    logger.startup('HTTPServer', 'ready', { 
+      port, 
+      externalUrl: `https://${process.env.REPL_SLUG || 'app'}.${process.env.REPL_OWNER || 'user'}.repl.co`
+    });
     log(`serving on port ${port} with WebSocket support`);
-    log(`External URL: https://${process.env.REPL_SLUG || 'app'}.${process.env.REPL_OWNER || 'user'}.repl.co`);
     Logger.info('Server', `Instagram metrics system initialized and ready`);
     
     // P9 INFRASTRUCTURE: Initialize graceful shutdown after server starts
@@ -1253,7 +1257,7 @@ app.use((req, res, next) => {
     }
   });
 })().catch((error) => {
-  console.error('❌ Server startup failed:', error);
+  logger.fatal('Server startup failed', error, { component: 'startup' });
   console.error('Stack trace:', error.stack);
   process.exit(1);
 });
