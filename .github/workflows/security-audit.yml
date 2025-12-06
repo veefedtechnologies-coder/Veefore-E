@@ -126,7 +126,7 @@ jobs:
         run: |
           echo "🔍 Scanning for hardcoded secrets..."
           # Check for common secret patterns
-          if grep -r "sk_live_\|sk_test_\|AKIA\|AIza\|ya29\." . --exclude-dir=node_modules --exclude-dir=.git; then
+          if grep -r "sk_live_\|sk_test_\|AKIA\|AIza\|ya29\.\|ghp_\|sk-ant-\|pplx-\|rw_\|rzp_\|SG\.[A-Za-z0-9]\|BEGIN PRIVATE KEY" . --exclude-dir=node_modules --exclude-dir=.git; then
             echo "❌ Hardcoded secrets found!"
             exit 1
           else

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import admin from 'firebase-admin'
+import { admin } from '../firebase-admin'
 
 export interface AuthenticatedRequest extends Request {
   user?: {

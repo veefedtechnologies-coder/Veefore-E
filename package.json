@@ -21,6 +21,7 @@
     "@google/generative-ai": "^0.24.1",
     "@neondatabase/serverless": "^0.10.4",
     "@sendgrid/mail": "^8.1.5",
+    "@sentry/node": "10.28.0",
     "@tanstack/query-sync-storage-persister": "^5.90.2",
     "@tanstack/react-query": "^5.90.2",
     "@tanstack/react-query-persist-client": "^5.90.2",

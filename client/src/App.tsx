@@ -16,35 +16,38 @@ import { DraftsSection } from './components/dashboard/drafts-section'
 import { CalendarView } from './components/calendar/calendar-view'
 import { AnalyticsDashboard } from './components/analytics/analytics-dashboard'
 import { CreatePost } from './components/create/create-post'
-import VeeGPT from './pages/VeeGPT'
-import Landing from './pages/Landing'
-import Landing3D from './pages/Landing3D'
-import Landing3DAdvanced from './pages/Landing3DAdvanced'
-import SplineKeyboardLanding from './pages/SplineKeyboardLanding'
-import RobotHeroLanding from './pages/RobotHeroLanding'
-import GlobalLandingPage from './pages/GlobalLandingPage'
-import SignUpIntegrated from './pages/SignUpIntegrated'
-import SignIn from './pages/SignIn'
-import Workspaces from './pages/Workspaces'
-import Waitlist from './pages/Waitlist'
-import WaitlistStatus from './pages/WaitlistStatus'
+const VeeGPT = React.lazy(() => import('./pages/VeeGPT'))
+const Landing = React.lazy(() => import('./pages/Landing'))
+const Landing3D = React.lazy(() => import('./pages/Landing3D'))
+const Landing3DAdvanced = React.lazy(() => import('./pages/Landing3DAdvanced'))
+const SplineKeyboardLanding = React.lazy(() => import('./pages/SplineKeyboardLanding'))
+const RobotHeroLanding = React.lazy(() => import('./pages/RobotHeroLanding'))
+const GlobalLandingPage = React.lazy(() => import('./pages/GlobalLandingPage'))
+const SignUpIntegrated = React.lazy(() => import('./pages/SignUpIntegrated'))
+const SignIn = React.lazy(() => import('./pages/SignIn'))
+const Workspaces = React.lazy(() => import('./pages/Workspaces'))
+const Waitlist = React.lazy(() => import('./pages/Waitlist'))
+const WaitlistStatus = React.lazy(() => import('./pages/WaitlistStatus'))
 import OnboardingFlow from './components/onboarding/OnboardingFlow'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
 import LoadingSpinner from './components/LoadingSpinner'
+import AccountNotFoundBanner from './components/AccountNotFoundBanner'
+import WorkspaceCreationOverlay from './components/WorkspaceCreationOverlay'
+import { getAuth } from 'firebase/auth'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest, queryClient } from '@/lib/queryClient'
-import Profile from './pages/Profile'
-import Integration from './pages/Integration'
-import AutomationStepByStep from './pages/AutomationStepByStep'
-import VideoGeneratorAdvanced from './pages/VideoGeneratorAdvanced'
-import AdminPanel from './pages/AdminPanel'
-import AdminLogin from './pages/AdminLogin'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import TermsOfService from './pages/TermsOfService'
-import Settings from './pages/Settings'
-import SecurityDashboard from './pages/SecurityDashboard'
-import TestFixtures from './pages/TestFixtures'
+const Profile = React.lazy(() => import('./pages/Profile'))
+const Integration = React.lazy(() => import('./pages/Integration'))
+const AutomationStepByStep = React.lazy(() => import('./pages/AutomationStepByStep'))
+const VideoGeneratorAdvanced = React.lazy(() => import('./pages/VideoGeneratorAdvanced'))
+const AdminPanel = React.lazy(() => import('./pages/AdminPanel'))
+const AdminLogin = React.lazy(() => import('./pages/AdminLogin'))
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'))
+const TermsOfService = React.lazy(() => import('./pages/TermsOfService'))
+const Settings = React.lazy(() => import('./pages/Settings'))
+const SecurityDashboard = React.lazy(() => import('./pages/SecurityDashboard'))
+const TestFixtures = React.lazy(() => import('./pages/TestFixtures'))
 import { GuidedTour } from './components/walkthrough/GuidedTour'
 import { initializeTheme } from './lib/theme'
 // P6: Frontend SEO, Accessibility & UX System
@@ -57,6 +60,8 @@ import { initializeMobileExcellence } from './lib/mobile-excellence'
 import { initializeSEO } from './lib/seo-optimization';
 import { initializeCoreWebVitals } from './lib/core-web-vitals';
 import { initializeComponentModernization } from './lib/component-modernization';
+import { ProtectedRoute } from './components/ProtectedRoute'
+const EncryptionHealth = React.lazy(() => import('./pages/EncryptionHealth'))
 
 function App() {
   // Initialization guards to prevent re-initialization
@@ -166,22 +171,61 @@ function App() {
     enabled: !!user && !loading,
     retry: 3, // Retry up to 3 times for new users whose account might still be creating
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s
-    staleTime: 30000, // Consider fresh for 30 seconds
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
   })
   
   // Check for Firebase auth in localStorage
   const hasFirebaseAuthInStorage = Object.keys(localStorage).some(key => 
     key.includes('firebase:authUser') && localStorage.getItem(key)
   )
+  useEffect(() => {
+    if (!loading && !user && hasFirebaseAuthInStorage) {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.includes('firebase:authUser')) localStorage.removeItem(key)
+      })
+    }
+  }, [user, loading, hasFirebaseAuthInStorage])
 
   // Pre-fetch workspaces data for faster navigation
-  const { data: workspaces } = useQuery({
+  const { data: workspaces, isLoading: workspacesLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: () => apiRequest('/api/workspaces'),
     enabled: !!user && !loading && !!userData,
-    staleTime: 10 * 60 * 1000, // 10 minutes cache
-    retry: false
+    staleTime: 0,
+    retry: false,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
   })
+
+  const [enforceHang, setEnforceHang] = useState(false)
+  const needEnforce = !!user && !!userData && !workspacesLoading && Array.isArray(workspaces) && (workspaces.length === 0 || !workspaces.some((w: any) => w.isDefault === true))
+  const { data: enforceResult, isLoading: enforcing, error: enforceError, refetch: enforceRefetch } = useQuery({
+    queryKey: ['/api/workspaces/enforce-default'],
+    queryFn: () => apiRequest('/api/workspaces/enforce-default', { method: 'POST' }),
+    enabled: needEnforce,
+    retry: false,
+    staleTime: 5 * 60 * 1000
+  })
+
+  useEffect(() => {
+    if (enforcing) {
+      const t = setTimeout(() => setEnforceHang(true), 7000)
+      return () => clearTimeout(t)
+    } else {
+      setEnforceHang(false)
+    }
+  }, [enforcing])
+
+  useEffect(() => {
+    if (enforceResult && (enforceResult as any).success) {
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
+      queryClient.refetchQueries({ queryKey: ['/api/workspaces'], type: 'active' })
+    }
+  }, [enforceResult])
 
   // ✅ PRODUCTION FIX: Validate workspace ID on app initialization
   useEffect(() => {
@@ -241,16 +285,21 @@ function App() {
     queryKey: ['/api/social-accounts', currentWorkspaceId],
     queryFn: () => currentWorkspaceId ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspaceId}`) : Promise.resolve([]),
     enabled: !!user && !loading && !!currentWorkspaceId,
-    staleTime: 10 * 60 * 1000, // 10 minutes cache for smooth navigation
-    retry: false
+    staleTime: 0,
+    retry: false,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
   })
   
   // Authentication and onboarding guard logic - STRICT ENFORCEMENT
   useEffect(() => {
-    // Wait for both loading states to complete to prevent timing issues
+    // Force-correct: if userData reports not onboarded but workspaces exist, mark modal closed
     if (!loading && !userDataLoading) {
-      // If user is authenticated and fully onboarded, allow full access
-      if (user && userData && userData.isOnboarded) {
+      const workspacesLoaded = !workspacesLoading && Array.isArray(workspaces)
+      const hasWorkspaces = workspacesLoaded && workspaces.length > 0
+      const localOnboarded = localStorage.getItem('isOnboarded') === 'true'
+      if (user && userData && (userData.isOnboarded || hasWorkspaces)) {
         if (location === '/signin' || location === '/signup' || location === '/onboarding') {
           setLocation('/')
         }
@@ -258,10 +307,14 @@ function App() {
         if (isOnboardingModalOpen) {
           setIsOnboardingModalOpen(false)
         }
-      }
-      
-      // STRICT: If user is authenticated but NOT onboarded, FORCE onboarding modal
-      else if (user && userData && !userData.isOnboarded) {
+        // If backend userData.isOnboarded is stale, invalidate to refresh
+        if (!userData.isOnboarded && hasWorkspaces) {
+          queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+        }
+        if (!userData.isOnboarded && localOnboarded) {
+          queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+        }
+      } else if (user && userData && !userData.isOnboarded && workspacesLoaded && !hasWorkspaces) {
         // Always ensure modal is open for non-onboarded users
         if (!isOnboardingModalOpen) {
           setIsOnboardingModalOpen(true)
@@ -284,7 +337,7 @@ function App() {
         }
       }
     }
-  }, [user, loading, userData, userDataLoading, location, setLocation, isOnboardingModalOpen])
+  }, [user, loading, userData, userDataLoading, location, setLocation, isOnboardingModalOpen, workspaces, workspacesLoading])
 
   // Show loading spinner only during initial auth - not for user data loading (better UX)
   if (loading) {
@@ -341,11 +394,13 @@ function App() {
         </div>
       </Route>
 
-      {/* Admin Panel - Accessible with admin token */}
+      {/* Admin Panel - Protected */}
       <Route path="/admin">
-        <div className="min-h-screen bg-gray-50">
-          <AdminPanel />
-        </div>
+        <ProtectedRoute>
+          <div className="min-h-screen bg-gray-50">
+            <AdminPanel />
+          </div>
+        </ProtectedRoute>
       </Route>
 
       {/* 3D Landing Page - Public access */}
@@ -382,13 +437,19 @@ function App() {
 
       {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
       <Route path="/">
-        {!user && !hasFirebaseAuthInStorage && !loading ? (
+        {!user && !loading ? (
           <GlobalLandingPage />
-        ) : !user && (hasFirebaseAuthInStorage || loading) ? (
-          <LoadingSpinner />
         ) : user && userData ? (
           // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+            {(needEnforce && enforcing && !enforceHang) && <WorkspaceCreationOverlay onRetry={() => {}} />}
+            {(needEnforce && ((enforceHang && enforcing) || (!enforcing && enforceError))) && (
+              <WorkspaceCreationOverlay 
+                error={String(enforceError || 'Taking longer than usual')} 
+                onRetry={() => enforceRefetch()} 
+                onSignOut={() => { const auth = getAuth(); auth.signOut(); setLocation('/signin'); }}
+              />
+            )}
             {/* Sidebar - Fixed height with independent scrolling */}
             <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
               <Sidebar 
@@ -467,6 +528,7 @@ function App() {
                     
                     // First, close the onboarding modal immediately
                     setIsOnboardingModalOpen(false)
+                    localStorage.setItem('isOnboarded', 'true')
                     
                     // Invalidate and refetch user data in background
                     queryClient.invalidateQueries({ queryKey: ['/api/user'] })
@@ -488,6 +550,19 @@ function App() {
         ) : userDataLoading ? (
           <LoadingSpinner />
         ) : user && !userData && !userDataLoading && userDataError ? (
+          String(userDataError).includes('404') ? (
+            <AccountNotFoundBanner
+              onSignup={() => setLocation('/signup')}
+              onSignOut={() => { auth.signOut(); setLocation('/signin') }}
+              onAssociate={async () => {
+                try {
+                  await apiRequest('/api/auth/associate-uid', { method: 'POST' })
+                  queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                  window.location.reload()
+                } catch {}
+              }}
+            />
+          ) : (
           // If user exists but userData failed to load after retries, show error
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
             <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
@@ -524,6 +599,7 @@ function App() {
               </div>
             </div>
           </div>
+          )
         ) : (
           <LoadingSpinner />
         )}
@@ -597,8 +673,9 @@ function App() {
             </div>
           </Route>
           
-                     <Route path="/create">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                    <Route path="/create">
+        <ProtectedRoute>
+           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -629,13 +706,15 @@ function App() {
                    {/* Instagram Webhook Listener for Real-time Updates */}
                    <InstagramWebhookListener />
                    <CreatePost />
-                 </main>
-               </div>
+                </main>
              </div>
+           </div>
+        </ProtectedRoute>
            </Route>
           
-                     <Route path="/analytics">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+      <Route path="/analytics">
+        <ProtectedRoute>
+           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -667,12 +746,14 @@ function App() {
                    <InstagramWebhookListener />
                    <AnalyticsDashboard />
                  </main>
-               </div>
-             </div>
+              </div>
+           </div>
+        </ProtectedRoute>
            </Route>
           
-                     <Route path="/inbox">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                    <Route path="/inbox">
+        <ProtectedRoute>
+           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -705,14 +786,16 @@ function App() {
                      <p className="text-gray-600 dark:text-gray-400">Manage your social media conversations here.</p>
                    </div>
                  </main>
-               </div>
-             </div>
+              </div>
+           </div>
+        </ProtectedRoute>
            </Route>
           
 
           
-                     <Route path="/video-generator">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                    <Route path="/video-generator">
+        <ProtectedRoute>
+           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -739,10 +822,12 @@ function App() {
                 </main>
               </div>
             </div>
+        </ProtectedRoute>
           </Route>
           
                      <Route path="/workspaces">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+        <ProtectedRoute>
+           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -773,13 +858,15 @@ function App() {
                    <Workspaces />
                  </main>
                </div>
-             </div>
+            </div>
+        </ProtectedRoute>
            </Route>
 
 
 
                      <Route path="/profile">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+        <ProtectedRoute>
+           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -811,10 +898,11 @@ function App() {
                  </main>
                </div>
              </div>
+        </ProtectedRoute>
            </Route>
 
-                     <Route path="/integration">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+      <Route path="/integration">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -851,7 +939,7 @@ function App() {
            </Route>
 
                      <Route path="/automation">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -876,13 +964,13 @@ function App() {
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                    <AutomationStepByStep />
                  </main>
-               </div>
-             </div>
+              </div>
+           </div>
            </Route>
 
                      {/* VeeGPT Route - with main sidebar */}
            <Route path="/veegpt">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -895,12 +983,13 @@ function App() {
                {/* Main Content Area - VeeGPT takes full remaining space */}
                <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                  <VeeGPT />
-               </div>
-             </div>
-           </Route>
+              </div>
+            </div>
+          </Route>
 
-                     <Route path="/integrations">
-             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+           <Route path="/integrations">
+            <ProtectedRoute>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
                  <Sidebar 
@@ -931,12 +1020,14 @@ function App() {
                    {/* Instagram Webhook Listener for Real-time Updates */}
                    <InstagramWebhookListener />
                    <Integration />
-                 </main>
-               </div>
-             </div>
-           </Route>
+                </main>
+              </div>
+            </div>
+            </ProtectedRoute>
+          </Route>
 
           <Route path="/settings">
+            <ProtectedRoute>
              <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
@@ -975,11 +1066,14 @@ function App() {
                  </div>
                </div>
              </div>
+            </ProtectedRoute>
            </Route>
 
            {/* P8: Security Operations Center Route */}
            <Route path="/security">
-             <SecurityDashboard />
+             <ProtectedRoute>
+               <SecurityDashboard />
+             </ProtectedRoute>
            </Route>
 
           {/* Privacy Policy Route - Public access */}
@@ -1010,7 +1104,38 @@ function App() {
                 </main>
               </div>
             </div>
-          </Route>
+      </Route>
+
+      <Route path="/encryption-health">
+        <ProtectedRoute>
+           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+               <div className="h-screen overflow-y-auto">
+                 <Sidebar 
+                   className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                   isCreateDropdownOpen={isCreateDropdownOpen}
+                   setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                 />
+               </div>
+               <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                 <Header 
+                   onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                 />
+                 {isCreateDropdownOpen && (
+                   <CreateDropdown
+                     isOpen={isCreateDropdownOpen}
+                     onClose={() => setIsCreateDropdownOpen(false)}
+                     onOptionSelect={handleCreateOptionSelect}
+                   />
+                 )}
+                 <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                   <React.Suspense fallback={<div />}> 
+                     <EncryptionHealth />
+                   </React.Suspense>
+                 </main>
+              </div>
+           </div>
+        </ProtectedRoute>
+      </Route>
 
           {/* Terms of Service Route - Public access */}
           <Route path="/terms-of-service">

@@ -9,7 +9,11 @@ export const useUser = () => {
     queryKey: ['/api/user'],
     queryFn: () => apiRequest('/api/user'),
     enabled: !!user && !authLoading,
-    retry: false
+    retry: 2,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true
   })
 
   return {

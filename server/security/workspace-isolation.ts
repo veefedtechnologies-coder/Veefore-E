@@ -372,19 +372,6 @@ export class InstagramAccountConstraints {
       });
 
       if (existingAccount) {
-        // P2-5.5: If the existing account's token is invalid, missing, or expired,
-        // we should allow it to be reconnected to a new workspace.
-        // This prevents "Account Already Connected" false positives when a token has gone stale.
-        const isTokenInvalid = existingAccount.tokenStatus !== 'valid' || 
-                               !existingAccount.expiresAt || 
-                               existingAccount.expiresAt < new Date();
-
-        if (isTokenInvalid) {
-          console.warn(`[P2-5.5] Allowing reconnection for Instagram account ${instagramAccountId} ` +
-                       `because its token in workspace ${existingAccount.workspaceId} is invalid/expired.`);
-          return { isUnique: true };
-        }
-
         return {
           isUnique: false,
           conflictWorkspace: existingAccount.workspaceId,

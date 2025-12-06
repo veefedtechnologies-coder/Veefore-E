@@ -872,44 +872,43 @@ export class MongoStorage implements IStorage {
 
   async createUser(userData: InsertUser): Promise<User> {
     await this.connect();
-    
-    // Generate unique referral code
-    const referralCode = this.generateReferralCode();
-    
-    const user = new UserModel({
-      ...userData,
-      referralCode,
-      isOnboarded: false, // Explicitly ensure new users need onboarding
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    const savedUser = await user.save();
-    const convertedUser = this.convertUser(savedUser);
-    
-    // Check if user already has workspaces to prevent duplicates
-    const existingWorkspaces = await this.getWorkspacesByUserId(convertedUser.id);
-    
-    if (existingWorkspaces.length === 0) {
-      // Only create default workspace if user has none
-      try {
-        const defaultWorkspace = await this.createWorkspace({
-          name: "My VeeFore Workspace",
-          description: "Default workspace for social media management",
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const referralCode = this.generateReferralCode();
+      const user = new UserModel({
+        ...userData,
+        referralCode,
+        isOnboarded: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      const savedUser = await user.save({ session });
+      const convertedUser = this.convertUser(savedUser);
+      const existingWorkspaces = await WorkspaceModel.find({ userId: convertedUser.id }).session(session);
+      if (existingWorkspaces.length === 0) {
+        const name = userData.displayName ? `${userData.displayName}'s Workspace` : 'My VeeFore Workspace';
+        const defaultWorkspace = new WorkspaceModel({
+          name,
+          description: 'Default workspace for social media management',
           userId: convertedUser.id,
-          theme: "space",
-          isDefault: true
+          theme: 'space',
+          isDefault: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
-        console.log(`[USER CREATION] Created default workspace for user ${convertedUser.id}: ${defaultWorkspace.id}`);
-      } catch (error) {
-        console.error(`[USER CREATION] Failed to create default workspace for user ${convertedUser.id}:`, error);
-        // Don't fail user creation if workspace creation fails
+        await defaultWorkspace.save({ session });
+        console.log(`[USER CREATION] Created default workspace for user ${convertedUser.id}: ${defaultWorkspace._id}`);
       }
-    } else {
-      console.log(`[USER CREATION] User ${convertedUser.id} already has ${existingWorkspaces.length} workspace(s), skipping default creation`);
+      await session.commitTransaction();
+      session.endSession();
+      return this.convertUser(savedUser);
+    } catch (error) {
+      console.error('[USER CREATION] Atomic creation failed - rolling back:', error);
+      await session.abortTransaction();
+      session.endSession();
+      throw new Error('Workspace creation failed during signup');
     }
-    
-    return convertedUser;
   }
 
   async updateUser(id: number | string, updates: Partial<User>): Promise<User> {
@@ -1073,6 +1072,11 @@ export class MongoStorage implements IStorage {
 
   async deleteWorkspace(id: number | string): Promise<void> {
     await this.connect();
+    const ws = await WorkspaceModel.findOne({ _id: id });
+    if (!ws) throw new Error('Workspace not found');
+    if (ws.isDefault === true) {
+      throw new Error('Default workspace cannot be deleted');
+    }
     await WorkspaceModel.findOneAndDelete({ _id: id });
   }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, memo } from 'react'
+import AuthFailureBanner from '@/components/AuthFailureBanner'
 import { Button } from '@/components/ui/button'
 import { Eye, EyeOff, ArrowLeft, Sparkles, Brain, Play, Pause } from 'lucide-react'
 import { Link, useLocation } from 'wouter'
@@ -61,6 +62,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
   const { toast } = useToast()
   const [, setLocation] = useLocation()
   const [isLoading, setIsLoading] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
   // Remove all unnecessary state variables that cause re-renders
   // const [currentDemo, setCurrentDemo] = useState(0)
   // const [isPlaying, setIsPlaying] = useState(true)
@@ -238,20 +240,14 @@ const SignIn = ({ onNavigate }: SignInProps) => {
           // Don't block user - Firebase auth succeeded, backend will auto-create user on next request
         }
         
-        toast({
-          title: "Success",
-          description: "Signed in successfully!",
-        })
+        setAuthError(null)
+        toast({ title: "Success", description: "Signed in successfully!" })
         
         // Redirect to home page
         setLocation('/')
       } catch (error: any) {
         console.error('Sign in error:', error)
-        toast({
-          title: "Error",
-          description: error.message || "Failed to sign in. Please try again.",
-          variant: "destructive",
-        })
+        setAuthError(error?.message || 'Failed to sign in. Please try again.')
       } finally {
         setIsLoading(false)
       }
@@ -303,10 +299,16 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         })
       })
 
+      const linkJson = await linkResponse.json().catch(() => ({}))
       if (!linkResponse.ok) {
-        const errorData = await linkResponse.json().catch(() => ({ message: 'Failed to link user' }))
-        console.error('❌ Backend linking failed:', errorData)
-        throw new Error(errorData.message || 'Failed to link user account')
+        console.error('❌ Backend linking failed:', linkJson)
+        setAuthError(linkJson?.message || 'Failed to link user account')
+        return
+      }
+      if (linkJson?.degraded) {
+        setAuthError('We linked your account in safe mode. You may need to retry if data looks outdated.')
+      } else {
+        setAuthError(null)
       }
 
       console.log('✅ User linked with backend successfully')
@@ -338,11 +340,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         errorMessage = error.message
       }
       
-      toast({
-        title: "Google Sign-in Failed",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      setAuthError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -654,6 +652,17 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                     Sign in to your VeeFore workspace
                   </p>
                 </div>
+
+                {/* Auth failure banner */}
+                {authError && (
+                  <AuthFailureBanner
+                    message={authError}
+                    onRetry={() => { setAuthError(null); handleGoogleSignIn(); }}
+                    onUseEmail={() => { setAuthError(null); }}
+                    onSignOut={() => { auth.signOut(); setLocation('/signin'); }}
+                    onSupport={() => { window.open('mailto:support@veefore.com?subject=Sign-in%20help', '_blank'); }}
+                  />
+                )}
 
                 {/* Completely New Card-Style Sign In Form */}
                 <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/30 dark:to-indigo-900/30 p-8 rounded-3xl border border-blue-100/50 dark:border-blue-600/50 shadow-xl backdrop-blur-sm">

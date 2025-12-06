@@ -267,18 +267,17 @@ function IntegrationContent() {
     queryKey: ['/api/social-accounts', currentWorkspace?.id || 'loading'],
     queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
     enabled: !!currentWorkspace?.id,
-    staleTime: 0, // Always consider data stale for background updates
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-    refetchOnMount: 'always', // Always get fresh data, but don't show loading
-    refetchOnWindowFocus: true, // Background refresh on focus
-    refetchInterval: 30 * 1000, // Background refresh every 30 seconds
-    notifyOnChangeProps: ['data'], // Only notify UI when data actually changes
-    placeholderData: (previousData) => previousData // Keep showing old data while new data loads
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
+    notifyOnChangeProps: ['data'],
+    placeholderData: []
   })
 
-  // CRITICAL FIX: Show skeleton by default until EVERYTHING is ready
-  // This prevents blank flash caused by useCurrentWorkspace() waiting for workspaces query
-  const shouldShowSkeleton = !currentWorkspace?.id || isLoading || connectedAccounts === undefined
+  // Show skeleton only when a workspace exists and data is loading
+  const shouldShowSkeleton = !!currentWorkspace?.id && isLoading
 
   console.log('Integration state:', { 
     isLoading, 

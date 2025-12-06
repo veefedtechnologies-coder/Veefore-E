@@ -17,6 +17,7 @@ export function SocialAccounts() {
   
   // ✅ CRITICAL FIX: Clear cache on component mount to ensure fresh data
   React.useEffect(() => {
+    if ((import.meta as any).env?.PROD) return;
     // Clear React Query cache for social accounts on mount
     queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
     queryClient.removeQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
