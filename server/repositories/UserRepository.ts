@@ -1,8 +1,11 @@
-import { FilterQuery } from 'mongoose';
+import mongoose, { FilterQuery } from 'mongoose';
 import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { User, IUser } from '../models/User';
+import { WorkspaceModel } from '../models/Workspace/Workspace';
+import { generateReferralCode } from '../storage/converters';
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
+import { InsertUser } from '@shared/schema';
 
 export class UserRepository extends BaseRepository<IUser> {
   constructor() {
@@ -415,6 +418,47 @@ export class UserRepository extends BaseRepository<IUser> {
     } catch (error) {
       logger.db.error('markEmailVerified', error, { entityName: this.entityName, id });
       throw new DatabaseError('Failed to mark email as verified', error as Error);
+    }
+  }
+
+  async createWithDefaultWorkspace(userData: InsertUser): Promise<IUser> {
+    const startTime = Date.now();
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const referralCode = generateReferralCode();
+      const user = new this.model({
+        ...userData,
+        referralCode,
+        isOnboarded: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      const savedUser = await user.save({ session });
+      const userId = savedUser._id.toString();
+      const existingWorkspaces = await WorkspaceModel.find({ userId }).session(session);
+      if (existingWorkspaces.length === 0) {
+        const name = userData.displayName ? `${userData.displayName}'s Workspace` : 'My VeeFore Workspace';
+        const defaultWorkspace = new WorkspaceModel({
+          name,
+          description: 'Default workspace for social media management',
+          userId,
+          theme: 'space',
+          isDefault: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        await defaultWorkspace.save({ session });
+      }
+      await session.commitTransaction();
+      session.endSession();
+      logger.db.query('createWithDefaultWorkspace', this.entityName, Date.now() - startTime, { userId });
+      return savedUser;
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      logger.db.error('createWithDefaultWorkspace', error, { entityName: this.entityName });
+      throw new DatabaseError('Workspace creation failed during signup', error as Error);
     }
   }
 }

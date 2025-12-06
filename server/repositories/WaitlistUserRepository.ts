@@ -1,7 +1,17 @@
+import mongoose from 'mongoose';
 import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { WaitlistUser, IWaitlistUser } from '../models/User/WaitlistUser';
+import { User as UserModel } from '../models/User/User';
+import { WorkspaceModel } from '../models/Workspace/Workspace';
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
+import { User, Workspace } from '@shared/schema';
+import {
+  convertUser,
+  convertWorkspace,
+  convertWaitlistUser,
+  generateReferralCode
+} from '../storage/converters';
 
 export class WaitlistUserRepository extends BaseRepository<IWaitlistUser> {
   constructor() {
@@ -91,6 +101,92 @@ export class WaitlistUserRepository extends BaseRepository<IWaitlistUser> {
 
   async markFeedbackSubmitted(userId: string): Promise<IWaitlistUser | null> {
     return this.updateById(userId, { feedbackSubmitted: true, updatedAt: new Date() });
+  }
+
+  async promoteToUser(id: string): Promise<{
+    user: User;
+    workspace: Workspace;
+    discountCode: string;
+    trialDays: number;
+  }> {
+    const startTime = Date.now();
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const waitlistUserDoc = await this.model.findById(id);
+      if (!waitlistUserDoc) {
+        throw new Error('Waitlist user not found');
+      }
+      const waitlistUser = convertWaitlistUser(waitlistUserDoc);
+
+      const discountCode = `EARLY50_${Date.now().toString(36).toUpperCase()}`;
+      const discountExpiry = new Date();
+      discountExpiry.setDate(discountExpiry.getDate() + 30);
+
+      const trialDays = Math.min(14 + waitlistUser.referralCount, 30);
+      const trialExpiry = new Date();
+      trialExpiry.setDate(trialExpiry.getDate() + trialDays);
+
+      const referralCode = generateReferralCode();
+      const newUserDoc = new UserModel({
+        email: waitlistUser.email,
+        username: waitlistUser.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now(),
+        displayName: waitlistUser.name,
+        credits: 100 + (waitlistUser.referralCount * 20),
+        plan: 'Free',
+        referredBy: waitlistUser.referredBy,
+        isEmailVerified: true,
+        status: 'early_access',
+        trialExpiresAt: trialExpiry,
+        discountCode,
+        discountExpiresAt: discountExpiry,
+        hasUsedWaitlistBonus: false,
+        referralCode,
+        isOnboarded: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      const savedUser = await newUserDoc.save({ session });
+      const user = convertUser(savedUser);
+
+      const workspaceName = `${waitlistUser.name}'s Workspace`;
+      const newWorkspaceDoc = new WorkspaceModel({
+        name: workspaceName,
+        description: 'Early access workspace',
+        userId: user.id,
+        theme: 'space',
+        isDefault: true,
+        credits: 50,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      const savedWorkspace = await newWorkspaceDoc.save({ session });
+      const workspace = convertWorkspace(savedWorkspace);
+
+      await this.model.updateOne(
+        { _id: id },
+        { status: 'early_access', updatedAt: new Date() },
+        { session }
+      );
+
+      await session.commitTransaction();
+      session.endSession();
+
+      logger.db.query('promoteToUser', this.entityName, Date.now() - startTime, { id });
+
+      return {
+        user,
+        workspace,
+        discountCode,
+        trialDays
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      logger.db.error('promoteToUser', error, { entityName: this.entityName, id });
+      throw error;
+    }
   }
 }
 
