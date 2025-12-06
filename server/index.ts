@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
 dotenv.config({ path: 'server/.env' });
+
+import { validateEnv, isProduction as isProd, isDevelopment as isDev } from './config/env';
+const validatedEnv = validateEnv();
+
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
@@ -79,8 +83,8 @@ const fallbackLog = (message: string, source = "express") => {
 let setupVite: any = null;
 let serveStatic: any = null;
 
-const isProduction = process.env.NODE_ENV === "production";
-const isDevelopment = process.env.NODE_ENV === "development";
+const isProduction = isProd();
+const isDevelopment = isDev();
 
 // P1-6 SECURITY: Initialize comprehensive key management system
 const keyManagementSystem = initializeKeyManagement();
