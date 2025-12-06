@@ -172,19 +172,7 @@ export class MongoStorage implements IStorage {
 
   async getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined> {
     await this.connect();
-    console.log(`[MONGODB DEBUG] Looking up user by firebaseUid: ${firebaseUid}`);
     const user = await userRepository.findByFirebaseUid(firebaseUid);
-    if (user) {
-      console.log(`[MONGODB DEBUG] Found user:`, {
-        id: user._id.toString(),
-        email: user.email,
-        username: user.username,
-        isOnboarded: user.isOnboarded,
-        firebaseUid: user.firebaseUid
-      });
-    } else {
-      console.log(`[MONGODB DEBUG] No user found with firebaseUid: ${firebaseUid}`);
-    }
     return user ? convertUser(user) : undefined;
   }
 
@@ -248,13 +236,11 @@ export class MongoStorage implements IStorage {
           updatedAt: new Date()
         });
         await defaultWorkspace.save({ session });
-        console.log(`[USER CREATION] Created default workspace for user ${convertedUser.id}: ${defaultWorkspace._id}`);
       }
       await session.commitTransaction();
       session.endSession();
       return convertUser(savedUser);
     } catch (error) {
-      console.error('[USER CREATION] Atomic creation failed - rolling back:', error);
       await session.abortTransaction();
       session.endSession();
       throw new Error('Workspace creation failed during signup');
@@ -263,18 +249,10 @@ export class MongoStorage implements IStorage {
 
   async updateUser(id: number | string, updates: Partial<User>): Promise<User> {
     await this.connect();
-    
-    console.log(`[MONGODB DEBUG] Updating user with ID: ${id} (type: ${typeof id})`);
-    console.log(`[MONGODB DEBUG] Updates:`, updates);
-    
     const user = await userRepository.updateById(id.toString(), { ...updates, updatedAt: new Date() });
-    
     if (!user) {
-      console.error(`[MONGODB DEBUG] User not found with ID: ${id}`);
       throw new Error('User not found');
     }
-    
-    console.log(`[MONGODB DEBUG] Successfully updated user: ${user._id}, isOnboarded: ${user.isOnboarded}`);
     return convertUser(user);
   }
 
@@ -297,63 +275,41 @@ export class MongoStorage implements IStorage {
     
     // Handle invalid IDs
     if (!id || id === 'undefined' || id === 'null') {
-      console.log('[MONGODB DEBUG] getWorkspace - Invalid ID provided:', id);
       return undefined;
     }
     
     try {
       const idString = id.toString();
-      console.log('[MONGODB DEBUG] getWorkspace - Processing ID:', idString, 'length:', idString.length);
       
       // Only accept valid 24-character ObjectIds
       if (idString.length !== 24) {
-        console.log('[MONGODB DEBUG] Invalid ID format (must be 24 chars), returning undefined');
         return undefined;
       }
       
       const workspace = await workspaceRepository.findById(idString);
-      
-      if (workspace) {
-        console.log('[MONGODB DEBUG] Workspace found:', workspace._id);
-        return convertWorkspace(workspace);
-      } else {
-        console.log('[MONGODB DEBUG] No workspace found for ID:', idString);
-        return undefined;
-      }
+      return workspace ? convertWorkspace(workspace) : undefined;
       
     } catch (objectIdError) {
-      console.error('[MONGODB DEBUG] getWorkspace - ObjectId conversion error:', objectIdError);
       return undefined;
     }
   }
 
   async getWorkspacesByUserId(userId: number | string): Promise<Workspace[]> {
     await this.connect();
-    console.log('[MONGODB DEBUG] getWorkspacesByUserId - userId:', userId, typeof userId);
-    
-    try {
-      const workspaces = await workspaceRepository.findByUserId(userId.toString());
-      console.log('[MONGODB DEBUG] Found workspaces:', workspaces.length);
-      return workspaces.map(ws => convertWorkspace(ws));
-    } catch (error) {
-      console.error('[MONGODB DEBUG] getWorkspacesByUserId error:', error);
-      throw error;
-    }
+    const workspaces = await workspaceRepository.findByUserId(userId.toString());
+    return workspaces.map(ws => convertWorkspace(ws));
   }
 
   async getDefaultWorkspace(userId: number | string): Promise<Workspace | undefined> {
     await this.connect();
-    console.log('[MONGODB DEBUG] Looking for workspace with userId:', userId, typeof userId);
     
     // Try to find default workspace first
     let workspace = await workspaceRepository.findDefaultByUserId(userId.toString());
-    console.log('[MONGODB DEBUG] Default workspace found:', !!workspace);
     
     // If no default workspace, get the first workspace for this user
     if (!workspace) {
       const workspaces = await workspaceRepository.findByUserId(userId.toString());
       workspace = workspaces.length > 0 ? workspaces[0] : null;
-      console.log('[MONGODB DEBUG] Any workspace found:', !!workspace);
     }
     
     return workspace ? convertWorkspace(workspace) : undefined;
@@ -378,15 +334,12 @@ export class MongoStorage implements IStorage {
 
   async updateWorkspaceCredits(id: number | string, credits: number): Promise<void> {
     await this.connect();
-    console.log(`[CREDIT UPDATE] Updating workspace ${id} credits to ${credits}`);
     
     const result = await workspaceRepository.updateById(id.toString(), { credits, updatedAt: new Date() });
     
     if (!result) {
       throw new Error('Workspace not found for credit update');
     }
-    
-    console.log(`[CREDIT UPDATE] Successfully updated workspace ${id} credits to ${credits}`);
   }
 
   async deleteWorkspace(id: number | string): Promise<void> {
@@ -417,9 +370,7 @@ export class MongoStorage implements IStorage {
   // Social account operations - delegating to socialAccountRepository
   async getSocialAccount(id: number | string): Promise<SocialAccount | undefined> {
     await this.connect();
-    console.log(`[MONGODB DEBUG] Getting social account with ID: ${id} (type: ${typeof id})`);
     const account = await socialAccountRepository.findById(id.toString());
-    console.log(`[MONGODB DEBUG] Find result:`, account ? 'Found' : 'Not found');
     return account ? convertSocialAccount(account) : undefined;
   }
 
@@ -432,41 +383,14 @@ export class MongoStorage implements IStorage {
   async getSocialAccountsByWorkspace(workspaceId: any): Promise<SocialAccount[]> {
     await this.connect();
     
-    console.log(`[MONGODB DEBUG] getSocialAccountsByWorkspace query: workspaceId=${workspaceId} (${typeof workspaceId})`);
-    console.log(`[MONGODB DEBUG] Mongoose connection state:`, mongoose.connection.readyState);
-    console.log(`[MONGODB DEBUG] Database name:`, mongoose.connection.db?.databaseName);
-    
-    // Test direct connection first
-    try {
-      const mongoClient = mongoose.connection.getClient();
-      const db = mongoClient.db('veeforedb');
-      const collection = db.collection('socialaccounts');
-      
-      const directResult = await collection.find({ workspaceId: workspaceId.toString() }).toArray();
-      console.log(`[MONGODB DEBUG] Direct collection query found: ${directResult.length} accounts`);
-      
-      if (directResult.length > 0) {
-        console.log(`[MONGODB DEBUG] Direct result sample:`, {
-          _id: directResult[0]._id,
-          username: directResult[0].username,
-          platform: directResult[0].platform,
-          workspaceId: directResult[0].workspaceId,
-          followers: directResult[0].followersCount
-        });
-      }
-    } catch (directError) {
-      console.log(`[MONGODB DEBUG] Direct query failed:`, directError);
-    }
-    
-    // Now try Mongoose query with both string and numeric workspaceId
     const workspaceIdStr = workspaceId.toString();
     const workspaceIdFirst6 = workspaceIdStr.substring(0, 6);
     
+    // Tolerant lookup: Query by multiple workspace ID variations to handle legacy/truncated IDs
     const accounts = await SocialAccountModel.find({
       $or: [
         { workspaceId: workspaceIdStr },
         { workspaceId: workspaceId },
-        // Handle truncated workspace IDs that need fixing
         { workspaceId: workspaceIdFirst6 },
         { workspaceId: parseInt(workspaceIdFirst6) }
       ]
@@ -474,59 +398,17 @@ export class MongoStorage implements IStorage {
     
     // Auto-fix workspace IDs that are truncated
     for (const account of accounts) {
-      const accountWorkspaceId = account.workspaceId.toString();
+      const accountWorkspaceId = account.workspaceId?.toString() || '';
       const expectedWorkspaceId = workspaceIdStr;
       
-      // Check if workspace ID needs fixing (is truncated or mismatched)
-      if (accountWorkspaceId !== expectedWorkspaceId && 
-          (accountWorkspaceId === workspaceIdFirst6 || 
+      if (accountWorkspaceId !== expectedWorkspaceId &&
+          (accountWorkspaceId === workspaceIdFirst6 ||
            accountWorkspaceId === parseInt(workspaceIdFirst6).toString())) {
-        console.log(`[MONGODB DEBUG] Auto-fixing workspace ID for ${account.username}: ${accountWorkspaceId} -> ${expectedWorkspaceId}`);
         await SocialAccountModel.updateOne(
           { _id: account._id },
           { workspaceId: expectedWorkspaceId, updatedAt: new Date() }
         );
         account.workspaceId = expectedWorkspaceId;
-      }
-    }
-    
-    console.log(`[MONGODB DEBUG] Mongoose query result: found ${accounts.length} accounts`);
-    if (accounts.length > 0) {
-      accounts.forEach((account, index) => {
-        console.log(`[MONGODB DEBUG] Account ${index + 1}: @${account.username} (${account.platform}) - followers: ${account.followersCount}, media: ${account.mediaCount}`);
-      });
-      
-      // Force refresh YouTube data from database to fix persistent caching issue
-      for (const account of accounts) {
-        if (account.platform === 'youtube') {
-          console.log(`[YOUTUBE CACHE FIX] Forcing YouTube data refresh for account: ${account.username}`);
-          try {
-            // Get fresh data directly from database
-            const freshYouTubeData = await SocialAccountModel.findById(account._id);
-            if (freshYouTubeData) {
-              console.log(`[YOUTUBE CACHE FIX] Fresh YouTube data - subscribers: ${freshYouTubeData.followersCount}, videos: ${freshYouTubeData.mediaCount}`);
-              // Update the account object with fresh data
-              account.followersCount = freshYouTubeData.followersCount || 0;
-              account.mediaCount = freshYouTubeData.mediaCount || 0;
-              account.subscriberCount = freshYouTubeData.subscriberCount || freshYouTubeData.followersCount || 0;
-              account.videoCount = freshYouTubeData.videoCount || freshYouTubeData.mediaCount || 0;
-            }
-          } catch (refreshError) {
-            console.error(`[YOUTUBE CACHE FIX] Error refreshing YouTube data:`, refreshError);
-          }
-        }
-      }
-    } else {
-      // Debug: check if any accounts exist at all
-      const allAccounts = await SocialAccountModel.find({}).limit(5);
-      console.log(`[MONGODB DEBUG] Total accounts in collection: ${allAccounts.length}`);
-      if (allAccounts.length > 0) {
-        console.log(`[MONGODB DEBUG] Sample account:`, {
-          _id: allAccounts[0]._id,
-          workspaceId: allAccounts[0].workspaceId,
-          platform: allAccounts[0].platform,
-          username: allAccounts[0].username
-        });
       }
     }
     
@@ -566,9 +448,7 @@ export class MongoStorage implements IStorage {
 
   async getAllSocialAccounts(): Promise<SocialAccount[]> {
     await this.connect();
-    console.log('[MONGODB DEBUG] getAllSocialAccounts called');
     const accounts = await socialAccountRepository.findAll({ isActive: true });
-    console.log(`[MONGODB DEBUG] Active accounts returned: ${accounts.length}`);
     return accounts.map(account => convertSocialAccount(account));
   }
 
@@ -576,15 +456,12 @@ export class MongoStorage implements IStorage {
 
   async getSocialAccountByPlatform(workspaceId: number | string, platform: string): Promise<SocialAccount | undefined> {
     await this.connect();
-    console.log(`[MONGODB DEBUG] Looking for social account with workspaceId: ${workspaceId} (${typeof workspaceId}), platform: ${platform}`);
     const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId.toString(), platform as any);
-    console.log(`[MONGODB DEBUG] Found social account:`, account ? `${account.platform} @${account.username}` : 'none');
     return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialAccountByPageId(pageId: string): Promise<SocialAccount | undefined> {
     await this.connect();
-    console.log(`[MONGODB DEBUG] getSocialAccountByPageId called with pageId: ${pageId}`);
     
     try {
       // First try to find by pageId field
@@ -596,7 +473,6 @@ export class MongoStorage implements IStorage {
       
       // If not found, try to find by accountId field (Instagram stores ID here)
       if (!account) {
-        console.log(`[MONGODB DEBUG] No account found by pageId, trying accountId...`);
         account = await SocialAccountModel.findOne({ 
           accountId: pageId,
           platform: 'instagram',
@@ -604,21 +480,8 @@ export class MongoStorage implements IStorage {
         });
       }
       
-      console.log(`[MONGODB DEBUG] Found account by pageId/accountId:`, account ? 'Yes' : 'No');
-      
-      if (account) {
-        console.log(`[MONGODB DEBUG] Account details:`, {
-          id: account._id,
-          username: account.username,
-          workspaceId: account.workspaceId,
-          accountId: account.accountId,
-          pageId: account.pageId
-        });
-      }
-      
       return account ? convertSocialAccount(account) : undefined;
     } catch (error) {
-      console.error(`[MONGODB DEBUG] getSocialAccountByPageId error:`, error);
       return undefined;
     }
   }
@@ -639,12 +502,6 @@ export class MongoStorage implements IStorage {
 
   async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
     await this.connect();
-    
-    console.log('[MONGODB DEBUG] createSocialAccount input:', {
-      ...account,
-      accessToken: account.accessToken ? '[REDACTED]' : undefined,
-      refreshToken: account.refreshToken ? '[REDACTED]' : undefined
-    });
     
     // SECURITY: Encrypt tokens before storing in database
     const socialAccountData: any = {
@@ -681,12 +538,6 @@ export class MongoStorage implements IStorage {
   async updateSocialAccount(id: number | string, updates: Partial<SocialAccount>): Promise<SocialAccount> {
     await this.connect();
     
-    console.log(`[MONGODB DEBUG] Updating social account with ID: ${id} (type: ${typeof id})`);
-    const logSafeUpdates = { ...updates };
-    if (logSafeUpdates.accessToken) logSafeUpdates.accessToken = '[REDACTED]';
-    if (logSafeUpdates.refreshToken) logSafeUpdates.refreshToken = '[REDACTED]';
-    console.log(`[MONGODB DEBUG] Updates:`, logSafeUpdates);
-    
     // SECURITY: Prepare encrypted updates for tokens
     const encryptedUpdates: any = { ...updates, updatedAt: new Date() };
 
@@ -707,26 +558,20 @@ export class MongoStorage implements IStorage {
     const updatedAccount = await socialAccountRepository.updateById(id.toString(), encryptedUpdates);
     
     if (!updatedAccount) {
-      console.error(`[MONGODB DEBUG] Social account not found with ID: ${id}`);
       throw new Error('Social account not found');
     }
     
-    console.log(`[MONGODB DEBUG] Successfully updated social account: ${updatedAccount._id}`);
     return convertSocialAccount(updatedAccount);
   }
 
   async deleteSocialAccount(id: number | string): Promise<void> {
     await this.connect();
-    console.log(`[MONGODB DELETE] Attempting to delete social account with ID: ${id} (type: ${typeof id})`);
     
     const deleted = await socialAccountRepository.deleteById(id.toString());
     
     if (!deleted) {
-      console.log(`[MONGODB DELETE] No account found with ID: ${id}`);
       throw new Error(`Social account with id ${id} not found`);
     }
-    
-    console.log(`[MONGODB DELETE] Successfully deleted social account`);
   }
 
   // Content operations - delegating to contentRepository
