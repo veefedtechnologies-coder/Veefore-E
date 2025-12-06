@@ -2,21 +2,21 @@ import { auth } from './firebase'
 
 // Get the correct API base URL based on current environment
 function getApiBaseUrl(): string {
+  // First check for environment variable (set in Vite config)
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
   const currentHost = window.location.hostname;
-  const currentProtocol = window.location.protocol;
   
-  // If we're on localhost, use HTTP
-  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-    return 'http://localhost:5000';
+  // If we're on a known production domain, use HTTPS explicitly
+  if (currentHost.includes('veefore.com')) {
+    return `https://${currentHost}`;
   }
   
-  // If we're on the Cloudflare tunnel, use HTTPS
-  if (currentHost === 'veefore-webhook.veefore.com') {
-    return 'https://veefore-webhook.veefore.com';
-  }
-  
-  // Default to current protocol and host
-  return `${currentProtocol}//${currentHost}`;
+  // For all environments (localhost, Replit proxy, etc.), use window.location.origin
+  // This includes protocol, hostname, and port - ensuring proper URL construction
+  return window.location.origin;
 }
 
 export class ApiClient {

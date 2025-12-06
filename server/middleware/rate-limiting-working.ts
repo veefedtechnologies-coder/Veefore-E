@@ -277,6 +277,42 @@ export const socialMediaRateLimiter = async (req: Request, res: Response, next: 
 };
 
 /**
+ * P1-3: AI endpoints rate limiter - Cost protection for AI API calls
+ * Stricter limits to prevent credit/cost overruns from OpenAI/Claude/Gemini
+ * 10 requests per user per 5 minutes
+ */
+export const aiRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  const user = (req as any).user;
+  const key = user?.id ? `ai_rl:user:${user.id}` : `ai_rl:ip:${req.ip}`;
+  const windowMs = 5 * 60 * 1000; // 5 minutes
+  const maxRequests = 10;
+  
+  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
+  
+  if (rateLimitInfo.blocked) {
+    const userId = user?.id || 'anonymous';
+    console.log(`🚨 AI RATE LIMIT: Blocked ${userId} (${rateLimitInfo.requests}/${maxRequests})`);
+    
+    // Track AI rate limit violations for monitoring
+    if (redisClient) {
+      const today = new Date().toISOString().slice(0, 10);
+      redisClient.incr(`ai_rate_limit_violations:${today}`).catch(console.error);
+      // Track per-user for abuse detection
+      redisClient.incr(`ai_rate_limit:${userId}:${today}`).catch(console.error);
+    }
+    
+    return res.status(429).json({
+      error: 'AI rate limit exceeded',
+      message: 'Too many AI requests. Please wait 5 minutes before generating more content.',
+      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
+      securityNote: 'This limit protects against excessive AI usage and helps manage costs.'
+    });
+  }
+  
+  next();
+};
+
+/**
  * P1-3: Rate limiting analytics
  */
 export const getRateLimitStats = async () => {
@@ -288,11 +324,13 @@ export const getRateLimitStats = async () => {
     const [
       globalViolations,
       authBruteForce,
-      progressiveBlocks
+      progressiveBlocks,
+      aiRateLimitViolations
     ] = await Promise.all([
       redisClient.get(`rate_limit_violations:${today}`),
       redisClient.get(`auth_brute_force:${today}`),
-      redisClient.get(`progressive_blocks:${today}`)
+      redisClient.get(`progressive_blocks:${today}`),
+      redisClient.get(`ai_rate_limit_violations:${today}`)
     ]);
     
     return {
@@ -300,9 +338,11 @@ export const getRateLimitStats = async () => {
       globalViolations: parseInt(globalViolations || '0'),
       authBruteForce: parseInt(authBruteForce || '0'),
       progressiveBlocks: parseInt(progressiveBlocks || '0'),
+      aiRateLimitViolations: parseInt(aiRateLimitViolations || '0'),
       totalSecurityEvents: parseInt(globalViolations || '0') + 
                           parseInt(authBruteForce || '0') + 
-                          parseInt(progressiveBlocks || '0')
+                          parseInt(progressiveBlocks || '0') +
+                          parseInt(aiRateLimitViolations || '0')
     };
   } catch (error) {
     console.error('❌ Error getting rate limit stats:', error);
@@ -351,6 +391,16 @@ export const checkSecurityAlerts = async () => {
     });
   }
   
+  // AI abuse detection - cost protection alert
+  if (stats.aiRateLimitViolations > 30) {
+    alerts.push({
+      type: 'AI_ABUSE_DETECTED',
+      severity: 'HIGH',
+      message: `High AI rate limit violations: ${stats.aiRateLimitViolations} attempts today - potential credit abuse`,
+      count: stats.aiRateLimitViolations
+    });
+  }
+  
   return alerts;
 };
 
@@ -367,26 +417,4 @@ export const checkRateLimitHealth = async (): Promise<boolean> => {
     console.error('❌ Rate limiting health check failed:', error);
     return false;
   }
-};
-
-export const aiRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
-  const path = req.path.toLowerCase();
-  const isAi = path.includes('/ai') || path.includes('openai') || path.includes('thumbnail') || path.includes('story') || path.includes('caption');
-  if (!isAi) return next();
-  const user = (req as any).user;
-  const key = user?.id ? `ai_rl:user:${user.id}` : `ai_rl:ip:${req.ip}`;
-  const windowMs = 60 * 1000;
-  let maxRequests = 10;
-  if (user?.plan === 'business') maxRequests = 60;
-  else if (user?.plan === 'pro') maxRequests = 30;
-  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
-  if (rateLimitInfo.blocked) {
-    return res.status(429).json({
-      error: 'AI rate limit exceeded',
-      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
-      limit: maxRequests,
-      remaining: 0
-    });
-  }
-  next();
 };

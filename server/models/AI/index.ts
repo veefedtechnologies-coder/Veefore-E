@@ -2,3 +2,4 @@ export { CreativeBriefSchema, CreativeBriefModel, ICreativeBrief } from './Creat
 export { ContentRepurposeSchema, ContentRepurposeModel, IContentRepurpose } from './ContentRepurpose';
 export { CompetitorAnalysisSchema, CompetitorAnalysisModel, ICompetitorAnalysis } from './CompetitorAnalysis';
 export { FeatureUsageSchema, FeatureUsageModel, IFeatureUsage } from './FeatureUsage';
+export { AIUsageLogSchema, AIUsageLogModel, IAIUsageLog } from './AIUsageLog';
