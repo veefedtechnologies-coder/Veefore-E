@@ -597,29 +597,12 @@ export class MongoStorage implements IStorage {
 
   async getScheduledContent(workspaceId?: number): Promise<Content[]> {
     await this.connect();
-    console.log(`[MONGODB DEBUG] getScheduledContent workspaceId:`, workspaceId);
     const contents = await contentRepository.findScheduledContent(workspaceId?.toString());
-    console.log(`[MONGODB DEBUG] Found ${contents.length} scheduled content items`);
-    
-    if (contents.length > 0) {
-      contents.forEach((content, index) => {
-        console.log(`[MONGODB DEBUG] Content ${index + 1}:`, {
-          id: content._id.toString(),
-          title: content.title,
-          workspaceId: content.workspaceId,
-          status: content.status,
-          scheduledAt: content.scheduledAt
-        });
-      });
-    }
-    
     return contents.map(content => convertContent(content));
   }
 
   async createContent(content: InsertContent): Promise<Content> {
     await this.connect();
-    
-    console.log('[MONGODB DEBUG] Creating content with data:', content);
     
     const contentData = {
       workspaceId: content.workspaceId.toString(),
@@ -636,11 +619,7 @@ export class MongoStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    console.log('[MONGODB DEBUG] Content data to save:', contentData);
-
     const saved = await contentRepository.create(contentData);
-    
-    console.log('[MONGODB DEBUG] Content saved successfully with ID:', saved._id.toString());
     
     return convertContent(saved);
   }
@@ -654,8 +633,6 @@ export class MongoStorage implements IStorage {
 
   async createPost(postData: any): Promise<any> {
     await this.connect();
-    
-    console.log('[MONGODB DEBUG] Creating post with data:', postData);
     
     const post = {
       workspaceId: postData.workspaceId.toString(),
@@ -671,12 +648,8 @@ export class MongoStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    console.log('[MONGODB DEBUG] Post data to save:', post);
-
     const postDoc = new ContentModel(post);
     const saved = await postDoc.save();
-    
-    console.log('[MONGODB DEBUG] Post saved successfully with ID:', saved._id.toString());
     
     return {
       id: saved._id.toString(),
@@ -687,16 +660,11 @@ export class MongoStorage implements IStorage {
   async deleteContent(id: number | string): Promise<void> {
     await this.connect();
     
-    console.log(`[MONGODB DELETE] Attempting to delete content with ID: ${id} (type: ${typeof id})`);
-    
     const deleted = await contentRepository.deleteById(id.toString());
     
     if (!deleted) {
-      console.log(`[MONGODB DELETE] No content found with ID: ${id}`);
       throw new Error(`Content with id ${id} not found`);
     }
-    
-    console.log(`[MONGODB] Successfully deleted content: ${id}`);
   }
 
   // Analytics operations - delegating to analyticsRepository
@@ -705,40 +673,30 @@ export class MongoStorage implements IStorage {
     
     const workspaceIdStr = workspaceId.toString();
     
-    console.log('[MONGO DEBUG] Querying analytics for workspace:', workspaceIdStr, 'platform:', platform, 'days:', days);
-    
     let analyticsData;
     if (platform) {
-      // If platform is specified, use findByWorkspaceAndPlatform
-      // Note: The repository method doesn't support days filter, so we'll filter after
       const result = await analyticsRepository.findByWorkspaceAndPlatform(workspaceIdStr, platform);
       analyticsData = result;
     } else {
-      // If no platform, use findByWorkspaceId
       const result = await analyticsRepository.findByWorkspaceId(workspaceIdStr);
       analyticsData = result;
     }
     
-    // Filter by days if specified
     if (days && analyticsData.length > 0) {
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - days);
       analyticsData = analyticsData.filter(doc => doc.date >= daysAgo);
     }
     
-    console.log('[MONGO DEBUG] Found analytics records:', analyticsData.length);
-    
     return analyticsData.map(doc => convertAnalytics(doc));
   }
 
   async createAnalytics(analytics: InsertAnalytics): Promise<Analytics> {
     await this.connect();
-    console.log('[STORAGE DEBUG] Creating analytics with data:', JSON.stringify(analytics, null, 2));
     const analyticsDoc = await analyticsRepository.create({
       ...analytics,
       createdAt: new Date()
     });
-    console.log('[STORAGE DEBUG] Saved analytics doc metrics:', JSON.stringify((analyticsDoc as any).metrics, null, 2));
     return convertAnalytics(analyticsDoc);
   }
 
@@ -751,19 +709,13 @@ export class MongoStorage implements IStorage {
   async getAutomationRules(workspaceId: number | string): Promise<AutomationRule[]> {
     await this.connect();
     try {
-      console.log(`[MONGODB DEBUG] getAutomationRules - workspaceId: ${workspaceId} (${typeof workspaceId})`);
-      
       const result = await automationRuleRepository.findByWorkspaceId(workspaceId.toString(), { limit: 10000 });
       const rules = result.data;
-      
-      console.log(`[MONGODB DEBUG] Found ${rules.length} automation rules`);
-      console.log(`[MONGODB DEBUG] Search query workspaceId: ${workspaceId.toString()}`);
       
       return rules.map(rule => {
         const trigger = rule.trigger || {};
         const action = rule.action || {};
         
-        // Handle different response structures for frontend compatibility
         let displayResponses = [];
         let displayDmResponses = [];
         let targetMediaIds = [];
@@ -787,15 +739,15 @@ export class MongoStorage implements IStorage {
           workspaceId: typeof workspaceId === 'string' ? workspaceId : parseInt(rule.workspaceId),
           description: rule.description || null,
           isActive: rule.isActive !== false,
-          type: rule.type || trigger.type || action.type || 'dm', // Extract type for webhook processing
-          postInteraction: rule.postInteraction, // Include postInteraction field for comment-to-DM detection
+          type: rule.type || trigger.type || action.type || 'dm',
+          postInteraction: rule.postInteraction,
           trigger: trigger,
-          triggers: rule.triggers || trigger, // Include triggers field for compatibility
+          triggers: rule.triggers || trigger,
           action: action,
-          keywords: rule.keywords || [], // Direct keywords array from rule
-          responses: displayResponses, // Comment responses for display  
-          dmResponses: displayDmResponses, // DM responses for display
-          targetMediaIds: targetMediaIds, // Target posts for display
+          keywords: rule.keywords || [],
+          responses: displayResponses,
+          dmResponses: displayDmResponses,
+          targetMediaIds: targetMediaIds,
           lastRun: rule.lastRun ? new Date(rule.lastRun) : null,
           nextRun: rule.nextRun ? new Date(rule.nextRun) : null,
           createdAt: rule.createdAt ? new Date(rule.createdAt) : new Date(),
@@ -803,7 +755,6 @@ export class MongoStorage implements IStorage {
         };
       });
     } catch (error: any) {
-      console.error('[MONGODB DEBUG] getAutomationRules error:', error.message);
       return [];
     }
   }
@@ -828,7 +779,6 @@ export class MongoStorage implements IStorage {
         updatedAt: rule.updatedAt ? new Date(rule.updatedAt) : new Date()
       }));
     } catch (error: any) {
-      console.error('[MONGODB DEBUG] getActiveAutomationRules error:', error.message);
       return [];
     }
   }
@@ -836,13 +786,8 @@ export class MongoStorage implements IStorage {
   async getAutomationRulesByType(type: string): Promise<AutomationRule[]> {
     await this.connect();
     try {
-      console.log(`[MONGODB DEBUG] getAutomationRulesByType - type: ${type}`);
-      
       const result = await automationRuleRepository.findByType(type, { limit: 10000 });
       const rules = result.data.filter(rule => rule.isActive !== false);
-      
-      console.log(`[MONGODB DEBUG] Found ${rules.length} automation rules of type ${type}`);
-      console.log(`[MONGODB DEBUG] Query used: type='${type}' (delegated to repository)`);
       
       return rules.map(rule => {
         const trigger = rule.trigger || {};
@@ -851,7 +796,7 @@ export class MongoStorage implements IStorage {
         return {
           id: rule._id.toString(),
           name: rule.name || '',
-          workspaceId: rule.workspaceId, // Keep as string - don't use parseInt which truncates ObjectIds
+          workspaceId: rule.workspaceId,
           description: rule.description || null,
           isActive: rule.isActive !== false,
           type: trigger.type || action.type || rule.type || type,
@@ -864,7 +809,6 @@ export class MongoStorage implements IStorage {
         };
       });
     } catch (error: any) {
-      console.error('[MONGODB DEBUG] getAutomationRulesByType error:', error.message);
       return [];
     }
   }
@@ -872,8 +816,6 @@ export class MongoStorage implements IStorage {
   async createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule> {
     await this.connect();
     try {
-      console.log(`[MONGODB DEBUG] Creating automation rule:`, rule);
-      
       const automationRuleData = {
         name: rule.name || 'Instagram Auto-Reply',
         workspaceId: rule.workspaceId.toString(),
@@ -892,7 +834,6 @@ export class MongoStorage implements IStorage {
       };
       
       const savedRule = await automationRuleRepository.create(automationRuleData);
-      console.log(`[MONGODB DEBUG] Created automation rule with ID: ${savedRule._id}`);
       
       return {
         id: savedRule._id.toString(),
@@ -912,7 +853,6 @@ export class MongoStorage implements IStorage {
         updatedAt: savedRule.updatedAt
       };
     } catch (error: any) {
-      console.error('[MONGODB DEBUG] createAutomationRule error:', error.message);
       throw new Error(`Failed to create automation rule: ${error.message}`);
     }
   }
@@ -920,8 +860,6 @@ export class MongoStorage implements IStorage {
   async updateAutomationRule(id: string, updates: Partial<AutomationRule>): Promise<AutomationRule> {
     await this.connect();
     try {
-      console.log(`[MONGODB DEBUG] Updating automation rule ${id}:`, updates);
-      
       const updateData: any = {
         ...updates,
         updatedAt: new Date()
@@ -935,8 +873,6 @@ export class MongoStorage implements IStorage {
       if (!result) {
         throw new Error('Automation rule not found');
       }
-      
-      console.log(`[MONGODB DEBUG] Updated automation rule: ${id}`);
       
       return {
         id: result._id.toString(),
@@ -952,7 +888,6 @@ export class MongoStorage implements IStorage {
         updatedAt: result.updatedAt ? new Date(result.updatedAt) : new Date()
       };
     } catch (error: any) {
-      console.error('[MONGODB DEBUG] updateAutomationRule error:', error.message);
       throw new Error(`Failed to update automation rule: ${error.message}`);
     }
   }
@@ -960,17 +895,12 @@ export class MongoStorage implements IStorage {
   async deleteAutomationRule(id: string): Promise<void> {
     await this.connect();
     try {
-      console.log(`[MONGODB DEBUG] Deleting automation rule: ${id}`);
-      
       const deleted = await automationRuleRepository.deleteById(id);
       
       if (!deleted) {
         throw new Error('Automation rule not found');
       }
-      
-      console.log(`[MONGODB DEBUG] Successfully deleted automation rule: ${id}`);
     } catch (error: any) {
-      console.error('[MONGODB DEBUG] deleteAutomationRule error:', error.message);
       throw new Error(`Failed to delete automation rule: ${error.message}`);
     }
   }
