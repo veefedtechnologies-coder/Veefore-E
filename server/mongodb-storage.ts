@@ -127,6 +127,7 @@ import {
   chatMessageRepository,
 } from './repositories/ChatRepository';
 import { waitlistUserRepository } from './repositories/WaitlistUserRepository';
+import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES, ADDONS } from './pricing-config';
 
 export class MongoStorage implements IStorage {
   private isConnected = false;
@@ -546,14 +547,12 @@ export class MongoStorage implements IStorage {
     if (account.accessToken) {
       socialAccountData.encryptedAccessToken = encryptAndStoreToken(account.accessToken);
       delete socialAccountData.accessToken;
-      console.log('🔒 SECURITY: Access token encrypted and stored securely');
     }
 
     // Encrypt refresh token if provided  
     if (account.refreshToken) {
       socialAccountData.encryptedRefreshToken = encryptAndStoreToken(account.refreshToken);
       delete socialAccountData.refreshToken;
-      console.log('🔒 SECURITY: Refresh token encrypted and stored securely');
     }
 
     const newAccount = await socialAccountRepository.create(socialAccountData);
@@ -570,14 +569,12 @@ export class MongoStorage implements IStorage {
     if (updates.accessToken) {
       encryptedUpdates.encryptedAccessToken = encryptAndStoreToken(updates.accessToken);
       delete encryptedUpdates.accessToken;
-      console.log('🔒 SECURITY: Access token encrypted for update');
     }
 
     // Encrypt refresh token if being updated
     if (updates.refreshToken) {
       encryptedUpdates.encryptedRefreshToken = encryptAndStoreToken(updates.refreshToken);
       delete encryptedUpdates.refreshToken;
-      console.log('🔒 SECURITY: Refresh token encrypted for update');
     }
     
     const updatedAccount = await socialAccountRepository.updateById(id.toString(), encryptedUpdates);
@@ -1444,107 +1441,12 @@ export class MongoStorage implements IStorage {
     return convertUserContentHistory(saved);
   }
 
-  // Pricing and plan operations
+  // Pricing and plan operations - delegating to pricing-config module
   async getPricingData(): Promise<any> {
     return {
-      plans: {
-        free: {
-          id: "free",
-          name: "Cosmic Explorer",
-          description: "Perfect for getting started in the social universe",
-          price: "Free",
-          credits: 50,
-          features: [
-            "Up to 2 social accounts",
-            "Basic analytics dashboard",
-            "50 AI-generated posts per month",
-            "Community support",
-            "Basic scheduling"
-          ]
-        },
-        pro: {
-          id: "pro", 
-          name: "Stellar Navigator",
-          description: "Advanced features for growing brands",
-          price: 999,
-          credits: 500,
-          features: [
-            "Up to 10 social accounts",
-            "Advanced analytics & insights",
-            "500 AI-generated posts per month",
-            "Priority support",
-            "Advanced scheduling",
-            "Custom AI personality",
-            "Hashtag optimization"
-          ],
-          popular: true
-        },
-        enterprise: {
-          id: "enterprise",
-          name: "Galactic Commander", 
-          description: "Ultimate power for large teams",
-          price: 2999,
-          credits: 2000,
-          features: [
-            "Unlimited social accounts",
-            "Enterprise analytics suite",
-            "2000 AI-generated posts per month",
-            "24/7 dedicated support",
-            "Advanced team collaboration",
-            "Custom integrations",
-            "White-label options"
-          ]
-        }
-      },
-      creditPackages: [
-        {
-          id: "credits_100",
-          name: "Starter Pack",
-          totalCredits: 100,
-          price: 199,
-          savings: "20% off"
-        },
-        {
-          id: "credits_500",
-          name: "Power Pack",
-          totalCredits: 500,
-          price: 799,
-          savings: "30% off"
-        },
-        {
-          id: "credits_1000",
-          name: "Mega Pack",
-          totalCredits: 1000,
-          price: 1399,
-          savings: "40% off"
-        }
-      ],
-      addons: {
-        extra_workspace: {
-          id: "extra_workspace",
-          name: "Additional Brand Workspace",
-          price: 49,
-          type: "workspace",
-          interval: "monthly",
-          benefit: "Add 1 extra brand workspace for team collaboration"
-        },
-        extra_social_account: {
-          id: "extra_social_account", 
-          name: "Extra Social Account",
-          price: 49,
-          type: "social_connection",
-          interval: "monthly",
-          benefit: "Connect 1 additional social media account"
-        },
-        boosted_ai_content: {
-          id: "boosted_ai_content",
-          name: "Boosted AI Content Generation", 
-          price: 99,
-          type: "ai_boost",
-          interval: "monthly",
-          benefit: "Generate 500 extra AI-powered posts per month"
-        }
-      }
+      plans: SUBSCRIPTION_PLANS,
+      creditPackages: CREDIT_PACKAGES,
+      addons: ADDONS
     };
   }
 
@@ -1662,11 +1564,9 @@ export class MongoStorage implements IStorage {
   async getDmMessages(conversationId: number | string, limit: number = 10): Promise<any[]> {
     await this.connect();
     
-    console.log(`[MONGODB] Getting authentic DM messages for conversation: ${conversationId}`);
-    
     // Try multiple message models and collections
     const messageModels = ['DmMessage', 'Message', 'InstagramMessage', 'ConversationMessage'];
-    let allMessages = [];
+    let allMessages: any[] = [];
     
     for (const modelName of messageModels) {
       try {
@@ -1681,11 +1581,10 @@ export class MongoStorage implements IStorage {
             ]
           }).sort({ createdAt: -1 });
           
-          console.log(`[MONGODB] Found ${messages.length} messages in ${modelName} for conversation ${conversationId}`);
           allMessages.push(...messages);
         }
       } catch (error) {
-        console.log(`[MONGODB] Error accessing ${modelName}: ${error.message}`);
+        // Continue to next model
       }
     }
     
@@ -1708,7 +1607,6 @@ export class MongoStorage implements IStorage {
             }).limit(20).toArray();
             
             if (docs.length > 0) {
-              console.log(`[MONGODB] Collection ${collection.name} has ${docs.length} messages for conversation ${conversationId}`);
               allMessages.push(...docs.map(doc => ({
                 ...doc,
                 _id: doc._id,
@@ -1716,20 +1614,18 @@ export class MongoStorage implements IStorage {
               })));
             }
           } catch (err) {
-            console.log(`[MONGODB] Error querying ${collection.name}: ${err.message}`);
+            // Continue to next collection
           }
         }
       }
     } catch (error) {
-      console.log(`[MONGODB] Error listing collections: ${error.message}`);
+      // Continue without additional collections
     }
     
     // Sort by creation date and limit
     const sortedMessages = allMessages
       .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
       .slice(0, limit);
-    
-    console.log(`[MONGODB] Returning ${sortedMessages.length} authentic messages for conversation ${conversationId}`);
     
     return sortedMessages.map(msg => ({
       id: msg._id.toString(),
@@ -1833,11 +1729,9 @@ export class MongoStorage implements IStorage {
   async getDmConversations(workspaceId: string, limit: number = 50): Promise<any[]> {
     await this.connect();
     
-    console.log(`[MONGODB] Getting authentic Instagram DM conversations for workspace: ${workspaceId}`);
-    
     // Access all DM conversation models to find authentic data
     const models = ['DmConversation', 'Conversation', 'InstagramConversation'];
-    let allConversations = [];
+    let allConversations: any[] = [];
     
     for (const modelName of models) {
       try {
@@ -1850,11 +1744,10 @@ export class MongoStorage implements IStorage {
             ]
           }).sort({ createdAt: -1 });
           
-          console.log(`[MONGODB] Found ${conversations.length} conversations in ${modelName}`);
           allConversations.push(...conversations);
         }
       } catch (error) {
-        console.log(`[MONGODB] Error accessing ${modelName}: ${error.message}`);
+        // Continue to next model
       }
     }
     
@@ -1866,8 +1759,6 @@ export class MongoStorage implements IStorage {
       for (const collection of collections) {
         if (collection.name.toLowerCase().includes('conversation') || 
             collection.name.toLowerCase().includes('message')) {
-          console.log(`[MONGODB] Found collection: ${collection.name}`);
-          
           try {
             const docs = await db.collection(collection.name).find({
               $or: [
@@ -1877,7 +1768,6 @@ export class MongoStorage implements IStorage {
             }).limit(10).toArray();
             
             if (docs.length > 0) {
-              console.log(`[MONGODB] Collection ${collection.name} has ${docs.length} relevant documents`);
               allConversations.push(...docs.map(doc => ({
                 ...doc,
                 _id: doc._id,
@@ -1885,15 +1775,13 @@ export class MongoStorage implements IStorage {
               })));
             }
           } catch (err) {
-            console.log(`[MONGODB] Error querying ${collection.name}: ${err.message}`);
+            // Continue to next collection
           }
         }
       }
     } catch (error) {
-      console.log(`[MONGODB] Error listing collections: ${error.message}`);
+      // Continue without additional collections
     }
-    
-    console.log(`[MONGODB] Total conversations found across all sources: ${allConversations.length}`);
     
     // Sort and limit results
     const sortedConversations = allConversations
@@ -2487,7 +2375,7 @@ export class MongoStorage implements IStorage {
   // Thumbnail Projects
   async createThumbnailProject(data: any): Promise<any> {
     await this.connect();
-    const result = await this.client.db().collection('thumbnail_projects').insertOne({
+    const result = await mongoose.connection.db!.collection('thumbnail_projects').insertOne({
       ...data,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -2503,7 +2391,7 @@ export class MongoStorage implements IStorage {
 
   async getThumbnailProject(projectId: number): Promise<any> {
     await this.connect();
-    const project = await this.client.db().collection('thumbnail_projects')
+    const project = await mongoose.connection.db!.collection('thumbnail_projects')
       .findOne({ _id: new ObjectId(projectId.toString()) });
     
     if (!project) return null;
@@ -2516,7 +2404,7 @@ export class MongoStorage implements IStorage {
 
   async updateThumbnailProject(projectId: number, updates: any): Promise<void> {
     await this.connect();
-    await this.client.db().collection('thumbnail_projects')
+    await mongoose.connection.db!.collection('thumbnail_projects')
       .updateOne(
         { _id: new ObjectId(projectId.toString()) },
         { $set: { ...updates, updatedAt: new Date() } }
@@ -2525,7 +2413,7 @@ export class MongoStorage implements IStorage {
 
   async getThumbnailProjects(workspaceId: number): Promise<any[]> {
     await this.connect();
-    const projects = await this.client.db().collection('thumbnail_projects')
+    const projects = await mongoose.connection.db!.collection('thumbnail_projects')
       .find({ workspaceId })
       .sort({ createdAt: -1 })
       .toArray();
@@ -2539,7 +2427,7 @@ export class MongoStorage implements IStorage {
   // Thumbnail Strategies
   async createThumbnailStrategy(data: any): Promise<any> {
     await this.connect();
-    const result = await this.client.db().collection('thumbnail_strategies').insertOne({
+    const result = await mongoose.connection.db!.collection('thumbnail_strategies').insertOne({
       ...data,
       createdAt: new Date()
     });
@@ -2553,7 +2441,7 @@ export class MongoStorage implements IStorage {
 
   async getThumbnailStrategy(projectId: number): Promise<any> {
     await this.connect();
-    const strategy = await this.client.db().collection('thumbnail_strategies')
+    const strategy = await mongoose.connection.db!.collection('thumbnail_strategies')
       .findOne({ projectId: projectId.toString() });
     
     if (!strategy) return null;
@@ -2567,7 +2455,7 @@ export class MongoStorage implements IStorage {
   // Thumbnail Variants
   async createThumbnailVariant(data: any): Promise<any> {
     await this.connect();
-    const result = await this.client.db().collection('thumbnail_variants').insertOne({
+    const result = await mongoose.connection.db!.collection('thumbnail_variants').insertOne({
       ...data,
       createdAt: new Date()
     });
@@ -2581,7 +2469,7 @@ export class MongoStorage implements IStorage {
 
   async getThumbnailVariant(variantId: number): Promise<any> {
     await this.connect();
-    const variant = await this.client.db().collection('thumbnail_variants')
+    const variant = await mongoose.connection.db!.collection('thumbnail_variants')
       .findOne({ _id: new ObjectId(variantId.toString()) });
     
     if (!variant) return null;
@@ -2594,7 +2482,7 @@ export class MongoStorage implements IStorage {
 
   async getThumbnailVariants(projectId: number): Promise<any[]> {
     await this.connect();
-    const variants = await this.client.db().collection('thumbnail_variants')
+    const variants = await mongoose.connection.db!.collection('thumbnail_variants')
       .find({ projectId: projectId.toString() })
       .sort({ variantNumber: 1 })
       .toArray();
@@ -2608,7 +2496,7 @@ export class MongoStorage implements IStorage {
   // Canvas Editor Sessions
   async createCanvasEditorSession(data: any): Promise<any> {
     await this.connect();
-    const result = await this.client.db().collection('canvas_editor_sessions').insertOne({
+    const result = await mongoose.connection.db!.collection('canvas_editor_sessions').insertOne({
       ...data,
       createdAt: new Date(),
       lastSaved: new Date()
@@ -2624,7 +2512,7 @@ export class MongoStorage implements IStorage {
 
   async getCanvasEditorSession(sessionId: number): Promise<any> {
     await this.connect();
-    const session = await this.client.db().collection('canvas_editor_sessions')
+    const session = await mongoose.connection.db!.collection('canvas_editor_sessions')
       .findOne({ _id: new ObjectId(sessionId.toString()) });
     
     if (!session) return null;
@@ -2637,7 +2525,7 @@ export class MongoStorage implements IStorage {
 
   async updateCanvasEditorSession(sessionId: number, updates: any): Promise<void> {
     await this.connect();
-    await this.client.db().collection('canvas_editor_sessions')
+    await mongoose.connection.db!.collection('canvas_editor_sessions')
       .updateOne(
         { _id: new ObjectId(sessionId.toString()) },
         { $set: { ...updates, lastSaved: new Date() } }
@@ -2647,7 +2535,7 @@ export class MongoStorage implements IStorage {
   // Thumbnail Exports
   async createThumbnailExport(data: any): Promise<any> {
     await this.connect();
-    const result = await this.client.db().collection('thumbnail_exports').insertOne({
+    const result = await mongoose.connection.db!.collection('thumbnail_exports').insertOne({
       ...data,
       createdAt: new Date(),
       downloadCount: 0
@@ -2663,7 +2551,7 @@ export class MongoStorage implements IStorage {
 
   async getThumbnailExports(sessionId: number): Promise<any[]> {
     await this.connect();
-    const exports = await this.client.db().collection('thumbnail_exports')
+    const exports = await mongoose.connection.db!.collection('thumbnail_exports')
       .find({ sessionId: sessionId.toString() })
       .sort({ createdAt: -1 })
       .toArray();
@@ -2676,7 +2564,7 @@ export class MongoStorage implements IStorage {
 
   async incrementExportDownload(exportId: number): Promise<void> {
     await this.connect();
-    await this.client.db().collection('thumbnail_exports')
+    await mongoose.connection.db!.collection('thumbnail_exports')
       .updateOne(
         { _id: new ObjectId(exportId.toString()) },
         { $inc: { downloadCount: 1 } }
@@ -2809,7 +2697,6 @@ export class MongoStorage implements IStorage {
         updatedAt: doc.updatedAt
       }));
     } catch (error) {
-      console.error('Error fetching feature usage:', error);
       return [];
     }
   }
@@ -2830,7 +2717,7 @@ export class MongoStorage implements IStorage {
         { upsert: true }
       );
     } catch (error) {
-      console.error('Error tracking feature usage:', error);
+      // Silently fail - feature usage tracking is non-critical
     }
   }
 

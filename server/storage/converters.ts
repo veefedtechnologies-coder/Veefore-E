@@ -20,41 +20,26 @@ export function decryptStoredToken(encryptedToken: any): string | null {
       try {
         tokenData = JSON.parse(encryptedToken);
       } catch (parseError) {
-        console.warn('🚨 P2-FIX: Failed to parse JSON token data, invalid format');
         return null;
       }
     } else if (typeof encryptedToken === 'object') {
       tokenData = encryptedToken;
     } else {
-      console.warn('🚨 P2-FIX: Invalid encrypted token format, expected string or object');
       return null;
     }
     
     if (!tokenData.encryptedData || !tokenData.iv || !tokenData.salt || !tokenData.tag) {
-      console.warn('🚨 P2-FIX: Incomplete encrypted token data, missing required fields:', {
-        hasEncryptedData: !!tokenData.encryptedData,
-        hasIV: !!tokenData.iv,
-        hasSalt: !!tokenData.salt,
-        hasTag: !!tokenData.tag
-      });
       return null;
     }
     
     const decryptedToken = tokenEncryption.decryptToken(tokenData);
     
     if (!decryptedToken || decryptedToken.trim().length === 0) {
-      console.warn('🚨 P2-FIX: Decryption returned empty token');
       return null;
     }
     
     return decryptedToken;
   } catch (error: any) {
-    console.warn('🚨 P2-FIX: Token decryption failed:', {
-      error: error.message,
-      tokenType: typeof encryptedToken,
-      tokenLength: typeof encryptedToken === 'string' ? encryptedToken.length : 'N/A',
-      hasBasicStructure: !!(encryptedToken && typeof encryptedToken === 'object')
-    });
     return null;
   }
 }
@@ -67,37 +52,26 @@ export function encryptAndStoreToken(plainToken: string | null): EncryptedToken 
   try {
     return tokenEncryption.encryptToken(plainToken);
   } catch (error) {
-    console.error('🚨 SECURITY: Failed to encrypt token:', error);
     throw new Error('Token encryption failed');
   }
 }
 
 export function getAccessTokenFromAccount(account: any): string | null {
-  console.log(`[TOKEN DEBUG] Checking access token for account: ${account.username}`);
-  console.log(`[TOKEN DEBUG] Has encryptedAccessToken: ${!!account.encryptedAccessToken}`);
-  console.log(`[TOKEN DEBUG] Has plain accessToken: ${!!account.accessToken}`);
-  
   if (account.encryptedAccessToken) {
-    console.log(`[TOKEN DEBUG] Attempting to decrypt encrypted token for ${account.username}`);
     try {
       const decryptedToken = decryptStoredToken(account.encryptedAccessToken);
       if (decryptedToken) {
-        console.log(`[TOKEN DEBUG] ✅ Successfully decrypted token for ${account.username}`);
         return decryptedToken;
       }
-      console.warn(`[TOKEN DEBUG] ❌ Decryption returned null for ${account.username}`);
     } catch (error: any) {
-      console.error(`[TOKEN DEBUG] ❌ Decryption failed for ${account.username}:`, error.message);
+      // Fall through to plain text check
     }
-    console.warn(`🚨 P2-FIX: Failed to decrypt access token for account ${account.username}, falling back to plain text`);
   }
   
   if (account.accessToken) {
-    console.log('📊 SECURITY: Found legacy plain text token, should migrate to encrypted storage');
     return account.accessToken;
   }
   
-  console.log(`[TOKEN DEBUG] ❌ No valid access token found for ${account.username}`);
   return null;
 }
 
@@ -107,11 +81,9 @@ export function getRefreshTokenFromAccount(account: any): string | null {
     if (decryptedToken) {
       return decryptedToken;
     }
-    console.warn(`🚨 P2-FIX: Failed to decrypt refresh token for account ${account.username}, falling back to plain text`);
   }
   
   if (account.refreshToken) {
-    console.log('📊 SECURITY: Found legacy plain text refresh token, should migrate to encrypted storage');
     return account.refreshToken;
   }
   
@@ -128,8 +100,7 @@ export function generateReferralCode(): string {
 }
 
 export function convertUser(mongoUser: any): User {
-  console.log(`[USER CONVERT] Raw MongoDB user isOnboarded:`, mongoUser.isOnboarded, `(type: ${typeof mongoUser.isOnboarded})`);
-  const converted = {
+  return {
     id: mongoUser._id.toString(),
     firebaseUid: mongoUser.firebaseUid,
     email: mongoUser.email,
@@ -152,9 +123,6 @@ export function convertUser(mongoUser: any): User {
     createdAt: mongoUser.createdAt,
     updatedAt: mongoUser.updatedAt
   };
-  console.log(`[USER CONVERT] Converted user isOnboarded:`, converted.isOnboarded);
-  console.log(`[CREDIT SECURITY] User ${converted.id} credits: ${converted.credits} (exact database value - no automatic allocation)`);
-  return converted;
 }
 
 export function convertWorkspace(mongoWorkspace: any): Workspace {
@@ -207,11 +175,6 @@ export function convertContent(mongoContent: any): Content {
 }
 
 export function convertSocialAccount(mongoAccount: any): SocialAccount {
-  console.log(`[CONVERT DEBUG] Converting social account: ${mongoAccount.username}`);
-  console.log(`[CONVERT DEBUG] Raw mongoAccount pageId:`, mongoAccount.pageId);
-  console.log(`[CONVERT DEBUG] Raw mongoAccount accountId:`, mongoAccount.accountId);
-  console.log(`[CONVERT DEBUG] All available fields:`, Object.keys(mongoAccount.toObject ? mongoAccount.toObject() : mongoAccount));
-  
   const hasToken = getAccessTokenFromAccount(mongoAccount) !== null;
   const hasEncryptedField = !!mongoAccount.encryptedAccessToken;
   const isExpired = mongoAccount.expiresAt ? (new Date(mongoAccount.expiresAt).getTime() < Date.now()) : false;
