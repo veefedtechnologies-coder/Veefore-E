@@ -67,11 +67,21 @@ interface WorkspaceSwitcherProps {
   onNavigateToWorkspaces?: () => void
 }
 
+// ✅ HELPER: Sanitize workspace ID from localStorage (filter out 'undefined', 'null', '')
+const getSanitizedWorkspaceId = (): string | null => {
+  const stored = localStorage.getItem('currentWorkspaceId');
+  if (!stored || stored === 'undefined' || stored === 'null' || stored === '') {
+    return null;
+  }
+  return stored;
+};
+
 export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceSwitcherProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  // ✅ FIX: Sanitize initial state to prevent 'undefined' string from propagating
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(
-    localStorage.getItem('currentWorkspaceId')
+    getSanitizedWorkspaceId()
   )
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [targetWorkspace, setTargetWorkspace] = useState<Workspace | null>(null)
@@ -96,6 +106,12 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
 
   // Advanced workspace switching with beautiful animation
   const handleWorkspaceSwitch = async (workspaceId: string) => {
+    // ✅ GUARD: Prevent storing invalid values
+    if (!workspaceId || workspaceId === 'undefined' || workspaceId === 'null') {
+      console.warn('[WorkspaceSwitcher] ❌ Attempted to switch to invalid workspace ID:', workspaceId);
+      return;
+    }
+    
     const workspace = safeWorkspaces.find((ws: Workspace) => ws.id === workspaceId)
     if (!workspace) return
     
@@ -269,8 +285,9 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
 // Hook to get current workspace ID (reactive to localStorage changes)
 // ✅ PRODUCTION FIX: Auto-validates workspace ID on mount and corrects invalid IDs
 export function useCurrentWorkspace() {
+  // ✅ FIX: Sanitize initial state to prevent 'undefined' string from propagating
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(
-    localStorage.getItem('currentWorkspaceId')
+    getSanitizedWorkspaceId()
   )
   const [isValidating, setIsValidating] = useState(false)
   const queryClient = useQueryClient()
@@ -294,9 +311,16 @@ export function useCurrentWorkspace() {
       
       const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
       
+      // ✅ GUARD: Check for invalid string values first
+      if (storedWorkspaceId === 'undefined' || storedWorkspaceId === 'null' || storedWorkspaceId === '') {
+        console.warn('[useCurrentWorkspace] 🧹 Removing invalid localStorage value:', storedWorkspaceId);
+        localStorage.removeItem('currentWorkspaceId');
+      }
+      
       // Check if stored workspace ID exists in user's workspaces
       const safeWorkspaces = Array.isArray(workspaces) ? workspaces as Workspace[] : [];
-      const isValid = storedWorkspaceId && safeWorkspaces.some((ws: Workspace) => ws.id === storedWorkspaceId);
+      const isValidString = storedWorkspaceId && storedWorkspaceId !== 'undefined' && storedWorkspaceId !== 'null' && storedWorkspaceId !== '';
+      const isValid = isValidString && safeWorkspaces.some((ws: Workspace) => ws.id === storedWorkspaceId);
       
       if (!isValid) {
         // INVALID WORKSPACE ID - Auto-correct
@@ -368,8 +392,13 @@ export function useCurrentWorkspace() {
             method: 'POST',
             body: JSON.stringify({ name: 'My Workspace' })
           });
-          localStorage.setItem('currentWorkspaceId', created.id);
-          setCurrentWorkspaceId(created.id);
+          // ✅ GUARD: Only set if we got a valid ID back
+          if (created && created.id && created.id !== 'undefined') {
+            localStorage.setItem('currentWorkspaceId', created.id);
+            setCurrentWorkspaceId(created.id);
+          } else {
+            console.warn('[useCurrentWorkspace] ⚠️ Workspace creation returned invalid ID:', created?.id);
+          }
           window.dispatchEvent(new Event('workspace-changed'));
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] }),
@@ -383,7 +412,8 @@ export function useCurrentWorkspace() {
   // Listen for localStorage changes to keep hook reactive
   useEffect(() => {
     const handleStorageChange = () => {
-      setCurrentWorkspaceId(localStorage.getItem('currentWorkspaceId'))
+      // ✅ FIX: Always sanitize when reading from localStorage
+      setCurrentWorkspaceId(getSanitizedWorkspaceId())
     }
     
     // Listen for storage events (when localStorage changes in other tabs)
