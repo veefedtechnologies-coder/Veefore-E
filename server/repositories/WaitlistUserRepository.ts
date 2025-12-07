@@ -18,6 +18,14 @@ export class WaitlistUserRepository extends BaseRepository<IWaitlistUser> {
     super(WaitlistUser, 'WaitlistUser');
   }
 
+  async createWithDefaults(data: Partial<IWaitlistUser>): Promise<IWaitlistUser> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async countAll(): Promise<number> {
     return this.count({});
   }

@@ -19,6 +19,14 @@ export class CreativeBriefRepository extends BaseRepository<ICreativeBrief> {
     super(CreativeBriefModel, 'CreativeBrief');
   }
 
+  async createWithDefaults(data: Partial<ICreativeBrief>): Promise<ICreativeBrief> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async findByWorkspaceId(workspaceId: string, options?: PaginationOptions) {
     return this.findMany({ workspaceId }, options);
   }
@@ -72,6 +80,14 @@ export class ContentRepurposeRepository extends BaseRepository<IContentRepurpose
     super(ContentRepurposeModel, 'ContentRepurpose');
   }
 
+  async createWithDefaults(data: Partial<IContentRepurpose>): Promise<IContentRepurpose> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async findByWorkspaceId(workspaceId: string, options?: PaginationOptions) {
     return this.findMany({ workspaceId }, options);
   }
@@ -112,6 +128,14 @@ export class ContentRepurposeRepository extends BaseRepository<IContentRepurpose
 export class CompetitorAnalysisRepository extends BaseRepository<ICompetitorAnalysis> {
   constructor() {
     super(CompetitorAnalysisModel, 'CompetitorAnalysis');
+  }
+
+  async createWithDefaults(data: Partial<ICompetitorAnalysis>): Promise<ICompetitorAnalysis> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   async findByWorkspaceId(workspaceId: string, options?: PaginationOptions) {
@@ -168,6 +192,14 @@ export class CompetitorAnalysisRepository extends BaseRepository<ICompetitorAnal
 export class FeatureUsageRepository extends BaseRepository<IFeatureUsage> {
   constructor() {
     super(FeatureUsageModel, 'FeatureUsage');
+  }
+
+  async createWithDefaults(data: Partial<IFeatureUsage>): Promise<IFeatureUsage> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   async findByUserId(userId: string, options?: PaginationOptions) {

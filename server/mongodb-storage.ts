@@ -1048,14 +1048,12 @@ export class MongoStorage implements IStorage {
 
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
     await this.connect();
-    const savedAdmin = await adminRepository.create({
+    const savedAdmin = await adminRepository.createWithDefaults({
       email: admin.email,
       username: admin.username,
       password: admin.password,
       role: admin.role || 'admin',
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      isActive: true
     });
     return convertAdmin(savedAdmin);
   }
@@ -1101,13 +1099,12 @@ export class MongoStorage implements IStorage {
   // Admin session operations - delegating to adminSessionRepository
   async createAdminSession(session: any): Promise<any> {
     await this.connect();
-    const savedSession = await adminSessionRepository.create({
+    const savedSession = await adminSessionRepository.createWithDefaults({
       adminId: session.adminId,
       token: session.token,
       ipAddress: session.ipAddress,
       userAgent: session.userAgent,
-      expiresAt: session.expiresAt,
-      createdAt: new Date()
+      expiresAt: session.expiresAt
     });
     return convertAdminSession(savedSession);
   }
@@ -1146,12 +1143,10 @@ export class MongoStorage implements IStorage {
       targetUsers: Array.isArray(notification.targetUsers) ? notification.targetUsers : [notification.targetUsers || 'all'],
       scheduledFor: notification.scheduledFor || null,
       sentAt: notification.scheduledFor ? null : new Date(),
-      isRead: false,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      isRead: false
     };
     
-    const savedNotification = await notificationRepository.create(notificationData);
+    const savedNotification = await notificationRepository.createWithDefaults(notificationData);
     return convertNotification(savedNotification);
   }
 
@@ -1195,11 +1190,7 @@ export class MongoStorage implements IStorage {
   // Popup operations - delegating to popupRepository
   async createPopup(popup: any): Promise<any> {
     await this.connect();
-    const savedPopup = await popupRepository.create({
-      ...popup,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    const savedPopup = await popupRepository.createWithDefaults(popup);
     return convertPopup(savedPopup);
   }
 
@@ -1230,11 +1221,7 @@ export class MongoStorage implements IStorage {
   // App settings operations - delegating to appSettingRepository
   async createAppSetting(setting: any): Promise<any> {
     await this.connect();
-    const savedSetting = await appSettingRepository.create({
-      ...setting,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    const savedSetting = await appSettingRepository.createWithDefaults(setting);
     return convertAppSetting(savedSetting);
   }
 
@@ -1274,7 +1261,7 @@ export class MongoStorage implements IStorage {
   async createAuditLog(log: any): Promise<any> {
     await this.connect();
     
-    const enrichedLog = { ...log, createdAt: new Date() };
+    const enrichedLog = { ...log };
     if (!enrichedLog.actorType) {
       enrichedLog.actorType = enrichedLog.adminId ? 'admin' : 'system';
     }
@@ -1282,7 +1269,7 @@ export class MongoStorage implements IStorage {
       enrichedLog.actorId = enrichedLog.adminId ? String(enrichedLog.adminId) : 'system';
     }
     
-    const savedLog = await auditLogRepository.create(enrichedLog);
+    const savedLog = await auditLogRepository.createWithDefaults(enrichedLog);
     return convertAuditLog(savedLog);
   }
 
@@ -1297,11 +1284,7 @@ export class MongoStorage implements IStorage {
   // Feedback operations - delegating to feedbackMessageRepository
   async createFeedbackMessage(feedback: any): Promise<any> {
     await this.connect();
-    const savedFeedback = await feedbackMessageRepository.create({
-      ...feedback,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    const savedFeedback = await feedbackMessageRepository.createWithDefaults(feedback);
     return convertFeedbackMessage(savedFeedback);
   }
 
@@ -1401,12 +1384,10 @@ export class MongoStorage implements IStorage {
       emailVerificationExpiry: data.emailVerificationExpiry,
       isOnboarded: false,
       credits: 10, // Initial credits for new users
-      referralCode: generateReferralCode(),
-      createdAt: new Date(),
-      updatedAt: new Date()
+      referralCode: generateReferralCode()
     };
 
-    const savedUser = await userRepository.create(userData);
+    const savedUser = await userRepository.createWithDefaults(userData);
     return convertUser(savedUser);
   }
 
@@ -1792,12 +1773,10 @@ export class MongoStorage implements IStorage {
       }
     }
     
-    const savedUser = await waitlistUserRepository.create({
+    const savedUser = await waitlistUserRepository.createWithDefaults({
       ...insertWaitlistUser,
       referralCode,
-      referredBy: referredByUserId,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      referredBy: referredByUserId
     });
     
     return convertWaitlistUser(savedUser);
@@ -1939,10 +1918,9 @@ export class MongoStorage implements IStorage {
     
     const numericId = Date.now() % 1000000000 + Math.floor(Math.random() * 1000);
     
-    const saved = await chatMessageRepository.create({
+    const saved = await chatMessageRepository.createWithDefaults({
       ...message,
-      id: numericId,
-      createdAt: new Date()
+      id: numericId
     });
     return {
       id: saved.id,
