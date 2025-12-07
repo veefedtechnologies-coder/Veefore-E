@@ -124,24 +124,28 @@ async function processWebhookEntry(entry: any): Promise<void> {
 
     console.log(`📱 Processing webhook for Instagram account: ${instagramAccountId}`);
 
-    // Find the user for this Instagram account using storage
-    const { storage } = await import('../mongodb-storage');
-    const users = await storage.getAllUsers();
-    const user = users.find(u => u.instagramAccountId === instagramAccountId);
-    if (!user) {
-      console.warn(`⚠️ No user found for Instagram account: ${instagramAccountId}`);
+    // Query SocialAccount directly by accountId (uses index for O(1) lookup)
+    const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+    const socialAccount = await SocialAccountModel.findOne({ 
+      accountId: instagramAccountId,
+      platform: 'instagram',
+      isActive: true 
+    }).lean();
+
+    if (!socialAccount) {
+      console.warn(`⚠️ No social account found for Instagram account: ${instagramAccountId}`);
       return;
     }
 
-    const workspaceId = user.workspaceId;
+    const workspaceId = socialAccount.workspaceId?.toString();
     if (!workspaceId) {
-      console.warn(`⚠️ No workspace found for user: ${user.userId}`);
+      console.warn(`⚠️ No workspace found for social account: ${instagramAccountId}`);
       return;
     }
 
     // Process each change in the entry
     for (const change of changes) {
-      await processWebhookChange(user.workspaceId, instagramAccountId, change);
+      await processWebhookChange(workspaceId, instagramAccountId, change);
     }
 
   } catch (error) {
