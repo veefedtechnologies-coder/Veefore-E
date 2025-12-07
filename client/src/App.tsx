@@ -931,7 +931,9 @@ function App() {
                  <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                    {/* Instagram Webhook Listener for Real-time Updates */}
                    <InstagramWebhookListener />
-                   <Integration />
+                   <React.Suspense fallback={<LoadingSpinner type="integration" />}>
+                     <Integration />
+                   </React.Suspense>
                 </main>
               </div>
             </div>
