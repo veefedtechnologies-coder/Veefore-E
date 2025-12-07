@@ -44,6 +44,16 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-12-07: Critical Onboarding Bug Fixes (COMPLETE)
+- ✅ **FIX**: Onboarding completion no longer stuck on "Completing..." state
+- ✅ **FIX**: Onboarding modal no longer shows to already onboarded users
+- ✅ App.tsx onComplete handler now throws errors on failure for proper error handling
+- ✅ OnboardingFlow.tsx uses `finally` block to always reset isCompleting state
+- ✅ Triple safety check for modal rendering (backend + localStorage + workspaces)
+- ✅ Backend timeouts increased from 3-5s to 10-15s for reliability
+- ✅ Better logging in completeOnboardingFull endpoint
+- **Files Modified**: App.tsx, OnboardingFlow.tsx, UserController.ts
+
 ### 2025-12-07: Architecture Refactoring - Repository Pattern (COMPLETE)
 - ✅ **MAJOR REFACTOR**: Complete backend architecture overhaul using Repository Pattern
 - ✅ **Thin Delegation Layer**: mongodb-storage.ts now purely delegates to repositories
