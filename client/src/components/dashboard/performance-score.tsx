@@ -254,7 +254,8 @@ export function PerformanceScore() {
   const invalidIconList = invalidAccounts.slice(0, ICON_LIMIT)
   const invalidRemainder = Math.max(0, invalidAccounts.length - ICON_LIMIT)
 
-  const connectedPlatforms = validAccounts.map((account: any) => ({
+  const connectedPlatforms = validAccounts.map((account: any, index: number) => ({
+    id: account.id || `platform-${index}`,
     name: account.platform === 'instagram' ? 'Instagram' : 
           account.platform === 'youtube' ? 'YouTube' : 
           account.platform === 'twitter' ? 'Twitter' : 
@@ -508,7 +509,7 @@ export function PerformanceScore() {
                 )}
                 <div className="flex items-center space-x-2">
                   {connectedPlatforms.map((platform: any) => (
-                    <div key={platform.name} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                    <div key={platform.id} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                       {platform.logo}
                     </div>
                   ))}
@@ -771,7 +772,7 @@ export function PerformanceScore() {
             'grid-cols-2 lg:grid-cols-6'
           }`}>
             {connectedPlatforms.map((platform: any) => (
-              <div key={platform.name} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 text-center hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
+              <div key={platform.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 text-center hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
                 <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 mx-auto mb-3 flex items-center justify-center text-lg shadow-sm">
                   {platform.logo}
                 </div>
