@@ -296,14 +296,33 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
   )
 }
 
+// ✅ PURE FUNCTION: Get valid workspace ID synchronously (no side effects in render)
+const getValidWorkspaceId = (workspaces: Workspace[], storedId: string | null): string | null => {
+  if (workspaces.length === 0) return null;
+  
+  // Check if stored ID is valid and exists in workspaces
+  const isValidId = storedId && 
+    storedId !== 'undefined' && 
+    storedId !== 'null' && 
+    storedId !== '' &&
+    workspaces.some(ws => ws.id === storedId);
+  
+  if (isValidId) return storedId;
+  
+  // Return default or first workspace ID
+  const fallback = workspaces.find(ws => ws.isDefault) || workspaces[0];
+  return fallback?.id || null;
+};
+
 // Hook to get current workspace ID (reactive to localStorage changes)
 // ✅ PRODUCTION FIX: Auto-validates workspace ID on mount and corrects invalid IDs
 export function useCurrentWorkspace() {
   // ✅ FIX: Sanitize initial state to prevent 'undefined' string from propagating
-  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(
+  const [storedWorkspaceId, setStoredWorkspaceId] = useState<string | null>(
     getSanitizedWorkspaceId()
   )
   const [isValidating, setIsValidating] = useState(false)
+  const [hasValidated, setHasValidated] = useState(false)
   const queryClient = useQueryClient()
   
   // Fetch user's workspaces
@@ -316,90 +335,72 @@ export function useCurrentWorkspace() {
   // Extract workspaces from nested API response { success: true, data: [...] }
   // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
   const rawWorkspaces = workspacesResponse?.data || workspacesResponse || []
-  const workspaces = normalizeWorkspaces(rawWorkspaces)
+  const workspaces = useMemo(() => normalizeWorkspaces(rawWorkspaces), [rawWorkspaces])
 
-  // ✅ PRODUCTION FIX: Validate workspace ID on mount and when workspaces change
+  // ✅ CRITICAL: Compute valid workspace ID synchronously (pure function, no side effects)
+  // This ensures currentWorkspace is ALWAYS consistent with normalized workspaces
+  const validWorkspaceId = useMemo(() => {
+    return getValidWorkspaceId(workspaces, storedWorkspaceId);
+  }, [workspaces, storedWorkspaceId]);
+
+  // ✅ CRITICAL: Compute currentWorkspace from validWorkspaceId (guaranteed to match)
+  const currentWorkspace = useMemo(() => {
+    if (!validWorkspaceId || workspaces.length === 0) return undefined;
+    return workspaces.find((ws: Workspace) => ws.id === validWorkspaceId);
+  }, [workspaces, validWorkspaceId]);
+
+  // ✅ SYNC localStorage when valid ID differs from stored ID (side effect)
   useEffect(() => {
-    if (workspacesLoading || workspaces.length === 0 || isValidating) return;
+    if (workspacesLoading || workspaces.length === 0 || isValidating || hasValidated) return;
 
-    const validateWorkspace = async () => {
+    const syncLocalStorage = async () => {
       setIsValidating(true);
       
-      const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
+      const currentStored = localStorage.getItem('currentWorkspaceId');
       
       // ✅ GUARD: Check for invalid string values first
-      if (storedWorkspaceId === 'undefined' || storedWorkspaceId === 'null' || storedWorkspaceId === '') {
-        console.warn('[useCurrentWorkspace] 🧹 Removing invalid localStorage value:', storedWorkspaceId);
+      if (currentStored === 'undefined' || currentStored === 'null' || currentStored === '') {
+        console.warn('[useCurrentWorkspace] 🧹 Removing invalid localStorage value:', currentStored);
         localStorage.removeItem('currentWorkspaceId');
       }
       
-      // Check if stored workspace ID exists in user's workspaces
-      const safeWorkspaces = Array.isArray(workspaces) ? workspaces as Workspace[] : [];
-      const isValidString = storedWorkspaceId && storedWorkspaceId !== 'undefined' && storedWorkspaceId !== 'null' && storedWorkspaceId !== '';
-      const isValid = isValidString && safeWorkspaces.some((ws: Workspace) => ws.id === storedWorkspaceId);
+      // Check if localStorage needs correction
+      const needsCorrection = validWorkspaceId && validWorkspaceId !== currentStored;
       
-      if (!isValid) {
-        // INVALID WORKSPACE ID - Auto-correct
-        console.warn('[useCurrentWorkspace] ❌ Invalid workspace ID detected:', storedWorkspaceId);
-        console.log('[useCurrentWorkspace] 🔧 Auto-correcting to valid workspace...');
+      if (needsCorrection) {
+        console.warn('[useCurrentWorkspace] ❌ Invalid workspace ID in localStorage:', currentStored);
+        console.log('[useCurrentWorkspace] 🔧 Correcting to:', validWorkspaceId);
         
-        const defaultWorkspace = safeWorkspaces.find((ws: Workspace) => ws.isDefault) || safeWorkspaces[0];
-        
-        // Guard check: If no workspaces available, we cannot auto-correct
-        if (!defaultWorkspace) {
-          console.log('[useCurrentWorkspace] ⚠️ No workspaces available, cannot auto-correct');
-          setIsValidating(false);
-          return;
-        }
-        
-        const correctedWorkspaceId = defaultWorkspace.id;
-        
-        console.log('[useCurrentWorkspace] ✅ Auto-corrected to workspace:', {
-          id: correctedWorkspaceId,
-          name: defaultWorkspace.name
-        });
-        
-        // Update localStorage and state
-        localStorage.setItem('currentWorkspaceId', correctedWorkspaceId);
-        setCurrentWorkspaceId(correctedWorkspaceId);
+        // Update localStorage
+        localStorage.setItem('currentWorkspaceId', validWorkspaceId);
+        setStoredWorkspaceId(validWorkspaceId);
         
         // ✅ CRITICAL: Invalidate all React Query caches that depend on workspace ID
-        // This forces React Query to refetch with the CORRECT workspace ID
-        console.log('[useCurrentWorkspace] 🔄 Invalidating all workspace-dependent queries...');
+        console.log('[useCurrentWorkspace] 🔄 Invalidating workspace-dependent queries...');
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] }),
           queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] }),
           queryClient.invalidateQueries({ queryKey: ['/api/analytics/historical'] }),
           queryClient.invalidateQueries({ queryKey: ['/api/content'] }),
-          // Refetch immediately to get data for correct workspace
-          queryClient.refetchQueries({ queryKey: ['/api/social-accounts'], type: 'active' }),
-          queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics'], type: 'active' })
         ]);
-        console.log('[useCurrentWorkspace] ✅ All queries invalidated and refetched with correct workspace ID');
         
         // Dispatch events to notify other components
         window.dispatchEvent(new Event('workspace-changed'));
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: 'currentWorkspaceId',
-          newValue: correctedWorkspaceId,
-          oldValue: storedWorkspaceId,
-          storageArea: localStorage
-        }));
-      } else {
-        console.log('[useCurrentWorkspace] ✅ Workspace ID is valid:', storedWorkspaceId);
+      } else if (validWorkspaceId) {
+        console.log('[useCurrentWorkspace] ✅ Workspace ID is valid:', validWorkspaceId);
       }
       
       setIsValidating(false);
+      setHasValidated(true);
     };
 
-    validateWorkspace();
-  }, [workspaces, workspacesLoading, isValidating, queryClient]);
+    syncLocalStorage();
+  }, [workspaces, workspacesLoading, validWorkspaceId, isValidating, hasValidated, queryClient]);
 
   // Auto-create a default workspace in production if none exists
   useEffect(() => {
     if (workspacesLoading) return;
-    const safe = Array.isArray(workspaces) ? workspaces as Workspace[] : [];
-    if (safe.length === 0) {
+    if (workspaces.length === 0) {
       const autoCreate = (import.meta as any).env?.VITE_AUTO_CREATE_WORKSPACE === 'true' && !(import.meta as any).env?.PROD;
       if (!autoCreate) return;
       (async () => {
@@ -411,7 +412,7 @@ export function useCurrentWorkspace() {
           // ✅ GUARD: Only set if we got a valid ID back
           if (created && created.id && created.id !== 'undefined') {
             localStorage.setItem('currentWorkspaceId', created.id);
-            setCurrentWorkspaceId(created.id);
+            setStoredWorkspaceId(created.id);
           } else {
             console.warn('[useCurrentWorkspace] ⚠️ Workspace creation returned invalid ID:', created?.id);
           }
@@ -429,7 +430,8 @@ export function useCurrentWorkspace() {
   useEffect(() => {
     const handleStorageChange = () => {
       // ✅ FIX: Always sanitize when reading from localStorage
-      setCurrentWorkspaceId(getSanitizedWorkspaceId())
+      setStoredWorkspaceId(getSanitizedWorkspaceId())
+      setHasValidated(false) // Re-validate after external change
     }
     
     // Listen for storage events (when localStorage changes in other tabs)
@@ -444,17 +446,15 @@ export function useCurrentWorkspace() {
     }
   }, [])
 
-  const currentWorkspace = useMemo(() => {
-    const safeWorkspaces = Array.isArray(workspaces) ? workspaces as Workspace[] : [];
-    return safeWorkspaces.find((ws: Workspace) => 
-      currentWorkspaceId ? ws.id === currentWorkspaceId : ws.isDefault
-    ) || safeWorkspaces.find((ws: Workspace) => ws.isDefault) || safeWorkspaces[0]
-  }, [workspaces, currentWorkspaceId])
+  // ✅ CRITICAL: isReady indicates when workspace data is safe to use
+  const isReady = !workspacesLoading && !!currentWorkspace?.id;
 
   return {
     currentWorkspace,
     currentWorkspaceId: currentWorkspace?.id || null,
     workspaces,
-    isValidating
+    isValidating,
+    isReady,
+    isLoading: workspacesLoading
   }
 }
