@@ -11,6 +11,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { registerRoutes, initializeLeaderElection } from "./routes";
 import { MongoStorage } from "./mongodb-storage";
+import mongoose from 'mongoose';
 import { startSchedulerService } from "./scheduler-service";
 import { AutoSyncService } from "./auto-sync-service";
 // Re-enabling for comprehensive testing
@@ -525,11 +526,43 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app, storage as any, upload);
   
   // Initialize leader election for Instagram polling AFTER routes are registered
-  // This ensures MongoDB is connected before attempting lock acquisition
-  console.log('[STARTUP] MongoDB is connected - initiating leader election for polling...');
-  initializeLeaderElection(storage as any).catch((error) => {
-    console.error('[STARTUP] Leader election initialization failed:', error);
-  });
+  // Use setTimeout to ensure the event loop has processed all pending connections
+  setTimeout(async () => {
+    try {
+      console.log('[STARTUP] Initiating leader election for Instagram polling...');
+      console.log(`[STARTUP] MongoDB connection state: ${mongoose.connection.readyState}`);
+      
+      // Wait for MongoDB to be fully connected if not already
+      if (mongoose.connection.readyState !== 1) {
+        console.log('[STARTUP] Waiting for MongoDB connection...');
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('MongoDB connection timeout after 30s'));
+          }, 30000);
+          
+          if (mongoose.connection.readyState === 1) {
+            clearTimeout(timeout);
+            resolve();
+          } else {
+            mongoose.connection.once('connected', () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+            mongoose.connection.once('error', (err) => {
+              clearTimeout(timeout);
+              reject(err);
+            });
+          }
+        });
+      }
+      
+      console.log('[STARTUP] MongoDB connected - starting leader election...');
+      await initializeLeaderElection(storage as any);
+      console.log('[STARTUP] Leader election completed successfully');
+    } catch (error) {
+      console.error('[STARTUP] Leader election initialization failed:', error);
+    }
+  }, 1000);
   
   // Register metrics and webhook routes
   app.use('/api', metricsRoutes);
