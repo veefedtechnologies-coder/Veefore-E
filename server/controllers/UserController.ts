@@ -202,37 +202,60 @@ export class UserController extends BaseController {
     const firebaseUid = req.user!.firebaseUid;
     const currentUserId = req.user!.id;
 
-    console.log(`[ONBOARDING] Completing onboarding for user ${currentUserId} (uid: ${firebaseUid})`);
+    console.log(`[ONBOARDING] ⏳ Starting onboarding completion for user ${currentUserId} (uid: ${firebaseUid})`);
 
-    let dbUser = await withTimeout(storage.getUserByFirebaseUid(firebaseUid!), 3000).catch(() => undefined as any);
-    if (!dbUser) {
-      dbUser = await withTimeout(storage.getUser(currentUserId), 3000).catch(() => undefined as any);
+    try {
+      // Step 1: Find or create user with longer timeout (10s)
+      let dbUser = await withTimeout(storage.getUserByFirebaseUid(firebaseUid!), 10000).catch((err) => {
+        console.log(`[ONBOARDING] getUserByFirebaseUid failed: ${err.message}`);
+        return undefined as any;
+      });
+      
+      if (!dbUser) {
+        console.log(`[ONBOARDING] User not found by Firebase UID, trying by ID: ${currentUserId}`);
+        dbUser = await withTimeout(storage.getUser(currentUserId), 10000).catch((err) => {
+          console.log(`[ONBOARDING] getUser failed: ${err.message}`);
+          return undefined as any;
+        });
+      }
+      
+      if (!dbUser) {
+        console.log(`[ONBOARDING] User not found, creating new user for Firebase UID: ${firebaseUid}`);
+        const email = req.user!.email || `user_${firebaseUid}@example.com`;
+        dbUser = await withTimeout(storage.createUser({
+          firebaseUid: firebaseUid!,
+          email,
+          username: email.split('@')[0],
+          displayName: (req.user as any).displayName || null,
+          avatar: (req.user as any).avatar || null,
+          referredBy: null
+        }), 15000);
+        console.log(`[ONBOARDING] ✅ Created new user: ${dbUser.id}`);
+      }
+
+      // Step 2: Update user with onboarding data (longer timeout - 15s)
+      console.log(`[ONBOARDING] Updating user ${dbUser.id} with isOnboarded=true`);
+      const updateData = {
+        isOnboarded: true,
+        onboardingCompletedAt: new Date(),
+        preferences: preferences || {}
+      };
+
+      const updatedUser = await withTimeout(storage.updateUser(dbUser.id, updateData), 15000);
+      console.log(`[ONBOARDING] ✅ User updated successfully, isOnboarded: ${updatedUser.isOnboarded}`);
+
+      // Step 3: Create default workspace (don't await to speed up response)
+      const userPlan = updatedUser.plan || 'free';
+      createDefaultWorkspaceIfNeeded(updatedUser.id, userPlan).catch((err) => {
+        console.error(`[ONBOARDING] Background workspace creation error:`, err);
+      });
+
+      console.log(`[ONBOARDING] ✅ Completed onboarding for user ${updatedUser.id}`);
+      this.sendSuccess(res, { success: true, message: 'Onboarding completed successfully', user: updatedUser });
+    } catch (error: any) {
+      console.error(`[ONBOARDING] ❌ Critical error during onboarding completion:`, error);
+      throw error; // Let the wrapAsync error handler deal with it
     }
-    if (!dbUser) {
-      const email = req.user!.email || `user_${firebaseUid}@example.com`;
-      dbUser = await withTimeout(storage.createUser({
-        firebaseUid: firebaseUid!,
-        email,
-        username: email.split('@')[0],
-        displayName: (req.user as any).displayName || null,
-        avatar: (req.user as any).avatar || null,
-        referredBy: null
-      }), 5000);
-    }
-
-    const updateData = {
-      isOnboarded: true,
-      onboardingCompletedAt: new Date(),
-      preferences: preferences || {}
-    };
-
-    const updatedUser = await withTimeout(storage.updateUser(dbUser.id, updateData), 5000);
-
-    const userPlan = updatedUser.plan || 'free';
-    await createDefaultWorkspaceIfNeeded(updatedUser.id, userPlan);
-
-    console.log(`[ONBOARDING] ✅ Completed onboarding for user ${updatedUser.id}`);
-    this.sendSuccess(res, { success: true, message: 'Onboarding completed successfully', user: updatedUser });
   });
 
   updateOnboardingStep = this.wrapAsync(async (
