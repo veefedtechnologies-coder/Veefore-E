@@ -144,7 +144,11 @@ const AutomationListManager = ({
     }
   }
 
-  if (rulesLoading) {
+  // Only show skeletons when loading AND no cached data exists
+  // This ensures instant navigation when data is already cached
+  const showSkeletons = rulesLoading && (!automationRules || automationRules.length === 0)
+  
+  if (showSkeletons) {
     return (
       <div className="p-8">
         <div className="mb-8">

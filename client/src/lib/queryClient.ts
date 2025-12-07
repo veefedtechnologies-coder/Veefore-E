@@ -4,17 +4,18 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 
 // Create a client with optimized caching to prevent unnecessary refetches
 // Data is cached for 10 minutes before becoming stale - this prevents refetch on navigation
+// When data becomes stale, it will be refetched on next mount to ensure freshness
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 10, // 10 minutes - data is fresh for 10 min (prevents refetch on navigation)
       retry: 1, // Retry once for transient errors
-      refetchOnWindowFocus: false, // Don't refetch when window regains focus
-      refetchOnReconnect: false, // Don't refetch on reconnect
-      refetchOnMount: false, // Don't refetch when component mounts (use cached data)
+      refetchOnWindowFocus: false, // Don't refetch when window regains focus (user preference)
+      refetchOnReconnect: true, // Refetch on reconnect to ensure data is fresh after connection loss
+      refetchOnMount: true, // Refetch on mount only if data is stale (default React Query behavior)
       refetchInterval: false, // Disable automatic polling
       refetchIntervalInBackground: false, // Disable background polling
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours - keep cached data for 24h
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours - keep cached data in memory for 24h
     },
   },
 })
