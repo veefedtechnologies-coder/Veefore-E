@@ -1,4 +1,4 @@
-import type { Express, Response, NextFunction } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
 import multer from 'multer';
@@ -167,7 +167,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
   app.use('/api/subscription', subscriptionRoutes);
 
   // Video Generator Routes - Set storage for middleware
-  app.use('/api/video', (req: any, res: any, next: any) => {
+  app.use('/api/video', (req: Request, res: Response, next: NextFunction) => {
     req.app.locals.storage = storage;
     next();
   }, videoRoutes);

@@ -4,6 +4,7 @@
  * Comprehensive key management system with encryption, rotation, and monitoring
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { createHash, randomBytes } from 'crypto';
 
 // Rate limiting for audit logging to prevent console spam
@@ -329,13 +330,13 @@ export class KeyRotationManager {
  * P1-6.4: Secrets validation middleware
  */
 export function secretsValidationMiddleware() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     // Add secrets audit info to request for monitoring
-    req.secretsAudit = auditEnvironmentVariables();
+    (req as any).secretsAudit = auditEnvironmentVariables();
     
     // Warn about missing critical secrets
-    if (req.secretsAudit.missing.length > 0) {
-      console.warn(`🚨 SECRETS: ${req.secretsAudit.missing.length} required secrets missing`);
+    if ((req as any).secretsAudit.missing.length > 0) {
+      console.warn(`🚨 SECRETS: ${(req as any).secretsAudit.missing.length} required secrets missing`);
     }
     
     next();
@@ -346,7 +347,7 @@ export function secretsValidationMiddleware() {
  * P1-6: Security headers for key management
  */
 export function keyManagementHeaders() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     // Additional security headers for endpoints handling sensitive data
     res.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.header('Pragma', 'no-cache');

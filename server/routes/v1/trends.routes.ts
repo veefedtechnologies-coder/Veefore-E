@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { aiRateLimiter } from '../../middleware/rate-limiting-working';
@@ -21,7 +21,7 @@ const TrendingHashtagsQuerySchema = z.object({
 
 router.get('/trending-topics',
   validateRequest({ query: TrendingTopicsQuerySchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { category = 'Business and Finance', clearCache } = req.query;
       
@@ -50,7 +50,7 @@ router.get('/trending-topics',
 );
 
 router.post('/trending-topics/clear-cache',
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       trendingTopicsAPI.clearCache();
       console.log('[TRENDING TOPICS API] Cache cleared successfully');
@@ -65,7 +65,7 @@ router.post('/trending-topics/clear-cache',
 router.get('/hashtags/trending',
   requireAuth,
   validateRequest({ query: TrendingHashtagsQuerySchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { category = 'all' } = req.query;
       console.log(`[LEGACY HASHTAGS] Redirecting to authentic trend analyzer for category: ${category}`);
@@ -98,11 +98,11 @@ function calculateContentScore(platforms: any[]): number {
 router.get('/ai-growth-insights',
   requireAuth,
   aiRateLimiter,
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      console.log('[AI INSIGHTS API] Generating comprehensive growth insights for user:', req.user.id);
+      console.log('[AI INSIGHTS API] Generating comprehensive growth insights for user:', (req as any).user.id);
       
-      const workspaces = await storage.getWorkspacesByUserId(req.user.id);
+      const workspaces = await storage.getWorkspacesByUserId((req as any).user.id);
       if (!workspaces || workspaces.length === 0) {
         return res.status(404).json({ error: 'No workspaces found' });
       }

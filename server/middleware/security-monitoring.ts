@@ -181,15 +181,15 @@ export const securityEventStore = new SecurityEventStore();
 /**
  * P1-7.1: Correlation ID middleware for request tracing
  */
-export function correlationIdMiddleware(req: any, res: Response, next: NextFunction) {
+export function correlationIdMiddleware(req: Request, res: Response, next: NextFunction) {
   // Generate or use existing correlation ID
   const correlationId = req.headers['x-correlation-id'] || randomUUID();
   
   // Add to request object
-  req.correlationId = correlationId;
+  (req as any).correlationId = correlationId;
   
   // Add to response headers
-  res.setHeader('X-Correlation-ID', correlationId);
+  res.setHeader('X-Correlation-ID', correlationId as string);
   
   next();
 }
@@ -197,13 +197,13 @@ export function correlationIdMiddleware(req: any, res: Response, next: NextFunct
 /**
  * P1-7.1: Main security logging middleware
  */
-export function securityLoggingMiddleware(req: any, res: Response, next: NextFunction) {
+export function securityLoggingMiddleware(req: Request, res: Response, next: NextFunction) {
   const startTime = Date.now();
   
   // Extract request info
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const ip = req.ip || (req as any).connection?.remoteAddress || 'unknown';
   const userAgent = req.headers['user-agent'] || 'unknown';
-  const correlationId = req.correlationId || randomUUID();
+  const correlationId = (req as any).correlationId || randomUUID();
   
   // Only log security-relevant requests to reduce noise
   const isSecurityRelevant = req.path.includes('/admin') || req.path.includes('/oauth') || req.path.includes('/auth');
@@ -226,8 +226,8 @@ export function securityLoggingMiddleware(req: any, res: Response, next: NextFun
         timestamp: new Date().toISOString(),
         type: getEventType(req.path, statusCode),
         severity,
-        userId: req.user?.id,
-        workspaceId: req.user?.currentWorkspace || req.query.workspaceId,
+        userId: (req as any).user?.id,
+        workspaceId: (req as any).user?.currentWorkspace || req.query.workspaceId,
         ip,
         userAgent,
         endpoint: req.path,
@@ -258,8 +258,8 @@ export function securityLoggingMiddleware(req: any, res: Response, next: NextFun
 /**
  * P1-7.2: Attack detection middleware
  */
-export function attackDetectionMiddleware(req: any, res: Response, next: NextFunction) {
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+export function attackDetectionMiddleware(req: Request, res: Response, next: NextFunction) {
+  const ip = req.ip || (req as any).connection?.remoteAddress || 'unknown';
   const path = req.path;
   const body = req.body;
   const query = req.query;
@@ -274,12 +274,12 @@ export function attackDetectionMiddleware(req: any, res: Response, next: NextFun
         timestamp: new Date().toISOString(),
         type: attack.type,
         severity: attack.severity,
-        userId: req.user?.id,
+        userId: (req as any).user?.id,
         ip,
         userAgent: req.headers['user-agent'] || 'unknown',
         endpoint: path,
         method: req.method,
-        correlationId: req.correlationId || randomUUID(),
+        correlationId: (req as any).correlationId || randomUUID(),
         message: attack.message,
         blocked: attack.shouldBlock,
         metadata: attack.evidence
@@ -304,7 +304,7 @@ export function attackDetectionMiddleware(req: any, res: Response, next: NextFun
 /**
  * P1-7.3: Security metrics endpoint
  */
-export function securityMetricsHandler(req: any, res: Response) {
+export function securityMetricsHandler(req: Request, res: Response) {
   const hours = parseInt(req.query.hours as string) || 24;
   const metrics = securityEventStore.getSecurityMetrics(hours);
   
@@ -319,19 +319,19 @@ export function securityMetricsHandler(req: any, res: Response) {
  * P1-7.4: Audit trail for privileged operations
  */
 export function auditTrailMiddleware(operation: string) {
-  return (req: any, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const event: SecurityEvent = {
       id: randomUUID(),
       timestamp: new Date().toISOString(),
       type: SecurityEventType.ADMIN_ACTION,
       severity: SecuritySeverity.MEDIUM,
-      userId: req.user?.id,
-      workspaceId: req.user?.currentWorkspace,
+      userId: (req as any).user?.id,
+      workspaceId: (req as any).user?.currentWorkspace,
       ip: req.ip || 'unknown',
       userAgent: req.headers['user-agent'] || 'unknown',
       endpoint: req.path,
       method: req.method,
-      correlationId: req.correlationId || randomUUID(),
+      correlationId: (req as any).correlationId || randomUUID(),
       message: `Privileged operation: ${operation}`,
       blocked: false,
       metadata: {

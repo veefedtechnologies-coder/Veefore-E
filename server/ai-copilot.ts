@@ -259,7 +259,7 @@ export function createCopilotRoutes(app: Express, storage: IStorage) {
   };
   registerPrivacyRoutes();
   // Chat endpoint
-  app.post('/api/copilot/chat', async (req: any, res: Response) => {
+  app.post('/api/copilot/chat', async (req: Request, res: Response) => {
     try {
       const { message, language, context } = req.body;
 
@@ -294,7 +294,7 @@ export function createCopilotRoutes(app: Express, storage: IStorage) {
   });
 
   // Generate content endpoint
-  app.post('/api/copilot/generate', async (req: any, res: Response) => {
+  app.post('/api/copilot/generate', async (req: Request, res: Response) => {
     try {
       const { type, prompt, language = 'en', platform, context } = req.body;
 
@@ -342,7 +342,7 @@ export function createCopilotRoutes(app: Express, storage: IStorage) {
   });
 
   // Analyze content endpoint
-  app.post('/api/copilot/analyze', async (req: any, res: Response) => {
+  app.post('/api/copilot/analyze', async (req: Request, res: Response) => {
     try {
       const { content, language = 'en' } = req.body;
 
