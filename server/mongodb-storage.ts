@@ -143,14 +143,23 @@ export class MongoStorage implements IStorage {
         console.log(`[MONGODB] Retry attempt ${retryCount}/${MongoStorage.MAX_RETRY_ATTEMPTS}...`);
       }
 
+      // Configurable MongoDB connection settings via environment variables
+      const poolSize = parseInt(process.env.MONGODB_POOL_SIZE || '50', 10);
+      const serverSelectionTimeout = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '10000', 10);
+      const socketTimeout = parseInt(process.env.MONGODB_SOCKET_TIMEOUT || '45000', 10);
+      const maxIdleTime = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '30000', 10);
+      
       await mongoose.connect(mongoUri, {
-        dbName: 'veeforedb',
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 10,
+        dbName: process.env.MONGODB_DB_NAME || 'veeforedb',
+        serverSelectionTimeoutMS: serverSelectionTimeout,
+        socketTimeoutMS: socketTimeout,
+        maxPoolSize: poolSize,
+        minPoolSize: Math.min(5, poolSize),
         bufferCommands: false,
-        maxIdleTimeMS: 30000,
-        retryWrites: true
+        maxIdleTimeMS: maxIdleTime,
+        retryWrites: true,
+        retryReads: true,
+        connectTimeoutMS: parseInt(process.env.MONGODB_CONNECT_TIMEOUT || '10000', 10),
       });
 
       const connectTime = Date.now() - startTime;
