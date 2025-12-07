@@ -1,0 +1,50 @@
+VM1342 integration:27 Warning: Each child in a list should have a unique "key" prop.
+
+Check the render method of `IntegrationContent`. See https://reactjs.org/link/warning-keys for more information.
+    at _c (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ui/card.tsx:20:11)
+    at IntegrationContent (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/pages/Integration.tsx:148:23)
+    at Integration
+    at Suspense
+    at main
+    at div
+    at div
+    at Route (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/wouter.js?v=b99b7969:205:16)
+    at Switch (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/wouter.js?v=b99b7969:261:17)
+    at P6Provider (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/lib/p6-integration.tsx:257:30)
+    at App (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/App.tsx:114:28)
+    at Suspense
+    at ChunkBoundary (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ChunkBoundary.tsx:7:5)
+    at RouteSuspense (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/RouteSuspense.tsx:20:41)
+    at ErrorBoundary (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ErrorBoundary.tsx:20:5)
+    at QueryClientProvider (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/chunk-6FXDDQHQ.js?v=b99b7969:44:3)
+
+2
+VM1342 integration:27 [Global Error Handler] TypeError: workspaces.map is not a function
+    at Workspaces (Workspaces.tsx:342:21)
+Workspaces.tsx:342 Uncaught TypeError: workspaces.map is not a function
+    at Workspaces (Workspaces.tsx:342:21)
+2
+VM1342 integration:27 [Global Error Handler] TypeError: workspaces.map is not a function
+    at Workspaces (Workspaces.tsx:342:21)
+Workspaces.tsx:342 Uncaught TypeError: workspaces.map is not a function
+    at Workspaces (Workspaces.tsx:342:21)
+VM1342 integration:27 The above error occurred in the <Workspaces> component:
+
+    at Workspaces (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/pages/Workspaces.tsx:43:21)
+    at Suspense
+    at main
+    at div
+    at div
+    at ProtectedRoute (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ProtectedRoute.tsx:20:34)
+    at Route (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/wouter.js?v=b99b7969:205:16)
+    at Switch (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/wouter.js?v=b99b7969:261:17)
+    at P6Provider (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/lib/p6-integration.tsx:257:30)
+    at App (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/App.tsx:114:28)
+    at Suspense
+    at ChunkBoundary (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ChunkBoundary.tsx:7:5)
+    at RouteSuspense (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/RouteSuspense.tsx:20:41)
+    at ErrorBoundary (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ErrorBoundary.tsx:20:5)
+    at QueryClientProvider (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/chunk-6FXDDQHQ.js?v=b99b7969:44:3)
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ChunkBoundary.
+﻿

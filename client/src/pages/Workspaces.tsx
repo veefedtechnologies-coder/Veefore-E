@@ -64,7 +64,13 @@ export default function Workspaces() {
   // Fetch user's workspaces
   const { data: workspaces = [], isLoading } = useQuery({
     queryKey: ['/api/workspaces'],
-    queryFn: () => apiRequest('/api/workspaces')
+    queryFn: async () => {
+      const response = await apiRequest('/api/workspaces');
+      // API returns { success: true, data: [...] } - extract the data array
+      if (Array.isArray(response)) return response;
+      if (response && Array.isArray(response.data)) return response.data;
+      return [];
+    }
   })
 
   // Create workspace mutation
