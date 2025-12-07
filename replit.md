@@ -44,6 +44,13 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-12-07: User Data & WorkspaceSwitcher Bug Fixes (COMPLETE)
+- ✅ **FIX**: useUser hook now correctly extracts user data from nested API response
+- ✅ **FIX**: /api/user endpoint returns all needed user fields (displayName, plan, credits, isOnboarded)
+- ✅ **FIX**: WorkspaceSwitcher no longer crashes when defaultWorkspace is undefined
+- ✅ Added null check guard in validateWorkspace function to handle empty workspace arrays
+- **Files Modified**: client/src/hooks/useUser.ts, server/auth-routes.ts, client/src/components/WorkspaceSwitcher.tsx
+
 ### 2025-12-07: Critical Onboarding Bug Fixes (COMPLETE)
 - ✅ **FIX**: Onboarding completion no longer stuck on "Completing..." state
 - ✅ **FIX**: Onboarding modal no longer shows to already onboarded users
