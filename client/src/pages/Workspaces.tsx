@@ -62,16 +62,21 @@ export default function Workspaces() {
   })
 
   // Fetch user's workspaces
-  const { data: workspaces = [], isLoading } = useQuery({
+  const { data: workspacesRaw = [], isLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: async () => {
       const response = await apiRequest('/api/workspaces');
       // API returns { success: true, data: [...] } - extract the data array
       if (Array.isArray(response)) return response;
       if (response && Array.isArray(response.data)) return response.data;
+      if (response && Array.isArray(response.workspaces)) return response.workspaces;
+      console.warn('Unexpected workspaces response format:', response);
       return [];
     }
   })
+  
+  // Ensure workspaces is always an array for safety
+  const workspaces = Array.isArray(workspacesRaw) ? workspacesRaw : [];
 
   // Create workspace mutation
   const createWorkspaceMutation = useMutation({
