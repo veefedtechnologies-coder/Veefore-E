@@ -332,11 +332,11 @@ export class KeyRotationManager {
 export function secretsValidationMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
     // Add secrets audit info to request for monitoring
-    (req as any).secretsAudit = auditEnvironmentVariables();
+    req.secretsAudit = auditEnvironmentVariables();
     
     // Warn about missing critical secrets
-    if ((req as any).secretsAudit.missing.length > 0) {
-      console.warn(`🚨 SECRETS: ${(req as any).secretsAudit.missing.length} required secrets missing`);
+    if (req.secretsAudit.missing.length > 0) {
+      console.warn(`🚨 SECRETS: ${req.secretsAudit.missing.length} required secrets missing`);
     }
     
     next();

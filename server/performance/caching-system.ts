@@ -5,6 +5,7 @@
  * and frequently accessed resources with intelligent cache invalidation
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from '../monitoring/structured-logger';
 import { MetricsCollector } from '../monitoring/metrics-collector';
 
@@ -537,7 +538,7 @@ export class CachingSystem {
  * P5-1.8: Cache middleware for Express
  */
 export function cacheMiddleware(ttl: number = 300, tags: string[] = []) {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     // Generate cache key based on URL and query parameters
     const cacheKey = `route:${req.method}:${req.originalUrl}:${req.user?.id || 'anonymous'}`;
     

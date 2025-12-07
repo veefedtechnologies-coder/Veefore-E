@@ -6,6 +6,7 @@ import { validateRequest } from '../../middleware/validation';
 import { storage } from '../../mongodb-storage';
 import { TrendingTopicsAPI } from '../../trending-topics-api';
 import { generateAIGrowthInsights, generateVisualInsights } from '../../ai-growth-insights';
+import { AuthenticatedRequest } from '../../types/express';
 
 const router = Router();
 const trendingTopicsAPI = TrendingTopicsAPI.getInstance();
@@ -98,11 +99,11 @@ function calculateContentScore(platforms: any[]): number {
 router.get('/ai-growth-insights',
   requireAuth,
   aiRateLimiter,
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      console.log('[AI INSIGHTS API] Generating comprehensive growth insights for user:', (req as any).user.id);
+      console.log('[AI INSIGHTS API] Generating comprehensive growth insights for user:', req.user.id);
       
-      const workspaces = await storage.getWorkspacesByUserId((req as any).user.id);
+      const workspaces = await storage.getWorkspacesByUserId(req.user.id);
       if (!workspaces || workspaces.length === 0) {
         return res.status(404).json({ error: 'No workspaces found' });
       }

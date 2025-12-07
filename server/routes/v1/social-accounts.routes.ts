@@ -22,7 +22,7 @@ router.get('/',
       if (!workspaceId) {
         return res.status(400).json({ error: 'workspaceId is required' });
       }
-      (req as any).params = { workspaceId };
+      req.params = { workspaceId };
       return socialAccountController.getByWorkspace(req, res);
     } catch (error: any) {
       console.error('[SOCIAL ACCOUNTS] Error:', error);

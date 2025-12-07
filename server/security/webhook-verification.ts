@@ -45,7 +45,7 @@ export class InstagramWebhookSecurity {
     signatureHeader?: string;
     secret?: string;
   } = {}) {
-    return (req: any, res: Response, next: NextFunction) => {
+    return (req: Request, res: Response, next: NextFunction) => {
       const {
         secretHeader = 'x-hub-signature',
         signatureHeader = 'x-hub-signature-256',
@@ -118,7 +118,7 @@ export class WebhookSecurity {
     prefix?: string;
     platform: string;
   }) {
-    return (req: any, res: Response, next: NextFunction) => {
+    return (req: Request, res: Response, next: NextFunction) => {
       const secret = process.env[options.secretEnvVar];
       
       if (!secret) {
@@ -202,7 +202,7 @@ export class WebhookReplayProtection {
     timestampHeader?: string;
     platform: string;
   } = { platform: 'webhook' }) {
-    return (req: any, res: Response, next: NextFunction) => {
+    return (req: Request, res: Response, next: NextFunction) => {
       const signature = req.headers['x-hub-signature'] || 
                        req.headers['x-hub-signature-256'] ||
                        req.headers['x-signature-256'];
@@ -292,10 +292,10 @@ export class WebhookIdempotency {
    * Middleware for webhook idempotency
    */
   static idempotencyMiddleware(options: {
-    generateId?: (req: any) => string;
+    generateId?: (req: Request) => string;
     platform: string;
   }) {
-    return (req: any, res: Response, next: NextFunction) => {
+    return (req: Request, res: Response, next: NextFunction) => {
       // Generate webhook ID (can be customized)
       const webhookId = options.generateId ? 
         options.generateId(req) : 

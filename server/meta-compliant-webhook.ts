@@ -162,7 +162,7 @@ export class MetaCompliantWebhook {
     }
 
     // Meta requirement: use raw body string for signature validation
-    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const rawBody = req.rawBody || JSON.stringify(req.body);
     
     const expectedSignature = `sha256=${crypto
       .createHmac('sha256', appSecret)

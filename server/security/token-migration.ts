@@ -159,8 +159,10 @@ export class TokenMigrationService {
 /**
  * P2-2.2: Automatic token encryption middleware
  */
+import { Request, Response, NextFunction } from 'express';
+
 export function tokenEncryptionMiddleware() {
-  return async function(req: any, res: any, next: any) {
+  return async function(req: Request, res: Response, next: NextFunction) {
     const originalSend = res.send;
     
     // Intercept response to ensure tokens are not leaked

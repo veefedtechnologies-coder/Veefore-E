@@ -1,3 +1,4 @@
+import { Request, Response, NextFunction } from 'express';
 import * as Sentry from '@sentry/node'
 let SentryReady = false
 
@@ -24,7 +25,7 @@ export async function attachSentryRequestMiddleware(app: any) {
   if (!dsn) return
   try {
     const SentryAny: any = Sentry as any
-    app.use((req: any, res: any, next: any) => {
+    app.use((req: Request, res: Response, next: NextFunction) => {
       try {
         SentryAny.addBreadcrumb({ category: 'request', message: req.method + ' ' + req.path, level: 'info' })
       } catch {}

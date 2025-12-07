@@ -5,6 +5,7 @@
  * content encoding, response streaming, and performance monitoring
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from '../monitoring/structured-logger';
 import { MetricsCollector } from '../monitoring/metrics-collector';
 import * as zlib from 'zlib';
@@ -453,7 +454,7 @@ export class ResponseOptimizer {
  * P5-4.7: Response optimization middleware
  */
 export function responseOptimizationMiddleware() {
-  return async (req: any, res: any, next: any) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const originalSend = res.send;
     const originalJson = res.json;
 

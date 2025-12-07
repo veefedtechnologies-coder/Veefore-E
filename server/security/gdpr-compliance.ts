@@ -43,7 +43,7 @@ export class DataPrivacyController {
     consentType: 'data_processing' | 'marketing' | 'analytics' | 'cookies',
     granted: boolean,
     purposes: string[],
-    req: any
+    req: Request
   ): string {
     const consentId = crypto.randomUUID();
     

@@ -57,7 +57,7 @@ export function sessionAffinityMiddleware() {
     res.setHeader(LB_CONFIG.sessionAffinityHeader, sessionId);
     
     // Add to request for downstream middleware
-    (req as any).sessionAffinityId = sessionId;
+    req.sessionAffinityId = sessionId;
 
     next();
   };
@@ -143,7 +143,7 @@ export class LoadBalancerRateLimiter {
 
   private static getClientIdentifier(req: Request): string {
     // Use session affinity ID if available, otherwise fall back to IP
-    const sessionId = (req as any).sessionAffinityId;
+    const sessionId = req.sessionAffinityId;
     if (sessionId) return sessionId;
     
     return req.ip || req.socket.remoteAddress || 'unknown';

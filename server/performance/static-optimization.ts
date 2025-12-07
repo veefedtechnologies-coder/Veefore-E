@@ -5,6 +5,7 @@
  * compression, caching headers, and performance monitoring
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from '../monitoring/structured-logger';
 import { MetricsCollector } from '../monitoring/metrics-collector';
 import * as path from 'path';
@@ -365,7 +366,7 @@ export class StaticOptimizer {
  * P5-3.8: Static optimization middleware
  */
 export function staticOptimizationMiddleware() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
     const originalJson = res.json;

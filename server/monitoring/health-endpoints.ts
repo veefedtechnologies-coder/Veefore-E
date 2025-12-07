@@ -283,7 +283,7 @@ export class HealthEndpoints {
    * Liveness probe - basic health check
    * Returns 200 if the application is running
    */
-  static async healthz(req: any, res: Response): Promise<void> {
+  static async healthz(req: Request, res: Response): Promise<void> {
     const timestamp = new Date().toISOString();
     const uptime = Math.floor((Date.now() - HealthEndpoints.startTime) / 1000);
     
@@ -330,7 +330,7 @@ export class HealthEndpoints {
    * Readiness probe - comprehensive health check
    * Returns 200 if the application is ready to serve traffic
    */
-  static async readyz(req: any, res: Response): Promise<void> {
+  static async readyz(req: Request, res: Response): Promise<void> {
     const timestamp = new Date().toISOString();
     const uptime = Math.floor((Date.now() - HealthEndpoints.startTime) / 1000);
     
@@ -384,7 +384,7 @@ export class HealthEndpoints {
   /**
    * Detailed health check with all information
    */
-  static async health(req: any, res: Response): Promise<void> {
+  static async health(req: Request, res: Response): Promise<void> {
     const timestamp = new Date().toISOString();
     const uptime = Math.floor((Date.now() - HealthEndpoints.startTime) / 1000);
     

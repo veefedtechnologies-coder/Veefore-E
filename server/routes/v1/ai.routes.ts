@@ -8,6 +8,7 @@ import { AICreditService } from '../../services/AICreditService';
 import { generateCompetitorAnalysis } from '../../competitor-analysis-ai';
 import { safeParseAIResponse } from '../../middleware/unsafe-json-replacements';
 import OpenAI from 'openai';
+import { AuthenticatedRequest } from '../../types/express';
 
 const router = Router();
 
@@ -101,9 +102,9 @@ router.post('/creative-brief',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: CreativeBriefSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
       const creditCost = AICreditService.calculateCost('content_generation');
       
       const creditCheck = await AICreditService.checkCredits(userId, creditCost);
@@ -174,9 +175,9 @@ router.post('/content-repurpose',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: ContentRepurposeSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
       const creditCost = AICreditService.calculateCost('repurpose');
       
       const creditCheck = await AICreditService.checkCredits(userId, creditCost);
@@ -246,10 +247,10 @@ router.post('/content-repurpose/bulk',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: BulkRepurposeSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { sourceContent, sourceLanguage, targetLanguages, contentType, platform } = req.body;
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
 
       const creditCost = targetLanguages.length * AICreditService.calculateCost('repurpose');
       const creditCheck = await AICreditService.checkCredits(userId, creditCost);
@@ -296,9 +297,9 @@ router.post('/competitor-analysis',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: CompetitorAnalysisSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
       const creditCost = AICreditService.calculateCost('competitor_analysis');
       
       const creditCheck = await AICreditService.checkCredits(userId, creditCost);
@@ -383,10 +384,10 @@ router.post('/generate-caption',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: GenerateCaptionSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { title, type, platform, mediaUrl } = req.body;
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
       
       if (!title && !mediaUrl) {
         return res.status(400).json({ error: 'Title or media URL is required' });
@@ -459,10 +460,10 @@ router.post('/generate-hashtags',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: GenerateHashtagsSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { title, description, type, platform } = req.body;
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
       
       if (!title && !description) {
         return res.status(400).json({ error: 'Title or description is required' });
@@ -540,9 +541,9 @@ router.post('/generate-image',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: GenerateImageSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { user } = req as any;
+      const user = req.user;
       const userId = user.id;
       const { prompt, platform, contentType, style, workspaceId, dimensions } = req.body;
 
@@ -701,9 +702,9 @@ router.post('/generate-script',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: GenerateScriptSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { user } = req as any;
+      const user = req.user;
       const userId = user.id;
       const { prompt, platform, contentType, style, duration, workspaceId, dimensions } = req.body;
 
@@ -804,9 +805,9 @@ router.post('/chat',
   requireAuth,
   aiRateLimiter,
   validateRequest({ body: ChatSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { user } = req as any;
+      const user = req.user;
       const userId = user.id;
       const { message, brandVoice, workspaceId } = req.body;
 

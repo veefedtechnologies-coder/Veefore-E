@@ -5,6 +5,7 @@
  * PII sanitization, and comprehensive audit trails for monitoring and debugging
  */
 
+import { Request, Response, NextFunction } from 'express';
 // Using built-in Node.js console with structured formatting
 // import pino from 'pino'; // Package conflicts resolved with built-in implementation
 import { randomUUID } from 'crypto';
@@ -384,7 +385,7 @@ export class StructuredLogger {
  * P4-1.5: Express middleware for correlation tracking
  */
 export function correlationMiddleware() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     // Generate or extract correlation ID
     const correlationId = req.headers['x-correlation-id'] as string || 
                          CorrelationManager.generateCorrelationId();

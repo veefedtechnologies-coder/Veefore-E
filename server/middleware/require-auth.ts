@@ -164,7 +164,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     
     console.log(`[AUTH] User ${user.email} authenticated successfully, allowing request`);
     console.log(`[AUTH] Setting req.user - ID: ${user.id}, isOnboarded: ${user.isOnboarded}`);
-    (req as any).user = user;
+    req.user = user;
     next();
   } catch (error) {
     console.error('Authentication failed:', error);

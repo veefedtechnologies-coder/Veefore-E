@@ -101,7 +101,7 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    (req as any).user = user;
+    req.user = user;
     next();
   } catch (error) {
     console.error('[SUBSCRIPTION AUTH] Error:', error);
@@ -155,7 +155,7 @@ router.get('/addons', async (req: Request, res: Response) => {
 // Get current user subscription
 router.get('/current', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -211,7 +211,7 @@ router.get('/current', requireAuth, async (req: Request, res: Response) => {
 // Validate feature access
 router.post('/validate-feature', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -276,7 +276,7 @@ router.post('/validate-feature', requireAuth, async (req: Request, res: Response
 // Update subscription plan
 router.post('/update-plan', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -325,7 +325,7 @@ router.post('/update-plan', requireAuth, async (req: Request, res: Response) => 
 // Purchase addon
 router.post('/purchase-addon', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -369,7 +369,7 @@ router.post('/purchase-addon', requireAuth, async (req: Request, res: Response) 
 // Get subscription usage analytics
 router.get('/usage', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -400,7 +400,7 @@ router.get('/usage', requireAuth, async (req: Request, res: Response) => {
 // Create Razorpay order for subscription upgrade
 router.post('/create-order', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -482,11 +482,11 @@ router.post('/create-order', requireAuth, async (req: Request, res: Response) =>
 router.post('/upgrade', requireAuth, async (req: Request, res: Response) => {
   try {
     console.log('[SUBSCRIPTION] Upgrade request received:', { 
-      userId: (req as any).user?.id, 
+      userId: req.user?.id, 
       body: req.body 
     });
 
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       console.error('[SUBSCRIPTION] No user found in request');
       return res.status(401).json({ error: 'Unauthorized' });

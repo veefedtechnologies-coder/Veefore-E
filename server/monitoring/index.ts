@@ -5,7 +5,7 @@
  * health endpoints, metrics collection, error tracking, and feature flags
  */
 
-import { Express } from 'express';
+import { Express, Request, Response } from 'express';
 import { 
   initializeStructuredLogging, 
   correlationMiddleware, 
@@ -99,7 +99,7 @@ export function applyErrorTrackingMiddleware(app: Express): void {
  */
 export function createMonitoringEndpoints(app: Express): void {
   // Metrics endpoint (Prometheus format)
-  app.get('/metrics', (req: any, res: any) => {
+  app.get('/metrics', (req: Request, res: Response) => {
     try {
       const metrics = MetricsCollector.exportPrometheusMetrics();
       res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
@@ -122,7 +122,7 @@ export function createMonitoringEndpoints(app: Express): void {
   });
 
   // Metrics endpoint (JSON format)
-  app.get('/metrics.json', (req: any, res: any) => {
+  app.get('/metrics.json', (req: Request, res: Response) => {
     try {
       const metrics = MetricsCollector.exportJSONMetrics();
       res.json(metrics);
@@ -144,7 +144,7 @@ export function createMonitoringEndpoints(app: Express): void {
   });
 
   // System information endpoint
-  app.get('/system/info', (req: any, res: any) => {
+  app.get('/system/info', (req: Request, res: Response) => {
     try {
       const systemInfo = {
         timestamp: new Date().toISOString(),
