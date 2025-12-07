@@ -267,7 +267,13 @@ export function SocialAccounts() {
       })
     },
     onError: (error: any) => {
-      console.error('Failed to start hybrid polling:', error)
+      // Gracefully handle AbortError (timeout) - don't spam console with these
+      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+        console.debug('[Hybrid Polling] Request timed out - will retry on next activity')
+        return
+      }
+      // Only log non-abort errors as actual errors
+      console.warn('[Hybrid Polling] Failed to start:', error?.message || error)
     }
   })
 
