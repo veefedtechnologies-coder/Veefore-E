@@ -214,7 +214,7 @@ export class APINamespacing {
    * Validate API request workspace scope
    */
   static validateAPIRequest(
-    req: any,
+    req: Request,
     expectedWorkspaceId: string
   ): { isValid: boolean; reason?: string } {
     const requestWorkspaceId = req.params.workspaceId || 
@@ -308,7 +308,7 @@ export function resourceNamespacingMiddleware(options: {
   enforceNamespacing?: boolean;
   allowedOperations?: string[];
 } = { resourceType: 'resource' }) {
-  return (req: any, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.workspace?.id || req.query.workspaceId;
       

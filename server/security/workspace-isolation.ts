@@ -133,7 +133,7 @@ export function workspaceIsolationMiddleware(options: {
   resourceType?: string;
   allowOwnerOnly?: boolean;
 } = {}) {
-  return async (req: any, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Skip if no user authenticated
       if (!req.user) {
@@ -394,7 +394,7 @@ export class InstagramAccountConstraints {
    * Middleware to enforce Instagram account constraints
    */
   static uniquenessMiddleware() {
-    return async (req: any, res: Response, next: NextFunction) => {
+    return async (req: Request, res: Response, next: NextFunction) => {
       // Only apply to Instagram account operations
       if (req.body.platform !== 'instagram' && req.query.platform !== 'instagram') {
         return next();

@@ -194,7 +194,7 @@ export async function logActionFromRequest(
     severity?: 'info' | 'warning' | 'critical';
   }
 ): Promise<IAuditLog | null> {
-  const user = (req as any).user;
+  const user = req.user;
   const userId = user?.id || user?.uid || 'unknown';
   
   return logUserAction(userId, action, metadata, {

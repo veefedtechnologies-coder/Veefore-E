@@ -263,7 +263,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // P1 SECURITY: Secure cookie parser for HTTP-only authentication cookies
 app.use((req: Request, res: Response, next: NextFunction) => {
-  (req as any).cookies = {};
+  req.cookies = {};
   const cookieHeader = req.headers.cookie;
   if (cookieHeader) {
     cookieHeader.split(';').forEach((cookie: string) => {
@@ -273,7 +273,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         // SECURITY FIX: Handle values containing '=' correctly
         const name = trimmed.substring(0, equalIndex);
         const value = trimmed.substring(equalIndex + 1);
-        (req as any).cookies[name] = decodeURIComponent(value);
+        req.cookies[name] = decodeURIComponent(value);
       }
     });
   }
@@ -599,7 +599,7 @@ app.use((req, res, next) => {
   await performStartupOptimizations();
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-    const id = (req as any).correlationId || '';
+    const id = req.correlationId || '';
     const status = err?.status || 500;
     const message = status === 500 ? 'Internal server error' : (err?.message || 'Error');
     res.status(status).json({ error: message, correlationId: id });

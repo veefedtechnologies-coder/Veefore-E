@@ -62,7 +62,7 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     console.log(`[VIDEO AUTH] User ${user.email} authenticated successfully`);
-    (req as any).user = user;
+    req.user = user;
     next();
   } catch (error) {
     console.error('[VIDEO AUTH] Authentication failed:', error);
@@ -200,7 +200,7 @@ export function broadcastError(jobId: string, error: string) {
 // Get user's video jobs
 router.get('/jobs', requireAuth, (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const userJobsList = Array.from(videoJobs.values()).filter(job => job.userId === userId);
     res.json(userJobsList);
   } catch (error) {
@@ -212,17 +212,18 @@ router.get('/jobs', requireAuth, (req: Request, res: Response) => {
 // Upload image for video generation
 router.post('/upload-image', requireAuth, upload.single('image'), (req: Request, res: Response) => {
   try {
-    if (!(req as any).file) {
+    const file = req.file;
+    if (!file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
 
-    const imageUrl = `/uploads/video-images/${(req as any).file.filename}`;
+    const imageUrl = `/uploads/video-images/${file.filename}`;
     res.json({
       success: true,
       imageUrl,
-      filename: (req as any).file.filename,
-      originalName: (req as any).file.originalname,
-      size: (req as any).file.size
+      filename: file.filename,
+      originalName: file.originalname,
+      size: file.size
     });
   } catch (error) {
     console.error('Error uploading image:', error);
@@ -235,7 +236,7 @@ router.post('/upload-image', requireAuth, upload.single('image'), (req: Request,
 // Generate video with approved script
 router.post('/generate', requireAuth, (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     
     const {
       title,
@@ -300,7 +301,7 @@ router.post('/generate', requireAuth, (req: Request, res: Response) => {
 router.get('/job/:jobId', requireAuth, (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     
     const job = videoJobs.get(jobId);
     if (!job) {
@@ -322,7 +323,7 @@ router.get('/job/:jobId', requireAuth, (req: Request, res: Response) => {
 router.delete('/job/:jobId', requireAuth, (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     
     const job = videoJobs.get(jobId);
     if (!job) {
@@ -416,11 +417,11 @@ async function startCompleteVideoGeneration(jobId: string, job: any) {
 // Debug endpoint to test authentication
 router.post('/debug-auth', requireAuth, async (req: Request, res: Response) => {
   try {
-    console.log('[VIDEO AUTH DEBUG] User:', (req as any).user);
+    console.log('[VIDEO AUTH DEBUG] User:', req.user);
     console.log('[VIDEO AUTH DEBUG] Headers:', req.headers.authorization);
     res.json({ 
       success: true, 
-      user: (req as any).user,
+      user: req.user,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -534,7 +535,7 @@ router.post('/generate-images', requireAuth, async (req: Request, res: Response)
     console.log('[VIDEO API] Received image generation request:', {
       hasScript: !!req.body.script,
       scenesCount: req.body.scenes?.length || 0,
-      userId: (req as any).user?.id
+      userId: req.user?.id
     });
     
     const { script, scenes } = req.body;
@@ -667,7 +668,7 @@ router.post('/regenerate-scene', requireAuth, async (req: Request, res: Response
 router.get('/job/:jobId/progress', requireAuth, (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     
     const job = videoJobs.get(jobId);
     if (!job) {

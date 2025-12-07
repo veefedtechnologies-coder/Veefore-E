@@ -21,7 +21,7 @@ const verifyFirebaseToken = async (req: Request, res: Response, next: NextFuncti
     }
 
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
-    (req as any).user = decodedToken
+    req.user = decodedToken as Express.Request['user'];
     next()
   } catch (error) {
     console.error('Token verification failed:', error)
@@ -33,10 +33,10 @@ const verifyFirebaseToken = async (req: Request, res: Response, next: NextFuncti
 // Send email verification code with validation
 router.post('/send-verification', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
-    if (!(req as any).user?.uid) {
+    if (!req.user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    const firebaseUid = (req as any).user.uid
+    const firebaseUid = req.user.uid
     
     // Get user from database
     const user = await storage.getUserByFirebaseUid(firebaseUid)
@@ -79,10 +79,10 @@ const verifyEmailValidation = validateRequest({
 
 router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (req: Request, res: Response) => {
   try {
-    if (!(req as any).user?.uid) {
+    if (!req.user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    const firebaseUid = (req as any).user.uid
+    const firebaseUid = req.user.uid
     const { code } = req.body
 
     if (!code) {
@@ -232,7 +232,7 @@ router.post('/register', async (req, res) => {
 // Get current user
 router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
-    const uid = (req as any).user.uid
+    const uid = req.user!.uid!
     const user = await storage.getUserByFirebaseId(uid)
     
     if (!user) {
@@ -256,7 +256,7 @@ router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
 // Update user profile
 router.put('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
-    const uid = (req as any).user.uid
+    const uid = req.user!.uid!
     const { displayName, profilePictureUrl } = req.body
     
     const updatedUser = await storage.updateUser(uid, {

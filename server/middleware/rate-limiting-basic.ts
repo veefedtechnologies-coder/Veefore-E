@@ -192,7 +192,7 @@ export const apiRateLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: (req: Request) => {
     // Dynamic limits based on authentication
-    const user = (req as any).user;
+    const user = req.user;
     if (user?.plan === 'business') return 200;
     if (user?.plan === 'pro') return 100;
     if (user) return 60;
@@ -200,7 +200,7 @@ export const apiRateLimiter: RateLimitRequestHandler = rateLimit({
   },
   
   keyGenerator: (req: Request) => {
-    return (req as any).user?.id || req.ip;
+    return req.user?.id || req.ip || 'unknown';
   },
   
   message: {
@@ -217,11 +217,11 @@ export const uploadRateLimiter: RateLimitRequestHandler = rateLimit({
   max: 5, // Only 5 uploads per minute
   
   keyGenerator: (req: Request) => {
-    return (req as any).user?.id || req.ip;
+    return req.user?.id || req.ip || 'unknown';
   },
   
   handler: (req: Request, res: Response) => {
-    console.log(`🚨 UPLOAD RATE LIMIT: Exceeded from user/IP: ${(req as any).user?.id || req.ip}`);
+    console.log(`🚨 UPLOAD RATE LIMIT: Exceeded from user/IP: ${req.user?.id || req.ip}`);
     
     res.status(429).json({
       error: 'Upload rate limit exceeded',
@@ -265,7 +265,7 @@ export const socialMediaRateLimiter: RateLimitRequestHandler = rateLimit({
   max: 10, // 10 operations per minute
   
   keyGenerator: (req: Request) => {
-    return (req as any).user?.id || req.ip;
+    return req.user?.id || req.ip || 'unknown';
   },
   
   message: {
@@ -284,11 +284,11 @@ export const aiRateLimiter: RateLimitRequestHandler = rateLimit({
   
   keyGenerator: (req: Request) => {
     // Key by user ID for authenticated requests, IP for anonymous
-    return (req as any).user?.id || req.ip || 'unknown';
+    return req.user?.id || req.ip || 'unknown';
   },
   
   handler: (req: Request, res: Response) => {
-    const userId = (req as any).user?.id || 'anonymous';
+    const userId = req.user?.id || 'anonymous';
     console.log(`🚨 AI RATE LIMIT: Exceeded from user: ${userId}, IP: ${req.ip}`);
     
     // Track AI rate limit violations for monitoring

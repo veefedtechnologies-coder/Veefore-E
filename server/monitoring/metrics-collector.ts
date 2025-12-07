@@ -5,6 +5,7 @@
  * business metrics, and operational insights with Prometheus-compatible format
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from './structured-logger';
 
 /**
@@ -425,7 +426,7 @@ export class MetricsCollector {
  * P4-3.9: Metrics middleware for Express
  */
 export function metricsMiddleware() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
 
     res.on('finish', () => {

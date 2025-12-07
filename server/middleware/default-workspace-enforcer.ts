@@ -14,9 +14,9 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
       )
       if (skip) return next()
 
-      if (!(req as any).user || !(req as any).user.id) return next()
+      if (!req.user || !req.user.id) return next()
 
-      const userId = (req as any).user.id
+      const userId = req.user.id
       const withTimeout = async <T>(p: Promise<T>, ms: number): Promise<T> => {
         return new Promise((resolve, reject) => {
           const t = setTimeout(() => reject(new Error('timeout')), ms)
@@ -35,7 +35,7 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
         let defaultWs: any
         try { defaultWs = await withTimeout(storage.getDefaultWorkspace(userId), 2000) } catch {}
         if (defaultWs) {
-          (req as any).workspaceId = defaultWs.id
+          req.workspaceId = defaultWs.id
         }
         return next()
       }
@@ -49,7 +49,7 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
 
       try {
         const ws = await withTimeout(storage.createWorkspace({ name, userId, isDefault: true, theme: 'space' }), 3000)
-        ;(req as any).workspaceId = ws.id
+        req.workspaceId = ws.id
         return next()
       } catch (err: any) {
         return res.status(409).json({

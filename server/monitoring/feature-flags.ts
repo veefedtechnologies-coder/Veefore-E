@@ -5,6 +5,7 @@
  * A/B testing, gradual rollouts, and emergency feature toggles
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from './structured-logger';
 
 /**
@@ -380,7 +381,7 @@ export class FeatureFlagManager {
  * P4-5.5: Feature flag middleware for Express
  */
 export function featureFlagMiddleware() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     // Add feature flag helper to request
     req.isFeatureEnabled = (flagKey: string, customContext?: Partial<FeatureFlagContext>) => {
       const context: FeatureFlagContext = {

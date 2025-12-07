@@ -60,9 +60,9 @@ export const globalRateLimiter = rateLimit({
     res.status(429).json({
       error: 'Rate limit exceeded',
       message: 'Too many requests from this IP address',
-      retryAfter: Math.ceil((req as any).rateLimit.resetTime / 1000),
-      limit: (req as any).rateLimit.limit,
-      remaining: (req as any).rateLimit.remaining
+      retryAfter: Math.ceil(req.rateLimit?.resetTime ?? 0 / 1000),
+      limit: req.rateLimit?.limit,
+      remaining: req.rateLimit?.remaining
     });
   }
 });
@@ -101,7 +101,7 @@ export const authRateLimiter = rateLimit({
     res.status(429).json({
       error: 'Authentication rate limit exceeded',
       message: 'Too many failed login attempts. Please wait 15 minutes before trying again.',
-      retryAfter: Math.ceil((req as any).rateLimit.resetTime / 1000),
+      retryAfter: Math.ceil(req.rateLimit?.resetTime ?? 0 / 1000),
       securityNote: 'This protection helps secure your account from unauthorized access attempts.'
     });
   }
@@ -160,9 +160,9 @@ export const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: (req: Request) => {
     // Dynamic limits based on authentication status
-    if ((req as any).user?.plan === 'business') return 200;
-    if ((req as any).user?.plan === 'pro') return 100;
-    if ((req as any).user) return 60; // Authenticated users
+    if (req.user?.plan === 'business') return 200;
+    if (req.user?.plan === 'pro') return 100;
+    if (req.user) return 60; // Authenticated users
     return 30; // Anonymous users
   },
   
@@ -173,7 +173,7 @@ export const apiRateLimiter = rateLimit({
   
   keyGenerator: (req: Request) => {
     // Use user ID for authenticated requests, IP for anonymous
-    return (req as any).user?.id || req.ip;
+    return req.user?.id || req.ip || 'unknown';
   },
   
   message: {
@@ -195,7 +195,7 @@ export const uploadRateLimiter = rateLimit({
   }),
   
   keyGenerator: (req: Request) => {
-    return (req as any).user?.id || req.ip;
+    return req.user?.id || req.ip || 'unknown';
   },
   
   message: {
@@ -204,12 +204,12 @@ export const uploadRateLimiter = rateLimit({
   },
   
   handler: (req: Request, res: Response) => {
-    console.log(`🚨 UPLOAD RATE LIMIT: Exceeded from user/IP: ${(req as any).user?.id || req.ip}`);
+    console.log(`🚨 UPLOAD RATE LIMIT: Exceeded from user/IP: ${req.user?.id || req.ip}`);
     
     res.status(429).json({
       error: 'Upload rate limit exceeded',
       message: 'Too many file uploads. Please wait 1 minute before uploading again.',
-      retryAfter: Math.ceil((req as any).rateLimit.resetTime / 1000),
+      retryAfter: Math.ceil(req.rateLimit?.resetTime ?? 0 / 1000),
       securityNote: 'This limit prevents abuse and ensures system stability.'
     });
   }
@@ -244,7 +244,7 @@ export const passwordResetRateLimiter = rateLimit({
     res.status(429).json({
       error: 'Password reset limit exceeded',
       message: 'Too many password reset requests. Please wait 1 hour before trying again.',
-      retryAfter: Math.ceil((req as any).rateLimit.resetTime / 1000),
+      retryAfter: Math.ceil(req.rateLimit?.resetTime ?? 0 / 1000),
       securityNote: 'This protects against automated password reset abuse.'
     });
   }
@@ -263,7 +263,7 @@ export const socialMediaRateLimiter = rateLimit({
   }),
   
   keyGenerator: (req: Request) => {
-    return (req as any).user?.id || req.ip;
+    return req.user?.id || req.ip || 'unknown';
   },
   
   message: {

@@ -5,6 +5,7 @@
  * and comprehensive error analysis for debugging and reliability
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from './structured-logger';
 
 /**
@@ -396,7 +397,7 @@ export class ErrorTracker {
  * P4-4.7: Express error handling middleware
  */
 export function errorTrackingMiddleware() {
-  return (err: Error, req: any, res: any, next: any) => {
+  return (err: Error, req: Request, res: Response, next: NextFunction) => {
     const context: ErrorContext = {
       userId: req.user?.id,
       workspaceId: req.workspace?.id,

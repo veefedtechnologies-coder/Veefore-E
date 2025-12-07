@@ -5,6 +5,7 @@
  * connection pooling, and performance monitoring for MongoDB operations
  */
 
+import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from '../monitoring/structured-logger';
 import { MetricsCollector } from '../monitoring/metrics-collector';
 
@@ -429,7 +430,7 @@ export class DatabaseOptimizer {
  * P5-2.7: Database optimization middleware
  */
 export function databaseOptimizationMiddleware() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     // Add database monitoring helpers to request
     req.dbMonitor = {
       query: async (operation: string, collection: string, queryFn: () => Promise<any>) => {

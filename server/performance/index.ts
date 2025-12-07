@@ -5,7 +5,7 @@
  * static asset optimization, response compression, and background job optimization
  */
 
-import { Express } from 'express';
+import { Express, Request, Response, NextFunction } from 'express';
 import { 
   initializeCachingSystem, 
   CachingSystem, 
@@ -101,7 +101,7 @@ export function applyPerformanceMiddleware(app: Express): void {
  */
 export function createPerformanceEndpoints(app: Express): void {
   // Cache statistics endpoint
-  app.get('/api/performance/cache', (req: any, res: any) => {
+  app.get('/api/performance/cache', (req: Request, res: Response) => {
     try {
       const stats = CachingSystem.getStats();
       res.json({
@@ -126,7 +126,7 @@ export function createPerformanceEndpoints(app: Express): void {
   });
 
   // Database performance endpoint
-  app.get('/api/performance/database', async (req: any, res: any) => {
+  app.get('/api/performance/database', async (req: Request, res: Response) => {
     try {
       const stats = DatabaseOptimizer.getPerformanceStats();
       const health = await DatabaseOptimizer.checkDatabaseHealth();
@@ -158,7 +158,7 @@ export function createPerformanceEndpoints(app: Express): void {
   });
 
   // Static asset performance endpoint
-  app.get('/api/performance/static', (req: any, res: any) => {
+  app.get('/api/performance/static', (req: Request, res: Response) => {
     try {
       const stats = StaticOptimizer.getStats();
       const recommendations = StaticOptimizer.getOptimizationRecommendations();
@@ -188,7 +188,7 @@ export function createPerformanceEndpoints(app: Express): void {
   });
 
   // Response optimization endpoint
-  app.get('/api/performance/response', (req: any, res: any) => {
+  app.get('/api/performance/response', (req: Request, res: Response) => {
     try {
       const stats = ResponseOptimizer.getStats();
       const recommendations = ResponseOptimizer.getOptimizationRecommendations();
@@ -218,7 +218,7 @@ export function createPerformanceEndpoints(app: Express): void {
   });
 
   // Background job performance endpoint
-  app.get('/api/performance/jobs', (req: any, res: any) => {
+  app.get('/api/performance/jobs', (req: Request, res: Response) => {
     try {
       const stats = BackgroundJobOptimizer.getStats();
       const recommendations = BackgroundJobOptimizer.getOptimizationRecommendations();
@@ -248,7 +248,7 @@ export function createPerformanceEndpoints(app: Express): void {
   });
 
   // Comprehensive performance overview endpoint
-  app.get('/api/performance/overview', async (req: any, res: any) => {
+  app.get('/api/performance/overview', async (req: Request, res: Response) => {
     try {
       const overview = {
         timestamp: new Date().toISOString(),
@@ -298,7 +298,7 @@ export function createPerformanceEndpoints(app: Express): void {
  */
 export function applyCachedRoutes(app: Express): void {
   // Cache dashboard analytics with workspace-specific invalidation
-  app.get('/api/dashboard/analytics', cacheMiddleware(180, ['dashboard']), (req: any, res: any, next: any) => {
+  app.get('/api/dashboard/analytics', cacheMiddleware(180, ['dashboard']), (req: Request, res: Response, next: NextFunction) => {
     const cacheKey = `dashboard:${req.query.workspaceId}`;
     
     req.cache.get(cacheKey).then((cached: any) => {
@@ -311,7 +311,7 @@ export function applyCachedRoutes(app: Express): void {
   });
 
   // Cache social accounts with workspace-specific invalidation
-  app.get('/api/social-accounts', cacheMiddleware(600, ['social_accounts']), (req: any, res: any, next: any) => {
+  app.get('/api/social-accounts', cacheMiddleware(600, ['social_accounts']), (req: Request, res: Response, next: NextFunction) => {
     const cacheKey = `social_accounts:${req.query.workspaceId}`;
     
     req.cache.get(cacheKey).then((cached: any) => {
@@ -324,7 +324,7 @@ export function applyCachedRoutes(app: Express): void {
   });
 
   // Cache historical analytics
-  app.get('/api/analytics/historical', cacheMiddleware(1800, ['historical']), (req: any, res: any, next: any) => {
+  app.get('/api/analytics/historical', cacheMiddleware(1800, ['historical']), (req: Request, res: Response, next: NextFunction) => {
     const cacheKey = `historical:${req.query.workspaceId}:${req.query.period}:${req.query.days}`;
     
     req.cache.get(cacheKey).then((cached: any) => {

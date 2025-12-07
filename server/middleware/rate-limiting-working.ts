@@ -175,7 +175,7 @@ export const bruteForceMiddleware = async (req: Request, res: Response, next: Ne
  * P1-3: API rate limiter with dynamic limits
  */
 export const apiRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as any).user;
+  const user = req.user;
   const key = user?.id ? `api_rl:user:${user.id}` : `api_rl:ip:${req.ip}`;
   const windowMs = 60 * 1000; // 1 minute
   
@@ -206,7 +206,7 @@ export const apiRateLimiter = async (req: Request, res: Response, next: NextFunc
  * P1-3: Upload rate limiter - 5 uploads per minute
  */
 export const uploadRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as any).user;
+  const user = req.user;
   const key = user?.id ? `upload_rl:user:${user.id}` : `upload_rl:ip:${req.ip}`;
   const windowMs = 60 * 1000;
   const maxRequests = 5;
@@ -256,7 +256,7 @@ export const passwordResetRateLimiter = async (req: Request, res: Response, next
  * P1-3: Social media rate limiter - 10 operations per minute
  */
 export const socialMediaRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as any).user;
+  const user = req.user;
   const key = user?.id ? `social_rl:user:${user.id}` : `social_rl:ip:${req.ip}`;
   const windowMs = 60 * 1000;
   const maxRequests = 10;
@@ -282,7 +282,7 @@ export const socialMediaRateLimiter = async (req: Request, res: Response, next: 
  * 10 requests per user per 5 minutes
  */
 export const aiRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as any).user;
+  const user = req.user;
   const key = user?.id ? `ai_rl:user:${user.id}` : `ai_rl:ip:${req.ip}`;
   const windowMs = 5 * 60 * 1000; // 5 minutes
   const maxRequests = 10;

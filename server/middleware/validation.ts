@@ -80,7 +80,7 @@ export function validateRequest(schemas: {
       }
       
       // Store validation results for debugging/logging
-      (req as any).validation = validationResults;
+      req.validation = validationResults;
       
       console.log(`✅ VALIDATION: ${req.method} ${req.path} - All validations passed`);
       next();

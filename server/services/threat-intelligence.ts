@@ -3,6 +3,8 @@
  * Integration with external threat feeds and reputation services
  */
 
+import { Request } from 'express';
+
 interface ThreatIntelligenceSource {
   name: string;
   url?: string;
@@ -188,7 +190,7 @@ export class ThreatIntelligenceService {
   /**
    * P8-3.3: Pattern-based Threat Detection
    */
-  static analyzeRequestPattern(req: any): {
+  static analyzeRequestPattern(req: Request): {
     threatLevel: number;
     patterns: string[];
     indicators: string[];

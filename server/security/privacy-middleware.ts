@@ -18,7 +18,7 @@ export function privacyByDesignMiddleware(options: {
   enableCookieConsent?: boolean;
   dataMinimization?: boolean;
 } = {}) {
-  return (req: any, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       const {
         requireConsent = [],
@@ -104,7 +104,7 @@ export function privacyByDesignMiddleware(options: {
  * P3-6.2: Cookie consent middleware
  */
 export function cookieConsentMiddleware() {
-  return (req: any, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       // Check for cookie consent
       const hasConsent = req.cookies?.cookie_consent === 'granted' ||
@@ -152,7 +152,7 @@ export function dataAnonymizationMiddleware(options: {
   hashFields?: string[];
   removeFields?: string[];
 } = {}) {
-  return (req: any, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       const {
         anonymizeFields = ['ip', 'userAgent'],

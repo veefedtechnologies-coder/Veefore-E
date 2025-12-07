@@ -6,6 +6,7 @@ import { storage } from '../../mongodb-storage';
 import { ThumbnailAIService } from '../../thumbnail-ai-service';
 import { advancedThumbnailGenerator } from '../../advanced-thumbnail-generator';
 import OpenAI from 'openai';
+import { AuthenticatedRequest } from '../../types/express';
 
 const router = Router();
 const thumbnailAIService = new ThumbnailAIService(storage);
@@ -395,8 +396,8 @@ router.post('/match-trending',
 router.post('/test-route',
   requireAuth,
   validateRequest({ body: TestRouteSchema }),
-  async (req: Request, res: Response) => {
-    console.log('[THUMBNAIL PRO DEBUG] Test route hit! User:', (req as any).user?.id);
+  async (req: AuthenticatedRequest, res: Response) => {
+    console.log('[THUMBNAIL PRO DEBUG] Test route hit! User:', req.user?.id);
     try {
       res.json({ success: true, message: 'Test route works!' });
     } catch (error) {
@@ -409,9 +410,9 @@ router.post('/test-route',
 router.post('/generate-7stage-pro',
   requireAuth,
   validateRequest({ body: Generate7StageProSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     console.log('[🚀 DALL-E PRO] === REAL DALL-E 3 GENERATION STARTED ===');
-    console.log('[DALL-E PRO] User ID:', (req as any).user?.id);
+    console.log('[DALL-E PRO] User ID:', req.user?.id);
     console.log('[DALL-E PRO] Request data:', JSON.stringify(req.body, null, 2));
     
     try {
@@ -422,7 +423,7 @@ router.post('/generate-7stage-pro',
       
       console.log('[DALL-E PRO] Input validation completed');
       
-      const user = await storage.getUser((req as any).user.id);
+      const user = await storage.getUser(req.user.id);
       if (!user || !user.credits || user.credits < 8) {
         console.log('[DALL-E PRO] Insufficient credits:', user?.credits);
         return res.status(400).json({ 
@@ -438,7 +439,7 @@ router.post('/generate-7stage-pro',
       
       const dalleVariants = await generateRealDalleThumbnails(title, category);
       
-      await storage.updateUser((req as any).user.id, { 
+      await storage.updateUser(req.user.id, { 
         credits: user.credits - 8
       });
       
@@ -487,9 +488,9 @@ router.post('/generate-7stage-pro',
 router.post('/generate-complete',
   requireAuth,
   validateRequest({ body: GenerateCompleteSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     console.log('[THUMBNAIL PRO] === 7-STAGE GENERATION PIPELINE STARTED ===');
-    console.log('[THUMBNAIL PRO] User ID:', (req as any).user?.id);
+    console.log('[THUMBNAIL PRO] User ID:', req.user?.id);
     console.log('[THUMBNAIL PRO] Request data:', JSON.stringify(req.body, null, 2));
     
     try {
@@ -502,7 +503,7 @@ router.post('/generate-complete',
       
       console.log('[THUMBNAIL PRO] Input validation completed');
       
-      const user = await storage.getUser((req as any).user.id);
+      const user = await storage.getUser(req.user.id);
       if (!user || !user.credits || user.credits < 8) {
         console.log('[THUMBNAIL PRO] Insufficient credits:', user?.credits);
         return res.status(400).json({ 
@@ -523,7 +524,7 @@ router.post('/generate-complete',
       
       const result = await generateCompleteThumbnailSet(thumbnailInput);
       
-      await storage.updateUser((req as any).user.id, { 
+      await storage.updateUser(req.user.id, { 
         credits: user.credits - result.metadata.creditsUsed 
       });
       
@@ -553,12 +554,12 @@ router.post('/generate-complete',
 
 router.post('/generate-strategy',
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       console.log('[THUMBNAIL API] ROUTE HIT: generate-strategy');
       console.log('[THUMBNAIL API] Full request headers:', req.headers);
       console.log('[THUMBNAIL API] Full request body:', req.body);
-      console.log('[THUMBNAIL API] User from auth:', (req as any).user);
+      console.log('[THUMBNAIL API] User from auth:', req.user);
       
       const { title, description, category, style } = req.body;
 
@@ -598,12 +599,12 @@ router.post('/generate-strategy',
 router.post('/generate-variants',
   requireAuth,
   validateRequest({ body: GenerateVariantsSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       console.log('[THUMBNAIL API] ROUTE HIT: generate-variants');
       console.log('[THUMBNAIL API] Full request headers:', req.headers);
       console.log('[THUMBNAIL API] Full request body:', req.body);
-      console.log('[THUMBNAIL API] User from auth:', (req as any).user);
+      console.log('[THUMBNAIL API] User from auth:', req.user);
       
       const { title, description, category, designData } = req.body;
 
@@ -641,10 +642,10 @@ router.post('/generate-variants',
 router.post('/save-project',
   requireAuth,
   validateRequest({ body: SaveProjectSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectName, variants, designData } = req.body;
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
 
       if (!projectName || !variants) {
         return res.status(400).json({ error: 'Project name and variants are required' });
@@ -678,10 +679,10 @@ router.post('/save-project',
 router.post('/create',
   requireAuth,
   validateRequest({ body: CreateProjectSchema }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { title, description, category, uploadedImageUrl } = req.body;
-      const userId = (req as any).user!.id;
+      const userId = req.user.id;
       
       const userWorkspaces = await storage.getWorkspacesByUserId(userId);
       const currentWorkspace = userWorkspaces[0];
@@ -730,10 +731,10 @@ router.get('/project/:projectId',
 router.post('/canvas/:variantId',
   requireAuth,
   validateRequest({ params: VariantIdParams }),
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { variantId } = req.params;
-      const userId = (req as any).user!.id;
+      const userId = req.user.id;
       
       const session = await advancedThumbnailGenerator.createCanvasEditorSession(
         parseInt(variantId),
@@ -793,9 +794,9 @@ router.post('/export/:sessionId',
 
 router.get('/projects',
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = (req as any).user!.id;
+      const userId = req.user.id;
       
       const userWorkspaces = await storage.getWorkspacesByUserId(userId);
       const workspaceIds = userWorkspaces.map(w => parseInt(w.id));
