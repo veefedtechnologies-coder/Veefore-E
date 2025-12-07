@@ -13,19 +13,31 @@ import { detectInvalidAccounts, getReconnectCopy, startReconnectFlow } from '@/l
 export function SocialAccounts() {
   const [, setLocation] = useLocation()
   const { toast } = useToast()
-  const { currentWorkspace } = useCurrentWorkspace()
+  const workspaceData = useCurrentWorkspace()
+  const { currentWorkspace, isReady, isLoading: workspaceLoading } = workspaceData || { currentWorkspace: undefined, isReady: false, isLoading: true }
   
   // ✅ CRITICAL FIX: Clear cache on component mount to ensure fresh data
   React.useEffect(() => {
+    // Skip if workspace not ready or in production
+    if (!isReady || !currentWorkspace) return;
     if ((import.meta as any).env?.PROD) return;
-    // Clear React Query cache for social accounts on mount
-    queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
-    queryClient.removeQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
     
-    // Clear localStorage cache
+    // Guard against SSR/environments without localStorage
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    
+    // Clear React Query cache for social accounts on mount
+    try {
+      queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
+      queryClient.removeQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
+    } catch (err) {
+      console.error('[SOCIAL ACCOUNTS] Error clearing query cache:', err)
+    }
+    
+    // Clear localStorage cache with defensive checks
     try {
       const keysToRemove: string[] = []
-      for (let i = 0; i < localStorage.length; i++) {
+      const storageLength = localStorage.length || 0
+      for (let i = 0; i < storageLength; i++) {
         const key = localStorage.key(i)
         if (key && (
           key.startsWith('REACT_QUERY_OFFLINE_CACHE') || 
@@ -35,12 +47,18 @@ export function SocialAccounts() {
           keysToRemove.push(key)
         }
       }
-      keysToRemove.forEach(key => localStorage.removeItem(key))
+      keysToRemove.forEach(key => {
+        try {
+          localStorage.removeItem(key)
+        } catch (e) {
+          // Ignore individual removal errors
+        }
+      })
       console.log(`[SOCIAL ACCOUNTS] ✅ Cleared ${keysToRemove.length} cache entries on mount`)
     } catch (error) {
       console.error('[SOCIAL ACCOUNTS] Error clearing cache on mount:', error)
     }
-  }, [currentWorkspace?.id])
+  }, [currentWorkspace?.id, isReady, currentWorkspace])
   
   // Fetch social accounts data for current workspace - IMMEDIATE FETCH ON LOAD
   const { data: socialAccounts, isLoading, isFetching, refetch: refetchAccounts } = useQuery({
@@ -85,21 +103,31 @@ export function SocialAccounts() {
           
           // ✅ AGGRESSIVE CACHE CLEARING: Clear ALL React Query cache
           try {
-            // Clear persisted cache from localStorage
-            const keysToRemove: string[] = []
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i)
-              if (key && (
-                key.startsWith('REACT_QUERY_OFFLINE_CACHE') || 
-                key.startsWith('tanstack-query') ||
-                key.includes('social-accounts') ||
-                key.includes('queryClient')
-              )) {
-                keysToRemove.push(key)
+            // Guard against SSR/environments without localStorage
+            if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+              // Clear persisted cache from localStorage
+              const keysToRemove: string[] = []
+              const storageLength = localStorage.length || 0
+              for (let i = 0; i < storageLength; i++) {
+                const key = localStorage.key(i)
+                if (key && (
+                  key.startsWith('REACT_QUERY_OFFLINE_CACHE') || 
+                  key.startsWith('tanstack-query') ||
+                  key.includes('social-accounts') ||
+                  key.includes('queryClient')
+                )) {
+                  keysToRemove.push(key)
+                }
               }
+              keysToRemove.forEach(key => {
+                try {
+                  localStorage.removeItem(key)
+                } catch (e) {
+                  // Ignore individual removal errors
+                }
+              })
+              console.log(`[FRONTEND DEBUG] ✅ Cleared ${keysToRemove.length} cache entries from localStorage`)
             }
-            keysToRemove.forEach(key => localStorage.removeItem(key))
-            console.log(`[FRONTEND DEBUG] ✅ Cleared ${keysToRemove.length} cache entries from localStorage`)
             
             // Clear ALL React Query cache
             queryClient.clear()
@@ -252,51 +280,67 @@ export function SocialAccounts() {
     staleTime: 1 * 60 * 1000, // Cache for 1 minute for faster updates
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    enabled: !!socialAccounts && socialAccounts.length > 0
+    enabled: !!socialAccounts && (Array.isArray(socialAccounts) ? socialAccounts.length > 0 : (socialAccounts?.data?.length || 0) > 0)
   })
 
-  // Filter for connected accounts with real data
-  const connectedAccounts = socialAccounts?.filter((account: any) => {
+  // State hooks - must be before early return
+  const [selectedAccount, setSelectedAccount] = useState('instagram')
+  const [hasStartedPolling, setHasStartedPolling] = React.useState(false)
+
+  // Early return if workspace not ready - placed AFTER all hooks but BEFORE calculations
+  if (!isReady || workspaceLoading || !currentWorkspace) {
+    return (
+      <Card data-testid="social-accounts" className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
+        <CardContent className="p-6">
+          <div className="animate-pulse">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-4"></div>
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Extract array from API response (handles { success: true, data: [...] } format)
+  const socialAccountsArray = Array.isArray(socialAccounts) ? socialAccounts : (socialAccounts?.data || [])
+
+  // All calculations AFTER early return guard - workspace is guaranteed ready here
+  const connectedAccounts = socialAccountsArray.filter((account: any) => {
     return account.isConnected || account.followersCount > 0 || account.accessToken
   }) || []
 
-  const [selectedAccount, setSelectedAccount] = useState(connectedAccounts[0]?.platform || 'instagram')
-
-  // PRODUCTION-SAFE: Only start polling once on initial load, not on every update
-  const [hasStartedPolling, setHasStartedPolling] = React.useState(false)
-  React.useEffect(() => {
-    const instagramAccount = connectedAccounts.find((acc: any) => acc.platform === 'instagram')
-    if (instagramAccount && !startPollingMutation.isPending && !hasStartedPolling) {
-      setHasStartedPolling(true)
-      // Start polling only once when Instagram account is first detected
-      const timer = setTimeout(() => {
-        startPollingMutation.mutate()
-      }, 5000) // Longer delay to prevent rapid triggering
-      return () => clearTimeout(timer)
-    }
-  }, [connectedAccounts, startPollingMutation.isPending, hasStartedPolling])
-
   const isInitialLoading = isLoading && !Array.isArray(socialAccounts)
-
-  // Find current account
   const currentAccount = connectedAccounts.find((acc: any) => acc.platform === selectedAccount) || connectedAccounts[0]
 
-  // 🔍 DEBUG: Log currentAccount data to see what's being displayed
-  React.useEffect(() => {
-    if (currentAccount) {
-      console.log('[FRONTEND DEBUG] Current account being displayed:', {
-        username: currentAccount.username,
-        platform: currentAccount.platform,
-        totalShares: currentAccount.totalShares,
-        totalSaves: currentAccount.totalSaves,
-        totalLikes: currentAccount.totalLikes,
-        totalComments: currentAccount.totalComments,
-        hasTotalShares: 'totalShares' in currentAccount,
-        hasTotalSaves: 'totalSaves' in currentAccount,
-        allKeys: Object.keys(currentAccount)
-      })
+  // Start polling once when Instagram account is first detected (now safe - workspace ready)
+  if (!hasStartedPolling) {
+    const instagramAccount = connectedAccounts.find((acc: any) => acc.platform === 'instagram')
+    if (instagramAccount && !startPollingMutation.isPending) {
+      setHasStartedPolling(true)
+      setTimeout(() => {
+        startPollingMutation.mutate()
+      }, 5000)
     }
-  }, [currentAccount])
+  }
+
+  // Debug logging (now safe - workspace ready)
+  if (currentAccount) {
+    console.log('[FRONTEND DEBUG] Current account being displayed:', {
+      username: currentAccount.username,
+      platform: currentAccount.platform,
+      totalShares: currentAccount.totalShares,
+      totalSaves: currentAccount.totalSaves,
+      totalLikes: currentAccount.totalLikes,
+      totalComments: currentAccount.totalComments,
+      hasTotalShares: 'totalShares' in currentAccount,
+      hasTotalSaves: 'totalSaves' in currentAccount,
+      allKeys: Object.keys(currentAccount)
+    })
+  }
 
   // Format numbers for display
   const formatNumber = (num: number) => {
@@ -411,12 +455,12 @@ export function SocialAccounts() {
           </div>
 
           {/* Account Selector */}
-          {(() => { const issues = detectInvalidAccounts(socialAccounts || []); return issues.count > 0 })() && (
+          {(() => { const issues = detectInvalidAccounts(socialAccountsArray); return issues.count > 0 })() && (
             <div className="mb-4 p-4 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-600 rounded-xl">
               <div className="flex items-start space-x-2">
                 <RefreshCw className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  {(() => { const c = getReconnectCopy(socialAccounts || []); return (
+                  {(() => { const c = getReconnectCopy(socialAccountsArray); return (
                     <>
                       <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">{c.title}</p>
                       <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">{c.description}</p>
@@ -427,7 +471,7 @@ export function SocialAccounts() {
               <div className="mt-3">
                 <Button
                   onClick={async () => {
-                    const res = await startReconnectFlow(socialAccounts || [], currentWorkspace?.id)
+                    const res = await startReconnectFlow(socialAccountsArray, currentWorkspace?.id)
                     if (res?.type === 'integrations') setLocation('/integration')
                   }}
                   className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"

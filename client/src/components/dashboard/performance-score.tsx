@@ -21,34 +21,37 @@ function TikTokIcon({ className = '' }: { className?: string }) {
 export function PerformanceScore() {
   const [, setLocation] = useLocation()
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month'>('month')
-  const { currentWorkspace } = useCurrentWorkspace()
+  const workspaceData = useCurrentWorkspace()
+  const { currentWorkspace, isReady, isLoading: workspaceLoading } = workspaceData || { currentWorkspace: undefined, isReady: false, isLoading: true }
   const [showDataStory, setShowDataStory] = useState(false)
   const [storyAnimation, setStoryAnimation] = useState(0)
   const [reconnectVisible, setReconnectVisible] = useState(true)
   const [isClosingReconnect, setIsClosingReconnect] = useState(false)
-  
 
   // Create unique data story when period changes
   useEffect(() => {
     setShowDataStory(true)
     setStoryAnimation(prev => prev + 1)
-    // No auto-close timer - only closes when user clicks X
   }, [selectedPeriod])
 
   // Generate unique data stories based on actual performance
   const generateDataStory = (currentData: any) => {
-    const followerCount = currentData?.followers || 4
-    const engagement = currentData?.engagement || 567
-    const reach = currentData?.reach || 135
-    const posts = currentData?.posts || 15
+    const followerCount = Number(currentData?.followers) || 4
+    const engagement = Number(currentData?.engagement) || 0
+    const reach = Number(currentData?.reach) || 135
+    const posts = Number(currentData?.posts) || 15
     const period = currentData?.period || selectedPeriod
+
+    const safeEngagementStr = engagement.toFixed(0)
+    const safePostsPerDay = posts > 0 ? (posts / 30).toFixed(1) : '0.0'
+    const safeAmplification = followerCount > 0 ? Math.round(reach / followerCount) : 0
 
     const stories = {
       day: {
         emoji: "⚡",
         title: "Right Now Mode",
         story: engagement > 100 
-          ? `🔥 Your content is ON FIRE today! ${engagement.toFixed(0)}% engagement means every post gets massive love`
+          ? `🔥 Your content is ON FIRE today! ${safeEngagementStr}% engagement means every post gets massive love`
           : `📊 Today's snapshot: ${followerCount} followers are watching. Time to drop that viral content!`,
         insight: posts > 0 ? "Peak activity detected! Your audience is most active right now." : "Perfect timing to post - your audience is waiting!",
         color: "bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600",
@@ -58,7 +61,7 @@ export function PerformanceScore() {
         emoji: "🎯", 
         title: "Weekly Pulse",
         story: reach > followerCount 
-          ? `🚀 VIRAL ALERT! You reached ${reach} people with just ${followerCount} followers. That's ${Math.round(reach/followerCount)}x amplification!`
+          ? `🚀 VIRAL ALERT! You reached ${reach} people with just ${followerCount} followers. That's ${safeAmplification}x amplification!`
           : `📈 This week: ${posts} posts, ${followerCount} loyal followers, building your empire one post at a time`,
         insight: "Weekly patterns reveal your content's true impact. Consistency is key!",
         color: "bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600", 
@@ -68,7 +71,7 @@ export function PerformanceScore() {
         emoji: "💎",
         title: "Growth Journey", 
         story: posts >= 10 
-          ? `🏆 CONTENT MACHINE! ${posts} posts this month = ${(posts/30).toFixed(1)} posts/day. You're building a media empire!`
+          ? `🏆 CONTENT MACHINE! ${posts} posts this month = ${safePostsPerDay} posts/day. You're building a media empire!`
           : `💪 ${posts} quality posts, ${followerCount} engaged followers. Quality > Quantity strategy in action!`,
         insight: engagement > 300 ? "Your content strategy is working! Keep this momentum going." : "Steady growth foundation set. Ready to scale up?",
         color: "bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600",
@@ -79,7 +82,7 @@ export function PerformanceScore() {
   }
   
   // Fetch real dashboard analytics data for current workspace - IMMEDIATE FETCH ON LOAD
-  const { data: analytics, isLoading, isFetching } = useQuery({
+  const { data: analytics, isLoading: analyticsLoading, isFetching } = useQuery({
     queryKey: ['/api/dashboard/analytics', currentWorkspace?.id],
     queryFn: () => currentWorkspace?.id ? apiRequest(`/api/dashboard/analytics?workspaceId=${currentWorkspace.id}`) : Promise.resolve({}),
     enabled: !!currentWorkspace?.id,
@@ -108,14 +111,14 @@ export function PerformanceScore() {
     placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
 
-  const invalidInfo = detectInvalidAccounts(socialAccounts || [])
-  const hasAnyInvalid = invalidInfo.count > 0
-  const hasAnyValid = (socialAccounts || []).some((a: any) => a?.tokenStatus === 'valid' || a?.hasAccessToken)
-
+  // Update reconnect visibility based on invalid accounts - guard for workspace readiness
   useEffect(() => {
+    if (!isReady || !currentWorkspace) return;
+    const invalidInfo = detectInvalidAccounts(socialAccounts || [])
+    const hasAnyInvalid = invalidInfo.count > 0
     if (!hasAnyInvalid) setReconnectVisible(false)
     else setReconnectVisible(true)
-  }, [hasAnyInvalid])
+  }, [socialAccounts, isReady, currentWorkspace])
   
 
   // Fetch historical analytics data for trend comparisons - IMMEDIATE FETCH ON LOAD
@@ -132,6 +135,39 @@ export function PerformanceScore() {
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
     placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
+
+  // Early return if workspace not ready - placed AFTER all hooks but BEFORE calculations
+  if (!isReady || workspaceLoading || !currentWorkspace) {
+    return (
+      <Card data-testid="performance-score" className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl transition-all duration-300 border-0 rounded-3xl overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+          <div className="flex items-center space-x-3">
+            <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">Performance Overview</CardTitle>
+            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Extract array from API response (handles { success: true, data: [...] } format)
+  const socialAccountsArray = Array.isArray(socialAccounts) ? socialAccounts : (socialAccounts?.data || [])
+
+  // Calculate invalid account info for UI (safe after early return)
+  const invalidInfo = detectInvalidAccounts(socialAccountsArray)
+  const hasAnyInvalid = invalidInfo.count > 0
+  const hasAnyValid = socialAccountsArray.some((a: any) => a?.tokenStatus === 'valid' || a?.hasAccessToken)
 
   // Calculate REAL growth data using historical records
   const calculateRealGrowthData = (historicalData: any, currentData: any, period: string) => {
@@ -209,9 +245,9 @@ export function PerformanceScore() {
   }
 
 
-  const isInitialLoading = isLoading && !analytics
+  const isInitialLoading = analyticsLoading && !analytics
 
-  const allAccounts = socialAccounts || []
+  const allAccounts = socialAccountsArray
   const validAccounts = allAccounts.filter((a: any) => (a?.isConnected || a?.tokenStatus) && (a?.tokenStatus === 'valid' || a?.hasAccessToken || a?.accessToken))
   const invalidAccounts = allAccounts.filter((a: any) => (a?.isConnected || a?.tokenStatus) && a?.tokenStatus && a.tokenStatus !== 'valid')
   const ICON_LIMIT = 6
@@ -444,7 +480,7 @@ export function PerformanceScore() {
                       reconnectVisible ? 'opacity-0 translate-x-3 pointer-events-none' : 'opacity-100 translate-x-0'
                     }`}
                     onClick={async () => {
-                      const res = await startReconnectFlow(socialAccounts || [], currentWorkspace?.id)
+                      const res = await startReconnectFlow(socialAccountsArray, currentWorkspace?.id)
                       if (res?.type === 'integrations') setLocation('/integration')
                     }}
                     aria-label="Reconnect social accounts"
@@ -498,7 +534,7 @@ export function PerformanceScore() {
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center">
                 <RefreshCw className="w-10 h-10 text-orange-600 dark:text-orange-400" />
               </div>
-              {(() => { const c = getReconnectCopy(socialAccounts || []); return (
+              {(() => { const c = getReconnectCopy(socialAccountsArray); return (
                 <>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{c.title}</h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">{c.description}</p>
@@ -525,7 +561,7 @@ export function PerformanceScore() {
               )})()}
               <Button
                 onClick={async () => {
-                  const res = await startReconnectFlow(socialAccounts || [], currentWorkspace?.id)
+                  const res = await startReconnectFlow(socialAccountsArray, currentWorkspace?.id)
                   if (res?.type === 'integrations') setLocation('/integration')
                 }}
                 className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg text-sm"
