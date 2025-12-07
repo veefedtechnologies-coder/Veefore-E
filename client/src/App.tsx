@@ -227,6 +227,15 @@ function App() {
     }
   }, [enforceResult])
 
+  // ✅ PRODUCTION FIX: Clean up any 'undefined' string in localStorage on app initialization
+  useEffect(() => {
+    const storedId = localStorage.getItem('currentWorkspaceId');
+    if (storedId === 'undefined' || storedId === 'null' || storedId === '') {
+      console.warn('[APP INIT] 🧹 Removing invalid localStorage value:', storedId);
+      localStorage.removeItem('currentWorkspaceId');
+    }
+  }, []);
+
   // ✅ PRODUCTION FIX: Validate workspace ID on app initialization
   useEffect(() => {
     const safeWorkspaces = Array.isArray(workspaces) ? workspaces : [];
@@ -235,8 +244,11 @@ function App() {
     const validateAndCorrectWorkspace = async () => {
       const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
       
+      // Check if stored workspace ID is a valid string (not 'undefined', 'null', empty)
+      const isValidString = storedWorkspaceId && storedWorkspaceId !== 'undefined' && storedWorkspaceId !== 'null' && storedWorkspaceId !== '';
+      
       // Check if stored workspace ID exists in user's workspaces
-      const isValid = storedWorkspaceId && safeWorkspaces.some((ws: any) => ws.id === storedWorkspaceId);
+      const isValid = isValidString && safeWorkspaces.some((ws: any) => ws.id === storedWorkspaceId);
       
       if (!isValid) {
         // INVALID WORKSPACE ID - Auto-correct on app initialization
@@ -244,6 +256,13 @@ function App() {
         console.log('[APP INIT] 🔧 Auto-correcting to valid workspace...');
         
         const defaultWorkspace = safeWorkspaces.find((ws: any) => ws.isDefault) || safeWorkspaces[0];
+        
+        // ✅ GUARD: Only set if we have a valid workspace with a valid ID
+        if (!defaultWorkspace || !defaultWorkspace.id) {
+          console.warn('[APP INIT] ⚠️ No valid workspace found, cannot auto-correct');
+          return;
+        }
+        
         const correctedWorkspaceId = defaultWorkspace.id;
         
         console.log('[APP INIT] ✅ Auto-corrected workspace:', {
@@ -281,11 +300,16 @@ function App() {
   // Pre-fetch social accounts for current workspace to eliminate loading on Integration page
   // ✅ PRODUCTION FIX: Use localStorage workspace ID (now validated)
   const safeWorkspacesForPrefetch = Array.isArray(workspaces) ? workspaces : [];
-  const currentWorkspaceId = localStorage.getItem('currentWorkspaceId') || safeWorkspacesForPrefetch.find((w: any) => w.isDefault)?.id || safeWorkspacesForPrefetch[0]?.id;
+  // ✅ GUARD: Filter out invalid localStorage values ('undefined', 'null', '')
+  const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
+  const validStoredId = storedWorkspaceId && storedWorkspaceId !== 'undefined' && storedWorkspaceId !== 'null' && storedWorkspaceId !== '' ? storedWorkspaceId : null;
+  const currentWorkspaceId = validStoredId || safeWorkspacesForPrefetch.find((w: any) => w.isDefault)?.id || safeWorkspacesForPrefetch[0]?.id;
+  // ✅ GUARD: Ensure currentWorkspaceId is valid before making API call
+  const isValidWorkspaceId = currentWorkspaceId && currentWorkspaceId !== 'undefined' && currentWorkspaceId !== 'null';
   useQuery({
     queryKey: ['/api/social-accounts', currentWorkspaceId],
-    queryFn: () => currentWorkspaceId ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspaceId}`) : Promise.resolve([]),
-    enabled: !!user && !loading && !!currentWorkspaceId,
+    queryFn: () => isValidWorkspaceId ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspaceId}`) : Promise.resolve([]),
+    enabled: !!user && !loading && !!isValidWorkspaceId,
     staleTime: 0,
     retry: false,
     refetchOnMount: 'always',
