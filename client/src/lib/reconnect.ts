@@ -10,8 +10,9 @@ export interface SimpleAccount {
   hasAccessToken?: boolean
 }
 
-export function detectInvalidAccounts(accounts: SimpleAccount[] = []) {
-  const invalid = (accounts || []).filter(a => a && a.tokenStatus && a.tokenStatus !== 'valid')
+export function detectInvalidAccounts(accounts: SimpleAccount[] | any = []) {
+  const accountsArray = Array.isArray(accounts) ? accounts : (accounts?.data || [])
+  const invalid = accountsArray.filter((a: any) => a && a.tokenStatus && a.tokenStatus !== 'valid')
   const count = invalid.length
   const platforms = invalid.map(a => a.platform)
   return { invalid, count, platforms }
