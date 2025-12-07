@@ -153,9 +153,13 @@ export default function OnboardingFlow({ open, onComplete, userData }: Onboardin
     setIsCompleting(true)
     try {
       await onComplete(formData)
+      // Success - the parent component will close the modal
     } catch (error) {
       console.error('Failed to complete onboarding:', error)
-      setIsCompleting(false) // Re-enable button on error
+      // Show user-friendly error message could be added here via toast
+    } finally {
+      // Always reset isCompleting state regardless of success/failure
+      setIsCompleting(false)
     }
   }
 

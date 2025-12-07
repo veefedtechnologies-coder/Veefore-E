@@ -508,8 +508,13 @@ function App() {
               </main>
             </div>
 
-            {/* Onboarding Flow for new users */}
-            {userData && !userData.isOnboarded && (
+            {/* Onboarding Flow for new users - triple safety check:
+                1. Backend says not onboarded
+                2. localStorage doesn't say onboarded
+                3. User doesn't have workspaces (which indicates completed onboarding) */}
+            {userData && !userData.isOnboarded && 
+             localStorage.getItem('isOnboarded') !== 'true' &&
+             !(Array.isArray(workspaces) && workspaces.length > 0) && (
               <OnboardingFlow 
                 open={isOnboardingModalOpen}
                 userData={userData}
@@ -533,16 +538,20 @@ function App() {
                     
                     // Invalidate and refetch user data in background
                     queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                    queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
                     
                     // Wait a bit for the modal to close, then start the guided tour
                     setTimeout(() => {
                       setIsWalkthroughOpen(true)
                     }, 500) // Small delay to ensure modal closes first
                   } else {
-                    console.error('❌ Failed to complete onboarding')
+                    const errorText = await response.text().catch(() => 'Unknown error')
+                    console.error('❌ Failed to complete onboarding:', errorText)
+                    throw new Error(`Failed to complete onboarding: ${response.status}`)
                   }
                 } catch (error) {
                   console.error('❌ Onboarding completion error:', error)
+                  throw error // Re-throw to let OnboardingFlow handle it
                 }
               }}
               />
