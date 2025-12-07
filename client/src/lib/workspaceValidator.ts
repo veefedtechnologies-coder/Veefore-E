@@ -9,9 +9,21 @@ import { apiRequest } from './queryClient';
 
 interface Workspace {
   id: string;
+  _id?: string;  // MongoDB returns _id, we normalize to id
   name: string;
   isDefault?: boolean;
 }
+
+// ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
+const normalizeWorkspace = (ws: any): Workspace => ({
+  ...ws,
+  id: ws.id || ws._id,  // Use id if exists, fallback to _id
+});
+
+const normalizeWorkspaces = (workspaces: any[]): Workspace[] => {
+  if (!Array.isArray(workspaces)) return [];
+  return workspaces.map(normalizeWorkspace);
+};
 
 class WorkspaceValidator {
   private static instance: WorkspaceValidator;
@@ -45,7 +57,9 @@ class WorkspaceValidator {
       console.log('[WORKSPACE VALIDATOR] 🔍 Fetching user workspaces for validation...');
       
       // Fetch user's actual workspaces from backend
-      const workspaces: Workspace[] = await apiRequest('/api/workspaces');
+      // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
+      const rawWorkspaces = await apiRequest('/api/workspaces');
+      const workspaces: Workspace[] = normalizeWorkspaces(rawWorkspaces?.data || rawWorkspaces || []);
       this.workspacesCache = workspaces;
 
       if (!workspaces || workspaces.length === 0) {

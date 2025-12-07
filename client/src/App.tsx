@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Route, Switch, useLocation } from 'wouter'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
@@ -62,6 +62,32 @@ import { initializeCoreWebVitals } from './lib/core-web-vitals';
 import { initializeComponentModernization } from './lib/component-modernization';
 import { ProtectedRoute } from './components/ProtectedRoute'
 const EncryptionHealth = React.lazy(() => import('./pages/EncryptionHealth'))
+
+// ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
+interface NormalizedWorkspace {
+  id: string;
+  _id?: string;
+  name: string;
+  description?: string;
+  theme?: string;
+  aiPersonality?: string;
+  isDefault?: boolean;
+  maxTeamMembers?: number;
+  credits?: number;
+  createdAt?: string;
+}
+
+const normalizeWorkspace = (ws: any): NormalizedWorkspace => ({
+  ...ws,
+  id: ws.id || ws._id,  // Use id if exists, fallback to _id
+});
+
+const normalizeWorkspaces = (workspaces: any): NormalizedWorkspace[] => {
+  // Handle nested API response { success: true, data: [...] }
+  const rawWorkspaces = workspaces?.data || workspaces || [];
+  if (!Array.isArray(rawWorkspaces)) return [];
+  return rawWorkspaces.map(normalizeWorkspace);
+};
 
 function App() {
   // Initialization guards to prevent re-initialization
@@ -190,7 +216,7 @@ function App() {
   }, [user, loading, hasFirebaseAuthInStorage])
 
   // Pre-fetch workspaces data for faster navigation
-  const { data: workspaces, isLoading: workspacesLoading } = useQuery({
+  const { data: rawWorkspacesResponse, isLoading: workspacesLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: () => apiRequest('/api/workspaces'),
     enabled: !!user && !loading && !!userData,
@@ -200,9 +226,12 @@ function App() {
     refetchOnReconnect: true,
     refetchOnWindowFocus: true,
   })
+  
+  // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
+  const workspaces = useMemo(() => normalizeWorkspaces(rawWorkspacesResponse), [rawWorkspacesResponse])
 
   const [enforceHang, setEnforceHang] = useState(false)
-  const needEnforce = !!user && !!userData && !workspacesLoading && Array.isArray(workspaces) && (workspaces.length === 0 || !workspaces.some((w: any) => w.isDefault === true))
+  const needEnforce = !!user && !!userData && !workspacesLoading && (workspaces.length === 0 || !workspaces.some((w) => w.isDefault === true))
   const { data: enforceResult, isLoading: enforcing, error: enforceError, refetch: enforceRefetch } = useQuery({
     queryKey: ['/api/workspaces/enforce-default'],
     queryFn: () => apiRequest('/api/workspaces/enforce-default', { method: 'POST' }),

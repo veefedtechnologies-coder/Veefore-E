@@ -53,6 +53,7 @@ const getPersonalityIcon = (personality: string) => {
 
 interface Workspace {
   id: string
+  _id?: string  // MongoDB returns _id, we normalize to id
   name: string
   description?: string
   theme: string
@@ -62,6 +63,17 @@ interface Workspace {
   credits: number
   createdAt: string
 }
+
+// ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
+const normalizeWorkspace = (ws: any): Workspace => ({
+  ...ws,
+  id: ws.id || ws._id,  // Use id if exists, fallback to _id
+});
+
+const normalizeWorkspaces = (workspaces: any[]): Workspace[] => {
+  if (!Array.isArray(workspaces)) return [];
+  return workspaces.map(normalizeWorkspace);
+};
 
 interface WorkspaceSwitcherProps {
   onNavigateToWorkspaces?: () => void
@@ -94,10 +106,12 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
   })
   
   // Extract workspaces from nested API response { success: true, data: [...] }
-  const workspaces = workspacesResponse?.data || workspacesResponse || []
+  // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
+  const rawWorkspaces = workspacesResponse?.data || workspacesResponse || []
+  const workspaces = normalizeWorkspaces(rawWorkspaces)
 
   // Ensure workspaces is always an array (defensive programming)
-  const safeWorkspaces = Array.isArray(workspaces) ? workspaces : []
+  const safeWorkspaces = workspaces
 
   // Get current workspace
   const currentWorkspace = safeWorkspaces.find((ws: Workspace) => 
@@ -300,7 +314,9 @@ export function useCurrentWorkspace() {
   })
   
   // Extract workspaces from nested API response { success: true, data: [...] }
-  const workspaces = workspacesResponse?.data || workspacesResponse || []
+  // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
+  const rawWorkspaces = workspacesResponse?.data || workspacesResponse || []
+  const workspaces = normalizeWorkspaces(rawWorkspaces)
 
   // ✅ PRODUCTION FIX: Validate workspace ID on mount and when workspaces change
   useEffect(() => {
