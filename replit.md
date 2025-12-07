@@ -44,6 +44,13 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-12-07: Critical Workspace Creation Bug Fix (COMPLETE)
+- ✅ **FIX**: Onboarding now AWAITS workspace creation instead of fire-and-forget
+- ✅ **FIX**: default-workspace-enforcer now creates workspace on GET /workspaces if user has none
+- ✅ Root cause: `completeOnboardingFull` was not awaiting `createDefaultWorkspaceIfNeeded`, causing silent failures
+- ✅ Fallback: Middleware now acts as safety net to create workspace for any user without one
+- **Files Modified**: server/controllers/UserController.ts, server/middleware/default-workspace-enforcer.ts
+
 ### 2025-12-07: User Data & WorkspaceSwitcher Bug Fixes (COMPLETE)
 - ✅ **FIX**: useUser hook now correctly extracts user data from nested API response
 - ✅ **FIX**: /api/user endpoint returns all needed user fields (displayName, plan, credits, isOnboarded)
