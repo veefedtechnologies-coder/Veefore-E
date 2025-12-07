@@ -12,6 +12,14 @@ export class UserRepository extends BaseRepository<IUser> {
     super(User, 'User');
   }
 
+  async createWithDefaults(data: Partial<IUser>): Promise<IUser> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async findByEmail(email: string): Promise<IUser | null> {
     return this.findOne({ email: email.toLowerCase() });
   }

@@ -41,6 +41,14 @@ export class AdminRepository extends BaseRepository<IAdmin> {
     super(AdminModel, 'Admin');
   }
 
+  async createWithDefaults(data: Partial<IAdmin>): Promise<IAdmin> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async findByEmail(email: string): Promise<IAdmin | null> {
     return this.findOne({ email: email.toLowerCase() });
   }
@@ -132,6 +140,13 @@ export class AdminSessionRepository extends BaseRepository<IAdminSession> {
     super(AdminSessionModel, 'AdminSession');
   }
 
+  async createWithDefaults(data: Partial<IAdminSession>): Promise<IAdminSession> {
+    return this.create({
+      ...data,
+      createdAt: new Date()
+    });
+  }
+
   async findByToken(token: string): Promise<IAdminSession | null> {
     return this.findOne({ token });
   }
@@ -156,6 +171,14 @@ export class AdminSessionRepository extends BaseRepository<IAdminSession> {
 export class NotificationRepository extends BaseRepository<INotification> {
   constructor() {
     super(NotificationModel, 'Notification');
+  }
+
+  async createWithDefaults(data: Partial<INotification>): Promise<INotification> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   async findByUserId(userId: number, options?: PaginationOptions) {
@@ -213,6 +236,14 @@ export class PopupRepository extends BaseRepository<IPopup> {
     super(PopupModel, 'Popup');
   }
 
+  async createWithDefaults(data: Partial<IPopup>): Promise<IPopup> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async findActivePopups(options?: PaginationOptions) {
     const now = new Date();
     return this.findMany({
@@ -260,6 +291,14 @@ export class PopupRepository extends BaseRepository<IPopup> {
 export class AppSettingRepository extends BaseRepository<IAppSetting> {
   constructor() {
     super(AppSettingModel, 'AppSetting');
+  }
+
+  async createWithDefaults(data: Partial<IAppSetting>): Promise<IAppSetting> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   async findByKey(key: string): Promise<IAppSetting | null> {
@@ -316,6 +355,13 @@ export class AppSettingRepository extends BaseRepository<IAppSetting> {
 export class AuditLogRepository extends BaseRepository<IAuditLog> {
   constructor() {
     super(AuditLogModel, 'AuditLog');
+  }
+
+  async createWithDefaults(data: Partial<IAuditLog>): Promise<IAuditLog> {
+    return this.create({
+      ...data,
+      createdAt: new Date()
+    });
   }
 
   async findByActorId(actorId: string, options?: PaginationOptions) {
@@ -388,6 +434,14 @@ export class AuditLogRepository extends BaseRepository<IAuditLog> {
 export class FeedbackMessageRepository extends BaseRepository<IFeedbackMessage> {
   constructor() {
     super(FeedbackMessageModel, 'FeedbackMessage');
+  }
+
+  async createWithDefaults(data: Partial<IFeedbackMessage>): Promise<IFeedbackMessage> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   async findByUserId(userId: number, options?: PaginationOptions) {

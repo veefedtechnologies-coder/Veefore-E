@@ -218,6 +218,13 @@ export class ChatMessageRepository extends BaseRepository<IChatMessage> {
     super(ChatMessage, 'ChatMessage');
   }
 
+  async createWithDefaults(data: Partial<IChatMessage>): Promise<IChatMessage> {
+    return this.create({
+      ...data,
+      createdAt: new Date()
+    });
+  }
+
   async findByConversationId(conversationId: number, options?: PaginationOptions) {
     return this.findMany({ conversationId }, options);
   }

@@ -79,6 +79,14 @@ export class PaymentRepository extends BaseRepository<IPayment> {
     super(PaymentModel, 'Payment');
   }
 
+  async createWithDefaults(data: Partial<IPayment>): Promise<IPayment> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
   async findByUserId(userId: string, options?: PaginationOptions) {
     return this.findMany({ userId }, options);
   }
@@ -126,6 +134,14 @@ export class PaymentRepository extends BaseRepository<IPayment> {
 export class SubscriptionRepository extends BaseRepository<ISubscription> {
   constructor() {
     super(SubscriptionModel, 'Subscription');
+  }
+
+  async createWithDefaults(data: Partial<ISubscription>): Promise<ISubscription> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   async findByUserId(userId: string): Promise<ISubscription | null> {
@@ -247,6 +263,14 @@ export class AddonRepository extends BaseRepository<IAddon> {
 export class ReferralRepository extends BaseRepository<IReferral> {
   constructor() {
     super(ReferralModel, 'Referral');
+  }
+
+  async createWithDefaults(data: Partial<IReferral>): Promise<IReferral> {
+    return this.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   async findByReferrerId(referrerId: number, options?: PaginationOptions) {
