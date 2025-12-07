@@ -66,17 +66,37 @@ export default function Workspaces() {
     queryKey: ['/api/workspaces'],
     queryFn: async () => {
       const response = await apiRequest('/api/workspaces');
+      console.log('[WORKSPACES DEBUG] Raw API response:', response);
+      console.log('[WORKSPACES DEBUG] Response type:', typeof response);
+      console.log('[WORKSPACES DEBUG] Is array:', Array.isArray(response));
+      console.log('[WORKSPACES DEBUG] Has data property:', response?.data);
+      console.log('[WORKSPACES DEBUG] data is array:', Array.isArray(response?.data));
+      
       // API returns { success: true, data: [...] } - extract the data array
-      if (Array.isArray(response)) return response;
-      if (response && Array.isArray(response.data)) return response.data;
-      if (response && Array.isArray(response.workspaces)) return response.workspaces;
-      console.warn('Unexpected workspaces response format:', response);
+      if (Array.isArray(response)) {
+        console.log('[WORKSPACES DEBUG] Returning response directly (is array)');
+        return response;
+      }
+      if (response && Array.isArray(response.data)) {
+        console.log('[WORKSPACES DEBUG] Returning response.data array, length:', response.data.length);
+        return response.data;
+      }
+      if (response && Array.isArray(response.workspaces)) {
+        console.log('[WORKSPACES DEBUG] Returning response.workspaces array');
+        return response.workspaces;
+      }
+      console.warn('[WORKSPACES DEBUG] Unexpected workspaces response format:', response);
       return [];
     }
   })
   
   // Ensure workspaces is always an array for safety
-  const workspaces = Array.isArray(workspacesRaw) ? workspacesRaw : [];
+  // Handle both array format (new) and wrapped format (old cached data from localStorage)
+  const workspaces: Workspace[] = Array.isArray(workspacesRaw) 
+    ? workspacesRaw 
+    : (workspacesRaw && Array.isArray((workspacesRaw as any).data) 
+        ? (workspacesRaw as any).data 
+        : []);
 
   // Create workspace mutation
   const createWorkspaceMutation = useMutation({
