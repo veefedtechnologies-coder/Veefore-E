@@ -8,7 +8,6 @@ import { ParsedQs } from 'qs';
 import { storage } from '../mongodb-storage';
 import { emailService } from '../email-service';
 import { firebaseAdmin } from '../firebase-admin';
-import { safeParseJWTPayload } from '../middleware/unsafe-json-replacements';
 
 const LinkFirebaseSchema = z.object({
   email: z.string().email(),
@@ -160,22 +159,18 @@ export class AuthController extends BaseController {
     }
     
     const token = authHeader.split(' ')[1];
-    let decoded: any = null;
     
-    if (firebaseAdmin) {
-      try {
-        decoded = await firebaseAdmin.auth().verifyIdToken(token);
-      } catch {
-      }
+    if (!firebaseAdmin) {
+      console.error('[AUTH] Firebase Admin not initialized - cannot verify tokens');
+      return this.sendError(res, new ValidationError('Authentication service unavailable'));
     }
     
-    if (!decoded) {
-      const parts = token.split('.');
-      const payloadResult = safeParseJWTPayload(parts[1]);
-      if (!payloadResult.success) {
-        return this.sendError(res, new ValidationError('Invalid token'));
-      }
-      decoded = payloadResult.data;
+    let decoded: any;
+    try {
+      decoded = await firebaseAdmin.auth().verifyIdToken(token);
+    } catch (error) {
+      console.error('[AUTH] Firebase token verification failed:', error);
+      return this.sendError(res, new ValidationError('Invalid or expired token'));
     }
     
     const uid = decoded.uid || decoded.user_id || decoded.sub;
