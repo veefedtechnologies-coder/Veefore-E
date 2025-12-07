@@ -244,11 +244,15 @@ export class UserController extends BaseController {
       const updatedUser = await withTimeout(storage.updateUser(dbUser.id, updateData), 15000);
       console.log(`[ONBOARDING] ✅ User updated successfully, isOnboarded: ${updatedUser.isOnboarded}`);
 
-      // Step 3: Create default workspace (don't await to speed up response)
+      // Step 3: Create default workspace (MUST await to ensure workspace exists before user lands on dashboard)
       const userPlan = updatedUser.plan || 'free';
-      createDefaultWorkspaceIfNeeded(updatedUser.id, userPlan).catch((err) => {
-        console.error(`[ONBOARDING] Background workspace creation error:`, err);
-      });
+      try {
+        await createDefaultWorkspaceIfNeeded(updatedUser.id, userPlan);
+        console.log(`[ONBOARDING] ✅ Default workspace created for user ${updatedUser.id}`);
+      } catch (err) {
+        console.error(`[ONBOARDING] ❌ Workspace creation error:`, err);
+        // Don't fail onboarding, but log it - the default-workspace-enforcer will handle it
+      }
 
       console.log(`[ONBOARDING] ✅ Completed onboarding for user ${updatedUser.id}`);
       this.sendSuccess(res, { success: true, message: 'Onboarding completed successfully', user: updatedUser });
