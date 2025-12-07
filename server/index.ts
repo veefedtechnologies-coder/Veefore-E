@@ -9,7 +9,7 @@ import logger from './config/logger';
 
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
-import { registerRoutes } from "./routes";
+import { registerRoutes, initializeLeaderElection } from "./routes";
 import { MongoStorage } from "./mongodb-storage";
 import { startSchedulerService } from "./scheduler-service";
 import { AutoSyncService } from "./auto-sync-service";
@@ -523,6 +523,13 @@ app.use((req, res, next) => {
   console.log('[SMART POLLING] Instagram polling initialization delegated to routes.ts with leader election');
   
   const server = await registerRoutes(app, storage as any, upload);
+  
+  // Initialize leader election for Instagram polling AFTER routes are registered
+  // This ensures MongoDB is connected before attempting lock acquisition
+  console.log('[STARTUP] MongoDB is connected - initiating leader election for polling...');
+  initializeLeaderElection(storage as any).catch((error) => {
+    console.error('[STARTUP] Leader election initialization failed:', error);
+  });
   
   // Register metrics and webhook routes
   app.use('/api', metricsRoutes);
