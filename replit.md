@@ -44,6 +44,15 @@ Firebase credentials are stored in secrets and automatically loaded:
 
 ## Recent Changes
 
+### 2025-12-07: Dashboard Crash Fix - socialAccounts Array Handling (COMPLETE)
+- ✅ **CRITICAL FIX**: Fixed PerformanceScore and SocialAccounts components crashing with "filter is not a function"
+- ✅ **Root Cause**: API returns `{ success: true, data: [...] }` object, but code expected an array directly
+- ✅ **Solution**: Added `socialAccountsArray` extraction that handles both array and object formats
+- ✅ Updated all array method calls (filter, map, length) to use normalized `socialAccountsArray`
+- ✅ Fixed polling query `enabled` check to handle object format
+- ✅ Architect review PASSED - no remaining crash surface
+- **Files Modified**: client/src/components/dashboard/performance-score.tsx, client/src/components/dashboard/social-accounts.tsx
+
 ### 2025-12-07: Critical Workspace Creation Bug Fix (COMPLETE)
 - ✅ **FIX**: Onboarding now AWAITS workspace creation instead of fire-and-forget
 - ✅ **FIX**: default-workspace-enforcer now creates workspace on GET /workspaces if user has none
