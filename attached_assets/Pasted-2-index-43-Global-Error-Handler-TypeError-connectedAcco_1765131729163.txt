@@ -1,0 +1,137 @@
+2(index):43 [Global Error Handler] TypeError: connectedAccounts?.reduce is not a function
+    at IntegrationContent (Integration.tsx:724:45)
+    at renderWithHooks (chunk-QR5BBP25.js?v=b99b7969:11596:26)
+    at mountIndeterminateComponent (chunk-QR5BBP25.js?v=b99b7969:14974:21)
+    at beginWork (chunk-QR5BBP25.js?v=b99b7969:15962:22)
+    at HTMLUnknownElement.callCallback2 (chunk-QR5BBP25.js?v=b99b7969:3680:22)
+    at Object.invokeGuardedCallbackDev (chunk-QR5BBP25.js?v=b99b7969:3705:24)
+    at invokeGuardedCallback (chunk-QR5BBP25.js?v=b99b7969:3739:39)
+    at beginWork$1 (chunk-QR5BBP25.js?v=b99b7969:19818:15)
+    at performUnitOfWork (chunk-QR5BBP25.js?v=b99b7969:19251:20)
+    at workLoopConcurrent (chunk-QR5BBP25.js?v=b99b7969:19242:13)
+console.error @ (index):43
+handleGlobalError @ ux-enhancement.ts:310
+(anonymous) @ p6-integration.tsx:286
+invokeGuardedCallbackDev @ chunk-QR5BBP25.js?v=b99b7969:3705
+invokeGuardedCallback @ chunk-QR5BBP25.js?v=b99b7969:3739
+beginWork$1 @ chunk-QR5BBP25.js?v=b99b7969:19818
+performUnitOfWork @ chunk-QR5BBP25.js?v=b99b7969:19251
+workLoopConcurrent @ chunk-QR5BBP25.js?v=b99b7969:19242
+renderRootConcurrent @ chunk-QR5BBP25.js?v=b99b7969:19217
+performConcurrentWorkOnRoot @ chunk-QR5BBP25.js?v=b99b7969:18728
+workLoop @ chunk-QR5BBP25.js?v=b99b7969:197
+flushWork @ chunk-QR5BBP25.js?v=b99b7969:176
+performWorkUntilDeadline @ chunk-QR5BBP25.js?v=b99b7969:384Understand this error
+Integration.tsx:724 Uncaught TypeError: connectedAccounts?.reduce is not a function
+    at IntegrationContent (Integration.tsx:724:45)
+    at renderWithHooks (chunk-QR5BBP25.js?v=b99b7969:11596:26)
+    at mountIndeterminateComponent (chunk-QR5BBP25.js?v=b99b7969:14974:21)
+    at beginWork (chunk-QR5BBP25.js?v=b99b7969:15962:22)
+    at HTMLUnknownElement.callCallback2 (chunk-QR5BBP25.js?v=b99b7969:3680:22)
+    at Object.invokeGuardedCallbackDev (chunk-QR5BBP25.js?v=b99b7969:3705:24)
+    at invokeGuardedCallback (chunk-QR5BBP25.js?v=b99b7969:3739:39)
+    at beginWork$1 (chunk-QR5BBP25.js?v=b99b7969:19818:15)
+    at performUnitOfWork (chunk-QR5BBP25.js?v=b99b7969:19251:20)
+    at workLoopConcurrent (chunk-QR5BBP25.js?v=b99b7969:19242:13)
+IntegrationContent @ Integration.tsx:724
+renderWithHooks @ chunk-QR5BBP25.js?v=b99b7969:11596
+mountIndeterminateComponent @ chunk-QR5BBP25.js?v=b99b7969:14974
+beginWork @ chunk-QR5BBP25.js?v=b99b7969:15962
+callCallback2 @ chunk-QR5BBP25.js?v=b99b7969:3680
+invokeGuardedCallbackDev @ chunk-QR5BBP25.js?v=b99b7969:3705
+invokeGuardedCallback @ chunk-QR5BBP25.js?v=b99b7969:3739
+beginWork$1 @ chunk-QR5BBP25.js?v=b99b7969:19818
+performUnitOfWork @ chunk-QR5BBP25.js?v=b99b7969:19251
+workLoopConcurrent @ chunk-QR5BBP25.js?v=b99b7969:19242
+renderRootConcurrent @ chunk-QR5BBP25.js?v=b99b7969:19217
+performConcurrentWorkOnRoot @ chunk-QR5BBP25.js?v=b99b7969:18728
+workLoop @ chunk-QR5BBP25.js?v=b99b7969:197
+flushWork @ chunk-QR5BBP25.js?v=b99b7969:176
+performWorkUntilDeadline @ chunk-QR5BBP25.js?v=b99b7969:384Understand this error
+2(index):43 [Global Error Handler] TypeError: connectedAccounts?.reduce is not a function
+    at IntegrationContent (Integration.tsx:724:45)
+    at renderWithHooks (chunk-QR5BBP25.js?v=b99b7969:11596:26)
+    at mountIndeterminateComponent (chunk-QR5BBP25.js?v=b99b7969:14974:21)
+    at beginWork (chunk-QR5BBP25.js?v=b99b7969:15962:22)
+    at HTMLUnknownElement.callCallback2 (chunk-QR5BBP25.js?v=b99b7969:3680:22)
+    at Object.invokeGuardedCallbackDev (chunk-QR5BBP25.js?v=b99b7969:3705:24)
+    at invokeGuardedCallback (chunk-QR5BBP25.js?v=b99b7969:3739:39)
+    at beginWork$1 (chunk-QR5BBP25.js?v=b99b7969:19818:15)
+    at performUnitOfWork (chunk-QR5BBP25.js?v=b99b7969:19251:20)
+    at workLoopSync (chunk-QR5BBP25.js?v=b99b7969:19190:13)
+console.error @ (index):43
+handleGlobalError @ ux-enhancement.ts:310
+(anonymous) @ p6-integration.tsx:286
+invokeGuardedCallbackDev @ chunk-QR5BBP25.js?v=b99b7969:3705
+invokeGuardedCallback @ chunk-QR5BBP25.js?v=b99b7969:3739
+beginWork$1 @ chunk-QR5BBP25.js?v=b99b7969:19818
+performUnitOfWork @ chunk-QR5BBP25.js?v=b99b7969:19251
+workLoopSync @ chunk-QR5BBP25.js?v=b99b7969:19190
+renderRootSync @ chunk-QR5BBP25.js?v=b99b7969:19169
+recoverFromConcurrentError @ chunk-QR5BBP25.js?v=b99b7969:18786
+performConcurrentWorkOnRoot @ chunk-QR5BBP25.js?v=b99b7969:18734
+workLoop @ chunk-QR5BBP25.js?v=b99b7969:197
+flushWork @ chunk-QR5BBP25.js?v=b99b7969:176
+performWorkUntilDeadline @ chunk-QR5BBP25.js?v=b99b7969:384Understand this error
+Integration.tsx:724 Uncaught TypeError: connectedAccounts?.reduce is not a function
+    at IntegrationContent (Integration.tsx:724:45)
+    at renderWithHooks (chunk-QR5BBP25.js?v=b99b7969:11596:26)
+    at mountIndeterminateComponent (chunk-QR5BBP25.js?v=b99b7969:14974:21)
+    at beginWork (chunk-QR5BBP25.js?v=b99b7969:15962:22)
+    at HTMLUnknownElement.callCallback2 (chunk-QR5BBP25.js?v=b99b7969:3680:22)
+    at Object.invokeGuardedCallbackDev (chunk-QR5BBP25.js?v=b99b7969:3705:24)
+    at invokeGuardedCallback (chunk-QR5BBP25.js?v=b99b7969:3739:39)
+    at beginWork$1 (chunk-QR5BBP25.js?v=b99b7969:19818:15)
+    at performUnitOfWork (chunk-QR5BBP25.js?v=b99b7969:19251:20)
+    at workLoopSync (chunk-QR5BBP25.js?v=b99b7969:19190:13)
+IntegrationContent @ Integration.tsx:724
+renderWithHooks @ chunk-QR5BBP25.js?v=b99b7969:11596
+mountIndeterminateComponent @ chunk-QR5BBP25.js?v=b99b7969:14974
+beginWork @ chunk-QR5BBP25.js?v=b99b7969:15962
+callCallback2 @ chunk-QR5BBP25.js?v=b99b7969:3680
+invokeGuardedCallbackDev @ chunk-QR5BBP25.js?v=b99b7969:3705
+invokeGuardedCallback @ chunk-QR5BBP25.js?v=b99b7969:3739
+beginWork$1 @ chunk-QR5BBP25.js?v=b99b7969:19818
+performUnitOfWork @ chunk-QR5BBP25.js?v=b99b7969:19251
+workLoopSync @ chunk-QR5BBP25.js?v=b99b7969:19190
+renderRootSync @ chunk-QR5BBP25.js?v=b99b7969:19169
+recoverFromConcurrentError @ chunk-QR5BBP25.js?v=b99b7969:18786
+performConcurrentWorkOnRoot @ chunk-QR5BBP25.js?v=b99b7969:18734
+workLoop @ chunk-QR5BBP25.js?v=b99b7969:197
+flushWork @ chunk-QR5BBP25.js?v=b99b7969:176
+performWorkUntilDeadline @ chunk-QR5BBP25.js?v=b99b7969:384Understand this error
+(index):43 The above error occurred in the <IntegrationContent> component:
+
+    at IntegrationContent (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/pages/Integration.tsx:148:23)
+    at Integration
+    at Suspense
+    at main
+    at div
+    at div
+    at Route (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/wouter.js?v=b99b7969:205:16)
+    at Switch (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/wouter.js?v=b99b7969:261:17)
+    at P6Provider (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/lib/p6-integration.tsx:257:30)
+    at App (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/App.tsx:114:28)
+    at Suspense
+    at ChunkBoundary (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ChunkBoundary.tsx:7:5)
+    at RouteSuspense (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/RouteSuspense.tsx:20:41)
+    at ErrorBoundary (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/src/components/ErrorBoundary.tsx:20:5)
+    at QueryClientProvider (https://9aad0126-aa20-4e24-b5df-40e0f57e2081-00-3iq8azh6t8w3t.janeway.replit.dev/node_modules/.vite/deps/chunk-6FXDDQHQ.js?v=b99b7969:44:3)
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ChunkBoundary.
+console.error @ (index):43
+logCapturedError @ chunk-QR5BBP25.js?v=b99b7969:14080
+update.callback @ chunk-QR5BBP25.js?v=b99b7969:14117
+callCallback @ chunk-QR5BBP25.js?v=b99b7969:11296
+commitUpdateQueue @ chunk-QR5BBP25.js?v=b99b7969:11313
+commitLayoutEffectOnFiber @ chunk-QR5BBP25.js?v=b99b7969:17123
+commitLayoutMountEffects_complete @ chunk-QR5BBP25.js?v=b99b7969:18030
+commitLayoutEffects_begin @ chunk-QR5BBP25.js?v=b99b7969:18019
+commitLayoutEffects @ chunk-QR5BBP25.js?v=b99b7969:17970
+commitRootImpl @ chunk-QR5BBP25.js?v=b99b7969:19406
+commitRoot @ chunk-QR5BBP25.js?v=b99b7969:19330
+finishConcurrentRender @ chunk-QR5BBP25.js?v=b99b7969:18813
+performConcurrentWorkOnRoot @ chunk-QR5BBP25.js?v=b99b7969:18768
+workLoop @ chunk-QR5BBP25.js?v=b99b7969:197
+flushWork @ chunk-QR5BBP25.js?v=b99b7969:176
+performWorkUntilDeadline @ chunk-QR5BBP25.js?v=b99b7969:384Understand this error

@@ -99,7 +99,14 @@ export function PerformanceScore() {
   // Fetch real social accounts data for current workspace - IMMEDIATE FETCH ON LOAD
   const { data: socialAccounts } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id],
-    queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!currentWorkspace?.id) return [];
+      const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`);
+      // API returns { success: true, data: [...] } - extract the data array
+      if (Array.isArray(response)) return response;
+      if (response && Array.isArray(response.data)) return response.data;
+      return [];
+    },
     enabled: !!currentWorkspace?.id,
     refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls

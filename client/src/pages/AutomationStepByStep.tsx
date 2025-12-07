@@ -997,7 +997,10 @@ function AutomationStepByStepContent() {
     queryFn: async () => {
       if (!currentWorkspace?.id) return []
       const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`)
-      return response
+      // API returns { success: true, data: [...] } - extract the data array
+      if (Array.isArray(response)) return response;
+      if (response && Array.isArray(response.data)) return response.data;
+      return [];
     },
     enabled: !!currentWorkspace?.id,
     staleTime: Infinity, // Never consider data stale - only fetch when explicitly invalidated

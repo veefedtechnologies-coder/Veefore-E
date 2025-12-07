@@ -68,7 +68,10 @@ export function SocialAccounts() {
       // ✅ FORCE FRESH FETCH: Add timestamp to bypass cache
       const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}&_t=${Date.now()}`);
       console.log('[FRONTEND API] Raw API response:', response);
-      return response;
+      // API returns { success: true, data: [...] } - extract the data array
+      if (Array.isArray(response)) return response;
+      if (response && Array.isArray(response.data)) return response.data;
+      return [];
     },
     enabled: !!currentWorkspace?.id,
     refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
