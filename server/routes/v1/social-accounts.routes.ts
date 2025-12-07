@@ -19,8 +19,9 @@ router.get('/',
   async (req: Request, res: Response) => {
     try {
       const workspaceId = req.query.workspaceId as string;
-      if (!workspaceId) {
-        return res.status(400).json({ error: 'workspaceId is required' });
+      if (!workspaceId || workspaceId === 'undefined' || workspaceId === 'null') {
+        console.warn('[SOCIAL ACCOUNTS] Invalid workspaceId received:', workspaceId);
+        return res.status(400).json({ error: 'Valid workspaceId is required' });
       }
       req.params = { workspaceId };
       return socialAccountController.getByWorkspace(req, res);

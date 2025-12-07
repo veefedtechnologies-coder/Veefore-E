@@ -77,11 +77,14 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
   const [targetWorkspace, setTargetWorkspace] = useState<Workspace | null>(null)
 
   // Fetch user's workspaces
-  const { data: workspaces = [], isLoading } = useQuery({
+  const { data: workspacesResponse, isLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: () => apiRequest('/api/workspaces'),
     staleTime: 5 * 60 * 1000 // 5 minutes
   })
+  
+  // Extract workspaces from nested API response { success: true, data: [...] }
+  const workspaces = workspacesResponse?.data || workspacesResponse || []
 
   // Ensure workspaces is always an array (defensive programming)
   const safeWorkspaces = Array.isArray(workspaces) ? workspaces : []
@@ -273,11 +276,14 @@ export function useCurrentWorkspace() {
   const queryClient = useQueryClient()
   
   // Fetch user's workspaces
-  const { data: workspaces = [], isLoading: workspacesLoading } = useQuery({
+  const { data: workspacesResponse, isLoading: workspacesLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: () => apiRequest('/api/workspaces'),
     staleTime: 5 * 60 * 1000 // 5 minutes
   })
+  
+  // Extract workspaces from nested API response { success: true, data: [...] }
+  const workspaces = workspacesResponse?.data || workspacesResponse || []
 
   // ✅ PRODUCTION FIX: Validate workspace ID on mount and when workspaces change
   useEffect(() => {

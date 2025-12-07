@@ -35,10 +35,12 @@ import {
 import { useLocation } from 'wouter'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest } from '@/lib/queryClient'
+import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 
 export function CreatePost() {
   const [, setLocation] = useLocation()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { currentWorkspace } = useCurrentWorkspace()
   
   // State management
   const [selectedAccount, setSelectedAccount] = useState('')
@@ -58,8 +60,9 @@ export function CreatePost() {
 
   // Fetch social accounts - HYBRID: Webhooks + Smart Polling
   const { data: socialAccounts, isLoading: accountsLoading } = useQuery({
-    queryKey: ['/api/social-accounts'],
-    queryFn: () => apiRequest('/api/social-accounts'),
+    queryKey: ['/api/social-accounts', currentWorkspace?.id],
+    queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
+    enabled: !!currentWorkspace?.id,
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes - webhooks provide immediate updates for comments/mentions
     refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
