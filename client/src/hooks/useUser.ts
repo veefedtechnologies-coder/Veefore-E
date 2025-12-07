@@ -5,7 +5,7 @@ import { useFirebaseAuth } from './useFirebaseAuth'
 export const useUser = () => {
   const { user, loading: authLoading } = useFirebaseAuth()
 
-  const { data: userData, isLoading: userDataLoading, error } = useQuery({
+  const { data: response, isLoading: userDataLoading, error } = useQuery({
     queryKey: ['/api/user'],
     queryFn: () => apiRequest('/api/user'),
     enabled: !!user && !authLoading,
@@ -15,6 +15,8 @@ export const useUser = () => {
     refetchOnReconnect: true,
     refetchOnWindowFocus: true
   })
+
+  const userData = response?.user || response?.data || response
 
   return {
     user,
