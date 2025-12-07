@@ -244,7 +244,19 @@ router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
         id: user._id,
         email: user.email,
         displayName: user.displayName,
-        profilePictureUrl: user.profilePictureUrl
+        profilePictureUrl: user.profilePictureUrl,
+        username: user.username,
+        avatar: user.avatar,
+        credits: user.credits,
+        plan: user.plan,
+        isOnboarded: user.isOnboarded,
+        preferences: user.preferences,
+        isEmailVerified: user.isEmailVerified,
+        onboardingStep: user.onboardingStep,
+        status: user.status,
+        trialExpiresAt: user.trialExpiresAt,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt
       }
     })
   } catch (error) {
