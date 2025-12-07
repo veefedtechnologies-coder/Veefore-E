@@ -28,6 +28,7 @@ import {
   Lock,
   ArrowUpDown
 } from 'lucide-react'
+import { SkeletonIntegrationCard } from '@/components/ui/skeleton'
 // import { TokenConverter } from '../components/dashboard/token-converter' // Commented out for now
 import { useCurrentWorkspace } from '../components/WorkspaceSwitcher'
 
@@ -283,8 +284,7 @@ function IntegrationContent() {
     placeholderData: []
   })
 
-  // Show skeleton only when a workspace exists and data is loading
-  const shouldShowSkeleton = !!currentWorkspace?.id && isLoading
+  const shouldShowSkeleton = !!currentWorkspace?.id && isLoading && (!Array.isArray(connectedAccounts) || connectedAccounts.length === 0)
 
   console.log('Integration state:', { 
     isLoading, 

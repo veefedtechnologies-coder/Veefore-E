@@ -195,12 +195,8 @@ function App() {
     queryKey: ['/api/user'],
     queryFn: () => apiRequest('/api/user'),
     enabled: !!user && !loading,
-    retry: 3, // Retry up to 3 times for new users whose account might still be creating
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   })
   
   // Check for Firebase auth in localStorage
@@ -215,16 +211,11 @@ function App() {
     }
   }, [user, loading, hasFirebaseAuthInStorage])
 
-  // Pre-fetch workspaces data for faster navigation
+  // Pre-fetch workspaces data for faster navigation - uses global cache settings
   const { data: rawWorkspacesResponse, isLoading: workspacesLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: () => apiRequest('/api/workspaces'),
     enabled: !!user && !loading && !!userData,
-    staleTime: 0,
-    retry: false,
-    refetchOnMount: 'always',
-    refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
   })
   
   // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
@@ -339,11 +330,6 @@ function App() {
     queryKey: ['/api/social-accounts', currentWorkspaceId],
     queryFn: () => isValidWorkspaceId ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspaceId}`) : Promise.resolve([]),
     enabled: !!user && !loading && !!isValidWorkspaceId,
-    staleTime: 0,
-    retry: false,
-    refetchOnMount: 'always',
-    refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
   })
   
   // Authentication and onboarding guard logic - STRICT ENFORCEMENT
