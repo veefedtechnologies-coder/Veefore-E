@@ -513,191 +513,8 @@ function App() {
         </React.Suspense>
       </Route>
 
-      {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
-      <Route path="/">
-        {!user && !loading ? (
-          <React.Suspense fallback={<LoadingSpinner />}>
-            <GlobalLandingPage />
-          </React.Suspense>
-        ) : user && userData ? (
-          // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-            {(needEnforce && enforcing && !enforceHang) && <WorkspaceCreationOverlay onRetry={() => {}} />}
-            {(needEnforce && ((enforceHang && enforcing) || (!enforcing && enforceError))) && (
-              <WorkspaceCreationOverlay 
-                error={String(enforceError || 'Taking longer than usual')} 
-                onRetry={() => enforceRefetch()} 
-                onSignOut={() => { const auth = getAuth(); auth.signOut(); setLocation('/signin'); }}
-              />
-            )}
-            {/* Sidebar - Fixed height with independent scrolling */}
-            <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
-              <Sidebar 
-                className="w-24 bg-white dark:bg-gray-800 h-full transition-colors duration-300"
-                isCreateDropdownOpen={isCreateDropdownOpen}
-                setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-              />
-            </div>
-
-            {/* Main Content Area - Independent scrolling */}
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
-              {/* Header */}
-              <Header 
-                onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-              />
-              
-              {/* Create Dropdown */}
-              {isCreateDropdownOpen && (
-                <CreateDropdown
-                  isOpen={isCreateDropdownOpen}
-                  onClose={() => setIsCreateDropdownOpen(false)}
-                  onOptionSelect={handleCreateOptionSelect}
-                />
-              )}
-
-              {/* Main Content - Scrollable */}
-              <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                <>
-                  {/* Instagram Webhook Listener for Real-time Updates */}
-                  <InstagramWebhookListener />
-                  
-                  {/* Quick Actions - Top Section */}
-                  <div className="mb-8">
-                    <QuickActions />
-                  </div>
-                  
-                  {/* Main Dashboard Layout - Hootsuite Style */}
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-                    {/* Left Column - Performance Score + Get Started + Scheduled Posts + Drafts */}
-                    <div className="space-y-6">
-                      <PerformanceScore />
-                      <GetStarted />
-                      <ScheduledPostsSection />
-                      <DraftsSection />
-                    </div>
-                    
-                    {/* Right Column - Recommendations + Social Accounts + Listening */}
-                    <div className="space-y-6">
-                      <Recommendations />
-                      <SocialAccounts />
-                      <Listening />
-                    </div>
-                  </div>
-                </>
-              </main>
-            </div>
-
-            {/* Onboarding Flow for new users - triple safety check:
-                1. Backend says not onboarded
-                2. localStorage doesn't say onboarded
-                3. User doesn't have workspaces (which indicates completed onboarding) */}
-            {userData && !userData.isOnboarded && 
-             localStorage.getItem('isOnboarded') !== 'true' &&
-             !(Array.isArray(workspaces) && workspaces.length > 0) && (
-              <OnboardingFlow 
-                open={isOnboardingModalOpen}
-                userData={userData}
-                onComplete={async (onboardingData) => {
-                console.log('🎯 COMPLETING ONBOARDING with data:', onboardingData)
-                try {
-                  const response = await fetch('/api/user/complete-onboarding', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${await user?.getIdToken()}`
-                    },
-                    body: JSON.stringify({ preferences: onboardingData })
-                  })
-                  if (response.ok) {
-                    console.log('✅ Onboarding completed successfully!')
-                    
-                    // First, close the onboarding modal immediately
-                    setIsOnboardingModalOpen(false)
-                    localStorage.setItem('isOnboarded', 'true')
-                    
-                    // Invalidate and refetch user data in background
-                    queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                    queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
-                    
-                    // Wait a bit for the modal to close, then start the guided tour
-                    setTimeout(() => {
-                      setIsWalkthroughOpen(true)
-                    }, 500) // Small delay to ensure modal closes first
-                  } else {
-                    const errorText = await response.text().catch(() => 'Unknown error')
-                    console.error('❌ Failed to complete onboarding:', errorText)
-                    throw new Error(`Failed to complete onboarding: ${response.status}`)
-                  }
-                } catch (error) {
-                  console.error('❌ Onboarding completion error:', error)
-                  throw error // Re-throw to let OnboardingFlow handle it
-                }
-              }}
-              />
-            )}
-          </div>
-        ) : userDataLoading ? (
-          <LoadingSpinner />
-        ) : user && !userData && !userDataLoading && userDataError ? (
-          String(userDataError).includes('404') ? (
-            <AccountNotFoundBanner
-              onSignup={() => setLocation('/signup')}
-              onSignOut={() => { auth.signOut(); setLocation('/signin') }}
-              onAssociate={async () => {
-                try {
-                  await apiRequest('/api/auth/associate-uid', { method: 'POST' })
-                  queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                  window.location.reload()
-                } catch {}
-              }}
-            />
-          ) : (
-          // If user exists but userData failed to load after retries, show error
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
-            <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Unable to Load Account
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                We're having trouble loading your account. This might be a temporary issue.
-              </p>
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                    window.location.reload()
-                  }}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={() => {
-                    auth.signOut()
-                    setLocation('/signin')
-                  }}
-                  className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                >
-                  Sign Out and Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-          )
-        ) : (
-          <LoadingSpinner />
-        )}
-      </Route>
-
-      {/* Protected routes with sidebar layout - STRICT: only accessible when authenticated AND onboarded */}
-      {user && userData && userData.isOnboarded && (
-        <>
-                     <Route path="/plan">
+      {/* Protected routes with sidebar layout - uses ProtectedRoute for auth */}
+      <Route path="/plan">
              <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
@@ -1248,8 +1065,6 @@ function App() {
           <Route path="/terms-of-service">
             <TermsOfService />
           </Route>
-        </>
-      )}
       
       {/* Public routes for legal pages - accessible without authentication */}
       <Route path="/privacy-policy">
@@ -1262,6 +1077,187 @@ function App() {
         <React.Suspense fallback={<LoadingSpinner />}>
           <TermsOfService />
         </React.Suspense>
+      </Route>
+
+      {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
+      <Route path="/">
+        {!user && !loading ? (
+          <React.Suspense fallback={<LoadingSpinner />}>
+            <GlobalLandingPage />
+          </React.Suspense>
+        ) : user && userData ? (
+          // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
+          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+            {(needEnforce && enforcing && !enforceHang) && <WorkspaceCreationOverlay onRetry={() => {}} />}
+            {(needEnforce && ((enforceHang && enforcing) || (!enforcing && enforceError))) && (
+              <WorkspaceCreationOverlay 
+                error={String(enforceError || 'Taking longer than usual')} 
+                onRetry={() => enforceRefetch()} 
+                onSignOut={() => { const auth = getAuth(); auth.signOut(); setLocation('/signin'); }}
+              />
+            )}
+            {/* Sidebar - Fixed height with independent scrolling */}
+            <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
+              <Sidebar 
+                className="w-24 bg-white dark:bg-gray-800 h-full transition-colors duration-300"
+                isCreateDropdownOpen={isCreateDropdownOpen}
+                setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+              />
+            </div>
+
+            {/* Main Content Area - Independent scrolling */}
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+              {/* Header */}
+              <Header 
+                onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+              />
+              
+              {/* Create Dropdown */}
+              {isCreateDropdownOpen && (
+                <CreateDropdown
+                  isOpen={isCreateDropdownOpen}
+                  onClose={() => setIsCreateDropdownOpen(false)}
+                  onOptionSelect={handleCreateOptionSelect}
+                />
+              )}
+
+              {/* Main Content - Scrollable */}
+              <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                <>
+                  {/* Instagram Webhook Listener for Real-time Updates */}
+                  <InstagramWebhookListener />
+                  
+                  {/* Quick Actions - Top Section */}
+                  <div className="mb-8">
+                    <QuickActions />
+                  </div>
+                  
+                  {/* Main Dashboard Layout - Hootsuite Style */}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+                    {/* Left Column - Performance Score + Get Started + Scheduled Posts + Drafts */}
+                    <div className="space-y-6">
+                      <PerformanceScore />
+                      <GetStarted />
+                      <ScheduledPostsSection />
+                      <DraftsSection />
+                    </div>
+                    
+                    {/* Right Column - Recommendations + Social Accounts + Listening */}
+                    <div className="space-y-6">
+                      <Recommendations />
+                      <SocialAccounts />
+                      <Listening />
+                    </div>
+                  </div>
+                </>
+              </main>
+            </div>
+
+            {/* Onboarding Flow for new users - triple safety check:
+                1. Backend says not onboarded
+                2. localStorage doesn't say onboarded
+                3. User doesn't have workspaces (which indicates completed onboarding) */}
+            {userData && !userData.isOnboarded && 
+             localStorage.getItem('isOnboarded') !== 'true' &&
+             !(Array.isArray(workspaces) && workspaces.length > 0) && (
+              <OnboardingFlow 
+                open={isOnboardingModalOpen}
+                userData={userData}
+                onComplete={async (onboardingData) => {
+                console.log('🎯 COMPLETING ONBOARDING with data:', onboardingData)
+                try {
+                  const response = await fetch('/api/user/complete-onboarding', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${await user?.getIdToken()}`
+                    },
+                    body: JSON.stringify({ preferences: onboardingData })
+                  })
+                  if (response.ok) {
+                    console.log('✅ Onboarding completed successfully!')
+                    
+                    // First, close the onboarding modal immediately
+                    setIsOnboardingModalOpen(false)
+                    localStorage.setItem('isOnboarded', 'true')
+                    
+                    // Invalidate and refetch user data in background
+                    queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                    queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
+                    
+                    // Wait a bit for the modal to close, then start the guided tour
+                    setTimeout(() => {
+                      setIsWalkthroughOpen(true)
+                    }, 500) // Small delay to ensure modal closes first
+                  } else {
+                    const errorText = await response.text().catch(() => 'Unknown error')
+                    console.error('❌ Failed to complete onboarding:', errorText)
+                    throw new Error(`Failed to complete onboarding: ${response.status}`)
+                  }
+                } catch (error) {
+                  console.error('❌ Onboarding completion error:', error)
+                  throw error // Re-throw to let OnboardingFlow handle it
+                }
+              }}
+              />
+            )}
+          </div>
+        ) : userDataLoading ? (
+          <LoadingSpinner />
+        ) : user && !userData && !userDataLoading && userDataError ? (
+          String(userDataError).includes('404') ? (
+            <AccountNotFoundBanner
+              onSignup={() => setLocation('/signup')}
+              onSignOut={() => { auth.signOut(); setLocation('/signin') }}
+              onAssociate={async () => {
+                try {
+                  await apiRequest('/api/auth/associate-uid', { method: 'POST' })
+                  queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                  window.location.reload()
+                } catch {}
+              }}
+            />
+          ) : (
+          // If user exists but userData failed to load after retries, show error
+          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
+            <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Unable to Load Account
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                We're having trouble loading your account. This might be a temporary issue.
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                    window.location.reload()
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => {
+                    auth.signOut()
+                    setLocation('/signin')
+                  }}
+                  className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Sign Out and Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+          )
+        ) : (
+          <LoadingSpinner />
+        )}
       </Route>
 
       {/* Catch-all route - handles unmatched routes and redirects appropriately */}
