@@ -82,5 +82,6 @@ SocialAccountSchema.index({ isActive: 1 }, { background: true });
 SocialAccountSchema.index({ workspaceId: 1, isActive: 1 }, { background: true });
 SocialAccountSchema.index({ isActive: 1, tokenStatus: 1 }, { background: true });
 SocialAccountSchema.index({ isActive: 1, lastSyncAt: 1 }, { background: true });
+SocialAccountSchema.index({ accountId: 1, platform: 1 }, { background: true });
 
 export const SocialAccountModel = mongoose.models.SocialAccount as mongoose.Model<ISocialAccount> || mongoose.model<ISocialAccount>('SocialAccount', SocialAccountSchema, 'socialaccounts');
