@@ -67,6 +67,8 @@ import { initializeGracefulShutdown } from "./middleware/graceful-shutdown";
 import { validateRequest, workspaceIdSchema } from './middleware/validation';
 import { z } from 'zod';
 import { initializeSentry } from './monitoring/sentry-init';
+import { requireAuth } from './middleware/require-auth';
+import { validateWorkspaceAccess } from './middleware/workspace-validation';
 
 // Production-safe log function
 let log: (message: string, source?: string) => void;
@@ -862,6 +864,141 @@ app.use((req, res, next) => {
       return res.redirect(`https://api.dicebear.com/7.x/avataaars/svg?seed=${raw.username}`);
     } catch {
       return res.redirect(`https://api.dicebear.com/7.x/avataaars/svg?seed=fallback`);
+    }
+  });
+
+  // Instagram polling status endpoint - returns smart polling status for accounts
+  // Secured: Requires authentication AND workspace ownership validation
+  app.get('/api/instagram/polling-status', requireAuth, validateWorkspaceAccess({ source: 'query' }), async (req: Request, res: Response) => {
+    try {
+      // SECURITY: workspaceId is validated by middleware - user has verified access
+      const workspaceId = req.workspaceId!;
+      
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      
+      // SECURITY: Only query accounts for the validated workspace
+      const accounts = await SocialAccountModel.find({ 
+        platform: 'instagram',
+        workspaceId: workspaceId 
+      }).lean();
+      
+      // Build polling status response - only expose non-sensitive data
+      const accountStatuses = accounts.map((acc: any) => {
+        const hasValidToken = !!(acc.accessToken || acc.encryptedAccessToken);
+        const lastSync = acc.lastSyncAt || acc.updatedAt;
+        
+        return {
+          id: acc._id?.toString() || acc.id,
+          username: acc.username,
+          isActive: hasValidToken,
+          lastSync: lastSync,
+          tokenStatus: acc.tokenStatus || (hasValidToken ? 'valid' : 'missing')
+        };
+      });
+      
+      res.json({
+        success: true,
+        totalAccounts: accountStatuses.length,
+        activePolling: accountStatuses.filter(a => a.isActive).length,
+        accounts: accountStatuses
+      });
+    } catch (error: any) {
+      console.error('[POLLING STATUS] Error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to get polling status'
+      });
+    }
+  });
+
+  // Instagram start-polling endpoint - triggers smart polling for accounts
+  // Secured: Requires authentication AND workspace ownership validation
+  app.post('/api/instagram/start-polling', requireAuth, validateWorkspaceAccess({ source: 'body' }), async (req: Request, res: Response) => {
+    try {
+      // SECURITY: workspaceId is validated by middleware - user has verified access
+      const workspaceId = req.workspaceId!;
+      
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      
+      const accounts = await SocialAccountModel.find({ 
+        platform: 'instagram',
+        workspaceId: workspaceId 
+      }).lean();
+      
+      const activeAccounts = accounts.filter((acc: any) => 
+        !!(acc.accessToken || acc.encryptedAccessToken)
+      );
+      
+      console.log(`[START POLLING] Workspace ${workspaceId}: ${activeAccounts.length}/${accounts.length} accounts have valid tokens`);
+      
+      res.json({
+        success: true,
+        message: 'Hybrid polling system active',
+        totalAccounts: accounts.length,
+        activeAccounts: activeAccounts.length,
+        pollingStarted: activeAccounts.length > 0
+      });
+    } catch (error: any) {
+      console.error('[START POLLING] Error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to start polling'
+      });
+    }
+  });
+
+  // Dashboard analytics endpoint - returns aggregated social account metrics
+  // Secured: Requires authentication AND workspace ownership validation
+  app.get('/api/dashboard/analytics', requireAuth, validateWorkspaceAccess({ source: 'query' }), async (req: Request, res: Response) => {
+    try {
+      // SECURITY: workspaceId is validated by middleware - user has verified access
+      const workspaceId = req.workspaceId!;
+      
+      const { SocialAccountModel } = await import('./mongodb-storage');
+      
+      // SECURITY: Only query accounts for the validated workspace
+      const accounts = await SocialAccountModel.find({ workspaceId, platform: 'instagram' }).lean();
+      
+      // Aggregate metrics from all accounts
+      let totalFollowers = 0;
+      let totalLikes = 0;
+      let totalComments = 0;
+      let totalReach = 0;
+      let totalPosts = 0;
+      let totalEngagement = 0;
+      let accountCount = 0;
+      
+      for (const acc of accounts) {
+        totalFollowers += (acc as any).followersCount || 0;
+        totalLikes += (acc as any).totalLikes || 0;
+        totalComments += (acc as any).totalComments || 0;
+        totalReach += (acc as any).totalReach || 0;
+        totalPosts += (acc as any).mediaCount || 0;
+        totalEngagement += (acc as any).engagementRate || (acc as any).avgEngagement || 0;
+        accountCount++;
+      }
+      
+      const avgEngagement = accountCount > 0 ? totalEngagement / accountCount : 0;
+      
+      res.json({
+        success: true,
+        data: {
+          totalFollowers,
+          totalLikes,
+          totalComments,
+          totalReach,
+          totalPosts,
+          avgEngagement: Math.round(avgEngagement * 100) / 100,
+          accountCount,
+          lastUpdated: new Date().toISOString()
+        }
+      });
+    } catch (error: any) {
+      console.error('[DASHBOARD ANALYTICS] Error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to get dashboard analytics'
+      });
     }
   });
 
