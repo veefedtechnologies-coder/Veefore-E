@@ -21,6 +21,11 @@ import { strictCorsMiddleware } from './middleware/cors-security';
 import { auditTrailMiddleware } from './middleware/security-monitoring';
 import { defaultWorkspaceEnforcer } from './middleware/default-workspace-enforcer';
 import { mountV1Routes } from './routes/v1/index';
+import { 
+  distributedLock, 
+  waitForMongoDBAndAcquireLock,
+  LOCK_NAMES
+} from './services/distributed-lock';
 
 export async function registerRoutes(app: Express, storage: IStorage, upload?: any): Promise<Server> {
   // Configure multer for file uploads
@@ -56,13 +61,48 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
   // P1-3 SECURITY: Apply AI rate limiting to all /api/ai/* routes for cost protection
   app.use('/api/ai', aiRateLimiter);
   
-  // HYBRID APPROACH: Webhooks for supported events + Smart polling for other metrics
-  console.log('[SMART POLLING] 🚀 Activating hybrid system - webhooks + smart polling');
-  const smartPolling = new InstagramSmartPolling(storage);
-  const accountMonitor = new InstagramAccountMonitor(storage, smartPolling);
-  accountMonitor.startMonitoring();
-  console.log('[ACCOUNT MONITOR] 👀 Starting Instagram account monitoring...');
-  console.log('[SMART POLLING] ✅ Hybrid system active - webhooks for comments/mentions, polling for likes/followers');
+  // SCALABILITY FIX: Use distributed lock for Instagram polling services
+  // Only one instance should run polling to prevent duplicate API calls and rate limiting
+  // Uses retry logic to wait for MongoDB connection before attempting lock acquisition
+  console.log('[DISTRIBUTED LOCK] Starting lock acquisition with MongoDB wait...');
+  
+  (async () => {
+    try {
+      console.log('[LEADER ELECTION] Waiting for MongoDB and acquiring polling lock...');
+      const hasPollingLock = await waitForMongoDBAndAcquireLock(LOCK_NAMES.INSTAGRAM_POLLING);
+      console.log(`[LEADER ELECTION] Polling lock result: ${hasPollingLock}`);
+      
+      console.log('[LEADER ELECTION] Waiting for MongoDB and acquiring monitor lock...');
+      const hasMonitorLock = await waitForMongoDBAndAcquireLock(LOCK_NAMES.INSTAGRAM_ACCOUNT_MONITOR);
+      console.log(`[LEADER ELECTION] Monitor lock result: ${hasMonitorLock}`);
+      
+      if (hasPollingLock && hasMonitorLock) {
+        console.log(`[LEADER ELECTION] ✅ This instance (${distributedLock.getInstanceId()}) is the LEADER for Instagram polling`);
+        console.log('[SMART POLLING] 🚀 Activating hybrid system - webhooks + smart polling');
+        
+        try {
+          const smartPolling = new InstagramSmartPolling(storage);
+          const accountMonitor = new InstagramAccountMonitor(storage, smartPolling);
+          accountMonitor.startMonitoring();
+          
+          console.log('[ACCOUNT MONITOR] 👀 Starting Instagram account monitoring...');
+          console.log('[SMART POLLING] ✅ Hybrid system active - webhooks for comments/mentions, polling for likes/followers');
+        } catch (pollingError) {
+          console.error('[LEADER ELECTION] Error starting polling services:', pollingError);
+        }
+      } else {
+        console.log(`[LEADER ELECTION] ⏳ This instance (${distributedLock.getInstanceId()}) is a FOLLOWER - skipping Instagram polling`);
+        console.log('[SMART POLLING] ℹ️ Polling will be handled by the leader instance');
+      }
+    } catch (error) {
+      console.error('[LEADER ELECTION] Failed to acquire polling locks:', error);
+      console.log('[SMART POLLING] ⚠️ Starting polling as fallback due to lock error');
+      
+      const smartPolling = new InstagramSmartPolling(storage);
+      const accountMonitor = new InstagramAccountMonitor(storage, smartPolling);
+      accountMonitor.startMonitoring();
+    }
+  })();
 
   // Mount v1 API routes - All route handlers are organized in v1 routes
   mountV1Routes(app, '/api');

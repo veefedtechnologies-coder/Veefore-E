@@ -32,8 +32,12 @@ const ContentSchema = new Schema<IContent>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-ContentSchema.index({ workspaceId: 1, status: 1, scheduledAt: 1 });
-ContentSchema.index({ workspaceId: 1, createdAt: -1 });
+ContentSchema.index({ workspaceId: 1 }, { background: true });
+ContentSchema.index({ status: 1 }, { background: true });
+ContentSchema.index({ scheduledAt: 1 }, { background: true });
+ContentSchema.index({ workspaceId: 1, status: 1 }, { background: true });
+ContentSchema.index({ workspaceId: 1, status: 1, scheduledAt: 1 }, { background: true });
+ContentSchema.index({ workspaceId: 1, createdAt: -1 }, { background: true });
 
 export const ContentModel: Model<IContent> = mongoose.models.Content as Model<IContent> || mongoose.model<IContent>('Content', ContentSchema, 'contents');
 export { ContentSchema };

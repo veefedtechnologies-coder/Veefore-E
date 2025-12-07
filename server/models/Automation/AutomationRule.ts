@@ -40,4 +40,9 @@ export const AutomationRuleSchema = new Schema<IAutomationRule>({
   updatedAt: { type: Date, default: Date.now }
 });
 
+AutomationRuleSchema.index({ workspaceId: 1 }, { background: true });
+AutomationRuleSchema.index({ isActive: 1 }, { background: true });
+AutomationRuleSchema.index({ workspaceId: 1, isActive: 1 }, { background: true });
+AutomationRuleSchema.index({ nextRun: 1 }, { background: true });
+
 export const AutomationRuleModel = mongoose.models.AutomationRule as mongoose.Model<IAutomationRule> || mongoose.model<IAutomationRule>('AutomationRule', AutomationRuleSchema);

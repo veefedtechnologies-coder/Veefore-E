@@ -74,7 +74,10 @@ export const SocialAccountSchema = new Schema<ISocialAccount>({
   updatedAt: { type: Date, default: Date.now }
 });
 
-SocialAccountSchema.index({ accountId: 1 });
-SocialAccountSchema.index({ workspaceId: 1, platform: 1 });
+SocialAccountSchema.index({ workspaceId: 1 }, { background: true });
+SocialAccountSchema.index({ platform: 1 }, { background: true });
+SocialAccountSchema.index({ accountId: 1 }, { background: true });
+SocialAccountSchema.index({ workspaceId: 1, platform: 1 }, { background: true });
+SocialAccountSchema.index({ isActive: 1 }, { background: true });
 
 export const SocialAccountModel = mongoose.models.SocialAccount as mongoose.Model<ISocialAccount> || mongoose.model<ISocialAccount>('SocialAccount', SocialAccountSchema, 'socialaccounts');

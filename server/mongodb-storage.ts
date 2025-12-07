@@ -155,10 +155,16 @@ export class MongoStorage implements IStorage {
       this.isConnected = true;
       console.log(`✅ Connected to MongoDB - ${mongoose.connection.db?.databaseName} database`);
     } catch (error) {
-      console.error('❌ MongoDB connection error:', error);
+      console.error('❌ FATAL: MongoDB connection failed:', error);
       this.isConnected = false;
-      // Don't throw the error - allow the server to continue with limited functionality
-      console.log('⚠️  Server will continue with limited functionality');
+      
+      // In production, fail fast
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('MongoDB connection required for production');
+      }
+      
+      // In development, warn but allow limited functionality
+      console.warn('⚠️ Development mode: Continuing with limited functionality');
     }
   }
 

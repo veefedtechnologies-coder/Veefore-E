@@ -30,7 +30,10 @@ export const AnalyticsSchema = new Schema<IAnalytics>({
   createdAt: { type: Date, default: Date.now }
 });
 
-AnalyticsSchema.index({ workspaceId: 1, platform: 1, date: -1 });
-AnalyticsSchema.index({ workspaceId: 1, date: -1 });
+AnalyticsSchema.index({ workspaceId: 1 }, { background: true });
+AnalyticsSchema.index({ platform: 1 }, { background: true });
+AnalyticsSchema.index({ date: -1 }, { background: true });
+AnalyticsSchema.index({ workspaceId: 1, platform: 1, date: -1 }, { background: true });
+AnalyticsSchema.index({ workspaceId: 1, date: -1 }, { background: true });
 
 export const AnalyticsModel = mongoose.models.Analytics as mongoose.Model<IAnalytics> || mongoose.model<IAnalytics>('Analytics', AnalyticsSchema);
