@@ -298,6 +298,14 @@ export function useCurrentWorkspace() {
         console.log('[useCurrentWorkspace] 🔧 Auto-correcting to valid workspace...');
         
         const defaultWorkspace = safeWorkspaces.find((ws: Workspace) => ws.isDefault) || safeWorkspaces[0];
+        
+        // Guard check: If no workspaces available, we cannot auto-correct
+        if (!defaultWorkspace) {
+          console.log('[useCurrentWorkspace] ⚠️ No workspaces available, cannot auto-correct');
+          setIsValidating(false);
+          return;
+        }
+        
         const correctedWorkspaceId = defaultWorkspace.id;
         
         console.log('[useCurrentWorkspace] ✅ Auto-corrected to workspace:', {
