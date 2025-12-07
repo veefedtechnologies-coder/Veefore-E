@@ -93,6 +93,13 @@ import {
   chatMessageRepository,
 } from './repositories/ChatRepository';
 import { waitlistUserRepository } from './repositories/WaitlistUserRepository';
+import {
+  thumbnailProjectRepository,
+  thumbnailStrategyRepository,
+  thumbnailVariantRepository,
+  canvasEditorSessionRepository,
+  thumbnailExportRepository,
+} from './repositories/ThumbnailRepository';
 import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES, ADDONS } from './pricing-config';
 
 export class MongoStorage implements IStorage {
@@ -1428,203 +1435,100 @@ export class MongoStorage implements IStorage {
 
   // THUMBNAIL GENERATION SYSTEM METHODS
 
-  // Thumbnail Projects
+  // Thumbnail Projects - delegating to thumbnailProjectRepository
   async createThumbnailProject(data: any): Promise<any> {
     await this.connect();
-    const result = await mongoose.connection.db!.collection('thumbnail_projects').insertOne({
-      ...data,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    return {
-      id: result.insertedId.toString(),
-      ...data,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    const project = await thumbnailProjectRepository.createWithDefaults(data);
+    return thumbnailProjectRepository.convertToOutput(project);
   }
 
   async getThumbnailProject(projectId: number): Promise<any> {
     await this.connect();
-    const project = await mongoose.connection.db!.collection('thumbnail_projects')
-      .findOne({ _id: new ObjectId(projectId.toString()) });
-    
+    const project = await thumbnailProjectRepository.findById(projectId.toString());
     if (!project) return null;
-    
-    return {
-      id: project._id.toString(),
-      ...project
-    };
+    return thumbnailProjectRepository.convertToOutput(project);
   }
 
   async updateThumbnailProject(projectId: number, updates: any): Promise<void> {
     await this.connect();
-    await mongoose.connection.db!.collection('thumbnail_projects')
-      .updateOne(
-        { _id: new ObjectId(projectId.toString()) },
-        { $set: { ...updates, updatedAt: new Date() } }
-      );
+    await thumbnailProjectRepository.updateById(projectId.toString(), updates);
   }
 
   async getThumbnailProjects(workspaceId: number): Promise<any[]> {
     await this.connect();
-    const projects = await mongoose.connection.db!.collection('thumbnail_projects')
-      .find({ workspaceId })
-      .sort({ createdAt: -1 })
-      .toArray();
-    
-    return projects.map(project => ({
-      id: project._id.toString(),
-      ...project
-    }));
+    const result = await thumbnailProjectRepository.findByWorkspaceId(workspaceId.toString());
+    return result.data.map(project => thumbnailProjectRepository.convertToOutput(project));
   }
 
-  // Thumbnail Strategies
+  // Thumbnail Strategies - delegating to thumbnailStrategyRepository
   async createThumbnailStrategy(data: any): Promise<any> {
     await this.connect();
-    const result = await mongoose.connection.db!.collection('thumbnail_strategies').insertOne({
-      ...data,
-      createdAt: new Date()
-    });
-    
-    return {
-      id: result.insertedId.toString(),
-      ...data,
-      createdAt: new Date()
-    };
+    const strategy = await thumbnailStrategyRepository.createWithDefaults(data);
+    return thumbnailStrategyRepository.convertToOutput(strategy);
   }
 
   async getThumbnailStrategy(projectId: number): Promise<any> {
     await this.connect();
-    const strategy = await mongoose.connection.db!.collection('thumbnail_strategies')
-      .findOne({ projectId: projectId.toString() });
-    
+    const strategy = await thumbnailStrategyRepository.findByProjectId(projectId.toString());
     if (!strategy) return null;
-    
-    return {
-      id: strategy._id.toString(),
-      ...strategy
-    };
+    return thumbnailStrategyRepository.convertToOutput(strategy);
   }
 
-  // Thumbnail Variants
+  // Thumbnail Variants - delegating to thumbnailVariantRepository
   async createThumbnailVariant(data: any): Promise<any> {
     await this.connect();
-    const result = await mongoose.connection.db!.collection('thumbnail_variants').insertOne({
-      ...data,
-      createdAt: new Date()
-    });
-    
-    return {
-      id: result.insertedId.toString(),
-      ...data,
-      createdAt: new Date()
-    };
+    const variant = await thumbnailVariantRepository.createWithDefaults(data);
+    return thumbnailVariantRepository.convertToOutput(variant);
   }
 
   async getThumbnailVariant(variantId: number): Promise<any> {
     await this.connect();
-    const variant = await mongoose.connection.db!.collection('thumbnail_variants')
-      .findOne({ _id: new ObjectId(variantId.toString()) });
-    
+    const variant = await thumbnailVariantRepository.findById(variantId.toString());
     if (!variant) return null;
-    
-    return {
-      id: variant._id.toString(),
-      ...variant
-    };
+    return thumbnailVariantRepository.convertToOutput(variant);
   }
 
   async getThumbnailVariants(projectId: number): Promise<any[]> {
     await this.connect();
-    const variants = await mongoose.connection.db!.collection('thumbnail_variants')
-      .find({ projectId: projectId.toString() })
-      .sort({ variantNumber: 1 })
-      .toArray();
-    
-    return variants.map(variant => ({
-      id: variant._id.toString(),
-      ...variant
-    }));
+    const variants = await thumbnailVariantRepository.findByProjectId(projectId.toString());
+    return variants.map(variant => thumbnailVariantRepository.convertToOutput(variant));
   }
 
-  // Canvas Editor Sessions
+  // Canvas Editor Sessions - delegating to canvasEditorSessionRepository
   async createCanvasEditorSession(data: any): Promise<any> {
     await this.connect();
-    const result = await mongoose.connection.db!.collection('canvas_editor_sessions').insertOne({
-      ...data,
-      createdAt: new Date(),
-      lastSaved: new Date()
-    });
-    
-    return {
-      id: result.insertedId.toString(),
-      ...data,
-      createdAt: new Date(),
-      lastSaved: new Date()
-    };
+    const session = await canvasEditorSessionRepository.createWithDefaults(data);
+    return canvasEditorSessionRepository.convertToOutput(session);
   }
 
   async getCanvasEditorSession(sessionId: number): Promise<any> {
     await this.connect();
-    const session = await mongoose.connection.db!.collection('canvas_editor_sessions')
-      .findOne({ _id: new ObjectId(sessionId.toString()) });
-    
+    const session = await canvasEditorSessionRepository.findById(sessionId.toString());
     if (!session) return null;
-    
-    return {
-      id: session._id.toString(),
-      ...session
-    };
+    return canvasEditorSessionRepository.convertToOutput(session);
   }
 
   async updateCanvasEditorSession(sessionId: number, updates: any): Promise<void> {
     await this.connect();
-    await mongoose.connection.db!.collection('canvas_editor_sessions')
-      .updateOne(
-        { _id: new ObjectId(sessionId.toString()) },
-        { $set: { ...updates, lastSaved: new Date() } }
-      );
+    await canvasEditorSessionRepository.updateById(sessionId.toString(), { ...updates, lastSaved: new Date() });
   }
 
-  // Thumbnail Exports
+  // Thumbnail Exports - delegating to thumbnailExportRepository
   async createThumbnailExport(data: any): Promise<any> {
     await this.connect();
-    const result = await mongoose.connection.db!.collection('thumbnail_exports').insertOne({
-      ...data,
-      createdAt: new Date(),
-      downloadCount: 0
-    });
-    
-    return {
-      id: result.insertedId.toString(),
-      ...data,
-      createdAt: new Date(),
-      downloadCount: 0
-    };
+    const exportDoc = await thumbnailExportRepository.createWithDefaults(data);
+    return thumbnailExportRepository.convertToOutput(exportDoc);
   }
 
   async getThumbnailExports(sessionId: number): Promise<any[]> {
     await this.connect();
-    const exports = await mongoose.connection.db!.collection('thumbnail_exports')
-      .find({ sessionId: sessionId.toString() })
-      .sort({ createdAt: -1 })
-      .toArray();
-    
-    return exports.map(exp => ({
-      id: exp._id.toString(),
-      ...exp
-    }));
+    const exports = await thumbnailExportRepository.findBySessionId(sessionId.toString());
+    return exports.map(exp => thumbnailExportRepository.convertToOutput(exp));
   }
 
   async incrementExportDownload(exportId: number): Promise<void> {
     await this.connect();
-    await mongoose.connection.db!.collection('thumbnail_exports')
-      .updateOne(
-        { _id: new ObjectId(exportId.toString()) },
-        { $inc: { downloadCount: 1 } }
-      );
+    await thumbnailExportRepository.incrementDownloadCount(exportId.toString());
   }
 
   // AI Features CRUD operations
