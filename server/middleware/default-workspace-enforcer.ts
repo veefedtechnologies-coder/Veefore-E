@@ -5,10 +5,10 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Skip enforcement on bootstrap/read endpoints to keep first render fast
+      // NOTE: We no longer skip GET /workspaces - if user has no workspaces, we create one
       const path = req.path || ''
       const skip = (
         path.startsWith('/user') ||
-        (path.startsWith('/workspaces') && req.method === 'GET') ||
         (path.startsWith('/social-accounts') && req.method === 'GET') ||
         req.method === 'HEAD' || req.method === 'OPTIONS'
       )
