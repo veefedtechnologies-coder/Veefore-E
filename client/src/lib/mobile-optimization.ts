@@ -163,7 +163,7 @@ export class MobileOptimizer {
     // Reduce touch delay (300ms click delay)
     if (this.config.touchDelayReduction) {
       document.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
-      document.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: true });
+      document.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
     }
 
     // Add touch-friendly CSS classes
