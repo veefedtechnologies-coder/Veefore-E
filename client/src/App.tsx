@@ -414,28 +414,36 @@ function App() {
     <Switch>
       {/* Waitlist pages - full screen without sidebar */}
       <Route path="/waitlist">
-        <div className="min-h-screen">
-          <Waitlist />
-        </div>
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <div className="min-h-screen">
+            <Waitlist />
+          </div>
+        </React.Suspense>
       </Route>
 
       <Route path="/waitlist-status">
-        <div className="min-h-screen">
-          <WaitlistStatus />
-        </div>
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <div className="min-h-screen">
+            <WaitlistStatus />
+          </div>
+        </React.Suspense>
       </Route>
 
       {/* Authentication pages - full screen without sidebar */}
       <Route path="/signup">
-        <div className="min-h-screen">
-          <SignUpIntegrated />
-        </div>
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <div className="min-h-screen">
+            <SignUpIntegrated />
+          </div>
+        </React.Suspense>
       </Route>
       
       <Route path="/signin">
-        <div className="min-h-screen">
-          <SignIn onNavigate={(page: string) => setLocation(`/${page}`)} />
-        </div>
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <div className="min-h-screen">
+            <SignIn onNavigate={(page: string) => setLocation(`/${page}`)} />
+          </div>
+        </React.Suspense>
       </Route>
 
       {/* Removed old onboarding route - now handled by modal */}
@@ -443,56 +451,74 @@ function App() {
 
       {/* Admin Login - Accessible to everyone */}
       <Route path="/admin-login">
-        <div className="min-h-screen">
-          <AdminLogin />
-        </div>
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <div className="min-h-screen">
+            <AdminLogin />
+          </div>
+        </React.Suspense>
       </Route>
 
       {/* Admin Panel - Protected */}
       <Route path="/admin">
         <ProtectedRoute>
-          <div className="min-h-screen bg-gray-50">
-            <AdminPanel />
-          </div>
+          <React.Suspense fallback={<LoadingSpinner />}>
+            <div className="min-h-screen bg-gray-50">
+              <AdminPanel />
+            </div>
+          </React.Suspense>
         </ProtectedRoute>
       </Route>
 
       {/* 3D Landing Page - Public access */}
       <Route path="/3d">
-        <Landing3D />
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <Landing3D />
+        </React.Suspense>
       </Route>
 
       {/* Advanced 3D Landing Page with Spline Robot - Public access */}
       <Route path="/3d-advanced">
-        <Landing3DAdvanced />
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <Landing3DAdvanced />
+        </React.Suspense>
       </Route>
 
       {/* Spline Keyboard Landing Page - Public access */}
       <Route path="/keyboard">
-        <SplineKeyboardLanding />
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <SplineKeyboardLanding />
+        </React.Suspense>
       </Route>
 
       {/* Robot Hero Landing Page - Public access */}
       <Route path="/robot-hero">
-        <RobotHeroLanding />
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <RobotHeroLanding />
+        </React.Suspense>
       </Route>
 
       {/* Global Landing Page - Public access */}
       <Route path="/global">
-        <GlobalLandingPage />
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <GlobalLandingPage />
+        </React.Suspense>
       </Route>
 
       {/* Original Landing Page - Public access */}
       <Route path="/landing">
-        <div className="min-h-screen">
-          <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
-        </div>
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <div className="min-h-screen">
+            <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+          </div>
+        </React.Suspense>
       </Route>
 
       {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
       <Route path="/">
         {!user && !loading ? (
-          <GlobalLandingPage />
+          <React.Suspense fallback={<LoadingSpinner />}>
+            <GlobalLandingPage />
+          </React.Suspense>
         ) : user && userData ? (
           // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
@@ -881,7 +907,9 @@ function App() {
 
                 {/* Cosmos Studio Interface - Full height with scrolling */}
                 <main className="flex-1 overflow-y-auto">
-                  <VideoGeneratorAdvanced />
+                  <React.Suspense fallback={<LoadingSpinner />}>
+                    <VideoGeneratorAdvanced />
+                  </React.Suspense>
                 </main>
               </div>
             </div>
@@ -918,7 +946,9 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <Workspaces />
+                   <React.Suspense fallback={<LoadingSpinner />}>
+                     <Workspaces />
+                   </React.Suspense>
                  </main>
                </div>
             </div>
@@ -957,7 +987,9 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <Profile />
+                   <React.Suspense fallback={<LoadingSpinner />}>
+                     <Profile />
+                   </React.Suspense>
                  </main>
                </div>
              </div>
@@ -995,7 +1027,9 @@ function App() {
                  <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                    {/* Instagram Webhook Listener for Real-time Updates */}
                    <InstagramWebhookListener />
-                   <Integration />
+                   <React.Suspense fallback={<LoadingSpinner />}>
+                     <Integration />
+                   </React.Suspense>
                  </main>
                </div>
              </div>
@@ -1025,7 +1059,9 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <AutomationStepByStep />
+                   <React.Suspense fallback={<LoadingSpinner />}>
+                     <AutomationStepByStep />
+                   </React.Suspense>
                  </main>
               </div>
            </div>
@@ -1045,7 +1081,9 @@ function App() {
 
                {/* Main Content Area - VeeGPT takes full remaining space */}
                <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                 <VeeGPT />
+                 <React.Suspense fallback={<LoadingSpinner />}>
+                   <VeeGPT />
+                 </React.Suspense>
               </div>
             </div>
           </Route>
@@ -1125,7 +1163,9 @@ function App() {
                  
                  {/* Page Content */}
                  <div className="flex-1 overflow-y-auto">
-                   <Settings />
+                   <React.Suspense fallback={<LoadingSpinner />}>
+                     <Settings />
+                   </React.Suspense>
                  </div>
                </div>
              </div>
@@ -1135,7 +1175,9 @@ function App() {
            {/* P8: Security Operations Center Route */}
            <Route path="/security">
              <ProtectedRoute>
-               <SecurityDashboard />
+               <React.Suspense fallback={<LoadingSpinner />}>
+                 <SecurityDashboard />
+               </React.Suspense>
              </ProtectedRoute>
            </Route>
 
@@ -1163,7 +1205,9 @@ function App() {
                 />
                 {/* Main Content - Scrollable */}
                 <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                  <TestFixtures />
+                  <React.Suspense fallback={<LoadingSpinner />}>
+                    <TestFixtures />
+                  </React.Suspense>
                 </main>
               </div>
             </div>
@@ -1209,11 +1253,58 @@ function App() {
       
       {/* Public routes for legal pages - accessible without authentication */}
       <Route path="/privacy-policy">
-        <PrivacyPolicy />
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <PrivacyPolicy />
+        </React.Suspense>
       </Route>
 
       <Route path="/terms-of-service">
-        <TermsOfService />
+        <React.Suspense fallback={<LoadingSpinner />}>
+          <TermsOfService />
+        </React.Suspense>
+      </Route>
+
+      {/* Catch-all route - handles unmatched routes and redirects appropriately */}
+      <Route>
+        {() => {
+          if (!user && !loading) {
+            return (
+              <React.Suspense fallback={<LoadingSpinner />}>
+                <GlobalLandingPage />
+              </React.Suspense>
+            )
+          }
+          if (user && !userData && userDataLoading) {
+            return <LoadingSpinner />
+          }
+          if (user && userData && !userData.isOnboarded) {
+            setLocation('/')
+            return <LoadingSpinner />
+          }
+          return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
+              <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+                <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  Page Not Found
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  The page you're looking for doesn't exist or has been moved.
+                </p>
+                <button
+                  onClick={() => setLocation('/')}
+                  className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Go to Dashboard
+                </button>
+              </div>
+            </div>
+          )
+        }}
       </Route>
       
     </Switch>
