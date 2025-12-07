@@ -9,4 +9,9 @@ export {
   RateLimitError,
   ExternalServiceError,
   DatabaseError,
+  TransientDatabaseError,
+  MongoConnectionError,
+  withRetry,
+  DEFAULT_RETRY_CONFIG,
+  type RetryConfig,
 } from './AppError';

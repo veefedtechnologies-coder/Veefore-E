@@ -84,3 +84,94 @@ export class DatabaseError extends AppError {
     }
   }
 }
+
+export class TransientDatabaseError extends AppError {
+  public readonly isTransient = true;
+  public readonly originalError?: Error;
+
+  constructor(message: string, originalError?: Error) {
+    super(`Transient database error: ${message}`, 503, 'TRANSIENT_DATABASE_ERROR');
+    this.originalError = originalError;
+    if (originalError) {
+      this.stack = originalError.stack;
+    }
+  }
+
+  static isTransientError(error: any): boolean {
+    if (!error) return false;
+    const errorName = error.name || '';
+    const errorMessage = error.message || '';
+    
+    return (
+      errorName === 'MongoNetworkError' ||
+      errorName === 'MongoServerSelectionError' ||
+      errorName === 'MongoTimeoutError' ||
+      errorMessage.includes('ECONNREFUSED') ||
+      errorMessage.includes('ECONNRESET') ||
+      errorMessage.includes('ETIMEDOUT') ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('connection closed') ||
+      errorMessage.includes('socket hang up')
+    );
+  }
+}
+
+export class MongoConnectionError extends AppError {
+  public readonly retryable: boolean;
+
+  constructor(message: string, retryable: boolean = true) {
+    super(`MongoDB connection error: ${message}`, 503, 'MONGO_CONNECTION_ERROR');
+    this.retryable = retryable;
+  }
+}
+
+export interface RetryConfig {
+  maxAttempts: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+  backoffMultiplier: number;
+}
+
+export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxAttempts: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+};
+
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  config: Partial<RetryConfig> = {},
+  shouldRetry: (error: any) => boolean = TransientDatabaseError.isTransientError
+): Promise<T> {
+  const { maxAttempts, baseDelayMs, maxDelayMs, backoffMultiplier } = {
+    ...DEFAULT_RETRY_CONFIG,
+    ...config,
+  };
+
+  let lastError: any;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+
+      if (attempt === maxAttempts || !shouldRetry(error)) {
+        throw error;
+      }
+
+      const delay = Math.min(baseDelayMs * Math.pow(backoffMultiplier, attempt - 1), maxDelayMs);
+      const jitter = Math.random() * delay * 0.1;
+      
+      console.warn(
+        `[RETRY] Attempt ${attempt}/${maxAttempts} failed, retrying in ${Math.round(delay + jitter)}ms:`,
+        error.message
+      );
+
+      await new Promise(resolve => setTimeout(resolve, delay + jitter));
+    }
+  }
+
+  throw lastError;
+}

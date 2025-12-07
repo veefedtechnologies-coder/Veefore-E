@@ -16,14 +16,73 @@ interface LockOptions {
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_RENEW_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
+interface CircuitBreakerState {
+  failures: number;
+  lastFailure: Date | null;
+  isOpen: boolean;
+  nextRetryAt: Date | null;
+}
+
 class DistributedLockService {
   private instanceId: string;
   private renewalIntervals: Map<string, NodeJS.Timeout> = new Map();
   private acquiredLocks: Set<string> = new Set();
+  private circuitBreaker: CircuitBreakerState = {
+    failures: 0,
+    lastFailure: null,
+    isOpen: false,
+    nextRetryAt: null,
+  };
+  private static readonly CIRCUIT_BREAKER_THRESHOLD = 3;
+  private static readonly CIRCUIT_BREAKER_RESET_MS = 30000;
 
   constructor() {
     this.instanceId = this.generateInstanceId();
     console.log(`[DISTRIBUTED LOCK] Instance ID: ${this.instanceId}`);
+  }
+
+  private checkCircuitBreaker(): boolean {
+    if (!this.circuitBreaker.isOpen) return true;
+    
+    if (this.circuitBreaker.nextRetryAt && new Date() >= this.circuitBreaker.nextRetryAt) {
+      console.log('[DISTRIBUTED LOCK] Circuit breaker half-open, allowing retry...');
+      return true;
+    }
+    
+    console.log('[DISTRIBUTED LOCK] Circuit breaker OPEN - skipping lock attempt');
+    return false;
+  }
+
+  private recordSuccess(): void {
+    if (this.circuitBreaker.isOpen || this.circuitBreaker.failures > 0) {
+      console.log('[DISTRIBUTED LOCK] Circuit breaker reset after success');
+    }
+    this.circuitBreaker = {
+      failures: 0,
+      lastFailure: null,
+      isOpen: false,
+      nextRetryAt: null,
+    };
+  }
+
+  private recordFailure(): void {
+    this.circuitBreaker.failures++;
+    this.circuitBreaker.lastFailure = new Date();
+    
+    if (this.circuitBreaker.failures >= DistributedLockService.CIRCUIT_BREAKER_THRESHOLD) {
+      this.circuitBreaker.isOpen = true;
+      this.circuitBreaker.nextRetryAt = new Date(
+        Date.now() + DistributedLockService.CIRCUIT_BREAKER_RESET_MS
+      );
+      console.warn(
+        `[DISTRIBUTED LOCK] Circuit breaker OPENED after ${this.circuitBreaker.failures} failures. ` +
+        `Will retry at ${this.circuitBreaker.nextRetryAt.toISOString()}`
+      );
+    }
+  }
+
+  getCircuitBreakerState(): CircuitBreakerState {
+    return { ...this.circuitBreaker };
   }
 
   private generateInstanceId(): string {
@@ -49,9 +108,14 @@ class DistributedLockService {
     const ttlMs = options.ttlMs || DEFAULT_TTL_MS;
     const renewIntervalMs = options.renewIntervalMs || DEFAULT_RENEW_INTERVAL_MS;
 
+    if (!this.checkCircuitBreaker()) {
+      return false;
+    }
+
     try {
       const collection = await this.getLockCollection();
       if (!collection) {
+        this.recordFailure();
         console.log(`[DISTRIBUTED LOCK] Cannot acquire lock '${lockName}': MongoDB not ready`);
         return false;
       }
@@ -98,6 +162,7 @@ class DistributedLockService {
         console.log(`[DISTRIBUTED LOCK] ✅ Successfully acquired lock '${lockName}'`);
         this.acquiredLocks.add(lockName);
         this.startRenewal(lockName, ttlMs, renewIntervalMs);
+        this.recordSuccess();
         return true;
       }
 
@@ -106,6 +171,7 @@ class DistributedLockService {
         console.log(`[DISTRIBUTED LOCK] ✅ Lock '${lockName}' acquired by this instance`);
         this.acquiredLocks.add(lockName);
         this.startRenewal(lockName, ttlMs, renewIntervalMs);
+        this.recordSuccess();
         return true;
       }
 
@@ -113,6 +179,7 @@ class DistributedLockService {
       return false;
 
     } catch (error) {
+      this.recordFailure();
       console.error(`[DISTRIBUTED LOCK] Error acquiring lock '${lockName}':`, error);
       return false;
     }
