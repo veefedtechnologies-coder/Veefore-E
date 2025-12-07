@@ -489,8 +489,8 @@ export function PerformanceScore() {
                   >
                     <span className="mr-2 whitespace-nowrap">Reconnect</span>
                     <div className="flex flex-wrap items-center gap-1 ml-1">
-                      {invalidIconList.map((acc: any) => (
-                        <div key={acc.id} className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                      {invalidIconList.map((acc: any, index: number) => (
+                        <div key={acc.id || `invalid-icon-${index}`} className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                           {acc.platform === 'instagram' ? <Instagram className="w-3 h-3 text-pink-600" /> :
                            acc.platform === 'youtube' ? <Youtube className="w-3 h-3 text-red-600" /> :
                            acc.platform === 'twitter' ? <Twitter className="w-3 h-3 text-blue-500" /> :
@@ -541,8 +541,8 @@ export function PerformanceScore() {
                   <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">{c.description}</p>
                   {invalidIconList.length > 0 && (
                     <div className="flex items-center justify-center gap-2 mb-6">
-                      {invalidIconList.map((acc: any) => (
-                        <div key={acc.id} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                      {invalidIconList.map((acc: any, index: number) => (
+                        <div key={acc.id || `invalid-center-${index}`} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                           {acc.platform === 'instagram' ? <Instagram className="w-4 h-4 text-pink-600" /> :
                            acc.platform === 'youtube' ? <Youtube className="w-4 h-4 text-red-600" /> :
                            acc.platform === 'twitter' ? <Twitter className="w-4 h-4 text-blue-500" /> :
