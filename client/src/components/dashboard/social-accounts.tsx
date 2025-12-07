@@ -273,14 +273,14 @@ export function SocialAccounts() {
 
   // Polling status query - Hybrid approach with smart polling
   const { data: pollingStatus } = useQuery({
-    queryKey: ['/api/instagram/polling-status'],
-    queryFn: () => apiRequest('/api/instagram/polling-status'),
+    queryKey: ['/api/instagram/polling-status', currentWorkspace?.id],
+    queryFn: () => currentWorkspace?.id ? apiRequest(`/api/instagram/polling-status?workspaceId=${currentWorkspace.id}`) : Promise.resolve(null),
     refetchInterval: 3 * 60 * 1000, // Smart polling every 3 minutes (Meta-friendly)
     refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
     staleTime: 1 * 60 * 1000, // Cache for 1 minute for faster updates
     refetchOnWindowFocus: true, // Refresh when user returns to tab
     refetchOnReconnect: true, // Refresh when network reconnects
-    enabled: !!socialAccounts && (Array.isArray(socialAccounts) ? socialAccounts.length > 0 : (socialAccounts?.data?.length || 0) > 0)
+    enabled: !!currentWorkspace?.id && !!socialAccounts && (Array.isArray(socialAccounts) ? socialAccounts.length > 0 : (socialAccounts?.data?.length || 0) > 0)
   })
 
   // State hooks - must be before early return
