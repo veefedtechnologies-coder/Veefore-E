@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import { corsHealthCheck } from '../../middleware/cors-security';
 import { securityMetricsHandler } from '../../middleware/security-monitoring';
 
@@ -6,18 +7,25 @@ const router = Router();
 
 router.get('/health', async (req: any, res: Response) => {
   try {
+    const mongoState = mongoose.connection.readyState;
+    const isDatabaseConnected = mongoState === 1;
+    const databaseStatus = isDatabaseConnected ? 'connected' : 'disconnected';
+    const isHealthy = isDatabaseConnected;
+    
     const healthStatus = {
-      status: 'healthy',
+      status: isHealthy ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
       uptime: process.uptime(),
       version: '1.0.0',
       services: {
-        database: 'connected',
+        database: databaseStatus,
         server: 'running'
       }
     };
-    res.status(200).json(healthStatus);
+    
+    const statusCode = isHealthy ? 200 : 503;
+    res.status(statusCode).json(healthStatus);
   } catch (error) {
     res.status(500).json({ 
       status: 'unhealthy',

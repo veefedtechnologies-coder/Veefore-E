@@ -106,4 +106,10 @@ export const UserSchema = new Schema<IUser>({
   updatedAt: { type: Date, default: Date.now }
 });
 
+UserSchema.index({ firebaseUid: 1 }, { unique: true, sparse: true, background: true });
+UserSchema.index({ email: 1 }, { unique: true, background: true });
+UserSchema.index({ referralCode: 1 }, { unique: true, sparse: true, background: true });
+UserSchema.index({ status: 1 }, { background: true });
+UserSchema.index({ createdAt: -1 }, { background: true });
+
 export const User = mongoose.models.User as mongoose.Model<IUser> || mongoose.model<IUser>('User', UserSchema);

@@ -30,4 +30,9 @@ export const WorkspaceSchema = new Schema<IWorkspace>({
   updatedAt: { type: Date, default: Date.now }
 });
 
+WorkspaceSchema.index({ userId: 1 }, { background: true });
+WorkspaceSchema.index({ isDefault: 1 }, { background: true });
+WorkspaceSchema.index({ userId: 1, isDefault: 1 }, { background: true });
+WorkspaceSchema.index({ createdAt: -1 }, { background: true });
+
 export const WorkspaceModel = mongoose.models.Workspace as mongoose.Model<IWorkspace> || mongoose.model<IWorkspace>('Workspace', WorkspaceSchema);

@@ -518,11 +518,9 @@ app.use((req, res, next) => {
   // Start the background scheduler service
   startSchedulerService(storage as any);
   
-  // Start comprehensive Instagram Smart Polling for metrics
-  console.log('[SMART POLLING] Starting comprehensive Instagram Smart Polling system...');
-  const { InstagramSmartPolling } = await import('./instagram-smart-polling');
-  const smartPolling = new InstagramSmartPolling(storage);
-  console.log('[SMART POLLING] ✅ Smart Polling initialized with adaptive rate limiting');
+  // Instagram Smart Polling is now handled in routes.ts with distributed locking
+  // This ensures only one instance runs polling when scaling horizontally
+  console.log('[SMART POLLING] Instagram polling initialization delegated to routes.ts with leader election');
   
   const server = await registerRoutes(app, storage as any, upload);
   
