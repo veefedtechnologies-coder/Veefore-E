@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Add CSS for slide-right animation
 const slideRightCSS = `
@@ -647,15 +648,31 @@ const VideoGeneratorAdvanced = () => {
              <div className="p-4 border-t border-gray-800">
                <h3 className="text-white text-xs font-medium mb-3">Recent Projects</h3>
                <div className="space-y-3">
-                 {recentProjects.slice(0, 3).map((project) => (
-                   <div key={project.id} className="flex items-center gap-3 p-3 hover:bg-gray-800 rounded-lg cursor-pointer transition-colors duration-200">
-                     <Play className="w-4 h-4 text-gray-400" />
-                     <div className="flex-1 min-w-0">
-                       <p className="text-white text-xs font-medium truncate">{project.title}</p>
-                       <p className="text-gray-400 text-xs">{project.lastEdited}</p>
+                 {projectsLoading ? (
+                   <>
+                     {[1, 2, 3].map((i) => (
+                       <div key={i} className="flex items-center gap-3 p-3 rounded-lg">
+                         <Skeleton className="w-4 h-4 rounded" />
+                         <div className="flex-1 min-w-0 space-y-2">
+                           <Skeleton className="h-3 w-24" />
+                           <Skeleton className="h-2 w-16" />
+                         </div>
+                       </div>
+                     ))}
+                   </>
+                 ) : recentProjects.length > 0 ? (
+                   recentProjects.slice(0, 3).map((project) => (
+                     <div key={project.id} className="flex items-center gap-3 p-3 hover:bg-gray-800 rounded-lg cursor-pointer transition-colors duration-200">
+                       <Play className="w-4 h-4 text-gray-400" />
+                       <div className="flex-1 min-w-0">
+                         <p className="text-white text-xs font-medium truncate">{project.title}</p>
+                         <p className="text-gray-400 text-xs">{project.lastEdited}</p>
+                       </div>
                      </div>
-                   </div>
-                 ))}
+                   ))
+                 ) : (
+                   <p className="text-gray-500 text-xs text-center py-2">No projects yet</p>
+                 )}
                </div>
              </div>
            </>
@@ -697,7 +714,18 @@ const VideoGeneratorAdvanced = () => {
            </div>
            
            <div className="flex items-center gap-4">
-             {finalUserData && (
+             {userLoading ? (
+               <>
+                 <Skeleton className="h-6 w-16 rounded-full" />
+                 <div className="flex items-center gap-2">
+                   <div className="text-right space-y-1">
+                     <Skeleton className="h-4 w-20 ml-auto" />
+                     <Skeleton className="h-3 w-32 ml-auto" />
+                   </div>
+                   <Skeleton className="w-8 h-8 rounded-full" />
+                 </div>
+               </>
+             ) : finalUserData ? (
                <>
                  <span className="text-white text-sm bg-gradient-to-r from-purple-600 to-blue-600 px-3 py-1 rounded-full font-medium">
                    {finalUserData.plan.toUpperCase()}
@@ -723,7 +751,7 @@ const VideoGeneratorAdvanced = () => {
                    </div>
                  </div>
                </>
-             )}
+             ) : null}
           </div>
         </header>
 
