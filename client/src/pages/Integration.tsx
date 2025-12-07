@@ -265,7 +265,14 @@ function IntegrationContent() {
   // Advanced: Always show page immediately - even without workspace data
   const { data: connectedAccounts = [], isLoading } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id || 'loading'],
-    queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!currentWorkspace?.id) return [];
+      const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`);
+      // API returns { success: true, data: [...] } - extract the data array
+      if (Array.isArray(response)) return response;
+      if (response && Array.isArray(response.data)) return response.data;
+      return [];
+    },
     enabled: !!currentWorkspace?.id,
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -452,11 +459,11 @@ function IntegrationContent() {
   }
 
   const isAccountConnected = (platform: string) => {
-    return connectedAccounts?.some((account: SocialAccount) => account.platform === platform) || false
+    return Array.isArray(connectedAccounts) && connectedAccounts.some((account: SocialAccount) => account.platform === platform)
   }
 
   const getConnectedAccount = (platform: string) => {
-    return connectedAccounts?.find((account: SocialAccount) => account.platform === platform)
+    return Array.isArray(connectedAccounts) ? connectedAccounts.find((account: SocialAccount) => account.platform === platform) : undefined
   }
 
   const formatFollowersCount = (count: number | undefined) => {
@@ -721,7 +728,7 @@ function IntegrationContent() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        {connectedAccounts?.reduce((total: number, account: SocialAccount) => total + (account.followers || 0), 0) || 0}
+                        {Array.isArray(connectedAccounts) ? connectedAccounts.reduce((total: number, account: SocialAccount) => total + (account.followers || 0), 0) : 0}
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Total Followers</p>
                     </div>
@@ -772,7 +779,7 @@ function IntegrationContent() {
         </div>
 
         {/* Connected Accounts Section */}
-        {connectedAccounts && connectedAccounts.length > 0 && (
+        {Array.isArray(connectedAccounts) && connectedAccounts.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center">
               <CheckCircle className="w-6 h-6 mr-3 text-green-600" />

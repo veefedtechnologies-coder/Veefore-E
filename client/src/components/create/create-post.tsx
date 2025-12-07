@@ -61,7 +61,14 @@ export function CreatePost() {
   // Fetch social accounts - HYBRID: Webhooks + Smart Polling
   const { data: socialAccounts, isLoading: accountsLoading } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id],
-    queryFn: () => currentWorkspace?.id ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!currentWorkspace?.id) return [];
+      const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`);
+      // API returns { success: true, data: [...] } - extract the data array
+      if (Array.isArray(response)) return response;
+      if (response && Array.isArray(response.data)) return response.data;
+      return [];
+    },
     enabled: !!currentWorkspace?.id,
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes - webhooks provide immediate updates for comments/mentions
     refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
