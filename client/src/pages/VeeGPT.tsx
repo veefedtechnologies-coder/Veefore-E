@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { SEO, seoConfig, generateStructuredData } from '@/lib/seo-optimization'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Mic,
   Send,
@@ -392,7 +393,7 @@ function VeeGPTContent() {
   )
 
   // Fetch current conversation messages - only if authenticated
-  const { data: messages = [] } = useQuery<ChatMessage[]>({
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessage[]>({
     queryKey: ['/api/chat/conversations', currentConversationId, 'messages'],
     queryFn: () => apiRequest(`/api/chat/conversations/${currentConversationId}/messages`),
     enabled: !!currentConversationId // Enable when conversation is selected
@@ -1107,8 +1108,8 @@ function VeeGPTContent() {
 
 
 
-  // Always show sidebar if conversations exist, regardless of whether it's a new chat or refresh
-  const shouldShowSidebar = conversations.length > 0
+  // Always show sidebar if conversations exist or during loading
+  const shouldShowSidebar = conversations.length > 0 || conversationsLoading
   
   // Show welcome screen when starting a new chat or when no conversation is selected
   // Always show sidebar if conversations exist, regardless of new chat state
@@ -1116,17 +1117,41 @@ function VeeGPTContent() {
   // Don't show welcome screen during initialization to prevent flash
   const showWelcomeScreen = !isInitializing && !conversationsLoading && !currentConversationId && (!hasSentFirstMessage || hasUserStartedNewChat) && optimisticMessages.length === 0
   
-  // Show loading state during initialization to prevent flash
-  if (isInitializing || conversationsLoading) {
-    return (
-      <div className="h-full w-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-8 h-8 border-4 border-blue-200 dark:border-blue-800 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin"></div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">Loading VeeGPT...</p>
+  // Skeleton component for conversation list items
+  const ConversationListSkeleton = () => (
+    <div className="space-y-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-center space-x-3 px-3 py-2.5 rounded-lg">
+          <Skeleton className="w-4 h-4 rounded bg-gray-700" />
+          <Skeleton className="h-4 flex-1 rounded bg-gray-700" />
         </div>
-      </div>
-    )
-  }
+      ))}
+    </div>
+  )
+  
+  // Skeleton component for chat messages
+  const MessagesSkeleton = () => (
+    <div className="space-y-8">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className={`flex flex-col space-y-2 ${i % 2 === 1 ? 'items-end' : 'items-start'}`}>
+          <div className={`${i % 2 === 1 ? 'max-w-sm' : 'max-w-4xl w-full'}`}>
+            <div className="flex items-center mb-2">
+              <Skeleton className="w-4 h-4 rounded-full" />
+              <Skeleton className="h-3 w-12 ml-1 rounded" />
+            </div>
+            <div className={`px-4 py-3 rounded-2xl ${i % 2 === 1 ? 'bg-gray-200 dark:bg-gray-700' : ''}`}>
+              <div className="space-y-2">
+                <Skeleton className={`h-4 ${i % 2 === 1 ? 'w-32' : 'w-full'} rounded`} />
+                {i % 2 === 0 && <Skeleton className="h-4 w-3/4 rounded" />}
+                {i % 2 === 0 && <Skeleton className="h-4 w-1/2 rounded" />}
+              </div>
+            </div>
+            <Skeleton className="h-3 w-12 mt-2 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
   
   if (showWelcomeScreen) {
     return (
@@ -1289,6 +1314,9 @@ function VeeGPTContent() {
                   <div className={`text-sm font-semibold text-gray-400 mb-3 px-2 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
                     Chats
                   </div>
+                  {conversationsLoading ? (
+                    <ConversationListSkeleton />
+                  ) : (
                   <div className="space-y-1">
                   {filteredConversations.map((conversation) => (
                     <div
@@ -1413,6 +1441,7 @@ function VeeGPTContent() {
                     </div>
                   ))}
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1783,6 +1812,9 @@ function VeeGPTContent() {
                   <div className={`text-sm font-semibold text-gray-400 mb-3 px-2 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
                     Chats
                   </div>
+                  {conversationsLoading ? (
+                    <ConversationListSkeleton />
+                  ) : (
                   <div className="space-y-1">
                   {filteredConversations.map((conversation) => (
                     <div
@@ -1907,6 +1939,7 @@ function VeeGPTContent() {
                     </div>
                   ))}
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1987,7 +2020,10 @@ function VeeGPTContent() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 bg-gradient-to-b from-gray-50/30 to-white dark:from-gray-800/30 dark:to-gray-900" style={{ paddingBottom: '140px' }}>
           <div className="max-w-4xl mx-auto space-y-8 overflow-x-hidden">
-            {displayMessages.map((message) => (
+            {messagesLoading && displayMessages.length === 0 ? (
+              <MessagesSkeleton />
+            ) : (
+            displayMessages.map((message) => (
               <div
                 key={message.id}
                 className={`flex flex-col space-y-2 ${
@@ -2117,7 +2153,8 @@ function VeeGPTContent() {
                   )}
                 </div>
               </div>
-            ))}
+            ))
+            )}
             
             {/* AI Status Indicator - shows when AI is processing before streaming */}
             {aiStatus && (
