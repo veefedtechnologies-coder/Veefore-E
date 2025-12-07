@@ -515,6 +515,7 @@ function App() {
 
       {/* Protected routes with sidebar layout - uses ProtectedRoute for auth */}
       <Route path="/plan">
+        <ProtectedRoute>
              <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
@@ -577,6 +578,7 @@ function App() {
                 </main>
               </div>
             </div>
+        </ProtectedRoute>
           </Route>
           
                     <Route path="/create">
@@ -814,6 +816,7 @@ function App() {
            </Route>
 
       <Route path="/integration">
+        <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
@@ -850,9 +853,11 @@ function App() {
                  </main>
                </div>
              </div>
+        </ProtectedRoute>
            </Route>
 
                      <Route path="/automation">
+        <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
@@ -882,10 +887,12 @@ function App() {
                  </main>
               </div>
            </div>
+        </ProtectedRoute>
            </Route>
 
                      {/* VeeGPT Route - with main sidebar */}
            <Route path="/veegpt">
+        <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
                {/* Sidebar - Fixed height with independent scrolling */}
                <div className="h-screen overflow-y-auto">
@@ -903,6 +910,7 @@ function App() {
                  </React.Suspense>
               </div>
             </div>
+        </ProtectedRoute>
           </Route>
 
            <Route path="/integrations">
@@ -1004,6 +1012,7 @@ function App() {
           </Route>
 
           <Route path="/test-fixtures">
+            <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
               {/* Sidebar - Fixed height with independent scrolling */}
               <div className="h-screen overflow-y-auto">
@@ -1028,6 +1037,7 @@ function App() {
                 </main>
               </div>
             </div>
+            </ProtectedRoute>
       </Route>
 
       <Route path="/encryption-health">
