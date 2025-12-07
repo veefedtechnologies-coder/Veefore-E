@@ -360,15 +360,35 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
     }
   }
 
-  async findByWorkspaceIds(workspaceIds: string[]): Promise<ISocialAccount[]> {
+  async findByWorkspaceIds(
+    workspaceIds: string[], 
+    options?: { 
+      activeOnly?: boolean; 
+      projection?: Record<string, 0 | 1>;
+    }
+  ): Promise<ISocialAccount[]> {
     const startTime = Date.now();
     try {
-      const accounts = await this.model.find({
-        workspaceId: { $in: workspaceIds }
-      }).exec();
+      const query: Record<string, any> = { workspaceId: { $in: workspaceIds } };
       
-      logger.db.query('findByWorkspaceIds', this.entityName, Date.now() - startTime, { workspaceIdsCount: workspaceIds.length });
-      return accounts;
+      if (options?.activeOnly) {
+        query.isActive = true;
+      }
+
+      const queryBuilder = this.model.find(query);
+      
+      if (options?.projection) {
+        queryBuilder.select(options.projection);
+      }
+
+      const accounts = await queryBuilder.lean().exec();
+      
+      logger.db.query('findByWorkspaceIds', this.entityName, Date.now() - startTime, { 
+        workspaceIdsCount: workspaceIds.length,
+        activeOnly: options?.activeOnly,
+        hasProjection: !!options?.projection
+      });
+      return accounts as ISocialAccount[];
     } catch (error) {
       logger.db.error('findByWorkspaceIds', error, { entityName: this.entityName });
       throw new DatabaseError('Failed to find accounts by workspace IDs', error as Error);

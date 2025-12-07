@@ -27,8 +27,35 @@ import {
   LOCK_NAMES
 } from './services/distributed-lock';
 
+async function performHealthCheck(storage: IStorage): Promise<boolean> {
+  try {
+    const metrics = (storage as any).getConnectionMetrics?.();
+    if (metrics && metrics.readyState !== 1) {
+      console.warn('[HEALTH CHECK] MongoDB not in ready state:', metrics.readyStateLabel);
+      return false;
+    }
+    
+    const testUser = await Promise.race([
+      storage.getUser('health-check-probe'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Health check timeout')), 5000))
+    ]).catch(() => null);
+    
+    console.log('[HEALTH CHECK] Storage layer responding normally');
+    return true;
+  } catch (error: any) {
+    console.error('[HEALTH CHECK] Failed:', error.message);
+    return false;
+  }
+}
+
 export async function initializeLeaderElection(storage: IStorage): Promise<void> {
   console.log('[LEADER ELECTION] Starting leader election for Instagram polling...');
+  
+  const isHealthy = await performHealthCheck(storage);
+  if (!isHealthy) {
+    console.warn('[LEADER ELECTION] Health check failed, delaying leader election...');
+    await new Promise(resolve => setTimeout(resolve, 5000));
+  }
   
   try {
     console.log('[LEADER ELECTION] Attempting to acquire polling lock...');
@@ -72,7 +99,10 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
 }
 
 export async function registerRoutes(app: Express, storage: IStorage, upload?: any): Promise<Server> {
-  // Configure multer for file uploads
+  const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif']);
+  const ALLOWED_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v']);
+  const ALLOWED_EXTENSIONS = new Set([...ALLOWED_IMAGE_EXTENSIONS, ...ALLOWED_VIDEO_EXTENSIONS]);
+
   const mediaUpload = multer({
     storage: multer.diskStorage({
       destination: (req, file, cb) => {
@@ -84,15 +114,22 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
       },
       filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
       }
     }),
     limits: {
-      fileSize: 100 * 1024 * 1024, // 100MB limit
+      fileSize: 100 * 1024 * 1024,
     },
     fileFilter: (req, file, cb) => {
-      if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const isValidMime = file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/');
+      const isValidExt = ALLOWED_EXTENSIONS.has(ext);
+      
+      if (isValidMime && isValidExt) {
         cb(null, true);
+      } else if (!isValidExt) {
+        cb(new Error(`File extension '${ext}' not allowed. Allowed: ${[...ALLOWED_EXTENSIONS].join(', ')}`));
       } else {
         cb(new Error('Only image and video files are allowed'));
       }
