@@ -25,6 +25,7 @@ import {
   Calendar,
   BarChart3
 } from 'lucide-react'
+import { SkeletonWorkspaceCard, SkeletonPageHeader } from '@/components/ui/skeleton'
 
 interface Workspace {
   id: string
@@ -258,14 +259,7 @@ export default function Workspaces() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">Loading workspaces...</p>
-      </div>
-    )
-  }
+  const showSkeletons = isLoading && workspaces.length === 0
 
   return (
     <div className="p-6 space-y-6">
@@ -370,7 +364,13 @@ export default function Workspaces() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {workspaces.map((workspace: Workspace) => (
+        {showSkeletons ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <SkeletonWorkspaceCard key={i} />
+            ))}
+          </>
+        ) : workspaces.map((workspace: Workspace) => (
           <Card key={workspace.id} className="border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow duration-200">
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between">
