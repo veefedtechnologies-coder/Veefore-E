@@ -2,7 +2,8 @@ import type { Express, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
 import multer from 'multer';
-import fs from 'fs';
+import fs from 'fs/promises';
+import fsSync from 'fs';
 import { IStorage } from "./storage";
 import { InstagramSmartPolling } from "./instagram-smart-polling";
 import { InstagramAccountMonitor } from "./instagram-account-monitor";
@@ -35,10 +36,22 @@ async function performHealthCheck(storage: IStorage): Promise<boolean> {
       return false;
     }
     
-    const testUser = await Promise.race([
-      storage.getUser('health-check-probe'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Health check timeout')), 5000))
-    ]).catch(() => null);
+    // Use a proper health check that actually validates connectivity
+    const healthCheckResult = await Promise.race([
+      (async () => {
+        // Try a simple operation that will fail if DB is not connected
+        await storage.getUser('health-check-probe');
+        return { success: true };
+      })(),
+      new Promise<{ success: false; reason: string }>((resolve) => 
+        setTimeout(() => resolve({ success: false, reason: 'timeout' }), 5000)
+      )
+    ]);
+    
+    if (!healthCheckResult.success) {
+      console.error('[HEALTH CHECK] Failed:', (healthCheckResult as any).reason || 'unknown error');
+      return false;
+    }
     
     console.log('[HEALTH CHECK] Storage layer responding normally');
     return true;
@@ -72,10 +85,9 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
       
       try {
         const smartPolling = new InstagramSmartPolling(storage);
-        const accountMonitor = new InstagramAccountMonitor(storage, smartPolling);
-        accountMonitor.startMonitoring();
+        // InstagramAccountMonitor starts monitoring automatically in constructor
+        new InstagramAccountMonitor(storage, smartPolling);
         
-        console.log('[ACCOUNT MONITOR] 👀 Starting Instagram account monitoring...');
         console.log('[SMART POLLING] ✅ Hybrid system active - webhooks for comments/mentions, polling for likes/followers');
       } catch (pollingError) {
         console.error('[LEADER ELECTION] Error starting polling services:', pollingError);
@@ -90,12 +102,18 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
     
     try {
       const smartPolling = new InstagramSmartPolling(storage);
-      const accountMonitor = new InstagramAccountMonitor(storage, smartPolling);
-      accountMonitor.startMonitoring();
+      // InstagramAccountMonitor starts monitoring automatically in constructor
+      new InstagramAccountMonitor(storage, smartPolling);
     } catch (fallbackError) {
       console.error('[SMART POLLING] Fallback polling failed:', fallbackError);
     }
   }
+}
+
+// Pre-create uploads directory at module load time (before request handling)
+const UPLOAD_DIR = './uploads';
+if (!fsSync.existsSync(UPLOAD_DIR)) {
+  fsSync.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
 export async function registerRoutes(app: Express, storage: IStorage, upload?: any): Promise<Server> {
@@ -105,14 +123,11 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
 
   const mediaUpload = multer({
     storage: multer.diskStorage({
-      destination: (req, file, cb) => {
-        const uploadDir = './uploads';
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
+      destination: (_req, _file, cb) => {
+        // Directory is pre-created at startup - no sync fs calls in request path
+        cb(null, UPLOAD_DIR);
       },
-      filename: (req, file, cb) => {
+      filename: (_req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname).toLowerCase();
         cb(null, file.fieldname + '-' + uniqueSuffix + ext);
@@ -121,7 +136,7 @@ export async function registerRoutes(app: Express, storage: IStorage, upload?: a
     limits: {
       fileSize: 100 * 1024 * 1024,
     },
-    fileFilter: (req, file, cb) => {
+    fileFilter: (_req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
       const isValidMime = file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/');
       const isValidExt = ALLOWED_EXTENSIONS.has(ext);
