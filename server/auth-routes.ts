@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response, NextFunction } from 'express'
 import { firebaseAdmin, admin } from './firebase-admin'
 import { storage } from './mongodb-storage'
 import { validateRequest, safeJsonParse } from './middleware/validation'
@@ -7,7 +7,7 @@ import { z } from 'zod'
 const router = Router()
 
 // Middleware to verify Firebase ID token
-const verifyFirebaseToken = async (req: any, res: any, next: any) => {
+const verifyFirebaseToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -20,8 +20,8 @@ const verifyFirebaseToken = async (req: any, res: any, next: any) => {
       return res.status(500).json({ error: 'Firebase Admin not initialized' })
     }
 
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(token)
-    req.user = decodedToken
+    const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
+    (req as any).user = decodedToken
     next()
   } catch (error) {
     console.error('Token verification failed:', error)
@@ -31,12 +31,12 @@ const verifyFirebaseToken = async (req: any, res: any, next: any) => {
 
 // Register or login user
 // Send email verification code with validation
-router.post('/send-verification', verifyFirebaseToken, async (req, res) => {
+router.post('/send-verification', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
-    if (!req.user?.uid) {
+    if (!(req as any).user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    const firebaseUid = req.user.uid
+    const firebaseUid = (req as any).user.uid
     
     // Get user from database
     const user = await storage.getUserByFirebaseUid(firebaseUid)
@@ -77,12 +77,12 @@ const verifyEmailValidation = validateRequest({
   })
 });
 
-router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (req, res) => {
+router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (req: Request, res: Response) => {
   try {
-    if (!req.user?.uid) {
+    if (!(req as any).user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    const firebaseUid = req.user.uid
+    const firebaseUid = (req as any).user.uid
     const { code } = req.body
 
     if (!code) {
@@ -230,9 +230,9 @@ router.post('/register', async (req, res) => {
 })
 
 // Get current user
-router.get('/user', verifyFirebaseToken, async (req, res) => {
+router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
-    const uid = req.user.uid
+    const uid = (req as any).user.uid
     const user = await storage.getUserByFirebaseId(uid)
     
     if (!user) {
@@ -254,9 +254,9 @@ router.get('/user', verifyFirebaseToken, async (req, res) => {
 })
 
 // Update user profile
-router.put('/user', verifyFirebaseToken, async (req, res) => {
+router.put('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
-    const uid = req.user.uid
+    const uid = (req as any).user.uid
     const { displayName, profilePictureUrl } = req.body
     
     const updatedUser = await storage.updateUser(uid, {
@@ -284,7 +284,7 @@ router.put('/user', verifyFirebaseToken, async (req, res) => {
 })
 
 // Logout (invalidate token on server side if needed)
-router.post('/logout', verifyFirebaseToken, async (req, res) => {
+router.post('/logout', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
     // For now, just return success
     // In a more complex setup, you might want to blacklist the token

@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
@@ -50,7 +50,7 @@ const GetLogsQuerySchema = z.object({
 router.get('/rules',
   requireAuth,
   validateRequest({ query: GetRulesQuerySchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { workspaceId } = req.query;
 
@@ -66,7 +66,7 @@ router.get('/rules',
 router.post('/rules',
   requireAuth,
   validateRequest({ body: CreateRuleSchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       console.log('[NEW AUTOMATION] Creating rule with body:', req.body);
       const { workspaceId, name, type, keywords, targetMediaIds, responses } = req.body;
@@ -102,7 +102,7 @@ router.post('/rules',
 router.put('/rules/:ruleId',
   requireAuth,
   validateRequest({ params: UpdateRuleParamsSchema, body: UpdateRuleBodySchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { ruleId } = req.params;
       const updates = req.body;
@@ -119,7 +119,7 @@ router.put('/rules/:ruleId',
 router.delete('/rules/:ruleId',
   requireAuth,
   validateRequest({ params: RuleIdParamsSchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { ruleId } = req.params;
       
@@ -135,7 +135,7 @@ router.delete('/rules/:ruleId',
 router.post('/rules/:ruleId/toggle',
   requireAuth,
   validateRequest({ params: RuleIdParamsSchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { ruleId } = req.params;
       
@@ -151,7 +151,7 @@ router.post('/rules/:ruleId/toggle',
 router.get('/logs/:workspaceId',
   requireAuth,
   validateRequest({ params: GetLogsParamsSchema, query: GetLogsQuerySchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { workspaceId } = req.params;
       const { limit = '50', type } = req.query;

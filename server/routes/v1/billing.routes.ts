@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
@@ -27,9 +27,9 @@ const CreateAddonOrderSchema = z.object({
   addonId: z.string().min(1, 'Addon ID is required'),
 });
 
-router.get('/subscription', requireAuth, async (req: any, res: Response) => {
+router.get('/subscription', requireAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     
     const user = await storage.getUser(userId);
     if (!user) {
@@ -71,7 +71,7 @@ router.get('/subscription', requireAuth, async (req: any, res: Response) => {
   }
 });
 
-router.get('/subscription/plans', async (req: any, res: Response) => {
+router.get('/subscription/plans', async (req: Request, res: Response) => {
   try {
     const pricingConfig = await import('../../pricing-config');
     
@@ -86,9 +86,9 @@ router.get('/subscription/plans', async (req: any, res: Response) => {
   }
 });
 
-router.get('/credit-transactions', requireAuth, async (req: any, res: Response) => {
+router.get('/credit-transactions', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { user } = req;
+    const { user } = req as any;
     const transactions = await storage.getCreditTransactions(user.id);
     
     res.json(transactions);
@@ -101,9 +101,9 @@ router.get('/credit-transactions', requireAuth, async (req: any, res: Response) 
 router.post('/razorpay/create-order',
   requireAuth,
   validateRequest({ body: CreateOrderSchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const { user } = req;
+      const { user } = req as any;
       const { packageId } = req.body;
 
       if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -160,9 +160,9 @@ router.post('/razorpay/create-order',
 router.post('/razorpay/create-subscription',
   requireAuth,
   validateRequest({ body: CreateSubscriptionSchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const { user } = req;
+      const { user } = req as any;
       const { planId } = req.body;
 
       if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -215,10 +215,10 @@ router.post('/razorpay/create-subscription',
 router.post('/razorpay/verify-payment',
   requireAuth,
   validateRequest({ body: VerifyPaymentSchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       console.log('[PAYMENT VERIFICATION] Endpoint hit with body:', req.body);
-      const { user } = req;
+      const { user } = req as any;
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature, type, planId, packageId } = req.body;
 
       console.log('[PAYMENT VERIFICATION] Starting verification:', {
@@ -356,9 +356,9 @@ router.post('/razorpay/verify-payment',
 router.post('/razorpay/create-addon-order',
   requireAuth,
   validateRequest({ body: CreateAddonOrderSchema }),
-  async (req: any, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const { user } = req;
+      const { user } = req as any;
       const { addonId } = req.body;
 
       if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {

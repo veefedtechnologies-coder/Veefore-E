@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { storage } from '../mongodb-storage';
 import { firebaseAdmin } from '../firebase-admin';
 import { safeParseJWTPayload } from './unsafe-json-replacements';
@@ -18,7 +18,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-export const requireAuth = async (req: any, res: Response, next: NextFunction) => {
+export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -164,7 +164,7 @@ export const requireAuth = async (req: any, res: Response, next: NextFunction) =
     
     console.log(`[AUTH] User ${user.email} authenticated successfully, allowing request`);
     console.log(`[AUTH] Setting req.user - ID: ${user.id}, isOnboarded: ${user.isOnboarded}`);
-    req.user = user;
+    (req as any).user = user;
     next();
   } catch (error) {
     console.error('Authentication failed:', error);
@@ -172,7 +172,7 @@ export const requireAuth = async (req: any, res: Response, next: NextFunction) =
   }
 };
 
-export const optionalAuth = async (req: any, res: Response, next: NextFunction) => {
+export const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) {

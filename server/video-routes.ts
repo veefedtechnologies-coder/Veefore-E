@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -13,7 +13,7 @@ import { firebaseAdmin } from './firebase-admin';
 const router = express.Router();
 
 // Video-specific authentication middleware that matches main routes
-const requireAuth = async (req: any, res: any, next: any) => {
+const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log('[VIDEO AUTH] Authentication attempt:', {
       hasAuthHeader: !!req.headers.authorization,
@@ -62,7 +62,7 @@ const requireAuth = async (req: any, res: any, next: any) => {
     }
 
     console.log(`[VIDEO AUTH] User ${user.email} authenticated successfully`);
-    req.user = user;
+    (req as any).user = user;
     next();
   } catch (error) {
     console.error('[VIDEO AUTH] Authentication failed:', error);
@@ -198,9 +198,9 @@ export function broadcastError(jobId: string, error: string) {
 }
 
 // Get user's video jobs
-router.get('/jobs', requireAuth, (req: any, res) => {
+router.get('/jobs', requireAuth, (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     const userJobsList = Array.from(videoJobs.values()).filter(job => job.userId === userId);
     res.json(userJobsList);
   } catch (error) {
@@ -210,19 +210,19 @@ router.get('/jobs', requireAuth, (req: any, res) => {
 });
 
 // Upload image for video generation
-router.post('/upload-image', requireAuth, upload.single('image'), (req: any, res) => {
+router.post('/upload-image', requireAuth, upload.single('image'), (req: Request, res: Response) => {
   try {
-    if (!req.file) {
+    if (!(req as any).file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
 
-    const imageUrl = `/uploads/video-images/${req.file.filename}`;
+    const imageUrl = `/uploads/video-images/${(req as any).file.filename}`;
     res.json({
       success: true,
       imageUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size
+      filename: (req as any).file.filename,
+      originalName: (req as any).file.originalname,
+      size: (req as any).file.size
     });
   } catch (error) {
     console.error('Error uploading image:', error);
@@ -233,9 +233,9 @@ router.post('/upload-image', requireAuth, upload.single('image'), (req: any, res
 // Note: Script generation routes are defined below with proper ES module imports
 
 // Generate video with approved script
-router.post('/generate', requireAuth, (req: any, res) => {
+router.post('/generate', requireAuth, (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     
     const {
       title,
@@ -297,10 +297,10 @@ router.post('/generate', requireAuth, (req: any, res) => {
 });
 
 // Get specific video job
-router.get('/job/:jobId', requireAuth, (req: any, res) => {
+router.get('/job/:jobId', requireAuth, (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     
     const job = videoJobs.get(jobId);
     if (!job) {
@@ -319,10 +319,10 @@ router.get('/job/:jobId', requireAuth, (req: any, res) => {
 });
 
 // Delete video job
-router.delete('/job/:jobId', requireAuth, (req: any, res) => {
+router.delete('/job/:jobId', requireAuth, (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     
     const job = videoJobs.get(jobId);
     if (!job) {
@@ -414,13 +414,13 @@ async function startCompleteVideoGeneration(jobId: string, job: any) {
 // Additional API endpoints for complete video generation workflow
 
 // Debug endpoint to test authentication
-router.post('/debug-auth', requireAuth, async (req: any, res) => {
+router.post('/debug-auth', requireAuth, async (req: Request, res: Response) => {
   try {
-    console.log('[VIDEO AUTH DEBUG] User:', req.user);
+    console.log('[VIDEO AUTH DEBUG] User:', (req as any).user);
     console.log('[VIDEO AUTH DEBUG] Headers:', req.headers.authorization);
     res.json({ 
       success: true, 
-      user: req.user,
+      user: (req as any).user,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -430,7 +430,7 @@ router.post('/debug-auth', requireAuth, async (req: any, res) => {
 });
 
 // Generate or regenerate script with hybrid AI service (Gemini + OpenAI fallback)
-router.post('/generate-script', requireAuth, async (req: any, res) => {
+router.post('/generate-script', requireAuth, async (req: Request, res: Response) => {
   try {
     const { 
       prompt, 
@@ -529,12 +529,12 @@ router.post('/generate-script', requireAuth, async (req: any, res) => {
 });
 
 // Generate AI images for script scenes
-router.post('/generate-images', requireAuth, async (req: any, res) => {
+router.post('/generate-images', requireAuth, async (req: Request, res: Response) => {
   try {
     console.log('[VIDEO API] Received image generation request:', {
       hasScript: !!req.body.script,
       scenesCount: req.body.scenes?.length || 0,
-      userId: req.user?.id
+      userId: (req as any).user?.id
     });
     
     const { script, scenes } = req.body;
@@ -579,7 +579,7 @@ router.post('/generate-images', requireAuth, async (req: any, res) => {
 });
 
 // Regenerate specific scene in script
-router.post('/regenerate-scene', requireAuth, async (req: any, res) => {
+router.post('/regenerate-scene', requireAuth, async (req: Request, res: Response) => {
   try {
     const { 
       originalPrompt, 
@@ -664,10 +664,10 @@ router.post('/regenerate-scene', requireAuth, async (req: any, res) => {
 });
 
 // Get generation progress for a specific job (WebSocket alternative via polling)
-router.get('/job/:jobId/progress', requireAuth, (req: any, res) => {
+router.get('/job/:jobId/progress', requireAuth, (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     
     const job = videoJobs.get(jobId);
     if (!job) {

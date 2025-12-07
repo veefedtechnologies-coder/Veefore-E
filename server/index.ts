@@ -231,7 +231,7 @@ app.use(helmet({
 }));
 
 // IFRAME FIX: Official Replit iframe embedding support + Clean Permissions Policy
-app.use((req: any, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   // Remove X-Frame-Options to allow iframe embedding
   res.removeHeader('X-Frame-Options');
   
@@ -262,8 +262,8 @@ app.use((req: any, res, next) => {
 });
 
 // P1 SECURITY: Secure cookie parser for HTTP-only authentication cookies
-app.use((req: any, res, next) => {
-  req.cookies = {};
+app.use((req: Request, res: Response, next: NextFunction) => {
+  (req as any).cookies = {};
   const cookieHeader = req.headers.cookie;
   if (cookieHeader) {
     cookieHeader.split(';').forEach((cookie: string) => {
@@ -273,7 +273,7 @@ app.use((req: any, res, next) => {
         // SECURITY FIX: Handle values containing '=' correctly
         const name = trimmed.substring(0, equalIndex);
         const value = trimmed.substring(equalIndex + 1);
-        req.cookies[name] = decodeURIComponent(value);
+        (req as any).cookies[name] = decodeURIComponent(value);
       }
     });
   }
@@ -606,7 +606,7 @@ app.use((req, res, next) => {
   });
 
   // Instagram account management routes
-  app.post('/api/instagram/cleanup-duplicates', async (req: any, res: Response) => {
+  app.post('/api/instagram/cleanup-duplicates', async (req: Request, res: Response) => {
     try {
       // Instagram account management handled by existing storage layer
       console.log('[CLEANUP] Starting Instagram account cleanup...');
@@ -629,7 +629,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/ensure-account', validateRequest({ body: z.object({ instagramAccountId: z.string().min(1), instagramUsername: z.string().min(1), workspaceId: z.string().min(1) }) }), async (req: any, res: Response) => {
+  app.post('/api/instagram/ensure-account', validateRequest({ body: z.object({ instagramAccountId: z.string().min(1), instagramUsername: z.string().min(1), workspaceId: z.string().min(1) }) }), async (req: Request, res: Response) => {
     try {
       const { instagramAccountId, instagramUsername, workspaceId } = req.body;
       
@@ -658,7 +658,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.get('/api/instagram/token-status/:accountId', async (req: any, res: Response) => {
+  app.get('/api/instagram/token-status/:accountId', async (req: Request, res: Response) => {
     try {
       const accountId = req.params.accountId;
       const { SocialAccountModel } = await import('./mongodb-storage');
@@ -692,7 +692,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/disconnect', validateRequest({ body: z.object({ accountId: z.string().optional(), workspaceId: workspaceIdSchema.shape.workspaceId.optional() }).refine(d => !!d.accountId || !!d.workspaceId, { message: 'accountId or workspaceId is required' }) }), async (req: any, res: Response) => {
+  app.post('/api/instagram/disconnect', validateRequest({ body: z.object({ accountId: z.string().optional(), workspaceId: workspaceIdSchema.shape.workspaceId.optional() }).refine(d => !!d.accountId || !!d.workspaceId, { message: 'accountId or workspaceId is required' }) }), async (req: Request, res: Response) => {
     try {
       const { accountId, workspaceId } = req.body || {};
       const { SocialAccountModel } = await import('./mongodb-storage');
@@ -718,7 +718,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/reconnect/start', validateRequest({ body: workspaceIdSchema }), async (req: any, res: Response) => {
+  app.post('/api/instagram/reconnect/start', validateRequest({ body: workspaceIdSchema }), async (req: Request, res: Response) => {
     try {
       const { workspaceId } = req.body || {};
       if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
@@ -747,7 +747,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.get('/api/instagram/profile-picture/:accountId', async (req: any, res: Response) => {
+  app.get('/api/instagram/profile-picture/:accountId', async (req: Request, res: Response) => {
     try {
       const accountId = req.params.accountId;
       const { SocialAccountModel } = await import('./mongodb-storage');
@@ -800,7 +800,7 @@ app.use((req, res, next) => {
     }
   });
 
-  app.get('/public/instagram/profile-picture/:accountId', async (req: any, res: Response) => {
+  app.get('/public/instagram/profile-picture/:accountId', async (req: Request, res: Response) => {
     try {
       const accountId = req.params.accountId;
       const { SocialAccountModel } = await import('./mongodb-storage');

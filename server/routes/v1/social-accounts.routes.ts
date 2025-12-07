@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { socialAccountController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
@@ -16,13 +16,13 @@ const WorkspaceIdParams = z.object({
 
 router.get('/', 
   requireAuth,
-  async (req: any, res) => {
+  async (req: Request, res: Response) => {
     try {
       const workspaceId = req.query.workspaceId as string;
       if (!workspaceId) {
         return res.status(400).json({ error: 'workspaceId is required' });
       }
-      req.params = { workspaceId };
+      (req as any).params = { workspaceId };
       return socialAccountController.getByWorkspace(req, res);
     } catch (error: any) {
       console.error('[SOCIAL ACCOUNTS] Error:', error);

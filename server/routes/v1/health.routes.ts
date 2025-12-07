@@ -1,11 +1,11 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { corsHealthCheck } from '../../middleware/cors-security';
 import { securityMetricsHandler } from '../../middleware/security-monitoring';
 
 const router = Router();
 
-router.get('/health', async (req: any, res: Response) => {
+router.get('/health', async (req: Request, res: Response) => {
   try {
     const mongoState = mongoose.connection.readyState;
     const isDatabaseConnected = mongoState === 1;
