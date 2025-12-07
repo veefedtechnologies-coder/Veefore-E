@@ -247,6 +247,177 @@ function SkeletonProfileCard() {
   )
 }
 
+function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integration' | 'workspaces' | 'profile' | 'dashboard' | 'veegpt' | 'video' | 'default' }) {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+      
+      {type === 'automation' && (
+        <>
+          <div className="mb-8">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <SkeletonAutomationCard key={i} />
+            ))}
+          </div>
+        </>
+      )}
+      
+      {type === 'integration' && (
+        <>
+          <SkeletonPageHeader />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <SkeletonIntegrationCard key={i} />
+            ))}
+          </div>
+        </>
+      )}
+      
+      {type === 'workspaces' && (
+        <>
+          <SkeletonPageHeader />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <SkeletonWorkspaceCard key={i} />
+            ))}
+          </div>
+        </>
+      )}
+      
+      {type === 'profile' && (
+        <>
+          <SkeletonPageHeader />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <SkeletonProfileCard />
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          </div>
+        </>
+      )}
+      
+      {type === 'dashboard' && (
+        <>
+          <SkeletonPageHeader />
+          <SkeletonDashboardStats />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <SkeletonTable rows={5} />
+        </>
+      )}
+      
+      {type === 'veegpt' && (
+        <div className="flex flex-col h-[calc(100vh-100px)]">
+          <div className="flex items-center justify-between mb-4">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
+          </div>
+          <div className="flex-1 space-y-4 overflow-hidden">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-4">
+                <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+        </div>
+      )}
+      
+      {type === 'video' && (
+        <>
+          <SkeletonPageHeader />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <Skeleton className="h-64 w-full rounded-xl" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+              <Skeleton className="h-10 w-full rounded-lg" />
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-48 w-full rounded-xl" />
+              <SkeletonCard />
+            </div>
+          </div>
+        </>
+      )}
+      
+      {type === 'default' && (
+        <>
+          <SkeletonPageHeader />
+          <SkeletonDashboardStats />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function SkeletonSidebarLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden">
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+      
+      {/* Sidebar Skeleton */}
+      <div className="w-24 h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 space-y-6">
+        <Skeleton className="h-12 w-12 rounded-xl mx-auto" />
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-10 w-10 rounded-lg mx-auto" />
+          ))}
+        </div>
+      </div>
+      
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Header Skeleton */}
+        <div className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center justify-between">
+          <Skeleton className="h-8 w-48" />
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="h-10 w-10 rounded-full" />
+          </div>
+        </div>
+        
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}
+
 export { 
   Skeleton, 
   SkeletonCard, 
@@ -256,5 +427,7 @@ export {
   SkeletonDashboardStats,
   SkeletonTable,
   SkeletonPageHeader,
-  SkeletonProfileCard
+  SkeletonProfileCard,
+  SkeletonPageLoader,
+  SkeletonSidebarLayout
 }

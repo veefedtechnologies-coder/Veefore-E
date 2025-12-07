@@ -381,13 +381,13 @@ function App() {
 
   // Show loading spinner only during initial auth - not for user data loading (better UX)
   if (loading) {
-    return <LoadingSpinner />
+    return <LoadingSpinner type="minimal" />
   }
   
   // Show loading spinner for protected routes when auth is still loading
   const protectedRoutes = ['/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator', '/workspaces', '/profile', '/automation', '/veegpt']
   if (!user && protectedRoutes.some(route => location.startsWith(route))) {
-    return <LoadingSpinner />
+    return <LoadingSpinner type="dashboard" />
   }
 
   const handleCreateOptionSelect = (option: string) => {
@@ -400,7 +400,7 @@ function App() {
     <Switch>
       {/* Waitlist pages - full screen without sidebar */}
       <Route path="/waitlist">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <div className="min-h-screen">
             <Waitlist />
           </div>
@@ -408,7 +408,7 @@ function App() {
       </Route>
 
       <Route path="/waitlist-status">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <div className="min-h-screen">
             <WaitlistStatus />
           </div>
@@ -417,7 +417,7 @@ function App() {
 
       {/* Authentication pages - full screen without sidebar */}
       <Route path="/signup">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <div className="min-h-screen">
             <SignUpIntegrated />
           </div>
@@ -425,7 +425,7 @@ function App() {
       </Route>
       
       <Route path="/signin">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <div className="min-h-screen">
             <SignIn onNavigate={(page: string) => setLocation(`/${page}`)} />
           </div>
@@ -437,7 +437,7 @@ function App() {
 
       {/* Admin Login - Accessible to everyone */}
       <Route path="/admin-login">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <div className="min-h-screen">
             <AdminLogin />
           </div>
@@ -447,7 +447,7 @@ function App() {
       {/* Admin Panel - Protected */}
       <Route path="/admin">
         <ProtectedRoute>
-          <React.Suspense fallback={<LoadingSpinner />}>
+          <React.Suspense fallback={<LoadingSpinner type="admin" />}>
             <div className="min-h-screen bg-gray-50">
               <AdminPanel />
             </div>
@@ -457,42 +457,42 @@ function App() {
 
       {/* 3D Landing Page - Public access */}
       <Route path="/3d">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <Landing3D />
         </React.Suspense>
       </Route>
 
       {/* Advanced 3D Landing Page with Spline Robot - Public access */}
       <Route path="/3d-advanced">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <Landing3DAdvanced />
         </React.Suspense>
       </Route>
 
       {/* Spline Keyboard Landing Page - Public access */}
       <Route path="/keyboard">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <SplineKeyboardLanding />
         </React.Suspense>
       </Route>
 
       {/* Robot Hero Landing Page - Public access */}
       <Route path="/robot-hero">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <RobotHeroLanding />
         </React.Suspense>
       </Route>
 
       {/* Global Landing Page - Public access */}
       <Route path="/global">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <GlobalLandingPage />
         </React.Suspense>
       </Route>
 
       {/* Original Landing Page - Public access */}
       <Route path="/landing">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <div className="min-h-screen">
             <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
           </div>
@@ -712,7 +712,7 @@ function App() {
 
                 {/* Cosmos Studio Interface - Full height with scrolling */}
                 <main className="flex-1 overflow-y-auto">
-                  <React.Suspense fallback={<LoadingSpinner />}>
+                  <React.Suspense fallback={<LoadingSpinner type="video" />}>
                     <VideoGeneratorAdvanced />
                   </React.Suspense>
                 </main>
@@ -751,7 +751,7 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <React.Suspense fallback={<LoadingSpinner />}>
+                   <React.Suspense fallback={<LoadingSpinner type="workspaces" />}>
                      <Workspaces />
                    </React.Suspense>
                  </main>
@@ -792,7 +792,7 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <React.Suspense fallback={<LoadingSpinner />}>
+                   <React.Suspense fallback={<LoadingSpinner type="profile" />}>
                      <Profile />
                    </React.Suspense>
                  </main>
@@ -833,7 +833,7 @@ function App() {
                  <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                    {/* Instagram Webhook Listener for Real-time Updates */}
                    <InstagramWebhookListener />
-                   <React.Suspense fallback={<LoadingSpinner />}>
+                   <React.Suspense fallback={<LoadingSpinner type="integration" />}>
                      <Integration />
                    </React.Suspense>
                  </main>
@@ -867,7 +867,7 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <React.Suspense fallback={<LoadingSpinner />}>
+                   <React.Suspense fallback={<LoadingSpinner type="automation" />}>
                      <AutomationStepByStep />
                    </React.Suspense>
                  </main>
@@ -891,7 +891,7 @@ function App() {
 
                {/* Main Content Area - VeeGPT takes full remaining space */}
                <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                 <React.Suspense fallback={<LoadingSpinner />}>
+                 <React.Suspense fallback={<LoadingSpinner type="veegpt" />}>
                    <VeeGPT />
                  </React.Suspense>
               </div>
@@ -974,7 +974,7 @@ function App() {
                  
                  {/* Page Content */}
                  <div className="flex-1 overflow-y-auto">
-                   <React.Suspense fallback={<LoadingSpinner />}>
+                   <React.Suspense fallback={<LoadingSpinner type="settings" />}>
                      <Settings />
                    </React.Suspense>
                  </div>
@@ -986,7 +986,7 @@ function App() {
            {/* P8: Security Operations Center Route */}
            <Route path="/security">
              <ProtectedRoute>
-               <React.Suspense fallback={<LoadingSpinner />}>
+               <React.Suspense fallback={<LoadingSpinner type="security" />}>
                  <SecurityDashboard />
                </React.Suspense>
              </ProtectedRoute>
@@ -1017,7 +1017,7 @@ function App() {
                 />
                 {/* Main Content - Scrollable */}
                 <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                  <React.Suspense fallback={<LoadingSpinner />}>
+                  <React.Suspense fallback={<LoadingSpinner type="default" />}>
                     <TestFixtures />
                   </React.Suspense>
                 </main>
@@ -1048,7 +1048,7 @@ function App() {
                    />
                  )}
                  <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <React.Suspense fallback={<div />}> 
+                   <React.Suspense fallback={<LoadingSpinner type="security" />}> 
                      <EncryptionHealth />
                    </React.Suspense>
                  </main>
@@ -1064,13 +1064,13 @@ function App() {
       
       {/* Public routes for legal pages - accessible without authentication */}
       <Route path="/privacy-policy">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <PrivacyPolicy />
         </React.Suspense>
       </Route>
 
       <Route path="/terms-of-service">
-        <React.Suspense fallback={<LoadingSpinner />}>
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <TermsOfService />
         </React.Suspense>
       </Route>
@@ -1078,7 +1078,7 @@ function App() {
       {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
       <Route path="/">
         {!user && !loading ? (
-          <React.Suspense fallback={<LoadingSpinner />}>
+          <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
             <GlobalLandingPage />
           </React.Suspense>
         ) : user && userData ? (
@@ -1199,7 +1199,7 @@ function App() {
             )}
           </div>
         ) : userDataLoading ? (
-          <LoadingSpinner />
+          <LoadingSpinner type="dashboard" />
         ) : user && !userData && !userDataLoading && userDataError ? (
           String(userDataError).includes('404') ? (
             <AccountNotFoundBanner
@@ -1252,7 +1252,7 @@ function App() {
           </div>
           )
         ) : (
-          <LoadingSpinner />
+          <LoadingSpinner type="dashboard" />
         )}
       </Route>
 
@@ -1261,17 +1261,17 @@ function App() {
         {() => {
           if (!user && !loading) {
             return (
-              <React.Suspense fallback={<LoadingSpinner />}>
+              <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
                 <GlobalLandingPage />
               </React.Suspense>
             )
           }
           if (user && !userData && userDataLoading) {
-            return <LoadingSpinner />
+            return <LoadingSpinner type="dashboard" />
           }
           if (user && userData && !userData.isOnboarded) {
             setLocation('/')
-            return <LoadingSpinner />
+            return <LoadingSpinner type="dashboard" />
           }
           return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
