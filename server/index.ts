@@ -1032,9 +1032,9 @@ app.use((req, res, next) => {
   console.log('🔍 Testing Redis connection for advanced queue system...');
   try {
     // P1-3 SECURITY: Initialize rate limiting with Redis connection
-    const { redisConnection, redisAvailable } = await import('./queues/metricsQueue');
+    const { redisConnection, isRedisAvailable } = await import('./queues/metricsQueue');
     
-    if (redisConnection && redisAvailable) {
+    if (redisConnection && isRedisAvailable()) {
       initializeRateLimiting(redisConnection);
       console.log('🔒 P1-3 SECURITY: Rate limiting system initialized with Redis persistence');
     } else {
