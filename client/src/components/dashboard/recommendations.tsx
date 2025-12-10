@@ -1,5 +1,6 @@
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { MapPin, Image, Search } from 'lucide-react'
 
 const recommendations = [
@@ -23,7 +24,43 @@ const recommendations = [
   }
 ]
 
-export function Recommendations() {
+function RecommendationSkeleton() {
+  return (
+    <div className="flex items-start space-x-5 p-4 rounded-2xl bg-gradient-to-r from-gray-50 to-blue-50/30 dark:from-gray-700 dark:to-blue-900/30">
+      <Skeleton className="w-12 h-12 flex-shrink-0 rounded-2xl" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
+    </div>
+  )
+}
+
+export function RecommendationsSkeleton() {
+  return (
+    <Card data-testid="recommendations-skeleton" className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl transition-all duration-300 border-0">
+      <CardHeader>
+        <Skeleton className="h-6 w-48" />
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {[1, 2, 3].map((i) => (
+          <RecommendationSkeleton key={i} />
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+interface RecommendationsProps {
+  isLoading?: boolean
+}
+
+export function Recommendations({ isLoading }: RecommendationsProps = {}) {
+  if (isLoading) {
+    return <RecommendationsSkeleton />
+  }
+
   return (
     <Card data-testid="recommendations" className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
       <CardHeader>

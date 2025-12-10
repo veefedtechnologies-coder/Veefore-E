@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { SEO, seoConfig, generateStructuredData } from '@/lib/seo-optimization'
 import { 
   Settings as SettingsIcon, 
@@ -7,15 +7,29 @@ import {
   Shield, 
   User, 
   Globe,
-  Monitor,
   Moon,
   Sun,
-  Sparkles,
-  Check
+  Sparkles
 } from 'lucide-react'
 import { ThemeSelector } from '@/components/ui/theme-selector'
 import { useTheme } from '@/hooks/useTheme'
-import { THEME_CONFIGS, Theme } from '@/lib/theme'
+import { THEME_CONFIGS } from '@/lib/theme'
+import { Skeleton, SkeletonSettingsSection } from '@/components/ui/skeleton'
+
+function SkeletonSettingsNav() {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <nav className="space-y-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl">
+            <Skeleton className="w-5 h-5 rounded" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        ))}
+      </nav>
+    </div>
+  )
+}
 
 export default function Settings() {
   return (
@@ -30,8 +44,16 @@ export default function Settings() {
 }
 
 function SettingsContent() {
-  const { theme, setTheme } = useTheme()
+  const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState('appearance')
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   const tabs = [
     { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -40,6 +62,36 @@ function SettingsContent() {
     { id: 'account', label: 'Account', icon: User },
     { id: 'general', label: 'General', icon: Globe }
   ]
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+          }
+        `}</style>
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <Skeleton className="w-10 h-10 rounded-xl" />
+              <Skeleton className="h-8 w-32" />
+            </div>
+            <Skeleton className="h-4 w-64 mt-2" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="lg:col-span-1">
+              <SkeletonSettingsNav />
+            </div>
+            <div className="lg:col-span-3">
+              <SkeletonSettingsSection rows={5} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">

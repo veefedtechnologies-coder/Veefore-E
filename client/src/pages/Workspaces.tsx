@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/use-toast'
 import { 
   Building2, 
   Plus, 
-  Settings, 
   Users, 
   Crown, 
   Trash2, 
@@ -20,12 +19,9 @@ import {
   Palette,
   Bot,
   Copy,
-  CheckCircle,
-  XCircle,
-  Calendar,
   BarChart3
 } from 'lucide-react'
-import { SkeletonWorkspaceCard, SkeletonPageHeader } from '@/components/ui/skeleton'
+import { SkeletonWorkspaceCard, SkeletonPageLoader } from '@/components/ui/skeleton'
 
 interface Workspace {
   id: string
@@ -307,6 +303,11 @@ export default function Workspaces() {
 
   const showSkeletons = isLoading && workspaces.length === 0
 
+  // Show full page skeleton loader for initial load
+  if (isLoading && workspaces.length === 0) {
+    return <SkeletonPageLoader type="workspaces" />
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -430,7 +431,9 @@ export default function Workspaces() {
                     <CardTitle className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
                       <span className="truncate">{workspace.name}</span>
                       {workspace.isDefault && (
-                        <Crown className="w-4 h-4 text-yellow-500" title="Default workspace" />
+                        <span title="Default workspace">
+                          <Crown className="w-4 h-4 text-yellow-500" />
+                        </span>
                       )}
                     </CardTitle>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">

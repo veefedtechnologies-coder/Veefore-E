@@ -5,10 +5,73 @@ import { apiRequest, queryClient } from '@/lib/queryClient'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { Users, TrendingUp, MessageSquare, Share2, Eye, Calendar, BarChart3, Heart, Instagram, Facebook, Twitter, Linkedin, Youtube, RefreshCw, Bookmark } from 'lucide-react'
 import { detectInvalidAccounts, getReconnectCopy, startReconnectFlow } from '@/lib/reconnect'
+
+function SocialAccountCardSkeleton() {
+  return (
+    <div className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-700">
+      <div className="flex items-center space-x-3 mb-4">
+        <Skeleton className="w-12 h-12 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+        <Skeleton className="h-6 w-16 rounded-full" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
+          <Skeleton className="h-6 w-16 mb-1" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
+          <Skeleton className="h-6 w-16 mb-1" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
+          <Skeleton className="h-6 w-16 mb-1" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
+          <Skeleton className="h-6 w-16 mb-1" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function SocialAccountsSkeleton() {
+  return (
+    <Card data-testid="social-accounts-skeleton" className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
+      <CardContent className="p-0">
+        <div className="p-6 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-gray-800 dark:to-gray-700 border-b border-gray-100 dark:border-gray-600">
+          <div className="flex items-center justify-between mb-4">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-36" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="flex space-x-2">
+              <Skeleton className="h-8 w-28 rounded-lg" />
+              <Skeleton className="h-8 w-32 rounded-lg" />
+            </div>
+          </div>
+          <div className="flex space-x-2 overflow-x-auto">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-12 rounded-xl flex-shrink-0" />
+            ))}
+          </div>
+        </div>
+        <div className="p-6">
+          <SocialAccountCardSkeleton />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export function SocialAccounts() {
   const [, setLocation] = useLocation()
@@ -298,20 +361,12 @@ export function SocialAccounts() {
 
   // Early return if workspace not ready - placed AFTER all hooks but BEFORE calculations
   if (!isReady || workspaceLoading || !currentWorkspace) {
-    return (
-      <Card data-testid="social-accounts" className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
-        <CardContent className="p-6">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-4"></div>
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return <SocialAccountsSkeleton />
+  }
+
+  // Show skeleton when initial data is loading
+  if (isLoading && !Array.isArray(socialAccounts)) {
+    return <SocialAccountsSkeleton />
   }
 
   // Extract array from API response (handles { success: true, data: [...] } format)

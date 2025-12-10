@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { SEO, seoConfig, generateStructuredData } from '@/lib/seo-optimization'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonChatMessage } from '@/components/ui/skeleton'
 import { 
   Mic,
   Send,
@@ -1117,7 +1117,6 @@ function VeeGPTContent() {
   // Don't show welcome screen during initialization to prevent flash
   const showWelcomeScreen = !isInitializing && !conversationsLoading && !currentConversationId && (!hasSentFirstMessage || hasUserStartedNewChat) && optimisticMessages.length === 0
   
-  // Skeleton component for conversation list items
   const ConversationListSkeleton = () => (
     <div className="space-y-1">
       {[1, 2, 3, 4, 5].map((i) => (
@@ -1129,27 +1128,11 @@ function VeeGPTContent() {
     </div>
   )
   
-  // Skeleton component for chat messages
   const MessagesSkeleton = () => (
-    <div className="space-y-8">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className={`flex flex-col space-y-2 ${i % 2 === 1 ? 'items-end' : 'items-start'}`}>
-          <div className={`${i % 2 === 1 ? 'max-w-sm' : 'max-w-4xl w-full'}`}>
-            <div className="flex items-center mb-2">
-              <Skeleton className="w-4 h-4 rounded-full" />
-              <Skeleton className="h-3 w-12 ml-1 rounded" />
-            </div>
-            <div className={`px-4 py-3 rounded-2xl ${i % 2 === 1 ? 'bg-gray-200 dark:bg-gray-700' : ''}`}>
-              <div className="space-y-2">
-                <Skeleton className={`h-4 ${i % 2 === 1 ? 'w-32' : 'w-full'} rounded`} />
-                {i % 2 === 0 && <Skeleton className="h-4 w-3/4 rounded" />}
-                {i % 2 === 0 && <Skeleton className="h-4 w-1/2 rounded" />}
-              </div>
-            </div>
-            <Skeleton className="h-3 w-12 mt-2 rounded" />
-          </div>
-        </div>
-      ))}
+    <div className="space-y-6 px-4">
+      <SkeletonChatMessage isUser={true} />
+      <SkeletonChatMessage isUser={false} />
+      <SkeletonChatMessage isUser={true} />
     </div>
   )
   
