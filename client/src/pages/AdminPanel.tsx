@@ -35,6 +35,107 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { apiRequest } from '@/lib/queryClient'
+import { Skeleton } from '@/components/ui/skeleton'
+
+function AdminPanelSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-8">
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-10 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-9 w-24 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+          </div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Table Card Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <Skeleton className="h-5 w-5 rounded" />
+              <Skeleton className="h-5 w-32" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Filters Skeleton */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <Skeleton className="h-10 flex-1 rounded-md" />
+              <Skeleton className="h-10 w-[200px] rounded-md" />
+            </div>
+
+            {/* Table Skeleton */}
+            <div className="rounded-md border">
+              <div className="border-b bg-gray-50 px-4 py-3">
+                <div className="flex items-center space-x-8">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              </div>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="px-4 py-4 border-b last:border-0">
+                  <div className="flex items-center space-x-8">
+                    <div className="flex flex-col space-y-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-48" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-6 w-8 rounded" />
+                    <Skeleton className="h-6 w-8 rounded" />
+                    <div className="flex items-center space-x-2">
+                      <Skeleton className="h-8 w-8 rounded" />
+                      <Skeleton className="h-8 w-8 rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination Skeleton */}
+            <div className="flex items-center justify-between mt-4">
+              <Skeleton className="h-4 w-48" />
+              <div className="flex items-center space-x-2">
+                <Skeleton className="h-8 w-20 rounded" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-16 rounded" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
 
 interface WaitlistUser {
   id: string
@@ -256,16 +357,9 @@ export default function AdminPanel() {
     })
   }
 
-  // Show loading state while data is being fetched
+  // Show skeleton loading state while data is being fetched
   if (isLoadingUsers || isLoadingStats) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading admin panel...</p>
-        </div>
-      </div>
-    )
+    return <AdminPanelSkeleton />
   }
 
   return (
