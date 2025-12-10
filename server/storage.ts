@@ -1,93 +1,96 @@
 import type { 
   User, Workspace, WorkspaceMember, TeamInvitation, SocialAccount, Content,
-  Analytics, AutomationRule, Suggestion,
-  CreditTransaction, Referral, Subscription, 
-  Payment, Addon, ContentRecommendation, UserContentHistory,
-  Admin, AdminSession, Notification, Popup, AppSetting, AuditLog, FeedbackMessage,
-  CreativeBrief, ContentRepurpose, CompetitorAnalysis,
-  ChatConversation, ChatMessage,
+  Analytics, AutomationRule, CreditTransaction, Subscription, Payment, 
+  AuditLog, Notification,
   InsertUser, InsertWorkspace, InsertWorkspaceMember, InsertTeamInvitation,
   InsertSocialAccount, InsertContent, InsertAutomationRule, InsertAnalytics,
-  InsertSuggestion, InsertCreditTransaction, InsertReferral,
-  InsertSubscription, InsertPayment, InsertAddon,
+  InsertCreditTransaction, InsertSubscription, InsertPayment, InsertAuditLog, InsertNotification
+} from "./domain/types";
+
+import type { 
+  Suggestion, Referral, Addon, ContentRecommendation, UserContentHistory,
+  Admin, AdminSession, Popup, AppSetting, FeedbackMessage,
+  CreativeBrief, ContentRepurpose, CompetitorAnalysis,
+  ChatConversation, ChatMessage,
+  InsertSuggestion, InsertReferral, InsertAddon,
   InsertContentRecommendation, InsertUserContentHistory,
-  InsertAdmin, InsertNotification, InsertPopup, InsertAppSetting, InsertAuditLog, InsertFeedbackMessage,
+  InsertAdmin, InsertPopup, InsertAppSetting, InsertFeedbackMessage,
   InsertCreativeBrief, InsertContentRepurpose, InsertCompetitorAnalysis,
   InsertChatConversation, InsertChatMessage
 } from "@shared/schema";
 
 export interface IStorage {
   // User operations
-  getUser(id: number | string): Promise<User | undefined>;
+  getUser(id: string): Promise<User | undefined>;
   getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByReferralCode(referralCode: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number | string, updates: Partial<User>): Promise<User>;
-  updateUserCredits(id: number | string, credits: number): Promise<User>;
-  getUserCredits(userId: number | string): Promise<number>;
-  updateUserStripeInfo(id: number | string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User>;
+  updateUserCredits(id: string, credits: number): Promise<User>;
+  getUserCredits(userId: string): Promise<number>;
+  updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User>;
   
   // Email verification operations
   createUnverifiedUser(data: { email: string; firstName: string; emailVerificationCode: string; emailVerificationExpiry: Date; isEmailVerified: boolean }): Promise<User>;
-  updateUserEmailVerification(id: number | string, token: string, expires: Date): Promise<User>;
-  verifyUserEmail(id: number | string, data: { password?: string; firstName?: string; lastName?: string }): Promise<User>;
+  updateUserEmailVerification(id: string, token: string, expires: Date): Promise<User>;
+  verifyUserEmail(id: string, data: { password?: string; firstName?: string; lastName?: string }): Promise<User>;
 
   // Workspace operations
-  getWorkspace(id: number | string): Promise<Workspace | undefined>;
-  getWorkspacesByUserId(userId: number | string): Promise<Workspace[]>;
-  getDefaultWorkspace(userId: number | string): Promise<Workspace | undefined>;
+  getWorkspace(id: string): Promise<Workspace | undefined>;
+  getWorkspacesByUserId(userId: string): Promise<Workspace[]>;
+  getDefaultWorkspace(userId: string): Promise<Workspace | undefined>;
   getWorkspaceByInviteCode(inviteCode: string): Promise<Workspace | undefined>;
   createWorkspace(workspace: InsertWorkspace): Promise<Workspace>;
-  updateWorkspace(id: number | string, updates: Partial<Workspace>): Promise<Workspace>;
-  updateWorkspaceCredits(id: number | string, credits: number): Promise<void>;
-  deleteWorkspace(id: number | string): Promise<void>;
-  setDefaultWorkspace(userId: number | string, workspaceId: number | string): Promise<void>;
+  updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace>;
+  updateWorkspaceCredits(id: string, credits: number): Promise<void>;
+  deleteWorkspace(id: string): Promise<void>;
+  setDefaultWorkspace(userId: string, workspaceId: string): Promise<void>;
 
   // Team management operations
-  getWorkspaceMember(workspaceId: number, userId: number): Promise<WorkspaceMember | undefined>;
-  getWorkspaceMembers(workspaceId: number): Promise<(WorkspaceMember & { user: User })[]>;
+  getWorkspaceMember(workspaceId: string, userId: string): Promise<WorkspaceMember | undefined>;
+  getWorkspaceMembers(workspaceId: string): Promise<(WorkspaceMember & { user: User })[]>;
   addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember>;
-  updateWorkspaceMember(workspaceId: number, userId: number, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember>;
-  removeWorkspaceMember(workspaceId: number, userId: number): Promise<void>;
+  updateWorkspaceMember(workspaceId: string, userId: string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember>;
+  removeWorkspaceMember(workspaceId: string, userId: string): Promise<void>;
   
   // Team invitation operations
   createTeamInvitation(invitation: InsertTeamInvitation): Promise<TeamInvitation>;
-  getTeamInvitation(id: number): Promise<TeamInvitation | undefined>;
+  getTeamInvitation(id: string): Promise<TeamInvitation | undefined>;
   getTeamInvitationByToken(token: string): Promise<TeamInvitation | undefined>;
-  getTeamInvitations(workspaceId: number, status?: string): Promise<TeamInvitation[]>;
-  getWorkspaceInvitations(workspaceId: number): Promise<TeamInvitation[]>;
-  updateTeamInvitation(id: number, updates: Partial<TeamInvitation>): Promise<TeamInvitation>;
+  getTeamInvitations(workspaceId: string, status?: string): Promise<TeamInvitation[]>;
+  getWorkspaceInvitations(workspaceId: string): Promise<TeamInvitation[]>;
+  updateTeamInvitation(id: string, updates: Partial<TeamInvitation>): Promise<TeamInvitation>;
 
   // Social account operations
-  getSocialAccount(id: number | string): Promise<SocialAccount | undefined>;
-  getSocialAccountsByWorkspace(workspaceId: number | string): Promise<SocialAccount[]>;
+  getSocialAccount(id: string): Promise<SocialAccount | undefined>;
+  getSocialAccountsByWorkspace(workspaceId: string): Promise<SocialAccount[]>;
   getAllSocialAccounts(): Promise<SocialAccount[]>;
-  getSocialAccountByPlatform(workspaceId: number | string, platform: string): Promise<SocialAccount | undefined>;
+  getSocialAccountByPlatform(workspaceId: string, platform: string): Promise<SocialAccount | undefined>;
   getSocialAccountByPageId(pageId: string): Promise<SocialAccount | undefined>;
-  getSocialConnections(userId: number): Promise<SocialAccount[]>;
+  getSocialConnections(userId: string): Promise<SocialAccount[]>;
   createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount>;
-  updateSocialAccount(id: number | string, updates: Partial<SocialAccount>): Promise<SocialAccount>;
-  deleteSocialAccount(id: number): Promise<void>;
+  updateSocialAccount(id: string, updates: Partial<SocialAccount>): Promise<SocialAccount>;
+  deleteSocialAccount(id: string): Promise<void>;
 
   // Content operations
-  getContent(id: number): Promise<Content | undefined>;
-  getContentByWorkspace(workspaceId: number | string, limit?: number): Promise<Content[]>;
-  getScheduledContent(workspaceId?: number | string): Promise<Content[]>;
+  getContent(id: string): Promise<Content | undefined>;
+  getContentByWorkspace(workspaceId: string, limit?: number): Promise<Content[]>;
+  getScheduledContent(workspaceId?: string): Promise<Content[]>;
   createContent(content: InsertContent): Promise<Content>;
-  updateContent(id: number, updates: Partial<Content>): Promise<Content>;
-  deleteContent(id: number): Promise<void>;
+  updateContent(id: string, updates: Partial<Content>): Promise<Content>;
+  deleteContent(id: string): Promise<void>;
   createPost(postData: any): Promise<any>;
 
   // Analytics operations
-  getAnalytics(workspaceId: number, platform?: string, days?: number): Promise<Analytics[]>;
+  getAnalytics(workspaceId: string, platform?: string, days?: number): Promise<Analytics[]>;
   createAnalytics(analytics: InsertAnalytics): Promise<Analytics>;
-  getLatestAnalytics(workspaceId: number, platform: string): Promise<Analytics | undefined>;
+  getLatestAnalytics(workspaceId: string, platform: string): Promise<Analytics | undefined>;
 
   // Automation rules
   getAutomationRule(id: string): Promise<AutomationRule | undefined>;
-  getAutomationRules(workspaceId: number | string): Promise<AutomationRule[]>;
+  getAutomationRules(workspaceId: string): Promise<AutomationRule[]>;
   getActiveAutomationRules(): Promise<AutomationRule[]>;
   getAutomationRulesByType(type: string): Promise<AutomationRule[]>;
   createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule>;
@@ -95,66 +98,66 @@ export interface IStorage {
   deleteAutomationRule(id: string): Promise<void>;
   
   // Automation logs
-  getAutomationLogs(workspaceId: string | number, options?: { limit?: number; type?: string }): Promise<any[]>;
+  getAutomationLogs(workspaceId: string, options?: { limit?: number; type?: string }): Promise<any[]>;
   createAutomationLog(log: any): Promise<any>;
   
   // Social accounts
   getAllSocialAccounts(): Promise<SocialAccount[]>;
 
   // Suggestions
-  getSuggestions(workspaceId: number, type?: string): Promise<Suggestion[]>;
-  getSuggestionsByWorkspace(workspaceId: string | number): Promise<Suggestion[]>;
-  getValidSuggestions(workspaceId: number): Promise<Suggestion[]>;
+  getSuggestions(workspaceId: string, type?: string): Promise<Suggestion[]>;
+  getSuggestionsByWorkspace(workspaceId: string): Promise<Suggestion[]>;
+  getValidSuggestions(workspaceId: string): Promise<Suggestion[]>;
   createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion>;
-  markSuggestionUsed(id: number): Promise<Suggestion>;
-  clearSuggestionsByWorkspace(workspaceId: string | number): Promise<void>;
+  markSuggestionUsed(id: string): Promise<Suggestion>;
+  clearSuggestionsByWorkspace(workspaceId: string): Promise<void>;
   
   // Analytics by workspace
-  getAnalyticsByWorkspace(workspaceId: string | number): Promise<Analytics[]>;
+  getAnalyticsByWorkspace(workspaceId: string): Promise<Analytics[]>;
 
   // Credit transactions
-  getCreditTransactions(userId: number, limit?: number): Promise<CreditTransaction[]>;
+  getCreditTransactions(userId: string, limit?: number): Promise<CreditTransaction[]>;
   createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction>;
 
   // Referrals
-  getReferrals(referrerId: number): Promise<Referral[]>;
-  getReferralStats(userId: number): Promise<{ totalReferrals: number; activePaid: number; totalEarned: number }>;
+  getReferrals(referrerId: string): Promise<Referral[]>;
+  getReferralStats(userId: string): Promise<{ totalReferrals: number; activePaid: number; totalEarned: number }>;
   createReferral(referral: InsertReferral): Promise<Referral>;
-  confirmReferral(id: number): Promise<Referral>;
+  confirmReferral(id: string): Promise<Referral>;
   getLeaderboard(limit?: number): Promise<Array<User & { referralCount: number }>>;
 
   // Subscription operations
-  getSubscription(userId: number): Promise<Subscription | undefined>;
+  getSubscription(userId: string): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
-  updateSubscriptionStatus(userId: number, status: string, canceledAt?: Date): Promise<Subscription>;
+  updateSubscriptionStatus(userId: string, status: string, canceledAt?: Date): Promise<Subscription>;
 
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
-  getPaymentsByUser(userId: number): Promise<Payment[]>;
+  getPaymentsByUser(userId: string): Promise<Payment[]>;
 
   // Addon operations
-  getUserAddons(userId: number | string): Promise<Addon[]>;
-  getActiveAddonsByUser(userId: number): Promise<Addon[]>;
+  getUserAddons(userId: string): Promise<Addon[]>;
+  getActiveAddonsByUser(userId: string): Promise<Addon[]>;
   createAddon(addon: InsertAddon): Promise<Addon>;
 
   // Feature usage tracking
-  getFeatureUsage(userId: number | string): Promise<any[]>;
-  trackFeatureUsage(userId: number | string, featureId: string, usage: any): Promise<void>;
+  getFeatureUsage(userId: string): Promise<any[]>;
+  trackFeatureUsage(userId: string, featureId: string, usage: any): Promise<void>;
 
   // Content recommendation operations
-  getContentRecommendation(id: number): Promise<ContentRecommendation | undefined>;
-  getContentRecommendations(workspaceId: number, type?: string, limit?: number): Promise<ContentRecommendation[]>;
+  getContentRecommendation(id: string): Promise<ContentRecommendation | undefined>;
+  getContentRecommendations(workspaceId: string, type?: string, limit?: number): Promise<ContentRecommendation[]>;
   createContentRecommendation(recommendation: InsertContentRecommendation): Promise<ContentRecommendation>;
-  updateContentRecommendation(id: number, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation>;
+  updateContentRecommendation(id: string, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation>;
 
   // User content history operations
-  getUserContentHistory(userId: number, workspaceId: number): Promise<UserContentHistory[]>;
+  getUserContentHistory(userId: string, workspaceId: string): Promise<UserContentHistory[]>;
   createUserContentHistory(history: InsertUserContentHistory): Promise<UserContentHistory>;
 
   // Pricing and plan operations
   getPricingData(): Promise<any>;
-  updateUserSubscription(userId: number | string, planId: string): Promise<User>;
-  addCreditsToUser(userId: number | string, credits: number): Promise<User>;
+  updateUserSubscription(userId: string, planId: string): Promise<User>;
+  addCreditsToUser(userId: string, credits: number): Promise<User>;
 
   // Conversation management operations
   createDmConversation(conversation: any): Promise<any>;
@@ -162,30 +165,30 @@ export interface IStorage {
   createConversationContext(context: any): Promise<any>;
   clearWorkspaceConversations(workspaceId: string): Promise<void>;
   getDmConversations(workspaceId: string, limit?: number): Promise<any[]>;
-  getDmMessages(conversationId: number | string, limit?: number): Promise<any[]>;
+  getDmMessages(conversationId: string, limit?: number): Promise<any[]>;
 
   // VeeGPT Chat operations
   getChatConversations(userId: string, workspaceId?: string): Promise<ChatConversation[]>;
-  getChatConversation(id: number): Promise<ChatConversation | undefined>;
+  getChatConversation(id: string): Promise<ChatConversation | undefined>;
   createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation>;
-  updateChatConversation(id: number, updates: Partial<ChatConversation>): Promise<ChatConversation>;
-  deleteChatConversation(id: number): Promise<void>;
-  getChatMessages(conversationId: number): Promise<ChatMessage[]>;
+  updateChatConversation(id: string, updates: Partial<ChatConversation>): Promise<ChatConversation>;
+  deleteChatConversation(id: string): Promise<void>;
+  getChatMessages(conversationId: string): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
-  updateChatMessage(id: number, updates: Partial<ChatMessage>): Promise<ChatMessage>;
-  getChatMessage(id: number): Promise<ChatMessage | undefined>;
+  updateChatMessage(id: string, updates: Partial<ChatMessage>): Promise<ChatMessage>;
+  getChatMessage(id: string): Promise<ChatMessage | undefined>;
 
   // YouTube workspace data operations
   updateYouTubeWorkspaceData(updates: any): Promise<any>;
 
   // Admin operations
-  getAdmin(id: number): Promise<Admin | undefined>;
+  getAdmin(id: string): Promise<Admin | undefined>;
   getAdminByEmail(email: string): Promise<Admin | undefined>;
   getAdminByUsername(username: string): Promise<Admin | undefined>;
   getAllAdmins(): Promise<Admin[]>;
   createAdmin(admin: InsertAdmin): Promise<Admin>;
-  updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin>;
-  deleteAdmin(id: number): Promise<void>;
+  updateAdmin(id: string, updates: Partial<Admin>): Promise<Admin>;
+  deleteAdmin(id: string): Promise<void>;
 
   // Admin session operations
   createAdminSession(session: Partial<AdminSession>): Promise<AdminSession>;
@@ -195,37 +198,37 @@ export interface IStorage {
 
   // Notification operations
   createNotification(notification: InsertNotification): Promise<Notification>;
-  getNotifications(userId?: number): Promise<Notification[]>;
+  getNotifications(userId?: string): Promise<Notification[]>;
   getUserNotifications(userId: string): Promise<any[]>;
   markNotificationAsRead(notificationId: string, userId: string): Promise<void>;
-  updateNotification(id: number, updates: Partial<Notification>): Promise<Notification>;
-  deleteNotification(id: number): Promise<void>;
-  markNotificationRead(id: number): Promise<void>;
+  updateNotification(id: string, updates: Partial<Notification>): Promise<Notification>;
+  deleteNotification(id: string): Promise<void>;
+  markNotificationRead(id: string): Promise<void>;
 
   // Popup operations
   createPopup(popup: InsertPopup): Promise<Popup>;
   getActivePopups(): Promise<Popup[]>;
-  getPopup(id: number): Promise<Popup | undefined>;
-  updatePopup(id: number, updates: Partial<Popup>): Promise<Popup>;
-  deletePopup(id: number): Promise<void>;
+  getPopup(id: string): Promise<Popup | undefined>;
+  updatePopup(id: string, updates: Partial<Popup>): Promise<Popup>;
+  deletePopup(id: string): Promise<void>;
 
   // App settings operations
   createAppSetting(setting: InsertAppSetting): Promise<AppSetting>;
   getAppSetting(key: string): Promise<AppSetting | undefined>;
   getAllAppSettings(): Promise<AppSetting[]>;
   getPublicAppSettings(): Promise<AppSetting[]>;
-  updateAppSetting(key: string, value: string, updatedBy?: number): Promise<AppSetting>;
+  updateAppSetting(key: string, value: string, updatedBy?: string): Promise<AppSetting>;
   deleteAppSetting(key: string): Promise<void>;
 
   // Audit log operations
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
-  getAuditLogs(limit?: number, adminId?: number): Promise<AuditLog[]>;
+  getAuditLogs(limit?: number, adminId?: string): Promise<AuditLog[]>;
 
   // Feedback operations
   createFeedbackMessage(feedback: InsertFeedbackMessage): Promise<FeedbackMessage>;
   getFeedbackMessages(status?: string): Promise<FeedbackMessage[]>;
-  updateFeedbackMessage(id: number, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage>;
-  deleteFeedbackMessage(id: number): Promise<void>;
+  updateFeedbackMessage(id: string, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage>;
+  deleteFeedbackMessage(id: string): Promise<void>;
 
   // Admin-specific operations
   getAdminUsers(page?: number, limit?: number, search?: string): Promise<{ users: User[], total: number }>;
@@ -244,43 +247,43 @@ export interface IStorage {
 
   // Thumbnail generation operations
   createThumbnailProject(project: any): Promise<any>;
-  getThumbnailProject(id: number): Promise<any>;
-  updateThumbnailProject(id: number, updates: any): Promise<any>;
+  getThumbnailProject(id: string): Promise<any>;
+  updateThumbnailProject(id: string, updates: any): Promise<any>;
   createThumbnailStrategy(strategy: any): Promise<any>;
   createThumbnailVariant(variant: any): Promise<any>;
-  getThumbnailVariants(projectId: number): Promise<any[]>;
+  getThumbnailVariants(projectId: string): Promise<any[]>;
   createCanvasSession(session: any): Promise<any>;
-  updateCanvasSession(id: number, updates: any): Promise<any>;
+  updateCanvasSession(id: string, updates: any): Promise<any>;
   createThumbnailExport(exportData: any): Promise<any>;
-  incrementExportDownload(exportId: number): Promise<void>;
+  incrementExportDownload(exportId: string): Promise<void>;
 
   // Creative Brief operations
   createCreativeBrief(brief: InsertCreativeBrief): Promise<CreativeBrief>;
-  getCreativeBrief(id: number): Promise<CreativeBrief | undefined>;
-  getCreativeBriefsByWorkspace(workspaceId: number): Promise<CreativeBrief[]>;
-  updateCreativeBrief(id: number, updates: Partial<CreativeBrief>): Promise<CreativeBrief>;
-  deleteCreativeBrief(id: number): Promise<void>;
+  getCreativeBrief(id: string): Promise<CreativeBrief | undefined>;
+  getCreativeBriefsByWorkspace(workspaceId: string): Promise<CreativeBrief[]>;
+  updateCreativeBrief(id: string, updates: Partial<CreativeBrief>): Promise<CreativeBrief>;
+  deleteCreativeBrief(id: string): Promise<void>;
 
   // Content Repurpose operations
   createContentRepurpose(repurpose: InsertContentRepurpose): Promise<ContentRepurpose>;
-  getContentRepurpose(id: number): Promise<ContentRepurpose | undefined>;
-  getContentRepurposesByWorkspace(workspaceId: number): Promise<ContentRepurpose[]>;
-  updateContentRepurpose(id: number, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose>;
-  deleteContentRepurpose(id: number): Promise<void>;
+  getContentRepurpose(id: string): Promise<ContentRepurpose | undefined>;
+  getContentRepurposesByWorkspace(workspaceId: string): Promise<ContentRepurpose[]>;
+  updateContentRepurpose(id: string, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose>;
+  deleteContentRepurpose(id: string): Promise<void>;
 
   // Competitor Analysis operations
   createCompetitorAnalysis(analysis: InsertCompetitorAnalysis): Promise<CompetitorAnalysis>;
-  getCompetitorAnalysis(id: number): Promise<CompetitorAnalysis | undefined>;
-  getCompetitorAnalysesByWorkspace(workspaceId: number): Promise<CompetitorAnalysis[]>;
-  updateCompetitorAnalysis(id: number, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis>;
-  deleteCompetitorAnalysis(id: number): Promise<void>;
+  getCompetitorAnalysis(id: string): Promise<CompetitorAnalysis | undefined>;
+  getCompetitorAnalysesByWorkspace(workspaceId: string): Promise<CompetitorAnalysis[]>;
+  updateCompetitorAnalysis(id: string, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis>;
+  deleteCompetitorAnalysis(id: string): Promise<void>;
 
   // Waitlist operations (MongoDB only)
   createWaitlistUser?(insertWaitlistUser: any): Promise<any>;
-  getWaitlistUser?(id: number | string): Promise<any>;
+  getWaitlistUser?(id: string): Promise<any>;
   getWaitlistUserByEmail?(email: string): Promise<any>;
-  updateWaitlistUser?(id: number | string, updates: any): Promise<any>;
-  deleteWaitlistUser?(id: number | string): Promise<void>;
+  updateWaitlistUser?(id: string, updates: any): Promise<any>;
+  deleteWaitlistUser?(id: string): Promise<void>;
   getAllWaitlistUsers?(): Promise<any[]>;
   getWaitlistStats?(): Promise<any>;
   clearAllWaitlistUsers?(): Promise<number>;
