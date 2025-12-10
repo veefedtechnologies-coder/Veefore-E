@@ -7,6 +7,14 @@ import {
   WorkspaceMember, TeamInvitation, ContentRecommendation, UserContentHistory,
   Admin, AdminSession, Notification, Popup, AppSetting, AuditLog, FeedbackMessage,
   CreativeBrief, ContentRepurpose, CompetitorAnalysis,
+  DmConversation, InsertDmConversation, DmMessage, InsertDmMessage,
+  ConversationContext, InsertConversationContext,
+  ThumbnailProject, InsertThumbnailProject,
+  ThumbnailStrategy, InsertThumbnailStrategy,
+  ThumbnailVariant, InsertThumbnailVariant,
+  CanvasEditorSession, InsertCanvasEditorSession,
+  ThumbnailExport, InsertThumbnailExport,
+  ChatConversation, InsertChatConversation, ChatMessage, InsertChatMessage,
   InsertUser, InsertWorkspace, InsertSocialAccount, InsertContent,
   InsertAutomationRule, InsertAnalytics, InsertSuggestion,
   InsertCreditTransaction, InsertReferral, InsertSubscription, InsertPayment, InsertAddon,
@@ -171,25 +179,27 @@ export class MongoStorage implements IStorage {
         this.connectionMetrics.successfulConnections;
 
       console.log(`✅ Connected to MongoDB - ${mongoose.connection.db?.databaseName} database (${connectTime}ms)`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.connectionMetrics.failedConnections++;
       this.connectionMetrics.lastErrorAt = new Date();
-      this.connectionMetrics.lastError = error.message;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorName = error instanceof Error ? error.name : '';
+      this.connectionMetrics.lastError = errorMessage;
       this.isConnected = false;
 
-      const isTransient = error.name === 'MongoNetworkError' || 
-                          error.name === 'MongoServerSelectionError' ||
-                          error.message?.includes('ECONNREFUSED') ||
-                          error.message?.includes('timeout');
+      const isTransient = errorName === 'MongoNetworkError' || 
+                          errorName === 'MongoServerSelectionError' ||
+                          errorMessage?.includes('ECONNREFUSED') ||
+                          errorMessage?.includes('timeout');
 
       if (isTransient && retryCount < MongoStorage.MAX_RETRY_ATTEMPTS) {
         const delay = MongoStorage.BASE_RETRY_DELAY_MS * Math.pow(2, retryCount);
-        console.warn(`[MONGODB] Transient error, retrying in ${delay}ms...`, error.message);
+        console.warn(`[MONGODB] Transient error, retrying in ${delay}ms...`, errorMessage);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.connectWithRetry(retryCount + 1);
       }
 
-      console.error('❌ FATAL: MongoDB connection failed after retries:', error);
+      console.error('❌ FATAL: MongoDB connection failed after retries:', errorMessage);
       
       if (process.env.NODE_ENV === 'production') {
         throw new Error('MongoDB connection required for production');
@@ -417,7 +427,7 @@ export class MongoStorage implements IStorage {
     return account ? convertSocialAccount(account) : undefined;
   }
 
-  async getSocialAccountsByWorkspace(workspaceId: any): Promise<SocialAccount[]> {
+  async getSocialAccountsByWorkspace(workspaceId: string | number): Promise<SocialAccount[]> {
     await this.ensureConnected();
     const accounts = await socialAccountRepository.findByWorkspaceWithTolerantLookup(workspaceId.toString());
     return accounts.map(account => convertSocialAccount(account));
@@ -428,7 +438,7 @@ export class MongoStorage implements IStorage {
    * This method exposes actual tokens and should ONLY be used by internal services
    * like auto-sync, NOT for API responses to clients
    */
-  async getSocialAccountsWithTokensInternal(workspaceId: string): Promise<any[]> {
+  async getSocialAccountsWithTokensInternal(workspaceId: string): Promise<SocialAccount[]> {
     await this.ensureConnected();
     return socialAccountRepository.findActiveWithDecryptedTokens(workspaceId);
   }
@@ -518,7 +528,7 @@ export class MongoStorage implements IStorage {
     return convertContent(content);
   }
 
-  async createPost(postData: any): Promise<any> {
+  async createPost(postData: InsertContent & { content?: string; media?: string[]; hashtags?: string; firstComment?: string; location?: string; accounts?: string[] }): Promise<Content & { content?: string; media?: string[]; hashtags?: string; firstComment?: string; location?: string; accounts?: string[] }> {
     await this.ensureConnected();
     const saved = await contentRepository.createPostWithDefaults(postData);
     return {
@@ -599,8 +609,9 @@ export class MongoStorage implements IStorage {
       if (!deleted) {
         throw new Error('Automation rule not found');
       }
-    } catch (error: any) {
-      throw new Error(`Failed to delete automation rule: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to delete automation rule: ${errorMessage}`);
     }
   }
 
@@ -908,7 +919,7 @@ export class MongoStorage implements IStorage {
   async getContentRecommendations(workspaceId: number, type?: string, limit?: number): Promise<ContentRecommendation[]> {
     await this.ensureConnected();
     
-    const options: any = { sortBy: 'createdAt', sortOrder: 'desc' };
+    const options: { sortBy: 'createdAt'; sortOrder: 'desc'; limit?: number } = { sortBy: 'createdAt', sortOrder: 'desc' };
     if (limit) {
       options.limit = limit;
     }
@@ -971,7 +982,7 @@ export class MongoStorage implements IStorage {
   }
 
   // Pricing and plan operations - delegating to pricing-config module
-  async getPricingData(): Promise<any> {
+  async getPricingData(): Promise<{ plans: typeof SUBSCRIPTION_PLANS; creditPackages: typeof CREDIT_PACKAGES; addons: typeof ADDONS }> {
     return {
       plans: SUBSCRIPTION_PLANS,
       creditPackages: CREDIT_PACKAGES,
@@ -1013,19 +1024,19 @@ export class MongoStorage implements IStorage {
   }
 
   // DM Conversation Memory Methods - delegating to dmConversationRepository and dmMessageRepository
-  async getDmConversation(workspaceId: string, platform: string, participantId: string): Promise<any> {
+  async getDmConversation(workspaceId: string, platform: string, participantId: string): Promise<DmConversation | null> {
     await this.ensureConnected();
     const conversation = await dmConversationRepository.findByWorkspaceAndParticipant(workspaceId, participantId);
     return conversation ? convertDmConversation(conversation) : null;
   }
 
-  async createDmConversation(data: any): Promise<any> {
+  async createDmConversation(data: InsertDmConversation): Promise<DmConversation> {
     await this.ensureConnected();
     const conversation = await dmConversationRepository.create(data);
     return convertDmConversation(conversation);
   }
 
-  async createDmMessage(data: any): Promise<any> {
+  async createDmMessage(data: InsertDmMessage): Promise<DmMessage> {
     await this.ensureConnected();
     const message = await dmMessageRepository.create(data);
     return convertDmMessage(message);
@@ -1036,40 +1047,44 @@ export class MongoStorage implements IStorage {
     await dmConversationRepository.incrementMessageCount(conversationId.toString());
   }
 
-  async getDmMessages(conversationId: number | string, limit: number = 10): Promise<any[]> {
+  async getDmMessages(conversationId: number | string, limit: number = 10): Promise<DmMessage[]> {
     await this.ensureConnected();
     return dmMessageRepository.findMessagesForConversation(conversationId, limit);
   }
 
-  async getConversationContext(conversationId: number): Promise<any[]> {
+  async getConversationContext(conversationId: number): Promise<ConversationContext[]> {
     await this.ensureConnected();
     
     const contexts = await conversationContextRepository.findActiveContexts(conversationId.toString());
     
     return contexts.map(ctx => ({
-      id: ctx._id.toString(),
+      id: parseInt(ctx._id.toString().slice(-8), 16),
       conversationId: ctx.conversationId,
       contextType: ctx.contextType,
       contextValue: ctx.contextValue,
-      confidence: ctx.confidence,
-      extractedAt: ctx.extractedAt,
-      expiresAt: ctx.expiresAt
+      confidence: ctx.confidence ?? 0,
+      source: ctx.source ?? 'ai',
+      expiresAt: ctx.expiresAt ?? null,
+      createdAt: ctx.createdAt,
+      updatedAt: ctx.updatedAt
     }));
   }
 
-  async createConversationContext(data: any): Promise<any> {
+  async createConversationContext(data: InsertConversationContext): Promise<ConversationContext> {
     await this.ensureConnected();
     
     const saved = await conversationContextRepository.create(data);
     
     return {
-      id: saved._id.toString(),
+      id: parseInt(saved._id.toString().slice(-8), 16),
       conversationId: saved.conversationId,
       contextType: saved.contextType,
       contextValue: saved.contextValue,
-      confidence: saved.confidence,
-      extractedAt: saved.extractedAt,
-      expiresAt: saved.expiresAt
+      confidence: saved.confidence ?? 0,
+      source: saved.source ?? 'ai',
+      expiresAt: saved.expiresAt ?? null,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt
     };
   }
 
@@ -1096,12 +1111,12 @@ export class MongoStorage implements IStorage {
     return dmConversationRepository.getStats(workspaceId);
   }
 
-  async getDmConversations(workspaceId: string, limit: number = 50): Promise<any[]> {
+  async getDmConversations(workspaceId: string, limit: number = 50): Promise<DmConversation[]> {
     await this.ensureConnected();
     return dmConversationRepository.findByWorkspaceFormatted(workspaceId, limit);
   }
 
-  async getAutomationRulesByTrigger(triggerType: string): Promise<any[]> {
+  async getAutomationRulesByTrigger(triggerType: string): Promise<AutomationRule[]> {
     await this.ensureConnected();
     return automationRuleRepository.findByGlobalTriggerTypeFormatted(triggerType);
   }
@@ -1165,7 +1180,7 @@ export class MongoStorage implements IStorage {
     search?: string;
     role?: 'admin' | 'superadmin';
     status?: 'active' | 'inactive';
-  }): Promise<any> {
+  }): Promise<{ admins: Admin[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
     await this.ensureConnected();
     
     const result = await adminRepository.findWithPaginationAndFilters(options);
@@ -1186,7 +1201,7 @@ export class MongoStorage implements IStorage {
 
 
   // Admin session operations - delegating to adminSessionRepository
-  async createAdminSession(session: any): Promise<any> {
+  async createAdminSession(session: InsertAdminSession): Promise<AdminSession> {
     await this.ensureConnected();
     const savedSession = await adminSessionRepository.createWithDefaults({
       adminId: session.adminId,
@@ -1198,7 +1213,7 @@ export class MongoStorage implements IStorage {
     return convertAdminSession(savedSession);
   }
 
-  async getAdminSession(token: string): Promise<any | undefined> {
+  async getAdminSession(token: string): Promise<AdminSession | undefined> {
     await this.ensureConnected();
     const session = await adminSessionRepository.findByToken(token);
     if (!session || new Date(session.expiresAt) <= new Date()) {
@@ -1221,7 +1236,7 @@ export class MongoStorage implements IStorage {
   }
 
   // Notification operations - delegating to notificationRepository
-  async createNotification(notification: any): Promise<any> {
+  async createNotification(notification: InsertNotification): Promise<Notification> {
     await this.ensureConnected();
     
     const notificationData = {
@@ -1239,7 +1254,7 @@ export class MongoStorage implements IStorage {
     return convertNotification(savedNotification);
   }
 
-  async getUserNotifications(userId: string): Promise<any[]> {
+  async getUserNotifications(userId: string): Promise<Notification[]> {
     await this.ensureConnected();
     
     const notifications = await notificationRepository.findActiveNotifications({ limit: 50 });
@@ -1251,7 +1266,7 @@ export class MongoStorage implements IStorage {
     await notificationRepository.markAsRead(notificationId);
   }
 
-  async getNotifications(userId?: number): Promise<any[]> {
+  async getNotifications(userId?: number): Promise<Notification[]> {
     await this.ensureConnected();
     const notifications = userId 
       ? await notificationRepository.findByUserId(userId)
@@ -1259,7 +1274,7 @@ export class MongoStorage implements IStorage {
     return notifications.map(notif => convertNotification(notif));
   }
 
-  async updateNotification(id: number, updates: Partial<any>): Promise<any> {
+  async updateNotification(id: number, updates: Partial<Notification>): Promise<Notification> {
     await this.ensureConnected();
     const notification = await notificationRepository.updateById(id.toString(), updates);
     if (!notification) throw new Error('Notification not found');
@@ -1277,25 +1292,25 @@ export class MongoStorage implements IStorage {
   }
 
   // Popup operations - delegating to popupRepository
-  async createPopup(popup: any): Promise<any> {
+  async createPopup(popup: InsertPopup): Promise<Popup> {
     await this.ensureConnected();
     const savedPopup = await popupRepository.createWithDefaults(popup);
     return convertPopup(savedPopup);
   }
 
-  async getActivePopups(): Promise<any[]> {
+  async getActivePopups(): Promise<Popup[]> {
     await this.ensureConnected();
     const popups = await popupRepository.findActivePopups();
     return popups.map(popup => convertPopup(popup));
   }
 
-  async getPopup(id: number): Promise<any | undefined> {
+  async getPopup(id: number): Promise<Popup | undefined> {
     await this.ensureConnected();
     const popup = await popupRepository.findById(id.toString());
     return popup ? convertPopup(popup) : undefined;
   }
 
-  async updatePopup(id: number, updates: Partial<any>): Promise<any> {
+  async updatePopup(id: number, updates: Partial<Popup>): Promise<Popup> {
     await this.ensureConnected();
     const popup = await popupRepository.updateById(id.toString(), updates);
     if (!popup) throw new Error('Popup not found');
@@ -1308,31 +1323,31 @@ export class MongoStorage implements IStorage {
   }
 
   // App settings operations - delegating to appSettingRepository
-  async createAppSetting(setting: any): Promise<any> {
+  async createAppSetting(setting: InsertAppSetting): Promise<AppSetting> {
     await this.ensureConnected();
     const savedSetting = await appSettingRepository.createWithDefaults(setting);
     return convertAppSetting(savedSetting);
   }
 
-  async getAppSetting(key: string): Promise<any | undefined> {
+  async getAppSetting(key: string): Promise<AppSetting | undefined> {
     await this.ensureConnected();
     const setting = await appSettingRepository.findByKey(key);
     return setting ? convertAppSetting(setting) : undefined;
   }
 
-  async getAllAppSettings(): Promise<any[]> {
+  async getAllAppSettings(): Promise<AppSetting[]> {
     await this.ensureConnected();
     const settings = await appSettingRepository.findAll({});
     return settings.map(setting => convertAppSetting(setting));
   }
 
-  async getPublicAppSettings(): Promise<any[]> {
+  async getPublicAppSettings(): Promise<AppSetting[]> {
     await this.ensureConnected();
     const settings = await appSettingRepository.findPublicSettings();
     return settings.map(setting => convertAppSetting(setting));
   }
 
-  async updateAppSetting(key: string, value: string, updatedBy?: number): Promise<any> {
+  async updateAppSetting(key: string, value: string, updatedBy?: number): Promise<AppSetting> {
     await this.ensureConnected();
     const setting = await appSettingRepository.upsertSetting(key, value, { updatedBy });
     return convertAppSetting(setting);
@@ -1347,7 +1362,7 @@ export class MongoStorage implements IStorage {
   }
 
   // Audit log operations - delegating to auditLogRepository
-  async createAuditLog(log: any): Promise<any> {
+  async createAuditLog(log: InsertAuditLog & { actorType?: string; actorId?: string }): Promise<AuditLog> {
     await this.ensureConnected();
     
     const enrichedLog = { ...log };
@@ -1362,7 +1377,7 @@ export class MongoStorage implements IStorage {
     return convertAuditLog(savedLog);
   }
 
-  async getAuditLogs(limit?: number, adminId?: number): Promise<any[]> {
+  async getAuditLogs(limit?: number, adminId?: number): Promise<AuditLog[]> {
     await this.ensureConnected();
     const logs = adminId 
       ? await auditLogRepository.findByActorId(String(adminId), { limit: limit || 100 })
@@ -1371,13 +1386,13 @@ export class MongoStorage implements IStorage {
   }
 
   // Feedback operations - delegating to feedbackMessageRepository
-  async createFeedbackMessage(feedback: any): Promise<any> {
+  async createFeedbackMessage(feedback: InsertFeedbackMessage): Promise<FeedbackMessage> {
     await this.ensureConnected();
     const savedFeedback = await feedbackMessageRepository.createWithDefaults(feedback);
     return convertFeedbackMessage(savedFeedback);
   }
 
-  async getFeedbackMessages(status?: string): Promise<any[]> {
+  async getFeedbackMessages(status?: string): Promise<FeedbackMessage[]> {
     await this.ensureConnected();
     const messages = status 
       ? await feedbackMessageRepository.findByStatus(status)
@@ -1385,7 +1400,7 @@ export class MongoStorage implements IStorage {
     return messages.map(msg => convertFeedbackMessage(msg));
   }
 
-  async updateFeedbackMessage(id: number, updates: Partial<any>): Promise<any> {
+  async updateFeedbackMessage(id: number, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage> {
     await this.ensureConnected();
     const message = await feedbackMessageRepository.updateById(id.toString(), updates);
     if (!message) throw new Error('Feedback message not found');
@@ -1398,27 +1413,27 @@ export class MongoStorage implements IStorage {
   }
 
   // Missing automation log methods
-  async getAutomationLogs(limit?: number): Promise<any[]> {
+  async getAutomationLogs(limit?: number): Promise<AutomationRule[]> {
     await this.ensureConnected();
     // Return empty array for now as automation logs schema not defined
     return [];
   }
 
-  async createAutomationLog(log: any): Promise<any> {
+  async createAutomationLog(log: InsertAutomationRule): Promise<AutomationRule> {
     await this.ensureConnected();
     // Return the log object for now as automation logs schema not defined
-    return { id: Date.now(), ...log, createdAt: new Date() };
+    return { id: Date.now(), workspaceId: log.workspaceId, name: log.name, ...log, createdAt: new Date() } as AutomationRule;
   }
 
   // Get all users method for cleanup operations
-  async getAllUsers(): Promise<any[]> {
+  async getAllUsers(): Promise<User[]> {
     await this.ensureConnected();
     const users = await userRepository.findAll({});
     return users.map(user => convertUser(user));
   }
 
   // Admin stats method
-  async getAdminStats(): Promise<any> {
+  async getAdminStats(): Promise<{ totalUsers: number; totalWorkspaces: number; totalContent: number; totalCreditsUsed: number; revenueThisMonth: number; activeUsers: number }> {
     await this.ensureConnected();
     
     const [userCount, workspaceCount, contentCount] = await Promise.all([
@@ -1493,7 +1508,7 @@ export class MongoStorage implements IStorage {
     return convertUser(user);
   }
 
-  async updateYouTubeWorkspaceData(updates: any): Promise<any> {
+  async updateYouTubeWorkspaceData(updates: Partial<SocialAccount>): Promise<SocialAccount | null> {
     await this.ensureConnected();
     return socialAccountRepository.updateYouTubePlatformData(updates);
   }
@@ -1518,38 +1533,38 @@ export class MongoStorage implements IStorage {
   // THUMBNAIL GENERATION SYSTEM METHODS
 
   // Thumbnail Projects - delegating to thumbnailProjectRepository
-  async createThumbnailProject(data: any): Promise<any> {
+  async createThumbnailProject(data: InsertThumbnailProject): Promise<ThumbnailProject> {
     await this.ensureConnected();
     const project = await thumbnailProjectRepository.createWithDefaults(data);
     return thumbnailProjectRepository.convertToOutput(project);
   }
 
-  async getThumbnailProject(projectId: number): Promise<any> {
+  async getThumbnailProject(projectId: number): Promise<ThumbnailProject | null> {
     await this.ensureConnected();
     const project = await thumbnailProjectRepository.findById(projectId.toString());
     if (!project) return null;
     return thumbnailProjectRepository.convertToOutput(project);
   }
 
-  async updateThumbnailProject(projectId: number, updates: any): Promise<void> {
+  async updateThumbnailProject(projectId: number, updates: Partial<ThumbnailProject>): Promise<void> {
     await this.ensureConnected();
     await thumbnailProjectRepository.updateById(projectId.toString(), updates);
   }
 
-  async getThumbnailProjects(workspaceId: number): Promise<any[]> {
+  async getThumbnailProjects(workspaceId: number): Promise<ThumbnailProject[]> {
     await this.ensureConnected();
     const result = await thumbnailProjectRepository.findByWorkspaceId(workspaceId.toString());
     return result.data.map(project => thumbnailProjectRepository.convertToOutput(project));
   }
 
   // Thumbnail Strategies - delegating to thumbnailStrategyRepository
-  async createThumbnailStrategy(data: any): Promise<any> {
+  async createThumbnailStrategy(data: InsertThumbnailStrategy): Promise<ThumbnailStrategy> {
     await this.ensureConnected();
     const strategy = await thumbnailStrategyRepository.createWithDefaults(data);
     return thumbnailStrategyRepository.convertToOutput(strategy);
   }
 
-  async getThumbnailStrategy(projectId: number): Promise<any> {
+  async getThumbnailStrategy(projectId: number): Promise<ThumbnailStrategy | null> {
     await this.ensureConnected();
     const strategy = await thumbnailStrategyRepository.findByProjectId(projectId.toString());
     if (!strategy) return null;
@@ -1557,52 +1572,52 @@ export class MongoStorage implements IStorage {
   }
 
   // Thumbnail Variants - delegating to thumbnailVariantRepository
-  async createThumbnailVariant(data: any): Promise<any> {
+  async createThumbnailVariant(data: InsertThumbnailVariant): Promise<ThumbnailVariant> {
     await this.ensureConnected();
     const variant = await thumbnailVariantRepository.createWithDefaults(data);
     return thumbnailVariantRepository.convertToOutput(variant);
   }
 
-  async getThumbnailVariant(variantId: number): Promise<any> {
+  async getThumbnailVariant(variantId: number): Promise<ThumbnailVariant | null> {
     await this.ensureConnected();
     const variant = await thumbnailVariantRepository.findById(variantId.toString());
     if (!variant) return null;
     return thumbnailVariantRepository.convertToOutput(variant);
   }
 
-  async getThumbnailVariants(projectId: number): Promise<any[]> {
+  async getThumbnailVariants(projectId: number): Promise<ThumbnailVariant[]> {
     await this.ensureConnected();
     const variants = await thumbnailVariantRepository.findByProjectId(projectId.toString());
     return variants.map(variant => thumbnailVariantRepository.convertToOutput(variant));
   }
 
   // Canvas Editor Sessions - delegating to canvasEditorSessionRepository
-  async createCanvasEditorSession(data: any): Promise<any> {
+  async createCanvasEditorSession(data: InsertCanvasEditorSession): Promise<CanvasEditorSession> {
     await this.ensureConnected();
     const session = await canvasEditorSessionRepository.createWithDefaults(data);
     return canvasEditorSessionRepository.convertToOutput(session);
   }
 
-  async getCanvasEditorSession(sessionId: number): Promise<any> {
+  async getCanvasEditorSession(sessionId: number): Promise<CanvasEditorSession | null> {
     await this.ensureConnected();
     const session = await canvasEditorSessionRepository.findById(sessionId.toString());
     if (!session) return null;
     return canvasEditorSessionRepository.convertToOutput(session);
   }
 
-  async updateCanvasEditorSession(sessionId: number, updates: any): Promise<void> {
+  async updateCanvasEditorSession(sessionId: number, updates: Partial<CanvasEditorSession>): Promise<void> {
     await this.ensureConnected();
     await canvasEditorSessionRepository.updateById(sessionId.toString(), { ...updates, lastSaved: new Date() });
   }
 
   // Thumbnail Exports - delegating to thumbnailExportRepository
-  async createThumbnailExport(data: any): Promise<any> {
+  async createThumbnailExport(data: InsertThumbnailExport): Promise<ThumbnailExport> {
     await this.ensureConnected();
     const exportDoc = await thumbnailExportRepository.createWithDefaults(data);
     return thumbnailExportRepository.convertToOutput(exportDoc);
   }
 
-  async getThumbnailExports(sessionId: number): Promise<any[]> {
+  async getThumbnailExports(sessionId: number): Promise<ThumbnailExport[]> {
     await this.ensureConnected();
     const exports = await thumbnailExportRepository.findBySessionId(sessionId.toString());
     return exports.map(exp => thumbnailExportRepository.convertToOutput(exp));
@@ -1712,7 +1727,16 @@ export class MongoStorage implements IStorage {
   }
 
   // Feature usage tracking methods
-  async getFeatureUsage(userId: number | string): Promise<any[]> {
+  async getFeatureUsage(userId: number | string): Promise<Array<{
+    id: string;
+    userId: string;
+    featureId: string;
+    usageCount: number;
+    lastUsed: Date;
+    metadata: Record<string, unknown>;
+    createdAt: Date;
+    updatedAt: Date;
+  }>> {
     await this.ensureConnected();
     try {
       const result = await featureUsageRepository.findByUserId(userId.toString());
@@ -1727,19 +1751,19 @@ export class MongoStorage implements IStorage {
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt
       }));
-    } catch (error) {
+    } catch (error: unknown) {
       return [];
     }
   }
 
-  async trackFeatureUsage(userId: number | string, featureId: string, usage: any): Promise<void> {
+  async trackFeatureUsage(userId: number | string, featureId: string, usage: Record<string, unknown> | null): Promise<void> {
     await this.ensureConnected();
     try {
       const updated = await featureUsageRepository.incrementUsage(userId.toString(), featureId);
       if (updated && usage) {
         await featureUsageRepository.updateById(updated._id.toString(), { metadata: usage });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Silently fail - feature usage tracking is non-critical
     }
   }

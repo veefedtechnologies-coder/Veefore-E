@@ -46,8 +46,9 @@ async function performHealthCheck(storage: IStorage): Promise<boolean> {
     // If no metrics available, assume healthy (backwards compatibility)
     console.log('[HEALTH CHECK] No metrics available, assuming healthy');
     return true;
-  } catch (error: any) {
-    console.error('[HEALTH CHECK] Failed:', error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[HEALTH CHECK] Failed:', errorMessage);
     return false;
   }
 }
@@ -107,7 +108,7 @@ if (!fsSync.existsSync(UPLOAD_DIR)) {
   fsSync.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-export async function registerRoutes(app: Express, storage: IStorage, upload?: any): Promise<Server> {
+export async function registerRoutes(app: Express, storage: IStorage, _upload?: multer.Multer): Promise<Server> {
   const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif']);
   const ALLOWED_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v']);
   const ALLOWED_EXTENSIONS = new Set([...ALLOWED_IMAGE_EXTENSIONS, ...ALLOWED_VIDEO_EXTENSIONS]);
