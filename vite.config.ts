@@ -11,9 +11,9 @@ const forceClean = () => {
   let outDirResolved: string | undefined
   return {
     name: 'force-clean-outdir',
-    apply: 'build',
-    configResolved(config) {
-      outDirResolved = (config.build as any)?.outDir
+    apply: 'build' as const,
+    configResolved(config: any) {
+      outDirResolved = config.build?.outDir
     },
     buildStart() {
       try {
@@ -30,10 +30,8 @@ export default defineConfig({
   root: path.resolve(__dirname, "client"),
   resolve: {
     preserveSymlinks: false,
-    dedupe: ['react', 'react-dom'],
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', '@tanstack/react-query', 'wouter'],
     alias: {
-      react: path.resolve(__dirname, 'client/node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'client/node_modules/react-dom'),
       'three-mesh-bvh': path.resolve(__dirname, 'client/src/stubs/three-mesh-bvh.ts'),
       "@": path.resolve(__dirname, "client/src"),
       "@shared": path.resolve(__dirname, "shared"),
@@ -43,6 +41,17 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: false,
+  },
+  optimizeDeps: {
+    include: [
+      'react', 
+      'react-dom', 
+      'react-dom/client', 
+      'react/jsx-runtime', 
+      'react/jsx-dev-runtime',
+      '@tanstack/react-query',
+      'wouter',
+    ],
   },
   server: {
     port: 5173,
