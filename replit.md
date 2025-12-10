@@ -262,6 +262,16 @@ npm run dev          # Start development server (port 5000)
 
 ## Recent Changes (December 2025)
 
+### Architecture Overhaul - MongoDB-Native Types (December 10, 2025)
+- **Domain Types**: Created `server/domain/types.ts` with MongoDB-native types using string IDs (ObjectId) instead of numeric IDs
+- **IStorage Interface**: Updated `server/storage.ts` to use string IDs throughout, eliminating Drizzle/Postgres-era numeric IDs
+- **Type Alignment**: Resolved 83+ LSP type errors in mongodb-storage.ts by aligning types with MongoDB schema
+- **Webhook Optimization**: 
+  - Added `pageId_1_platform_1` and `platform_1_accountId_1_isActive_1` indexes to SocialAccount model
+  - Refactored webhook handler to use indexed queries only (no full collection scans)
+  - Re-enabled Meta webhook signature validation for production security
+- **Repository Pattern**: All database operations now properly delegate to specialized repositories
+
 ### React "Invalid Hook Call" Fix
 - **Root Cause**: Multiple React instances loaded due to:
   1. Cache-busting query parameter on main.tsx script tag
