@@ -99,15 +99,39 @@ export default function Workspaces() {
         ? (workspacesRaw as any).data 
         : []);
 
-  // Create workspace mutation
+  // Create workspace mutation with optimistic updates
   const createWorkspaceMutation = useMutation({
     mutationFn: (data: WorkspaceFormData) => 
       apiRequest('/api/workspaces', {
         method: 'POST',
         body: JSON.stringify(data)
       }),
+    onMutate: async (newWorkspace) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/workspaces'] })
+      const previousWorkspaces = queryClient.getQueryData(['/api/workspaces'])
+      const optimisticWorkspace = {
+        id: `temp-${Date.now()}`,
+        ...newWorkspace,
+        isDefault: false,
+        maxTeamMembers: 5,
+        credits: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      queryClient.setQueryData(['/api/workspaces'], (old: any) => [...(old || []), optimisticWorkspace])
+      return { previousWorkspaces }
+    },
+    onError: (error: any, newWorkspace, context) => {
+      if (context?.previousWorkspaces) {
+        queryClient.setQueryData(['/api/workspaces'], context.previousWorkspaces)
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create workspace",
+        variant: "destructive"
+      })
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
       setIsCreateDialogOpen(false)
       setFormData({ name: '', description: '', theme: 'default', aiPersonality: 'professional' })
       toast({
@@ -115,24 +139,37 @@ export default function Workspaces() {
         description: "Your new workspace has been created successfully."
       })
     },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create workspace",
-        variant: "destructive"
-      })
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
     }
   })
 
-  // Update workspace mutation
+  // Update workspace mutation with optimistic updates
   const updateWorkspaceMutation = useMutation({
     mutationFn: ({ id, data }: { id: string, data: Partial<WorkspaceFormData> }) =>
       apiRequest(`/api/workspaces/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data)
       }),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/workspaces'] })
+      const previousWorkspaces = queryClient.getQueryData(['/api/workspaces'])
+      queryClient.setQueryData(['/api/workspaces'], (old: any) => 
+        (old || []).map((w: Workspace) => w.id === id ? { ...w, ...data, updatedAt: new Date().toISOString() } : w)
+      )
+      return { previousWorkspaces }
+    },
+    onError: (error: any, variables, context) => {
+      if (context?.previousWorkspaces) {
+        queryClient.setQueryData(['/api/workspaces'], context.previousWorkspaces)
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update workspace",
+        variant: "destructive"
+      })
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
       setIsEditDialogOpen(false)
       setSelectedWorkspace(null)
       toast({
@@ -140,34 +177,43 @@ export default function Workspaces() {
         description: "Your workspace has been updated successfully."
       })
     },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update workspace",
-        variant: "destructive"
-      })
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
     }
   })
 
-  // Delete workspace mutation
+  // Delete workspace mutation with optimistic updates
   const deleteWorkspaceMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest(`/api/workspaces/${id}`, {
         method: 'DELETE'
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
-      toast({
-        title: "Workspace deleted",
-        description: "The workspace has been deleted successfully."
-      })
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/workspaces'] })
+      const previousWorkspaces = queryClient.getQueryData(['/api/workspaces'])
+      queryClient.setQueryData(['/api/workspaces'], (old: any) => 
+        (old || []).filter((w: Workspace) => w.id !== id)
+      )
+      return { previousWorkspaces }
     },
-    onError: (error: any) => {
+    onError: (error: any, id, context) => {
+      if (context?.previousWorkspaces) {
+        queryClient.setQueryData(['/api/workspaces'], context.previousWorkspaces)
+      }
       toast({
         title: "Error",
         description: error.message || "Failed to delete workspace",
         variant: "destructive"
       })
+    },
+    onSuccess: () => {
+      toast({
+        title: "Workspace deleted",
+        description: "The workspace has been deleted successfully."
+      })
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
     }
   })
 
