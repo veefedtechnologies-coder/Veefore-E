@@ -247,7 +247,7 @@ function SkeletonProfileCard() {
   )
 }
 
-function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integration' | 'workspaces' | 'profile' | 'dashboard' | 'veegpt' | 'video' | 'default' }) {
+function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integration' | 'workspaces' | 'profile' | 'dashboard' | 'veegpt' | 'video' | 'settings' | 'default' }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
       <style>{`
@@ -361,6 +361,21 @@ function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integ
             </div>
           </div>
         </>
+      )}
+
+      {type === 'settings' && (
+        <div className="flex gap-6">
+          <div className="w-64 space-y-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
+          </div>
+          <div className="flex-1 space-y-6">
+            <SkeletonPageHeader />
+            <SkeletonSettingsSection />
+            <SkeletonSettingsSection />
+          </div>
+        </div>
       )}
       
       {type === 'default' && (
