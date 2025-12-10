@@ -1,5 +1,8 @@
 import { Queue } from 'bullmq';
-import { redisConnection, redisAvailable } from './metricsQueue';
+import { redisConnection, isRedisAvailable } from './metricsQueue';
+
+// Re-export for convenience
+export { isRedisAvailable };
 
 export interface ScheduledPostJobData {
   contentId: number;
@@ -33,7 +36,7 @@ export class PostSchedulerManager {
       title?: string;
     } = {}
   ): Promise<{ success: boolean; jobId?: string; error?: string }> {
-    if (!redisAvailable || !postQueue) {
+    if (!isRedisAvailable() || !postQueue) {
       console.log(`[POST_QUEUE] Redis unavailable, cannot schedule post ${contentId} via queue`);
       return { success: false, error: 'Redis unavailable' };
     }
@@ -67,7 +70,7 @@ export class PostSchedulerManager {
   }
 
   static async cancelScheduledPost(contentId: number): Promise<{ success: boolean; error?: string }> {
-    if (!redisAvailable || !postQueue) {
+    if (!isRedisAvailable() || !postQueue) {
       console.log(`[POST_QUEUE] Redis unavailable, cannot cancel post ${contentId}`);
       return { success: false, error: 'Redis unavailable' };
     }
@@ -100,7 +103,7 @@ export class PostSchedulerManager {
     newScheduledAt: Date,
     workspaceId?: string
   ): Promise<{ success: boolean; jobId?: string; error?: string }> {
-    if (!redisAvailable || !postQueue) {
+    if (!isRedisAvailable() || !postQueue) {
       console.log(`[POST_QUEUE] Redis unavailable, cannot reschedule post ${contentId}`);
       return { success: false, error: 'Redis unavailable' };
     }
@@ -137,7 +140,7 @@ export class PostSchedulerManager {
   }
 
   static async getScheduledPosts(workspaceId?: string): Promise<ScheduledPostJobData[]> {
-    if (!redisAvailable || !postQueue) {
+    if (!isRedisAvailable() || !postQueue) {
       return [];
     }
 
@@ -157,7 +160,7 @@ export class PostSchedulerManager {
   }
 
   static async getQueueStats() {
-    if (!redisAvailable || !postQueue) {
+    if (!isRedisAvailable() || !postQueue) {
       return {
         waiting: 0,
         active: 0,
@@ -199,5 +202,3 @@ export class PostSchedulerManager {
     }
   }
 }
-
-export { redisAvailable };

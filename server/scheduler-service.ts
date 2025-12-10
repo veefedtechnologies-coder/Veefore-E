@@ -1,27 +1,29 @@
 import { IStorage } from "./storage";
 import { instagramAPI } from "./instagram-api";
-import { PostSchedulerManager, redisAvailable } from "./queues/postQueue";
+import { PostSchedulerManager, isRedisAvailable } from "./queues/postQueue";
+import { ensureRedisConnected } from "./queues/metricsQueue";
 import { PostWorker } from "./workers/postWorker";
 
 export class SchedulerService {
   private storage: IStorage;
   private checkInterval: NodeJS.Timeout | null = null;
-  private useQueueScheduler: boolean = false;
+  private workerStarted: boolean = false;
 
   constructor(storage: IStorage) {
     this.storage = storage;
   }
 
-  start() {
+  async start() {
     console.log('[SCHEDULER] Starting background scheduler service');
     
-    if (redisAvailable) {
+    // Try to connect to Redis and start the worker
+    const redisConnected = await ensureRedisConnected();
+    if (redisConnected) {
       console.log('[SCHEDULER] Redis available - starting BullMQ post worker');
       PostWorker.start(this.storage);
-      this.useQueueScheduler = true;
+      this.workerStarted = true;
     } else {
       console.log('[SCHEDULER] Redis unavailable - using in-memory fallback scheduler');
-      this.useQueueScheduler = false;
     }
     
     this.checkInterval = setInterval(() => {
@@ -45,9 +47,17 @@ export class SchedulerService {
   }
 
   async scheduleWithQueue(content: any): Promise<{ success: boolean; jobId?: string; error?: string }> {
-    if (!this.useQueueScheduler || !redisAvailable) {
+    // Check dynamically at runtime - Redis may have connected after startup
+    if (!isRedisAvailable()) {
       console.log(`[SCHEDULER] Queue scheduling unavailable for content ${content.id}, using in-memory fallback`);
       return { success: false, error: 'Queue scheduler unavailable' };
+    }
+    
+    // Start worker if not already running (late Redis connection)
+    if (!this.workerStarted && !PostWorker.isRunning()) {
+      console.log('[SCHEDULER] Late Redis connection detected - starting BullMQ post worker');
+      PostWorker.start(this.storage);
+      this.workerStarted = true;
     }
 
     if (!content.scheduledAt) {
@@ -74,21 +84,21 @@ export class SchedulerService {
   }
 
   async cancelScheduledPost(contentId: number): Promise<{ success: boolean; error?: string }> {
-    if (this.useQueueScheduler && redisAvailable) {
+    if (isRedisAvailable()) {
       return PostSchedulerManager.cancelScheduledPost(contentId);
     }
     return { success: true };
   }
 
   async reschedulePost(contentId: number, newScheduledAt: Date, workspaceId?: string): Promise<{ success: boolean; jobId?: string; error?: string }> {
-    if (this.useQueueScheduler && redisAvailable) {
+    if (isRedisAvailable()) {
       return PostSchedulerManager.reschedulePost(contentId, newScheduledAt, workspaceId);
     }
     return { success: false, error: 'Queue scheduler unavailable' };
   }
 
   isUsingQueueScheduler(): boolean {
-    return this.useQueueScheduler;
+    return isRedisAvailable();
   }
 
   private async processScheduledContent() {
@@ -122,7 +132,7 @@ export class SchedulerService {
       console.log(`[SCHEDULER] Found ${contentToPublish.length} items ready to publish`);
 
       for (const content of contentToPublish) {
-        if (this.useQueueScheduler && redisAvailable) {
+        if (isRedisAvailable()) {
           const isInQueue = await this.isContentInQueue(content.id);
           if (isInQueue) {
             console.log(`[SCHEDULER] Content ${content.id} is already in BullMQ queue, skipping in-memory processing`);
@@ -138,7 +148,7 @@ export class SchedulerService {
   }
 
   private async isContentInQueue(contentId: number): Promise<boolean> {
-    if (!this.useQueueScheduler || !redisAvailable) {
+    if (!isRedisAvailable()) {
       return false;
     }
 

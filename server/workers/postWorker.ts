@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { redisConnection, redisAvailable } from '../queues/metricsQueue';
+import { redisConnection, isRedisAvailable } from '../queues/metricsQueue';
 import { ScheduledPostJobData } from '../queues/postQueue';
 
 export class PostWorker {
@@ -11,7 +11,7 @@ export class PostWorker {
     
     console.log('[POST_WORKER] Starting post publishing worker...');
 
-    if (!redisAvailable || !redisConnection) {
+    if (!isRedisAvailable() || !redisConnection) {
       console.log('[POST_WORKER] Redis unavailable, worker will not start. Using in-memory fallback.');
       return;
     }

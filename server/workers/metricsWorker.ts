@@ -7,7 +7,7 @@ import {
   WebhookProcessJobData, 
   TokenRefreshJobData,
   redisConnection,
-  redisAvailable
+  isRedisAvailable
 } from '../queues/metricsQueue';
 import InstagramApiService, { InstagramApiError } from '../services/instagramApi';
 import TokenManager from '../services/tokenManager';
@@ -26,7 +26,7 @@ export class MetricsWorker {
     console.log('🚀 Starting Instagram metrics workers...');
 
     // Check if Redis is available
-    if (!redisAvailable || !redisConnection) {
+    if (!isRedisAvailable() || !redisConnection) {
       console.log('⚠️ Redis unavailable, workers will not start. Using fallback polling system.');
       return;
     }

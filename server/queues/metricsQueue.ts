@@ -6,6 +6,43 @@ let redisConnection: IORedis | null = null;
 let redisAvailable = false;
 let redisDisabledPermanently = false;
 
+// Function to check if Redis is available (for dynamic runtime checks)
+export function isRedisAvailable(): boolean {
+  return redisAvailable && !redisDisabledPermanently && redisConnection !== null;
+}
+
+// Function to trigger Redis connection if lazy
+export async function ensureRedisConnected(): Promise<boolean> {
+  if (redisDisabledPermanently) return false;
+  if (redisAvailable) return true;
+  if (!redisConnection) return false;
+  
+  try {
+    // Trigger the lazy connection
+    if (redisConnection.status === 'wait') {
+      await redisConnection.connect();
+    }
+    // Wait briefly for ready state
+    return new Promise((resolve) => {
+      if (redisAvailable) {
+        resolve(true);
+      } else {
+        const timeout = setTimeout(() => resolve(false), 3000);
+        redisConnection!.once('ready', () => {
+          clearTimeout(timeout);
+          resolve(true);
+        });
+        redisConnection!.once('error', () => {
+          clearTimeout(timeout);
+          resolve(false);
+        });
+      }
+    });
+  } catch {
+    return false;
+  }
+}
+
 // Initialize Redis connection with graceful fallback - NO RETRIES
 function initializeRedisConnection(): IORedis | null {
   // CRITICAL: Skip Redis entirely if no REDIS_URL is configured
