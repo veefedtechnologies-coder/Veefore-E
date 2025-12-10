@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { contentController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { auditMiddleware } from '../../middleware/audit-middleware';
+import { AuditActions } from '../../utils/audit-logger';
 import { z } from 'zod';
 
 const router = Router();
@@ -45,6 +47,7 @@ router.get('/workspace/:workspaceId',
 router.post('/workspace/:workspaceId', 
   requireAuth,
   validateRequest({ params: WorkspaceIdParams }),
+  auditMiddleware(AuditActions.CONTENT.CREATE, { resource: 'content' }),
   contentController.createContent
 );
 
@@ -57,36 +60,42 @@ router.get('/:contentId',
 router.put('/:contentId', 
   requireAuth,
   validateRequest({ params: ContentIdParams }),
+  auditMiddleware(AuditActions.CONTENT.UPDATE, { resource: 'content' }),
   contentController.updateContent
 );
 
 router.post('/:contentId/schedule', 
   requireAuth,
   validateRequest({ params: ContentIdParams }),
+  auditMiddleware(AuditActions.CONTENT.SCHEDULE, { resource: 'content' }),
   contentController.scheduleContent
 );
 
 router.put('/:contentId/reschedule', 
   requireAuth,
   validateRequest({ params: ContentIdParams }),
+  auditMiddleware(AuditActions.CONTENT.RESCHEDULE, { resource: 'content' }),
   contentController.rescheduleContent
 );
 
 router.post('/:contentId/cancel-schedule', 
   requireAuth,
   validateRequest({ params: ContentIdParams }),
+  auditMiddleware('content.cancel_schedule', { resource: 'content' }),
   contentController.cancelSchedule
 );
 
 router.post('/:contentId/archive', 
   requireAuth,
   validateRequest({ params: ContentIdParams }),
+  auditMiddleware('content.archive', { resource: 'content' }),
   contentController.archiveContent
 );
 
 router.delete('/:contentId', 
   requireAuth,
   validateRequest({ params: ContentIdParams }),
+  auditMiddleware(AuditActions.CONTENT.DELETE, { resource: 'content' }),
   contentController.deleteContent
 );
 
