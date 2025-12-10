@@ -88,6 +88,117 @@ import { useToast } from '@/hooks/use-toast'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { useAuth } from '@/hooks/useAuth'
 import { saveAutomationState, loadAutomationState, clearAutomationCache, clearUserAutomationCache } from '@/lib/cache'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+
+function AutomationStepByStepSkeleton() {
+  return (
+    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 min-h-full transition-colors duration-300">
+      {/* Header Skeleton */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 w-full shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-8 h-8 rounded-lg" />
+            <div className="space-y-1">
+              <Skeleton className="h-6 w-36" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-40 rounded-lg" />
+            <Skeleton className="h-9 w-36 rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto p-6 pb-20">
+        {/* Progress Steps Skeleton */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between max-w-5xl mx-auto">
+            {[1, 2, 3, 4].map((step, index) => (
+              <div key={step} className="flex items-center flex-1">
+                <div className="flex flex-col items-center">
+                  <Skeleton className="w-14 h-14 rounded-full" />
+                  <div className="mt-3 text-center space-y-1">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                {index < 3 && (
+                  <Skeleton className="flex-1 h-1 mx-6 mt-[-25px] rounded-full" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Form Section Skeleton */}
+          <div className="lg:col-span-2">
+            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20">
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-64" />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Account Selection Skeleton */}
+                <div className="space-y-4">
+                  <Skeleton className="h-5 w-32" />
+                  <div className="grid grid-cols-2 gap-4">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-24 rounded-xl" />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Content Type Skeleton */}
+                <div className="space-y-4">
+                  <Skeleton className="h-5 w-28" />
+                  <div className="grid grid-cols-3 gap-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-20 rounded-lg" />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Automation Type Skeleton */}
+                <div className="space-y-4">
+                  <Skeleton className="h-5 w-36" />
+                  <div className="grid grid-cols-1 gap-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16 rounded-lg" />
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Preview Section Skeleton */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-4">
+              <Skeleton className="h-12 rounded-t-3xl" />
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-b-3xl p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-full" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+                <Skeleton className="h-64 w-full rounded-lg" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // AutomationListManager component
 const AutomationListManager = ({ 
@@ -3604,6 +3715,12 @@ function AutomationStepByStepContent() {
     // Don't show comment screen immediately - wait for keywords to be added
     // Continue to next step logic here
   };
+
+  // Show skeleton loading during initial data fetch (first visit only)
+  // keepPreviousData: true means we won't see loading on subsequent visits
+  if (authLoading || (accountsLoading && !socialAccountsData)) {
+    return <AutomationStepByStepSkeleton />
+  }
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 min-h-full transition-colors duration-300">
