@@ -165,27 +165,29 @@ export class TokenEncryptionService {
       try {
         decryptedData = decipher.update(encryptedData, 'base64', 'utf8');
         decryptedData += decipher.final('utf8');
-      } catch (cryptoError) {
+      } catch (cryptoError: unknown) {
         // Handle specific GCM authentication failures
-        if (cryptoError.message.includes('Unsupported state') || 
-            cryptoError.message.includes('unable to authenticate')) {
+        const errorMessage = cryptoError instanceof Error ? cryptoError.message : 'Unknown crypto error';
+        if (errorMessage.includes('Unsupported state') || 
+            errorMessage.includes('unable to authenticate')) {
           throw new Error('Token authentication failed - key mismatch or corrupted data');
         }
         throw cryptoError;
       }
       
       return decryptedData;
-    } catch (error) {
+    } catch (error: unknown) {
       // Provide detailed error information for debugging
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.warn('🚨 P2-FIX: Token decryption failed with detailed error:', {
-        error: error.message,
+        error: errorMessage,
         hasEncryptedData: !!encryptedToken?.encryptedData,
         hasIV: !!encryptedToken?.iv,
         hasSalt: !!encryptedToken?.salt,
         hasTag: !!encryptedToken?.tag,
         algorithmUsed: ALGORITHM
       });
-      throw new Error(`Token decryption failed: ${error.message}`);
+      throw new Error(`Token decryption failed: ${errorMessage}`);
     }
   }
 
