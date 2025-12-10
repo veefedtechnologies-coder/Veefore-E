@@ -45,8 +45,14 @@ VeeFore/
 │   ├── models/                 # Mongoose models
 │   ├── middleware/             # Express middleware (auth, rate-limiting, security)
 │   ├── security/               # Security modules (GDPR, PKCE, workspace isolation)
+│   ├── infrastructure/         # Infrastructure modules
+│   │   ├── media-upload.ts     # Multer configuration for file uploads
+│   │   ├── leader-election.ts  # Distributed leader election for polling
+│   │   └── mongodb-connection.ts # MongoDB connection manager with retry
+│   ├── domain/                 # Domain types
+│   │   └── types.ts            # MongoDB-native domain types (string IDs)
 │   ├── index.ts                # Server entry point
-│   ├── routes.ts               # Route registration
+│   ├── routes.ts               # Route registration (~58 lines, minimal)
 │   └── mongodb-storage.ts      # Storage interface implementation
 ├── shared/                     # Shared types and schemas
 │   └── schema.ts               # Drizzle/Zod schema definitions
