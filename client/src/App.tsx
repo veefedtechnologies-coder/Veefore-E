@@ -32,6 +32,7 @@ import OnboardingFlow from './components/onboarding/OnboardingFlow'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
 import LoadingSpinner from './components/LoadingSpinner'
+import { SkeletonPageLoader } from './components/ui/skeleton'
 import AccountNotFoundBanner from './components/AccountNotFoundBanner'
 import { SectionErrorBoundary } from './components/ErrorBoundary'
 import WorkspaceCreationOverlay from './components/WorkspaceCreationOverlay'
@@ -715,7 +716,7 @@ function App() {
 
                 {/* Cosmos Studio Interface - Full height with scrolling */}
                 <main className="flex-1 overflow-y-auto">
-                  <React.Suspense fallback={<LoadingSpinner type="video" />}>
+                  <React.Suspense fallback={<SkeletonPageLoader type="video" />}>
                     <VideoGeneratorAdvanced />
                   </React.Suspense>
                 </main>
@@ -754,7 +755,7 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <React.Suspense fallback={<LoadingSpinner type="workspaces" />}>
+                   <React.Suspense fallback={<SkeletonPageLoader type="workspaces" />}>
                      <Workspaces />
                    </React.Suspense>
                  </main>
@@ -795,7 +796,7 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <React.Suspense fallback={<LoadingSpinner type="profile" />}>
+                   <React.Suspense fallback={<SkeletonPageLoader type="profile" />}>
                      <Profile />
                    </React.Suspense>
                  </main>
@@ -836,7 +837,7 @@ function App() {
                  <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                    {/* Instagram Webhook Listener for Real-time Updates */}
                    <InstagramWebhookListener />
-                   <React.Suspense fallback={<LoadingSpinner type="integration" />}>
+                   <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
                      <Integration />
                    </React.Suspense>
                  </main>
@@ -870,7 +871,7 @@ function App() {
 
                  {/* Main Content - Scrollable */}
                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                   <React.Suspense fallback={<LoadingSpinner type="automation" />}>
+                   <React.Suspense fallback={<SkeletonPageLoader type="automation" />}>
                      <AutomationStepByStep />
                    </React.Suspense>
                  </main>
@@ -894,7 +895,7 @@ function App() {
 
                {/* Main Content Area - VeeGPT takes full remaining space */}
                <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                 <React.Suspense fallback={<LoadingSpinner type="veegpt" />}>
+                 <React.Suspense fallback={<SkeletonPageLoader type="veegpt" />}>
                    <VeeGPT />
                  </React.Suspense>
               </div>
@@ -934,7 +935,7 @@ function App() {
                  <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                    {/* Instagram Webhook Listener for Real-time Updates */}
                    <InstagramWebhookListener />
-                   <React.Suspense fallback={<LoadingSpinner type="integration" />}>
+                   <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
                      <Integration />
                    </React.Suspense>
                 </main>
@@ -979,7 +980,7 @@ function App() {
                  
                  {/* Page Content */}
                  <div className="flex-1 overflow-y-auto">
-                   <React.Suspense fallback={<LoadingSpinner type="settings" />}>
+                   <React.Suspense fallback={<SkeletonPageLoader type="settings" />}>
                      <Settings />
                    </React.Suspense>
                  </div>
