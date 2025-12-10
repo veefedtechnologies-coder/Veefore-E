@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
 import LoadingSpinner from './components/LoadingSpinner'
 import AccountNotFoundBanner from './components/AccountNotFoundBanner'
+import { SectionErrorBoundary } from './components/ErrorBoundary'
 import WorkspaceCreationOverlay from './components/WorkspaceCreationOverlay'
 import { getAuth } from 'firebase/auth'
 import { useQuery } from '@tanstack/react-query'
@@ -1134,17 +1135,31 @@ function App() {
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
                     {/* Left Column - Performance Score + Get Started + Scheduled Posts + Drafts */}
                     <div className="space-y-6">
-                      <PerformanceScore />
-                      <GetStarted />
-                      <ScheduledPostsSection />
-                      <DraftsSection />
+                      <SectionErrorBoundary sectionName="Performance Score">
+                        <PerformanceScore />
+                      </SectionErrorBoundary>
+                      <SectionErrorBoundary sectionName="Get Started">
+                        <GetStarted />
+                      </SectionErrorBoundary>
+                      <SectionErrorBoundary sectionName="Scheduled Posts">
+                        <ScheduledPostsSection />
+                      </SectionErrorBoundary>
+                      <SectionErrorBoundary sectionName="Drafts">
+                        <DraftsSection />
+                      </SectionErrorBoundary>
                     </div>
                     
                     {/* Right Column - Recommendations + Social Accounts + Listening */}
                     <div className="space-y-6">
-                      <Recommendations />
-                      <SocialAccounts />
-                      <Listening />
+                      <SectionErrorBoundary sectionName="Recommendations">
+                        <Recommendations />
+                      </SectionErrorBoundary>
+                      <SectionErrorBoundary sectionName="Social Accounts">
+                        <SocialAccounts />
+                      </SectionErrorBoundary>
+                      <SectionErrorBoundary sectionName="Listening">
+                        <Listening />
+                      </SectionErrorBoundary>
                     </div>
                   </div>
                 </>
