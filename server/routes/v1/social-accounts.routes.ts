@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { socialAccountController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { auditMiddleware } from '../../middleware/audit-middleware';
+import { AuditActions } from '../../utils/audit-logger';
 import { z } from 'zod';
 
 const router = Router();
@@ -47,18 +49,21 @@ router.get('/:accountId',
 router.post('/workspace/:workspaceId', 
   requireAuth,
   validateRequest({ params: WorkspaceIdParams }),
+  auditMiddleware(AuditActions.SOCIAL_ACCOUNT.CONNECT, { resource: 'social_account' }),
   socialAccountController.connectAccount
 );
 
 router.delete('/:accountId', 
   requireAuth,
   validateRequest({ params: AccountIdParams }),
+  auditMiddleware(AuditActions.SOCIAL_ACCOUNT.DISCONNECT, { resource: 'social_account' }),
   socialAccountController.disconnectAccount
 );
 
 router.put('/:accountId/tokens', 
   requireAuth,
   validateRequest({ params: AccountIdParams }),
+  auditMiddleware(AuditActions.SOCIAL_ACCOUNT.REFRESH, { resource: 'social_account' }),
   socialAccountController.updateTokens
 );
 

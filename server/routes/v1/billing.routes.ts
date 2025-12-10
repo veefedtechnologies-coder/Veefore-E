@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { billingAuditMiddleware } from '../../middleware/audit-middleware';
+import { AuditActions } from '../../utils/audit-logger';
 import { storage } from '../../mongodb-storage';
 import { AuthenticatedRequest } from '../../types/express';
 
@@ -101,6 +103,7 @@ router.get('/credit-transactions', requireAuth, async (req: AuthenticatedRequest
 router.post('/razorpay/create-order',
   requireAuth,
   validateRequest({ body: CreateOrderSchema }),
+  billingAuditMiddleware(AuditActions.BILLING.CREDIT_PURCHASE),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { packageId } = req.body;
@@ -159,6 +162,7 @@ router.post('/razorpay/create-order',
 router.post('/razorpay/create-subscription',
   requireAuth,
   validateRequest({ body: CreateSubscriptionSchema }),
+  billingAuditMiddleware(AuditActions.BILLING.SUBSCRIPTION_CHANGE),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { planId } = req.body;
@@ -213,6 +217,7 @@ router.post('/razorpay/create-subscription',
 router.post('/razorpay/verify-payment',
   requireAuth,
   validateRequest({ body: VerifyPaymentSchema }),
+  billingAuditMiddleware(AuditActions.BILLING.PAYMENT),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       console.log('[PAYMENT VERIFICATION] Endpoint hit with body:', req.body);
@@ -353,6 +358,7 @@ router.post('/razorpay/verify-payment',
 router.post('/razorpay/create-addon-order',
   requireAuth,
   validateRequest({ body: CreateAddonOrderSchema }),
+  billingAuditMiddleware(AuditActions.BILLING.CREDIT_PURCHASE),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { addonId } = req.body;

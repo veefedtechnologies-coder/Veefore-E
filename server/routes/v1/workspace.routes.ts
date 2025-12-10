@@ -3,6 +3,8 @@ import { workspaceController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { apiRateLimiter } from '../../middleware/rate-limiting-working';
 import { validateRequest } from '../../middleware/validation';
+import { auditMiddleware } from '../../middleware/audit-middleware';
+import { AuditActions } from '../../utils/audit-logger';
 import { z } from 'zod';
 
 const router = Router();
@@ -52,16 +54,19 @@ router.get('/:workspaceId',
 
 router.post('/', 
   validateRequest({ body: CreateWorkspaceSchema }), 
+  auditMiddleware(AuditActions.WORKSPACE.CREATE, { resource: 'workspace' }),
   workspaceController.createWorkspace
 );
 
 router.put('/:workspaceId', 
   validateRequest({ params: WorkspaceIdParams, body: UpdateWorkspaceSchema }), 
+  auditMiddleware(AuditActions.WORKSPACE.UPDATE, { resource: 'workspace' }),
   workspaceController.updateWorkspace
 );
 
 router.delete('/:workspaceId', 
   validateRequest({ params: WorkspaceIdParams }), 
+  auditMiddleware(AuditActions.WORKSPACE.DELETE, { resource: 'workspace' }),
   workspaceController.deleteWorkspace
 );
 
@@ -94,11 +99,13 @@ router.get('/:workspaceId/invitations',
 
 router.post('/:workspaceId/invite', 
   validateRequest({ params: WorkspaceIdParams, body: InviteMemberSchema }), 
+  auditMiddleware(AuditActions.WORKSPACE.INVITE_MEMBER, { resource: 'workspace' }),
   workspaceController.inviteMember
 );
 
 router.delete('/:workspaceId/invitations/:invitationId', 
   validateRequest({ params: InvitationIdParams }), 
+  auditMiddleware('workspace.remove_invitation', { resource: 'workspace' }),
   workspaceController.deleteInvitation
 );
 

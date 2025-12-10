@@ -16,6 +16,8 @@ export interface IAuditLog extends Document {
   ipAddress?: string;
   userAgent?: string;
   severity?: 'info' | 'warning' | 'critical';
+  archived?: boolean;
+  archivedAt?: Date;
   createdAt: Date;
 }
 
@@ -57,6 +59,8 @@ const AuditLogSchema = new Schema<IAuditLog>({
     enum: ['info', 'warning', 'critical'],
     default: 'info'
   },
+  archived: { type: Boolean, default: false },
+  archivedAt: { type: Date },
   createdAt: { type: Date, default: Date.now, index: true }
 });
 
