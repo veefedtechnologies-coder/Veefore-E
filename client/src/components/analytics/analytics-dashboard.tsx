@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { SEO, seoConfig, generateStructuredData } from '@/lib/seo-optimization'
 import { TrendingUp, Users, Eye, Heart, Share, ArrowUpRight } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { SkeletonDashboardStats, SkeletonAnalyticsChart, SkeletonMetricCard } from '@/components/ui/skeleton'
 
 const performanceData = [
   { date: 'Sep 24', score: 50 },
@@ -19,7 +20,31 @@ const socialMetrics = [
   { platform: 'LinkedIn', followers: '1.8K', engagement: '+8.4%', color: 'bg-blue-700' },
 ]
 
-export function AnalyticsDashboard() {
+interface AnalyticsDashboardProps {
+  isLoading?: boolean
+  isFetching?: boolean
+}
+
+export function AnalyticsDashboard({ isLoading = false, isFetching = false }: AnalyticsDashboardProps) {
+  // Show full skeleton during initial load
+  if (isLoading) {
+    return (
+      <>
+        <SEO 
+          {...seoConfig.analytics}
+          structuredData={generateStructuredData.softwareApplication()}
+        />
+        <div className="space-y-6">
+          <SkeletonDashboardStats />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <SkeletonAnalyticsChart />
+            <SkeletonAnalyticsChart />
+          </div>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <SEO 
@@ -29,6 +54,15 @@ export function AnalyticsDashboard() {
       <div className="space-y-6">
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {isFetching ? (
+          <>
+            <SkeletonMetricCard />
+            <SkeletonMetricCard />
+            <SkeletonMetricCard />
+            <SkeletonMetricCard />
+          </>
+        ) : (
+          <>
         <Card className="border-gray-200 dark:border-gray-700">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -100,6 +134,8 @@ export function AnalyticsDashboard() {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
 
       {/* Performance Score */}

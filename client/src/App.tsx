@@ -53,6 +53,7 @@ import { GuidedTour } from './components/walkthrough/GuidedTour'
 import { initializeTheme } from './lib/theme'
 // P6: Frontend SEO, Accessibility & UX System
 import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
+import { RealtimeProvider } from './contexts/RealtimeContext'
 // P7: Accessibility System
 import { initializeAccessibilityCompliance, useAccessibilityRouteAnnouncements } from './lib/accessibility-compliance'
 // P11: Mobile & Cross-Platform Excellence
@@ -397,6 +398,7 @@ function App() {
 
   return (
     <P6Provider>
+    <RealtimeProvider>
     <>
     <Switch>
       {/* Waitlist pages - full screen without sidebar */}
@@ -1327,6 +1329,7 @@ function App() {
     {/* P6: Toast notifications container */}
     <ToastContainer position="top-right" />
     </>
+    </RealtimeProvider>
     </P6Provider>
   )
 }
