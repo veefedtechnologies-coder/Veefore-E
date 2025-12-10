@@ -120,9 +120,9 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
           firebaseUid,
           email,
           username: email.split('@')[0],
-          displayName: payload.name || null,
-          avatar: payload.picture || null,
-          referredBy: null
+          displayName: payload.name || undefined,
+          avatar: payload.picture || undefined,
+          referredBy: undefined
         }), 2500);
       } catch {
         user = {
