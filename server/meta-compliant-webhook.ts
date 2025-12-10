@@ -97,15 +97,12 @@ export class MetaCompliantWebhook {
     try {
       console.log('[META WEBHOOK] Event notification received from Meta');
 
-      // CRITICAL: Signature validation (temporarily bypassed for testing)
-      console.log('[META WEBHOOK] ⚠️ Signature validation bypassed for debugging');
-      // TODO: Fix signature validation
-      /*
+      // CRITICAL: Meta signature validation (re-enabled for production security)
       if (!this.validateMetaSignature(req)) {
         console.log('[META WEBHOOK] ❌ Invalid Meta signature - rejecting');
         return res.sendStatus(401) as any;
       }
-      */
+      console.log('[META WEBHOOK] ✅ Meta signature validated');
 
       const payload = req.body as MetaWebhookPayload;
       
@@ -146,9 +143,6 @@ export class MetaCompliantWebhook {
    * Reference: https://developers.facebook.com/docs/instagram-platform/webhooks#validating-payloads
    */
   private validateMetaSignature(req: Request): boolean {
-    // TEMPORARILY RETURN TRUE FOR TESTING
-    console.log('[META SIGNATURE] ⚠️ Signature validation bypassed - returning true');
-    return true;
     const signature = req.headers['x-hub-signature-256'] as string;
     if (!signature) {
       console.log('[META SIGNATURE] ❌ Missing X-Hub-Signature-256 header');
@@ -367,79 +361,24 @@ export class MetaCompliantWebhook {
   }
 
   /**
-   * Find Instagram account by Page ID
+   * Find Instagram account by Page ID using direct indexed lookups only
+   * Optimized: Uses repository's indexed queries (pageId_1_platform_1 and accountId_1_platform_1 indexes)
+   * No full collection scans - repository handles both pageId and accountId lookups via indexed queries
    */
   private async findAccountByPageId(pageId: string): Promise<any> {
     try {
-      const accounts = await this.storage.getAllSocialAccounts();
+      // Repository method uses indexed queries:
+      // 1. First tries: { pageId, platform: 'instagram', isActive: true } - uses pageId_1_platform_1 index
+      // 2. Falls back to: { accountId, platform: 'instagram', isActive: true } - uses platform_1_accountId_1_isActive_1 index
+      const account = await this.storage.getSocialAccountByPageId(pageId);
       
-      // Find all matching Instagram accounts with this Page ID
-      // For Instagram, the Page ID from Meta webhook corresponds to the Instagram account ID
-      const matchingAccounts = accounts.filter(acc => 
-        acc.platform === 'instagram' && 
-        (acc.pageId === pageId || acc.instagramId === pageId || acc.accountId === pageId)
-      );
-
-      // If no exact match found, try to find any active Instagram account as fallback
-      if (matchingAccounts.length === 0) {
-        console.log('[ACCOUNT LOOKUP] ⚠️ No exact Page ID match, trying fallback to any active Instagram account');
-        const fallbackAccounts = accounts.filter(acc => 
-          acc.platform === 'instagram' && acc.isActive
-        );
-        
-        if (fallbackAccounts.length > 0) {
-          console.log('[ACCOUNT LOOKUP] ✅ Using fallback Instagram account:', fallbackAccounts[0].username);
-          return fallbackAccounts[0];
-        }
+      if (account) {
+        console.log('[ACCOUNT LOOKUP] ✅ Found account:', account.username, '(indexed query)');
+        return account;
       }
 
-      if (matchingAccounts.length === 0) {
-        console.log('[ACCOUNT LOOKUP] ❌ No account found for Page ID:', pageId);
-        console.log('[ACCOUNT LOOKUP] Available accounts:', accounts
-          .filter(acc => acc.platform === 'instagram')
-          .map(acc => ({ username: acc.username, pageId: acc.pageId, accountId: acc.accountId, workspaceId: acc.workspaceId }))
-        );
-        return null;
-      }
-
-      // Debug all matching accounts
-      console.log('[ACCOUNT LOOKUP] 🔍 All matching accounts found:');
-      matchingAccounts.forEach((acc, index) => {
-        console.log(`[ACCOUNT LOOKUP] Account ${index + 1}: workspace=${acc.workspaceId}, username=${acc.username}, updated=${acc.updatedAt}, created=${acc.createdAt}`);
-      });
-
-      // Use the most recently updated account from matching accounts
-      const goodAccounts = matchingAccounts.sort((a, b) => {
-        const aDate = new Date(a.updatedAt || a.createdAt || 0);
-        const bDate = new Date(b.updatedAt || b.createdAt || 0);
-        return bDate.getTime() - aDate.getTime();
-      });
-      
-      let account;
-      if (goodAccounts.length > 0) {
-        // Use the most recently updated good account
-        account = goodAccounts.sort((a, b) => {
-          const aDate = new Date(a.updatedAt || a.createdAt || 0);
-          const bDate = new Date(b.updatedAt || b.createdAt || 0);
-          return bDate.getTime() - aDate.getTime(); // Most recent first
-        })[0];
-        console.log('[ACCOUNT LOOKUP] ✅ Using most recently updated account');
-      } else {
-        // Fallback to most recent if no good accounts found
-        account = matchingAccounts.sort((a, b) => {
-          const aDate = new Date(a.updatedAt || a.createdAt || 0);
-          const bDate = new Date(b.updatedAt || b.createdAt || 0);
-          return bDate.getTime() - aDate.getTime(); // Most recent first
-        })[0];
-        console.log('[ACCOUNT LOOKUP] ⚠️ Using fallback account (any matching)');
-      }
-
-      console.log('[ACCOUNT LOOKUP] ✅ Found account:', account.username);
-      console.log('[ACCOUNT LOOKUP] Using workspace:', account.workspaceId);
-      if (matchingAccounts.length > 1) {
-        console.log('[ACCOUNT LOOKUP] ⚠️ Multiple accounts found, selected best one');
-      }
-      return account;
+      console.log('[ACCOUNT LOOKUP] ❌ No Instagram account found for Page ID:', pageId);
+      return null;
     } catch (error) {
       console.error('[ACCOUNT LOOKUP] ❌ Error finding account:', error);
       return null;
