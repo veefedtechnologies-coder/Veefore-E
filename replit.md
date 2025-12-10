@@ -118,6 +118,7 @@ VeeFore/
 - `/api/scheduler/*` - Content scheduling
 - `/api/thumbnails/*` - Thumbnail generation
 - `/api/trends/*` - Trending topics
+- `/api/activity/*` - User activity logs and audit trail
 
 ### Authentication Flow
 1. Client uses Firebase Auth for login (email/password or Google OAuth)
@@ -172,6 +173,14 @@ Backend uses Repository Pattern for data access:
 - Webhook signature verification
 - Workspace isolation (multi-tenant)
 - Audit trail logging
+
+### Audit Trail System
+- **Automatic Logging**: Middleware captures all successful API requests across content, workspace, social accounts, and billing routes
+- **Sensitive Data Sanitization**: Passwords, tokens, and signatures are redacted before logging
+- **Activity APIs**: `/api/activity/my-activity` and `/api/activity/workspace/:id/activity` with pagination
+- **Role-Based Access**: Workspace activity logs require Owner or Admin role
+- **Retention Policy**: 90-day default retention with critical log archiving
+- **AuditRetentionService**: Automated cleanup with archive support for critical logs
 
 ---
 
