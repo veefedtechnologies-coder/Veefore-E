@@ -56,15 +56,30 @@ export function useQueryWithRealtime<TData, TError = Error>(
     (realtimeData: any) => {
       console.log('[useQueryWithRealtime] Received realtime update for:', queryKey)
       
+      if (realtimeData === null || realtimeData === undefined) {
+        console.warn('[useQueryWithRealtime] Ignoring null/undefined realtime data')
+        return
+      }
+
       const currentData = queryClient.getQueryData<TData>(queryKey)
       let newData: TData
 
       switch (mergeStrategy) {
         case 'merge':
           if (currentData && typeof currentData === 'object' && !Array.isArray(currentData)) {
-            newData = { ...currentData, ...realtimeData } as TData
-          } else if (Array.isArray(currentData) && Array.isArray(realtimeData)) {
-            newData = [...realtimeData] as TData
+            if (typeof realtimeData !== 'object' || Array.isArray(realtimeData)) {
+              console.warn('[useQueryWithRealtime] Shape mismatch: current is object but realtime is not')
+              newData = currentData
+            } else {
+              newData = { ...currentData, ...realtimeData } as TData
+            }
+          } else if (Array.isArray(currentData)) {
+            if (!Array.isArray(realtimeData)) {
+              console.warn('[useQueryWithRealtime] Shape mismatch: current is array but realtime is not, skipping update')
+              newData = currentData
+            } else {
+              newData = [...realtimeData] as TData
+            }
           } else {
             newData = realtimeData as TData
           }
@@ -78,6 +93,15 @@ export function useQueryWithRealtime<TData, TError = Error>(
           break
         case 'replace':
         default:
+          if (currentData !== undefined) {
+            const currentIsArray = Array.isArray(currentData)
+            const realtimeIsArray = Array.isArray(realtimeData)
+            if (currentIsArray !== realtimeIsArray) {
+              console.warn('[useQueryWithRealtime] Shape mismatch on replace: array/object type differs, invalidating instead')
+              queryClient.invalidateQueries({ queryKey })
+              return
+            }
+          }
           newData = realtimeData as TData
           break
       }

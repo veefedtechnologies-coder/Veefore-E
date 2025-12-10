@@ -107,6 +107,13 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
   }, [getSocketUrl])
 
   const scheduleReconnect = useCallback(() => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      console.log('[Realtime] Skipping reconnect - no authenticated user')
+      setConnectionStatus('disconnected')
+      return
+    }
+
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
     }
@@ -117,6 +124,11 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
     console.log(`[Realtime] Scheduling reconnect in ${delay}ms`)
 
     reconnectTimeoutRef.current = setTimeout(() => {
+      if (!auth.currentUser) {
+        console.log('[Realtime] Aborting scheduled reconnect - user signed out')
+        setConnectionStatus('disconnected')
+        return
+      }
       reconnectDelayRef.current = Math.min(
         reconnectDelayRef.current * RECONNECT_MULTIPLIER,
         MAX_RECONNECT_DELAY
