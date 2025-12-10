@@ -48,3 +48,21 @@ VeeFore is an AI-powered social media management platform designed for creators 
 -   **Firebase Authentication**: For user authentication and session management.
 -   **Stripe**: For payment processing.
 -   **SendGrid**: For email notifications.
+
+## Recent Changes (December 2025)
+
+### React "Invalid Hook Call" Fix
+- **Root Cause**: Multiple React instances were being loaded due to a combination of:
+  1. Cache-busting query parameter on main.tsx script tag in index.html
+  2. Manual React aliases in vite.config.ts conflicting with Vite's pre-bundled modules
+- **Solution Applied**:
+  1. Removed cache-busting query parameter from `<script type="module" src="/src/main.tsx">` in client/index.html
+  2. Removed manual React/react-dom path aliases from vite.config.ts (kept resolve.dedupe)
+  3. Removed React from root package.json (only keep in client/package.json)
+  4. Let Vite handle React module resolution through its default pre-bundling
+
+### Vite Configuration Best Practices
+- Do NOT add cache-busting query parameters to script tags when using Vite
+- Do NOT manually alias React paths - let Vite's resolve.dedupe handle deduplication
+- Keep React dependencies only in client/package.json, not root package.json
+- Clear Vite cache (rm -rf client/node_modules/.vite) when troubleshooting module issues
