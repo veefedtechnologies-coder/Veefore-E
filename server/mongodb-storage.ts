@@ -54,10 +54,7 @@ import {
   generateReferralCode
 } from './storage/converters';
 
-// Import models - only those directly used in this file (others delegated to repositories)
-import { User as UserModel } from './models/User/User';
-import { WorkspaceModel } from './models/Workspace/Workspace';
-import { SocialAccountModel } from './models/Social/SocialAccount';
+import { connectionManager } from './infrastructure/mongodb-connection';
 
 import { userRepository } from './repositories/UserRepository';
 import { workspaceRepository } from './repositories/WorkspaceRepository';
@@ -111,170 +108,35 @@ import {
 import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES, ADDONS } from './pricing-config';
 
 export class MongoStorage implements IStorage {
-  private isConnected = false;
-  private connectionPromise: Promise<void> | null = null;
-  private connectionMetrics = {
-    connectAttempts: 0,
-    successfulConnections: 0,
-    failedConnections: 0,
-    lastConnectedAt: null as Date | null,
-    lastErrorAt: null as Date | null,
-    lastError: null as string | null,
-    averageConnectTimeMs: 0,
-  };
-  private static readonly MAX_RETRY_ATTEMPTS = 3;
-  private static readonly BASE_RETRY_DELAY_MS = 1000;
-
   getConnectionMetrics() {
-    return {
-      ...this.connectionMetrics,
-      isConnected: this.isConnected,
-      readyState: mongoose.connection.readyState,
-      readyStateLabel: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
-    };
-  }
-
-  private async connectWithRetry(retryCount = 0): Promise<void> {
-    const startTime = Date.now();
-    this.connectionMetrics.connectAttempts++;
-
-    try {
-      if (mongoose.connection.readyState === 3) {
-        await mongoose.disconnect();
-      }
-
-      const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://localhost:27017/veefore';
-      
-      if (retryCount === 0) {
-        console.log('[MONGODB] Attempting to connect to:', mongoUri);
-      } else {
-        console.log(`[MONGODB] Retry attempt ${retryCount}/${MongoStorage.MAX_RETRY_ATTEMPTS}...`);
-      }
-
-      // Configurable MongoDB connection settings via environment variables
-      const poolSize = parseInt(process.env.MONGODB_POOL_SIZE || '50', 10);
-      const serverSelectionTimeout = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '10000', 10);
-      const socketTimeout = parseInt(process.env.MONGODB_SOCKET_TIMEOUT || '45000', 10);
-      const maxIdleTime = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '30000', 10);
-      
-      await mongoose.connect(mongoUri, {
-        dbName: process.env.MONGODB_DB_NAME || 'veeforedb',
-        serverSelectionTimeoutMS: serverSelectionTimeout,
-        socketTimeoutMS: socketTimeout,
-        maxPoolSize: poolSize,
-        minPoolSize: Math.min(5, poolSize),
-        bufferCommands: false,
-        maxIdleTimeMS: maxIdleTime,
-        retryWrites: true,
-        retryReads: true,
-        connectTimeoutMS: parseInt(process.env.MONGODB_CONNECT_TIMEOUT || '10000', 10),
-      });
-
-      const connectTime = Date.now() - startTime;
-      this.isConnected = true;
-      this.connectionMetrics.successfulConnections++;
-      this.connectionMetrics.lastConnectedAt = new Date();
-      this.connectionMetrics.averageConnectTimeMs = 
-        (this.connectionMetrics.averageConnectTimeMs * (this.connectionMetrics.successfulConnections - 1) + connectTime) / 
-        this.connectionMetrics.successfulConnections;
-
-      console.log(`✅ Connected to MongoDB - ${mongoose.connection.db?.databaseName} database (${connectTime}ms)`);
-    } catch (error: unknown) {
-      this.connectionMetrics.failedConnections++;
-      this.connectionMetrics.lastErrorAt = new Date();
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorName = error instanceof Error ? error.name : '';
-      this.connectionMetrics.lastError = errorMessage;
-      this.isConnected = false;
-
-      const isTransient = errorName === 'MongoNetworkError' || 
-                          errorName === 'MongoServerSelectionError' ||
-                          errorMessage?.includes('ECONNREFUSED') ||
-                          errorMessage?.includes('timeout');
-
-      if (isTransient && retryCount < MongoStorage.MAX_RETRY_ATTEMPTS) {
-        const delay = MongoStorage.BASE_RETRY_DELAY_MS * Math.pow(2, retryCount);
-        console.warn(`[MONGODB] Transient error, retrying in ${delay}ms...`, errorMessage);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return this.connectWithRetry(retryCount + 1);
-      }
-
-      console.error('❌ FATAL: MongoDB connection failed after retries:', errorMessage);
-      
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('MongoDB connection required for production');
-      }
-      
-      console.warn('⚠️ Development mode: Continuing with limited functionality');
-    }
+    return connectionManager.getConnectionMetrics();
   }
 
   async connect(): Promise<void> {
-    if (this.isConnected && mongoose.connection.readyState === 1) {
-      return;
-    }
-
-    if (this.connectionPromise) {
-      return this.connectionPromise;
-    }
-
-    if (mongoose.connection.readyState === 2) {
-      this.connectionPromise = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          this.connectionPromise = null;
-          reject(new Error('MongoDB connection timeout'));
-        }, 10000);
-
-        mongoose.connection.once('connected', () => {
-          clearTimeout(timeout);
-          this.isConnected = true;
-          this.connectionPromise = null;
-          resolve();
-        });
-        mongoose.connection.once('error', (error) => {
-          clearTimeout(timeout);
-          this.isConnected = false;
-          this.connectionPromise = null;
-          reject(error);
-        });
-      });
-      return this.connectionPromise;
-    }
-
-    this.connectionPromise = this.connectWithRetry().finally(() => {
-      this.connectionPromise = null;
-    });
-
-    return this.connectionPromise;
-  }
-
-  private async ensureConnected(): Promise<void> {
-    if (!this.isConnected || mongoose.connection.readyState !== 1) {
-      await this.connect();
-    }
+    return connectionManager.connect();
   }
 
   // User operations - delegating to userRepository
   async getUser(id: number | string): Promise<User | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.findById(id.toString());
     return user ? convertUser(user) : undefined;
   }
 
   async getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.findByFirebaseUid(firebaseUid);
     return user ? convertUser(user) : undefined;
   }
 
   async getUserByFirebaseId(firebaseId: string): Promise<User | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.findByFirebaseUid(firebaseId);
     return user ? convertUser(user) : undefined;
   }
 
   async updateUserLastLogin(firebaseId: string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.findByFirebaseUid(firebaseId);
     if (user) {
       await userRepository.updateById(user._id.toString(), { lastLoginAt: new Date() });
@@ -282,31 +144,31 @@ export class MongoStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.findByEmail(email);
     return user ? convertUser(user) : undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.findByUsername(username);
     return user ? convertUser(user) : undefined;
   }
 
   async getUserByReferralCode(referralCode: string): Promise<User | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.findByReferralCode(referralCode);
     return user ? convertUser(user) : undefined;
   }
 
   async createUser(userData: InsertUser): Promise<User> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const savedUser = await userRepository.createWithDefaultWorkspace(userData);
     return convertUser(savedUser);
   }
 
   async updateUser(id: number | string, updates: Partial<User>): Promise<User> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await userRepository.updateById(id.toString(), updates);
     if (!user) {
       throw new Error('User not found');
@@ -329,7 +191,7 @@ export class MongoStorage implements IStorage {
 
   // Workspace operations - delegating to workspaceRepository
   async getWorkspace(id: number | string): Promise<Workspace | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     // Handle invalid IDs
     if (!id || id === 'undefined' || id === 'null') {
@@ -353,13 +215,13 @@ export class MongoStorage implements IStorage {
   }
 
   async getWorkspacesByUserId(userId: number | string): Promise<Workspace[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const workspaces = await workspaceRepository.findByUserId(userId.toString());
     return workspaces.map(ws => convertWorkspace(ws));
   }
 
   async getDefaultWorkspace(userId: number | string): Promise<Workspace | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     // Try to find default workspace first
     let workspace = await workspaceRepository.findDefaultByUserId(userId.toString());
@@ -374,20 +236,20 @@ export class MongoStorage implements IStorage {
   }
 
   async createWorkspace(workspaceData: InsertWorkspace): Promise<Workspace> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const workspace = await workspaceRepository.createWithDefaults(workspaceData);
     return convertWorkspace(workspace);
   }
 
   async updateWorkspace(id: number | string, updates: Partial<Workspace>): Promise<Workspace> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const workspace = await workspaceRepository.updateById(id.toString(), updates);
     if (!workspace) throw new Error('Workspace not found');
     return convertWorkspace(workspace);
   }
 
   async updateWorkspaceCredits(id: number | string, credits: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const result = await workspaceRepository.updateById(id.toString(), { credits });
     
@@ -397,7 +259,7 @@ export class MongoStorage implements IStorage {
   }
 
   async deleteWorkspace(id: number | string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const ws = await workspaceRepository.findById(id.toString());
     if (!ws) throw new Error('Workspace not found');
     if (ws.isDefault === true) {
@@ -407,7 +269,7 @@ export class MongoStorage implements IStorage {
   }
 
   async setDefaultWorkspace(userId: number | string, workspaceId: number | string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await workspaceRepository.unsetDefaultForUser(userId.toString());
     await workspaceRepository.updateById(workspaceId.toString(), { isDefault: true });
   }
@@ -416,19 +278,19 @@ export class MongoStorage implements IStorage {
 
   // Social account operations - delegating to socialAccountRepository
   async getSocialAccount(id: number | string): Promise<SocialAccount | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const account = await socialAccountRepository.findById(id.toString());
     return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialAccountByWorkspaceAndPlatform(workspaceId: number, platform: string): Promise<SocialAccount | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId.toString(), platform as any);
     return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialAccountsByWorkspace(workspaceId: string | number): Promise<SocialAccount[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const accounts = await socialAccountRepository.findByWorkspaceWithTolerantLookup(workspaceId.toString());
     return accounts.map(account => convertSocialAccount(account));
   }
@@ -439,12 +301,12 @@ export class MongoStorage implements IStorage {
    * like auto-sync, NOT for API responses to clients
    */
   async getSocialAccountsWithTokensInternal(workspaceId: string): Promise<SocialAccount[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return socialAccountRepository.findActiveWithDecryptedTokens(workspaceId);
   }
 
   async getAllSocialAccounts(): Promise<SocialAccount[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const accounts = await socialAccountRepository.findAll({ isActive: true });
     return accounts.map(account => convertSocialAccount(account));
   }
@@ -452,19 +314,19 @@ export class MongoStorage implements IStorage {
 
 
   async getSocialAccountByPlatform(workspaceId: number | string, platform: string): Promise<SocialAccount | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId.toString(), platform as any);
     return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialAccountByPageId(pageId: string): Promise<SocialAccount | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const account = await socialAccountRepository.findByPageIdOrAccountId(pageId);
     return account ? convertSocialAccount(account) : undefined;
   }
 
   async getSocialConnections(userId: number | string): Promise<SocialAccount[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const userWorkspaces = await this.getWorkspacesByUserId(userId);
     const workspaceIds = userWorkspaces.map(w => w.id.toString());
     const accounts = await socialAccountRepository.findByWorkspaceIds(workspaceIds);
@@ -472,19 +334,19 @@ export class MongoStorage implements IStorage {
   }
 
   async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const newAccount = await socialAccountRepository.createWithEncryptedTokens(account);
     return convertSocialAccount(newAccount);
   }
 
   async updateSocialAccount(id: number | string, updates: Partial<SocialAccount>): Promise<SocialAccount> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const updatedAccount = await socialAccountRepository.updateWithEncryptedTokens(id.toString(), updates);
     return convertSocialAccount(updatedAccount);
   }
 
   async deleteSocialAccount(id: number | string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const deleted = await socialAccountRepository.deleteById(id.toString());
     
@@ -495,13 +357,13 @@ export class MongoStorage implements IStorage {
 
   // Content operations - delegating to contentRepository
   async getContent(id: number): Promise<Content | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const content = await contentRepository.findById(id.toString());
     return content ? convertContent(content) : undefined;
   }
 
   async getContentByWorkspace(workspaceId: number, limit?: number): Promise<Content[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const contents = await contentRepository.findByWorkspaceId(
       workspaceId.toString(),
       limit ? { limit, sortBy: 'createdAt', sortOrder: 'desc' } : { sortBy: 'createdAt', sortOrder: 'desc' }
@@ -510,26 +372,26 @@ export class MongoStorage implements IStorage {
   }
 
   async getScheduledContent(workspaceId?: number): Promise<Content[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const contents = await contentRepository.findScheduledContent(workspaceId?.toString());
     return contents.map(content => convertContent(content));
   }
 
   async createContent(content: InsertContent): Promise<Content> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await contentRepository.createWithDefaults(content);
     return convertContent(saved);
   }
 
   async updateContent(id: number, updates: Partial<Content>): Promise<Content> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const content = await contentRepository.updateById(id.toString(), updates);
     if (!content) throw new Error('Content not found');
     return convertContent(content);
   }
 
   async createPost(postData: InsertContent & { content?: string; media?: string[]; hashtags?: string; firstComment?: string; location?: string; accounts?: string[] }): Promise<Content & { content?: string; media?: string[]; hashtags?: string; firstComment?: string; location?: string; accounts?: string[] }> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await contentRepository.createPostWithDefaults(postData);
     return {
       id: saved._id.toString(),
@@ -548,7 +410,7 @@ export class MongoStorage implements IStorage {
   }
 
   async deleteContent(id: number | string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const deleted = await contentRepository.deleteById(id.toString());
     
@@ -559,50 +421,50 @@ export class MongoStorage implements IStorage {
 
   // Analytics operations - delegating to analyticsRepository
   async getAnalytics(workspaceId: number | string, platform?: string, days?: number): Promise<Analytics[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const analyticsData = await analyticsRepository.findByWorkspaceWithDaysFilter(workspaceId.toString(), platform, days);
     return analyticsData.map(doc => convertAnalytics(doc));
   }
 
   async createAnalytics(analytics: InsertAnalytics): Promise<Analytics> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const analyticsDoc = await analyticsRepository.createWithDefaults(analytics);
     return convertAnalytics(analyticsDoc);
   }
 
   async getLatestAnalytics(workspaceId: number, platform: string): Promise<Analytics | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const analytics = await analyticsRepository.findLatestByPlatform(workspaceId.toString(), platform);
     return analytics ? convertAnalytics(analytics) : undefined;
   }
 
   async getAutomationRules(workspaceId: number | string): Promise<AutomationRule[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return automationRuleRepository.findByWorkspaceIdFormatted(workspaceId.toString());
   }
 
   async getActiveAutomationRules(): Promise<AutomationRule[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return automationRuleRepository.findActiveRulesFormatted();
   }
 
   async getAutomationRulesByType(type: string): Promise<AutomationRule[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return automationRuleRepository.findByTypeFormatted(type);
   }
 
   async createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return automationRuleRepository.createWithDefaults(rule);
   }
 
   async updateAutomationRule(id: string, updates: Partial<AutomationRule>): Promise<AutomationRule> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return automationRuleRepository.updateWithCleanup(id, updates);
   }
 
   async deleteAutomationRule(id: string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     try {
       const deleted = await automationRuleRepository.deleteById(id);
       
@@ -622,12 +484,12 @@ export class MongoStorage implements IStorage {
 
 
   async clearWorkspaceConversations(workspaceId: string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await dmConversationRepository.clearWorkspaceData(workspaceId);
   }
 
   async getSuggestions(workspaceId: number, type?: string): Promise<Suggestion[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const suggestions = await suggestionRepository.findByWorkspaceId(workspaceId.toString());
     
@@ -637,19 +499,19 @@ export class MongoStorage implements IStorage {
   }
 
   async getValidSuggestions(workspaceId: number): Promise<Suggestion[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const suggestions = await suggestionRepository.findValidByWorkspace(workspaceId.toString());
     return suggestions.map(doc => convertSuggestion(doc));
   }
 
   async createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await suggestionRepository.createWithDefaults(suggestion);
     return convertSuggestion(saved);
   }
 
   async markSuggestionUsed(id: number): Promise<Suggestion> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const updated = await suggestionRepository.markAsUsed(id.toString());
     
@@ -661,13 +523,13 @@ export class MongoStorage implements IStorage {
   }
 
   async clearSuggestionsByWorkspace(workspaceId: string | number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     await suggestionRepository.deleteMany({ workspaceId: workspaceId.toString() });
   }
 
   async getCreditTransactions(userId: number, limit = 50): Promise<CreditTransaction[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     try {
       const transactions = await creditTransactionRepository.getRecentTransactions(userId.toString(), limit);
@@ -678,7 +540,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const created = await creditTransactionRepository.createWithDefaults(transaction);
     return convertCreditTransaction(created);
   }
@@ -705,19 +567,19 @@ export class MongoStorage implements IStorage {
 
   // Subscription operations - delegating to subscriptionRepository
   async getSubscription(userId: number): Promise<Subscription | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const subscription = await subscriptionRepository.findByUserId(userId.toString());
     return subscription ? convertSubscription(subscription) : undefined;
   }
 
   async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const subscription = await subscriptionRepository.create(insertSubscription);
     return convertSubscription(subscription);
   }
 
   async updateSubscriptionStatus(userId: number, status: string, canceledAt?: Date): Promise<Subscription> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const subscription = await subscriptionRepository.updateOne(
       { userId: userId.toString() },
       { status, canceledAt }
@@ -727,33 +589,33 @@ export class MongoStorage implements IStorage {
   }
 
   async getActiveSubscription(userId: number): Promise<Subscription | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const subscription = await subscriptionRepository.findActiveByUserId(userId.toString());
     return subscription ? convertSubscription(subscription) : undefined;
   }
 
   // Payment operations - delegating to paymentRepository
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const payment = await paymentRepository.create(insertPayment);
     return convertPayment(payment);
   }
 
   async getPaymentsByUser(userId: number): Promise<Payment[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const result = await paymentRepository.findByUserId(userId.toString());
     return result.data.map(payment => convertPayment(payment));
   }
 
   // Addon operations - delegating to addonRepository
   async getUserAddons(userId: number | string): Promise<Addon[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const addons = await addonRepository.findActiveByUserId(userId.toString());
     return addons.map(addon => convertAddon(addon));
   }
 
   async getActiveAddonsByUser(userId: number | string): Promise<Addon[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const userIdStr = userId.toString();
     const addons = await addonRepository.findActiveByUserId(userIdStr);
@@ -762,13 +624,13 @@ export class MongoStorage implements IStorage {
   }
 
   async createAddon(insertAddon: InsertAddon): Promise<Addon> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const savedAddon = await addonRepository.createWithDefaults(insertAddon);
     return convertAddon(savedAddon);
   }
 
   async getSuggestionsByWorkspace(workspaceId: string | number): Promise<Suggestion[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const suggestions = await suggestionRepository.findByWorkspaceId(
       workspaceId.toString(),
       { sortBy: 'createdAt', sortOrder: 'desc' }
@@ -777,20 +639,20 @@ export class MongoStorage implements IStorage {
   }
 
   async getAnalyticsByWorkspace(workspaceId: string | number): Promise<Analytics[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const analytics = await analyticsRepository.findByWorkspaceId(workspaceId.toString());
     return analytics.map(convertAnalytics);
   }
 
   // Team management operations
   async getWorkspaceByInviteCode(inviteCode: string): Promise<Workspace | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const workspace = await workspaceRepository.findByInviteCode(inviteCode);
     return workspace ? convertWorkspace(workspace) : undefined;
   }
 
   async getWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<WorkspaceMember | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const member = await workspaceMemberRepository.findByWorkspaceAndUser(
       workspaceId.toString(),
       userId.toString()
@@ -799,7 +661,7 @@ export class MongoStorage implements IStorage {
   }
 
   async getWorkspaceMembers(workspaceId: number | string): Promise<(WorkspaceMember & { user: User })[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const membersWithUsers = await workspaceMemberRepository.getMembersWithOwnerFallback(workspaceId.toString());
     
@@ -815,20 +677,20 @@ export class MongoStorage implements IStorage {
   }
 
   async addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const newMember = await workspaceMemberRepository.createWithDefaults(member);
     return convertWorkspaceMember(newMember);
   }
 
   async updateWorkspaceMember(workspaceId: number | string, userId: number | string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const updatedMember = await workspaceMemberRepository.updateByWorkspaceAndUser(workspaceId.toString(), userId.toString(), updates);
     if (!updatedMember) throw new Error(`Workspace member not found`);
     return convertWorkspaceMember(updatedMember);
   }
 
   async removeWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const member = await workspaceMemberRepository.findByWorkspaceAndUser(
       workspaceId.toString(),
       userId.toString()
@@ -839,13 +701,13 @@ export class MongoStorage implements IStorage {
   }
 
   async createTeamInvitation(invitation: InsertTeamInvitation): Promise<TeamInvitation> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const newInvitation = await teamInvitationRepository.createWithDefaults(invitation);
     return convertTeamInvitation(newInvitation);
   }
 
   async getWorkspaceInvitations(workspaceId: number): Promise<TeamInvitation[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const invitations = await teamInvitationRepository.findPendingByWorkspace(
       workspaceId.toString(),
@@ -856,19 +718,19 @@ export class MongoStorage implements IStorage {
   }
 
   async getTeamInvitation(id: number): Promise<TeamInvitation | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const invitation = await teamInvitationRepository.findOne({ id });
     return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
   async getTeamInvitationByToken(token: string): Promise<TeamInvitation | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const invitation = await teamInvitationRepository.findByToken(token);
     return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
   async getTeamInvitations(workspaceId: number | string, status?: string): Promise<TeamInvitation[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const options = { sortBy: 'createdAt' as const, sortOrder: 'desc' as const };
     let invitations;
@@ -889,7 +751,7 @@ export class MongoStorage implements IStorage {
   }
 
   async updateTeamInvitation(id: number, updates: Partial<TeamInvitation>): Promise<TeamInvitation> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const invitation = await teamInvitationRepository.findOne({ id });
     
@@ -911,13 +773,13 @@ export class MongoStorage implements IStorage {
 
   // Content recommendation operations
   async getContentRecommendation(id: number): Promise<ContentRecommendation | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const recommendation = await contentRecommendationRepository.findById(id.toString());
     return recommendation ? convertContentRecommendation(recommendation) : undefined;
   }
 
   async getContentRecommendations(workspaceId: number, type?: string, limit?: number): Promise<ContentRecommendation[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const options: { sortBy: 'createdAt'; sortOrder: 'desc'; limit?: number } = { sortBy: 'createdAt', sortOrder: 'desc' };
     if (limit) {
@@ -941,13 +803,13 @@ export class MongoStorage implements IStorage {
   }
 
   async createContentRecommendation(insertRecommendation: InsertContentRecommendation): Promise<ContentRecommendation> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await contentRecommendationRepository.createWithDefaults(insertRecommendation);
     return convertContentRecommendation(saved);
   }
 
   async updateContentRecommendation(id: number, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const updated = await contentRecommendationRepository.updateById(
       id.toString(),
       updates
@@ -959,7 +821,7 @@ export class MongoStorage implements IStorage {
   }
 
   async deleteContentRecommendation(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const deleted = await contentRecommendationRepository.deleteById(id.toString());
     if (!deleted) {
       throw new Error(`Content recommendation ${id} not found`);
@@ -967,7 +829,7 @@ export class MongoStorage implements IStorage {
   }
 
   async getUserContentHistory(userId: number, workspaceId: number): Promise<UserContentHistory[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const history = await userContentHistoryRepository.findMany(
       { userId: userId.toString(), workspaceId: workspaceId.toString() },
       { sortBy: 'createdAt', sortOrder: 'desc' }
@@ -976,7 +838,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createUserContentHistory(insertHistory: InsertUserContentHistory): Promise<UserContentHistory> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await userContentHistoryRepository.createWithDefaults(insertHistory);
     return convertUserContentHistory(saved);
   }
@@ -991,7 +853,7 @@ export class MongoStorage implements IStorage {
   }
 
   async updateUserSubscription(userId: number | string, planId: string): Promise<User> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     // Get plan credits from pricing config
     const plan = SUBSCRIPTION_PLANS[planId];
@@ -1011,7 +873,7 @@ export class MongoStorage implements IStorage {
   }
 
   async addCreditsToUser(userId: number | string, credits: number): Promise<User> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     // Use repository method that handles both _id and id field lookups atomically
     const updatedUser = await userRepository.addCreditsAtomic(userId.toString(), credits);
@@ -1025,35 +887,35 @@ export class MongoStorage implements IStorage {
 
   // DM Conversation Memory Methods - delegating to dmConversationRepository and dmMessageRepository
   async getDmConversation(workspaceId: string, platform: string, participantId: string): Promise<DmConversation | null> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const conversation = await dmConversationRepository.findByWorkspaceAndParticipant(workspaceId, participantId);
     return conversation ? convertDmConversation(conversation) : null;
   }
 
   async createDmConversation(data: InsertDmConversation): Promise<DmConversation> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const conversation = await dmConversationRepository.create(data);
     return convertDmConversation(conversation);
   }
 
   async createDmMessage(data: InsertDmMessage): Promise<DmMessage> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const message = await dmMessageRepository.create(data);
     return convertDmMessage(message);
   }
 
   async updateConversationLastMessage(conversationId: string | number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await dmConversationRepository.incrementMessageCount(conversationId.toString());
   }
 
   async getDmMessages(conversationId: number | string, limit: number = 10): Promise<DmMessage[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return dmMessageRepository.findMessagesForConversation(conversationId, limit);
   }
 
   async getConversationContext(conversationId: number): Promise<ConversationContext[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const contexts = await conversationContextRepository.findActiveContexts(conversationId.toString());
     
@@ -1071,7 +933,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createConversationContext(data: InsertConversationContext): Promise<ConversationContext> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const saved = await conversationContextRepository.create(data);
     
@@ -1089,7 +951,7 @@ export class MongoStorage implements IStorage {
   }
 
   async cleanupExpiredContext(cutoffDate: Date): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     await conversationContextRepository.deleteMany({
       expiresAt: { $lt: cutoffDate }
@@ -1097,7 +959,7 @@ export class MongoStorage implements IStorage {
   }
 
   async cleanupOldMessages(cutoffDate: Date): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await dmMessageRepository.cleanupOldMessages(cutoffDate);
   }
 
@@ -1107,23 +969,23 @@ export class MongoStorage implements IStorage {
     totalMessages: number;
     averageResponseTime: number;
   }> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return dmConversationRepository.getStats(workspaceId);
   }
 
   async getDmConversations(workspaceId: string, limit: number = 50): Promise<DmConversation[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return dmConversationRepository.findByWorkspaceFormatted(workspaceId, limit);
   }
 
   async getAutomationRulesByTrigger(triggerType: string): Promise<AutomationRule[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return automationRuleRepository.findByGlobalTriggerTypeFormatted(triggerType);
   }
 
   // Admin operations - delegating to adminRepository
   async getAdmin(id: number): Promise<Admin | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     try {
       const admin = await adminRepository.findById(id.toString());
       return admin ? convertAdmin(admin) : undefined;
@@ -1133,25 +995,25 @@ export class MongoStorage implements IStorage {
   }
 
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const admin = await adminRepository.findByEmail(email);
     return admin ? convertAdmin(admin) : undefined;
   }
 
   async getAdminByUsername(username: string): Promise<Admin | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const admin = await adminRepository.findByUsername(username);
     return admin ? convertAdmin(admin) : undefined;
   }
 
   async getAllAdmins(): Promise<Admin[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const admins = await adminRepository.findActiveAdmins();
     return admins.map(admin => convertAdmin(admin));
   }
 
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const savedAdmin = await adminRepository.createWithDefaults({
       email: admin.email,
       username: admin.username,
@@ -1163,14 +1025,14 @@ export class MongoStorage implements IStorage {
   }
 
   async updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const admin = await adminRepository.updateById(id.toString(), updates);
     if (!admin) throw new Error('Admin not found');
     return convertAdmin(admin);
   }
 
   async deleteAdmin(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await adminRepository.deactivateAdmin(id.toString());
   }
 
@@ -1181,7 +1043,7 @@ export class MongoStorage implements IStorage {
     role?: 'admin' | 'superadmin';
     status?: 'active' | 'inactive';
   }): Promise<{ admins: Admin[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const result = await adminRepository.findWithPaginationAndFilters(options);
     
@@ -1202,7 +1064,7 @@ export class MongoStorage implements IStorage {
 
   // Admin session operations - delegating to adminSessionRepository
   async createAdminSession(session: InsertAdminSession): Promise<AdminSession> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const savedSession = await adminSessionRepository.createWithDefaults({
       adminId: session.adminId,
       token: session.token,
@@ -1214,7 +1076,7 @@ export class MongoStorage implements IStorage {
   }
 
   async getAdminSession(token: string): Promise<AdminSession | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const session = await adminSessionRepository.findByToken(token);
     if (!session || new Date(session.expiresAt) <= new Date()) {
       return undefined;
@@ -1223,7 +1085,7 @@ export class MongoStorage implements IStorage {
   }
 
   async deleteAdminSession(token: string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const session = await adminSessionRepository.findByToken(token);
     if (session) {
       await adminSessionRepository.deleteById(session._id.toString());
@@ -1231,13 +1093,13 @@ export class MongoStorage implements IStorage {
   }
 
   async cleanupExpiredSessions(): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await adminSessionRepository.deleteExpiredSessions();
   }
 
   // Notification operations - delegating to notificationRepository
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const notificationData = {
       userId: notification.userId || null,
@@ -1255,19 +1117,19 @@ export class MongoStorage implements IStorage {
   }
 
   async getUserNotifications(userId: string): Promise<Notification[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const notifications = await notificationRepository.findActiveNotifications({ limit: 50 });
     return notifications.map(notification => convertNotification(notification));
   }
 
   async markNotificationAsRead(notificationId: string, userId: string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await notificationRepository.markAsRead(notificationId);
   }
 
   async getNotifications(userId?: number): Promise<Notification[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const notifications = userId 
       ? await notificationRepository.findByUserId(userId)
       : await notificationRepository.findAll({});
@@ -1275,86 +1137,86 @@ export class MongoStorage implements IStorage {
   }
 
   async updateNotification(id: number, updates: Partial<Notification>): Promise<Notification> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const notification = await notificationRepository.updateById(id.toString(), updates);
     if (!notification) throw new Error('Notification not found');
     return convertNotification(notification);
   }
 
   async deleteNotification(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await notificationRepository.deleteById(id.toString());
   }
 
   async markNotificationRead(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await notificationRepository.markAsRead(id.toString());
   }
 
   // Popup operations - delegating to popupRepository
   async createPopup(popup: InsertPopup): Promise<Popup> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const savedPopup = await popupRepository.createWithDefaults(popup);
     return convertPopup(savedPopup);
   }
 
   async getActivePopups(): Promise<Popup[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const popups = await popupRepository.findActivePopups();
     return popups.map(popup => convertPopup(popup));
   }
 
   async getPopup(id: number): Promise<Popup | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const popup = await popupRepository.findById(id.toString());
     return popup ? convertPopup(popup) : undefined;
   }
 
   async updatePopup(id: number, updates: Partial<Popup>): Promise<Popup> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const popup = await popupRepository.updateById(id.toString(), updates);
     if (!popup) throw new Error('Popup not found');
     return convertPopup(popup);
   }
 
   async deletePopup(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await popupRepository.deleteById(id.toString());
   }
 
   // App settings operations - delegating to appSettingRepository
   async createAppSetting(setting: InsertAppSetting): Promise<AppSetting> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const savedSetting = await appSettingRepository.createWithDefaults(setting);
     return convertAppSetting(savedSetting);
   }
 
   async getAppSetting(key: string): Promise<AppSetting | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const setting = await appSettingRepository.findByKey(key);
     return setting ? convertAppSetting(setting) : undefined;
   }
 
   async getAllAppSettings(): Promise<AppSetting[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const settings = await appSettingRepository.findAll({});
     return settings.map(setting => convertAppSetting(setting));
   }
 
   async getPublicAppSettings(): Promise<AppSetting[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const settings = await appSettingRepository.findPublicSettings();
     return settings.map(setting => convertAppSetting(setting));
   }
 
   async updateAppSetting(key: string, value: string, updatedBy?: number): Promise<AppSetting> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const setting = await appSettingRepository.upsertSetting(key, value, { updatedBy });
     return convertAppSetting(setting);
   }
 
   async deleteAppSetting(key: string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const setting = await appSettingRepository.findByKey(key);
     if (setting) {
       await appSettingRepository.deleteById(setting._id.toString());
@@ -1363,7 +1225,7 @@ export class MongoStorage implements IStorage {
 
   // Audit log operations - delegating to auditLogRepository
   async createAuditLog(log: InsertAuditLog & { actorType?: string; actorId?: string }): Promise<AuditLog> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const enrichedLog = { ...log };
     if (!enrichedLog.actorType) {
@@ -1378,7 +1240,7 @@ export class MongoStorage implements IStorage {
   }
 
   async getAuditLogs(limit?: number, adminId?: number): Promise<AuditLog[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const logs = adminId 
       ? await auditLogRepository.findByActorId(String(adminId), { limit: limit || 100 })
       : await auditLogRepository.getRecentAuditLogs(limit || 100);
@@ -1387,13 +1249,13 @@ export class MongoStorage implements IStorage {
 
   // Feedback operations - delegating to feedbackMessageRepository
   async createFeedbackMessage(feedback: InsertFeedbackMessage): Promise<FeedbackMessage> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const savedFeedback = await feedbackMessageRepository.createWithDefaults(feedback);
     return convertFeedbackMessage(savedFeedback);
   }
 
   async getFeedbackMessages(status?: string): Promise<FeedbackMessage[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const messages = status 
       ? await feedbackMessageRepository.findByStatus(status)
       : await feedbackMessageRepository.findAll({});
@@ -1401,40 +1263,40 @@ export class MongoStorage implements IStorage {
   }
 
   async updateFeedbackMessage(id: number, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const message = await feedbackMessageRepository.updateById(id.toString(), updates);
     if (!message) throw new Error('Feedback message not found');
     return convertFeedbackMessage(message);
   }
 
   async deleteFeedbackMessage(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await feedbackMessageRepository.deleteById(id.toString());
   }
 
   // Missing automation log methods
   async getAutomationLogs(limit?: number): Promise<AutomationRule[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     // Return empty array for now as automation logs schema not defined
     return [];
   }
 
   async createAutomationLog(log: InsertAutomationRule): Promise<AutomationRule> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     // Return the log object for now as automation logs schema not defined
     return { id: Date.now(), workspaceId: log.workspaceId, name: log.name, ...log, createdAt: new Date() } as AutomationRule;
   }
 
   // Get all users method for cleanup operations
   async getAllUsers(): Promise<User[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const users = await userRepository.findAll({});
     return users.map(user => convertUser(user));
   }
 
   // Admin stats method
   async getAdminStats(): Promise<{ totalUsers: number; totalWorkspaces: number; totalContent: number; totalCreditsUsed: number; revenueThisMonth: number; activeUsers: number }> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const [userCount, workspaceCount, contentCount] = await Promise.all([
       userRepository.countAll(),
@@ -1454,17 +1316,17 @@ export class MongoStorage implements IStorage {
 
   // Email verification methods
   async storeEmailVerificationCode(email: string, code: string, expiry: Date): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await userRepository.storeEmailVerificationCode(email, code, expiry);
   }
 
   async verifyEmailCode(email: string, code: string): Promise<boolean> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return userRepository.verifyEmailCodeAndMarkVerified(email, code);
   }
 
   async clearEmailVerificationCode(email: string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await userRepository.clearEmailVerificationCode(email);
   }
 
@@ -1476,7 +1338,7 @@ export class MongoStorage implements IStorage {
     emailVerificationExpiry: Date; 
     isEmailVerified: boolean 
   }): Promise<User> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const userData = {
       email: data.email,
@@ -1497,7 +1359,7 @@ export class MongoStorage implements IStorage {
 
   // Email verification helper methods
   async updateUserEmailVerification(id: number | string, token: string, expires: Date): Promise<User> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const user = await userRepository.updateEmailVerificationData(id.toString(), token, expires);
 
@@ -1509,12 +1371,12 @@ export class MongoStorage implements IStorage {
   }
 
   async updateYouTubeWorkspaceData(updates: Partial<SocialAccount>): Promise<SocialAccount | null> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return socialAccountRepository.updateYouTubePlatformData(updates);
   }
 
   async verifyUserEmail(id: number | string, data: { password?: string; firstName?: string; lastName?: string; firebaseUid?: string }): Promise<User> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const additionalData: { displayName?: string; passwordHash?: string; firebaseUid?: string } = {};
     if (data.firstName) additionalData.displayName = data.firstName;
@@ -1534,38 +1396,38 @@ export class MongoStorage implements IStorage {
 
   // Thumbnail Projects - delegating to thumbnailProjectRepository
   async createThumbnailProject(data: InsertThumbnailProject): Promise<ThumbnailProject> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const project = await thumbnailProjectRepository.createWithDefaults(data);
     return thumbnailProjectRepository.convertToOutput(project);
   }
 
   async getThumbnailProject(projectId: number): Promise<ThumbnailProject | null> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const project = await thumbnailProjectRepository.findById(projectId.toString());
     if (!project) return null;
     return thumbnailProjectRepository.convertToOutput(project);
   }
 
   async updateThumbnailProject(projectId: number, updates: Partial<ThumbnailProject>): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await thumbnailProjectRepository.updateById(projectId.toString(), updates);
   }
 
   async getThumbnailProjects(workspaceId: number): Promise<ThumbnailProject[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const result = await thumbnailProjectRepository.findByWorkspaceId(workspaceId.toString());
     return result.data.map(project => thumbnailProjectRepository.convertToOutput(project));
   }
 
   // Thumbnail Strategies - delegating to thumbnailStrategyRepository
   async createThumbnailStrategy(data: InsertThumbnailStrategy): Promise<ThumbnailStrategy> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const strategy = await thumbnailStrategyRepository.createWithDefaults(data);
     return thumbnailStrategyRepository.convertToOutput(strategy);
   }
 
   async getThumbnailStrategy(projectId: number): Promise<ThumbnailStrategy | null> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const strategy = await thumbnailStrategyRepository.findByProjectId(projectId.toString());
     if (!strategy) return null;
     return thumbnailStrategyRepository.convertToOutput(strategy);
@@ -1573,58 +1435,58 @@ export class MongoStorage implements IStorage {
 
   // Thumbnail Variants - delegating to thumbnailVariantRepository
   async createThumbnailVariant(data: InsertThumbnailVariant): Promise<ThumbnailVariant> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const variant = await thumbnailVariantRepository.createWithDefaults(data);
     return thumbnailVariantRepository.convertToOutput(variant);
   }
 
   async getThumbnailVariant(variantId: number): Promise<ThumbnailVariant | null> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const variant = await thumbnailVariantRepository.findById(variantId.toString());
     if (!variant) return null;
     return thumbnailVariantRepository.convertToOutput(variant);
   }
 
   async getThumbnailVariants(projectId: number): Promise<ThumbnailVariant[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const variants = await thumbnailVariantRepository.findByProjectId(projectId.toString());
     return variants.map(variant => thumbnailVariantRepository.convertToOutput(variant));
   }
 
   // Canvas Editor Sessions - delegating to canvasEditorSessionRepository
   async createCanvasEditorSession(data: InsertCanvasEditorSession): Promise<CanvasEditorSession> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const session = await canvasEditorSessionRepository.createWithDefaults(data);
     return canvasEditorSessionRepository.convertToOutput(session);
   }
 
   async getCanvasEditorSession(sessionId: number): Promise<CanvasEditorSession | null> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const session = await canvasEditorSessionRepository.findById(sessionId.toString());
     if (!session) return null;
     return canvasEditorSessionRepository.convertToOutput(session);
   }
 
   async updateCanvasEditorSession(sessionId: number, updates: Partial<CanvasEditorSession>): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await canvasEditorSessionRepository.updateById(sessionId.toString(), { ...updates, lastSaved: new Date() });
   }
 
   // Thumbnail Exports - delegating to thumbnailExportRepository
   async createThumbnailExport(data: InsertThumbnailExport): Promise<ThumbnailExport> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const exportDoc = await thumbnailExportRepository.createWithDefaults(data);
     return thumbnailExportRepository.convertToOutput(exportDoc);
   }
 
   async getThumbnailExports(sessionId: number): Promise<ThumbnailExport[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const exports = await thumbnailExportRepository.findBySessionId(sessionId.toString());
     return exports.map(exp => thumbnailExportRepository.convertToOutput(exp));
   }
 
   async incrementExportDownload(exportId: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await thumbnailExportRepository.incrementDownloadCount(exportId.toString());
   }
 
@@ -1632,97 +1494,97 @@ export class MongoStorage implements IStorage {
   
   // Creative Brief operations - delegating to creativeBriefRepository
   async createCreativeBrief(brief: InsertCreativeBrief): Promise<CreativeBrief> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await creativeBriefRepository.create(brief);
     return convertCreativeBrief(saved);
   }
 
   async getCreativeBrief(id: number): Promise<CreativeBrief | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const brief = await creativeBriefRepository.findById(id.toString());
     return brief ? convertCreativeBrief(brief) : undefined;
   }
 
   async getCreativeBriefsByWorkspace(workspaceId: number): Promise<CreativeBrief[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const result = await creativeBriefRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
     const briefs = result.data || [];
     return briefs.map(brief => convertCreativeBrief(brief));
   }
 
   async updateCreativeBrief(id: number, updates: Partial<CreativeBrief>): Promise<CreativeBrief> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const updated = await creativeBriefRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Creative brief not found');
     return convertCreativeBrief(updated);
   }
 
   async deleteCreativeBrief(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await creativeBriefRepository.deleteById(id.toString());
   }
 
   // Content Repurpose operations - delegating to contentRepurposeRepository
   async createContentRepurpose(repurpose: InsertContentRepurpose): Promise<ContentRepurpose> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await contentRepurposeRepository.create(repurpose);
     return convertContentRepurpose(saved);
   }
 
   async getContentRepurpose(id: number): Promise<ContentRepurpose | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const repurpose = await contentRepurposeRepository.findById(id.toString());
     return repurpose ? convertContentRepurpose(repurpose) : undefined;
   }
 
   async getContentRepurposesByWorkspace(workspaceId: number): Promise<ContentRepurpose[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const result = await contentRepurposeRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
     const repurposes = result.data || [];
     return repurposes.map(repurpose => convertContentRepurpose(repurpose));
   }
 
   async updateContentRepurpose(id: number, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const updated = await contentRepurposeRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Content repurpose not found');
     return convertContentRepurpose(updated);
   }
 
   async deleteContentRepurpose(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await contentRepurposeRepository.deleteById(id.toString());
   }
 
   // Competitor Analysis operations - delegating to competitorAnalysisRepository
   async createCompetitorAnalysis(analysis: InsertCompetitorAnalysis): Promise<CompetitorAnalysis> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const saved = await competitorAnalysisRepository.create(analysis);
     return convertCompetitorAnalysis(saved);
   }
 
   async getCompetitorAnalysis(id: number): Promise<CompetitorAnalysis | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const analysis = await competitorAnalysisRepository.findById(id.toString());
     return analysis ? convertCompetitorAnalysis(analysis) : undefined;
   }
 
   async getCompetitorAnalysesByWorkspace(workspaceId: number): Promise<CompetitorAnalysis[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const result = await competitorAnalysisRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
     const analyses = result.data || [];
     return analyses.map(analysis => convertCompetitorAnalysis(analysis));
   }
 
   async updateCompetitorAnalysis(id: number, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const updated = await competitorAnalysisRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Competitor analysis not found');
     return convertCompetitorAnalysis(updated);
   }
 
   async deleteCompetitorAnalysis(id: number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     await competitorAnalysisRepository.deleteById(id.toString());
   }
 
@@ -1737,7 +1599,7 @@ export class MongoStorage implements IStorage {
     createdAt: Date;
     updatedAt: Date;
   }>> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     try {
       const result = await featureUsageRepository.findByUserId(userId.toString());
       const docs = result.data || [];
@@ -1757,7 +1619,7 @@ export class MongoStorage implements IStorage {
   }
 
   async trackFeatureUsage(userId: number | string, featureId: string, usage: Record<string, unknown> | null): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     try {
       const updated = await featureUsageRepository.incrementUsage(userId.toString(), featureId);
       if (updated && usage) {
@@ -1770,7 +1632,7 @@ export class MongoStorage implements IStorage {
 
   // Waitlist Management Methods - delegating to waitlistUserRepository
   async createWaitlistUser(insertWaitlistUser: InsertWaitlistUser): Promise<WaitlistUser> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const referralCode = generateReferralCode();
     
@@ -1793,32 +1655,32 @@ export class MongoStorage implements IStorage {
   }
 
   async getWaitlistUser(id: number | string): Promise<WaitlistUser | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await waitlistUserRepository.findById(id.toString());
     return user ? convertWaitlistUser(user) : undefined;
   }
 
   async getWaitlistUserByEmail(email: string): Promise<WaitlistUser | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await waitlistUserRepository.findByEmail(email);
     return user ? convertWaitlistUser(user) : undefined;
   }
 
   async getWaitlistUserByReferralCode(referralCode: string): Promise<WaitlistUser | undefined> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await waitlistUserRepository.findByReferralCode(referralCode);
     return user ? convertWaitlistUser(user) : undefined;
   }
 
   async updateWaitlistUser(id: number | string, updates: Partial<WaitlistUser>): Promise<WaitlistUser> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const user = await waitlistUserRepository.updateById(id.toString(), updates);
     if (!user) throw new Error('Waitlist user not found');
     return convertWaitlistUser(user);
   }
 
   async getAllWaitlistUsers(): Promise<WaitlistUser[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const users = await waitlistUserRepository.findAll({});
     return users.map(user => convertWaitlistUser(user));
   }
@@ -1830,7 +1692,7 @@ export class MongoStorage implements IStorage {
     averageReferrals: number;
     statusBreakdown: { [key: string]: number };
   }> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1857,23 +1719,23 @@ export class MongoStorage implements IStorage {
     discountCode: string;
     trialDays: number;
   }> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return waitlistUserRepository.promoteToUser(id.toString());
   }
 
   // Database reset methods for fresh starts
   async clearAllUsers(): Promise<number> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return await userRepository.deleteMany({});
   }
 
   async clearAllWaitlistUsers(): Promise<number> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return await waitlistUserRepository.deleteMany({});
   }
 
   async deleteWaitlistUser(id: number | string): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const deleted = await waitlistUserRepository.deleteById(id.toString());
     if (!deleted) {
       throw new Error('Waitlist user not found');
@@ -1881,28 +1743,28 @@ export class MongoStorage implements IStorage {
   }
 
   async clearAllWorkspaces(): Promise<number> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return await workspaceRepository.deleteMany({});
   }
 
   async clearAllSocialAccounts(): Promise<number> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return await socialAccountRepository.deleteMany({});
   }
 
   async clearAllContent(): Promise<number> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return await contentRepository.deleteMany({});
   }
 
   // VeeGPT Chat Methods - delegating to chatConversationRepository and chatMessageRepository
   async getChatConversations(userId: string, workspaceId?: string): Promise<ChatConversation[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return chatConversationRepository.findByUserSorted(userId, workspaceId);
   }
 
   async createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     return chatConversationRepository.createWithDefaults({
       userId: conversation.userId.toString(),
       workspaceId: conversation.workspaceId.toString(),
@@ -1911,7 +1773,7 @@ export class MongoStorage implements IStorage {
   }
 
   async getChatMessages(conversationId: number): Promise<ChatMessage[]> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const messages = await chatMessageRepository.findByConversationId(conversationId);
     return messages.map(doc => ({
       id: doc.id,
@@ -1924,7 +1786,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     const numericId = Date.now() % 1000000000 + Math.floor(Math.random() * 1000);
     
@@ -1943,7 +1805,7 @@ export class MongoStorage implements IStorage {
   }
 
   async updateChatMessage(id: number, updates: Partial<ChatMessage>): Promise<ChatMessage> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     const updated = await chatMessageRepository.updateById(id.toString(), updates);
     if (!updated) throw new Error('Message not found');
     return {
@@ -1957,7 +1819,7 @@ export class MongoStorage implements IStorage {
   }
 
   async updateChatConversation(id: string | number, updates: Partial<ChatConversation>): Promise<ChatConversation> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     // Validate ObjectId format if id is a string
     if (typeof id === 'string' && !mongoose.Types.ObjectId.isValid(id)) {
@@ -1979,7 +1841,7 @@ export class MongoStorage implements IStorage {
   }
 
   async deleteChatConversation(id: string | number): Promise<void> {
-    await this.ensureConnected();
+    await connectionManager.ensureConnected();
     
     // Validate ObjectId format if id is a string
     if (typeof id === 'string' && !mongoose.Types.ObjectId.isValid(id)) {
@@ -1993,6 +1855,3 @@ export class MongoStorage implements IStorage {
 
 // Export singleton instance
 export const storage = new MongoStorage();
-
-// Export models for direct access
-export { UserModel, WorkspaceModel, SocialAccountModel };
