@@ -118,6 +118,173 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
   )
 }
 
+const DashboardPageContent = () => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-4 gap-3">
+      {[
+        { label: 'Total Engagements', value: '24,847', change: '+18%', color: 'text-blue-400' },
+        { label: 'DMs Processed', value: '3,291', change: '+42%', color: 'text-purple-400' },
+        { label: 'Hooks Created', value: '847', change: '+28%', color: 'text-pink-400' },
+        { label: 'Credits Used', value: '892/1200', change: '74%', color: 'text-amber-400' }
+      ].map((stat) => (
+        <div key={stat.label} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <p className="text-[10px] text-white/40 mb-1">{stat.label}</p>
+          <div className="flex items-end justify-between">
+            <span className="text-xl font-bold">{stat.value}</span>
+            <span className={`text-xs ${stat.color}`}>{stat.change}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-sm font-medium">Engagement Velocity</h4>
+        <div className="flex items-center space-x-2 text-xs text-white/40">
+          <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-1.5" />Comments</span>
+          <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-purple-500 mr-1.5" />DMs</span>
+        </div>
+      </div>
+      <div className="h-32 flex items-end space-x-2">
+        {[40, 55, 45, 70, 60, 80, 75, 90, 85, 95, 88, 100].map((h, i) => (
+          <div key={i} style={{ height: `${h}%` }} className="flex-1 rounded-t-sm bg-gradient-to-t from-blue-600 to-blue-400" />
+        ))}
+      </div>
+    </div>
+    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+      <h4 className="text-sm font-medium mb-3">Recent AI Activity</h4>
+      <div className="space-y-2">
+        {[
+          { text: 'Replied to 12 comments on latest post', time: '2m ago' },
+          { text: 'Processed 8 DM inquiries automatically', time: '5m ago' },
+          { text: 'Generated 3 hook variations for carousel', time: '8m ago' }
+        ].map((activity, i) => (
+          <div key={i} className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0">
+            <span className="text-xs text-white/60">{activity.text}</span>
+            <span className="text-[10px] text-white/30">{activity.time}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)
+
+const EngagementPageContent = () => (
+  <div className="space-y-4">
+    <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+            <MessageSquare className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold">Comment Automation</h4>
+            <p className="text-xs text-white/40">AI-powered reply engine active</p>
+          </div>
+        </div>
+        <div className="px-3 py-1.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium flex items-center space-x-1.5">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <span>Active</span>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {[
+          { user: '@sarah_creates', comment: 'Love this content! How do you...', reply: 'Thanks Sarah! I use a combination of...', status: 'sent' },
+          { user: '@mike_growth', comment: 'Can you share more about your process?', reply: 'Absolutely! My process involves...', status: 'sending' },
+          { user: '@julia_design', comment: 'This is exactly what I needed!', reply: 'So glad it helped Julia! Check out...', status: 'queued' }
+        ].map((item, i) => (
+          <div key={i} className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+            <div className="flex items-start justify-between mb-2">
+              <span className="text-xs font-medium text-blue-400">{item.user}</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.status === 'sent' ? 'bg-green-500/20 text-green-400' : item.status === 'sending' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white/40'}`}>{item.status}</span>
+            </div>
+            <p className="text-[11px] text-white/50 mb-1.5">"{item.comment}"</p>
+            <div className="flex items-center space-x-2">
+              <Bot className="w-3 h-3 text-purple-400" />
+              <p className="text-[11px] text-white/70">{item.reply}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="p-5 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+            <Send className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold">DM Automation</h4>
+            <p className="text-xs text-white/40">Smart funnel responses</p>
+          </div>
+        </div>
+        <span className="text-2xl font-bold text-purple-400">847</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {[{ label: 'Leads Captured', value: '324' }, { label: 'Responded', value: '98%' }, { label: 'Converted', value: '23%' }].map((s, i) => (
+          <div key={i} className="p-2 rounded-lg bg-white/[0.03]">
+            <p className="text-lg font-bold text-white">{s.value}</p>
+            <p className="text-[10px] text-white/40">{s.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)
+
+const HooksPageContent = () => (
+  <div className="space-y-4">
+    <div className="p-5 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+            <Brain className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold">AI Hook Generator</h4>
+            <p className="text-xs text-white/40">Trending patterns detected</p>
+          </div>
+        </div>
+        <Sparkles className="w-5 h-5 text-indigo-400" />
+      </div>
+      <div className="space-y-3">
+        {[
+          { hook: "Stop scrolling. This changed everything for me...", score: 94, type: 'Curiosity' },
+          { hook: "I made $10K in 30 days using this one strategy", score: 91, type: 'Result' },
+          { hook: "Nobody talks about this creator secret...", score: 88, type: 'Exclusive' }
+        ].map((item, i) => (
+          <div key={i} className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+            <div className="flex items-start justify-between mb-2">
+              <p className="text-sm text-white/80 flex-1">"{item.hook}"</p>
+              <div className="ml-3 flex items-center space-x-1 px-2 py-0.5 rounded-full bg-green-500/20">
+                <span className="text-xs font-bold text-green-400">{item.score}</span>
+                <TrendingUp className="w-3 h-3 text-green-400" />
+              </div>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">{item.type}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+        <h5 className="text-xs font-medium text-white/60 mb-2">Trending Patterns</h5>
+        <div className="flex flex-wrap gap-1.5">
+          {['Story hooks', 'Questions', 'Contrarian', 'Numbers', 'Emotional'].map((tag) => (
+            <span key={tag} className="px-2 py-1 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">{tag}</span>
+          ))}
+        </div>
+      </div>
+      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+        <h5 className="text-xs font-medium text-white/60 mb-2">Your Hook Score</h5>
+        <div className="flex items-end space-x-2">
+          <span className="text-3xl font-bold text-indigo-400">87</span>
+          <span className="text-xs text-green-400 mb-1">+12 this week</span>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
 const AnimatedDashboard = () => {
   const [activePage, setActivePage] = useState(0)
   const [cursorPos, setCursorPos] = useState({ x: 50, y: 12 })
@@ -230,172 +397,6 @@ const AnimatedDashboard = () => {
     }
   }, [getCursorPosition])
 
-  const DashboardContent = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: 'Total Engagements', value: '24,847', change: '+18%', color: 'text-blue-400' },
-          { label: 'DMs Processed', value: '3,291', change: '+42%', color: 'text-purple-400' },
-          { label: 'Hooks Created', value: '847', change: '+28%', color: 'text-pink-400' },
-          { label: 'Credits Used', value: '892/1200', change: '74%', color: 'text-amber-400' }
-        ].map((stat, i) => (
-          <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-            <p className="text-[10px] text-white/40 mb-1">{stat.label}</p>
-            <div className="flex items-end justify-between">
-              <span className="text-xl font-bold">{stat.value}</span>
-              <span className={`text-xs ${stat.color}`}>{stat.change}</span>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-      <div className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-medium">Engagement Velocity</h4>
-          <div className="flex items-center space-x-2 text-xs text-white/40">
-            <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-1.5" />Comments</span>
-            <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-purple-500 mr-1.5" />DMs</span>
-          </div>
-        </div>
-        <div className="h-32 flex items-end space-x-2">
-          {[40, 55, 45, 70, 60, 80, 75, 90, 85, 95, 88, 100].map((h, i) => (
-            <motion.div key={i} initial={{ height: 0 }} animate={{ height: `${h}%` }} transition={{ delay: i * 0.05, duration: 0.4 }} className="flex-1 rounded-t-sm bg-gradient-to-t from-blue-600 to-blue-400" />
-          ))}
-        </div>
-      </div>
-      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <h4 className="text-sm font-medium mb-3">Recent AI Activity</h4>
-        <div className="space-y-2">
-          {[
-            { text: 'Replied to 12 comments on latest post', time: '2m ago' },
-            { text: 'Processed 8 DM inquiries automatically', time: '5m ago' },
-            { text: 'Generated 3 hook variations for carousel', time: '8m ago' }
-          ].map((activity, i) => (
-            <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0">
-              <span className="text-xs text-white/60">{activity.text}</span>
-              <span className="text-[10px] text-white/30">{activity.time}</span>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-
-  const EngagementContent = () => (
-    <div className="space-y-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold">Comment Automation</h4>
-              <p className="text-xs text-white/40">AI-powered reply engine active</p>
-            </div>
-          </div>
-          <div className="px-3 py-1.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium flex items-center space-x-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span>Active</span>
-          </div>
-        </div>
-        <div className="space-y-3">
-          {[
-            { user: '@sarah_creates', comment: 'Love this content! How do you...', reply: 'Thanks Sarah! I use a combination of...', status: 'sent' },
-            { user: '@mike_growth', comment: 'Can you share more about your process?', reply: 'Absolutely! My process involves...', status: 'sending' },
-            { user: '@julia_design', comment: 'This is exactly what I needed!', reply: 'So glad it helped Julia! Check out...', status: 'queued' }
-          ].map((item, i) => (
-            <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.15 }} className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.05]">
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-xs font-medium text-blue-400">{item.user}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.status === 'sent' ? 'bg-green-500/20 text-green-400' : item.status === 'sending' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white/40'}`}>{item.status}</span>
-              </div>
-              <p className="text-[11px] text-white/50 mb-1.5">"{item.comment}"</p>
-              <div className="flex items-center space-x-2">
-                <Bot className="w-3 h-3 text-purple-400" />
-                <p className="text-[11px] text-white/70">{item.reply}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="p-5 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <Send className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold">DM Automation</h4>
-              <p className="text-xs text-white/40">Smart funnel responses</p>
-            </div>
-          </div>
-          <span className="text-2xl font-bold text-purple-400">847</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          {[{ label: 'Leads Captured', value: '324' }, { label: 'Responded', value: '98%' }, { label: 'Converted', value: '23%' }].map((s, i) => (
-            <motion.div key={i} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.7 + i * 0.1 }} className="p-2 rounded-lg bg-white/[0.03]">
-              <p className="text-lg font-bold text-white">{s.value}</p>
-              <p className="text-[10px] text-white/40">{s.label}</p>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-    </div>
-  )
-
-  const HooksContent = () => (
-    <div className="space-y-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-5 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-              <Brain className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold">AI Hook Generator</h4>
-              <p className="text-xs text-white/40">Trending patterns detected</p>
-            </div>
-          </div>
-          <Sparkles className="w-5 h-5 text-indigo-400" />
-        </div>
-        <div className="space-y-3">
-          {[
-            { hook: "Stop scrolling. This changed everything for me...", score: 94, type: 'Curiosity' },
-            { hook: "I made $10K in 30 days using this one strategy", score: 91, type: 'Result' },
-            { hook: "Nobody talks about this creator secret...", score: 88, type: 'Exclusive' }
-          ].map((item, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.15 }} className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.05]">
-              <div className="flex items-start justify-between mb-2">
-                <p className="text-sm text-white/80 flex-1">"{item.hook}"</p>
-                <div className="ml-3 flex items-center space-x-1 px-2 py-0.5 rounded-full bg-green-500/20">
-                  <span className="text-xs font-bold text-green-400">{item.score}</span>
-                  <TrendingUp className="w-3 h-3 text-green-400" />
-                </div>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">{item.type}</span>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="grid grid-cols-2 gap-3">
-        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-          <h5 className="text-xs font-medium text-white/60 mb-2">Trending Patterns</h5>
-          <div className="flex flex-wrap gap-1.5">
-            {['Story hooks', 'Questions', 'Contrarian', 'Numbers', 'Emotional'].map((tag, i) => (
-              <motion.span key={tag} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.6 + i * 0.1 }} className="px-2 py-1 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">{tag}</motion.span>
-            ))}
-          </div>
-        </div>
-        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-          <h5 className="text-xs font-medium text-white/60 mb-2">Your Hook Score</h5>
-          <div className="flex items-end space-x-2">
-            <span className="text-3xl font-bold text-indigo-400">87</span>
-            <span className="text-xs text-green-400 mb-1">+12 this week</span>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  )
 
   return (
     <div className="relative mx-auto max-w-[1000px]">
@@ -455,19 +456,19 @@ const AnimatedDashboard = () => {
                 className="absolute inset-0 transition-opacity duration-300 ease-in-out"
                 style={{ opacity: activePage === 0 ? 1 : 0, pointerEvents: activePage === 0 ? 'auto' : 'none' }}
               >
-                <DashboardContent />
+                <DashboardPageContent />
               </div>
               <div 
                 className="absolute inset-0 transition-opacity duration-300 ease-in-out"
                 style={{ opacity: activePage === 1 ? 1 : 0, pointerEvents: activePage === 1 ? 'auto' : 'none' }}
               >
-                <EngagementContent />
+                <EngagementPageContent />
               </div>
               <div 
                 className="absolute inset-0 transition-opacity duration-300 ease-in-out"
                 style={{ opacity: activePage === 2 ? 1 : 0, pointerEvents: activePage === 2 ? 'auto' : 'none' }}
               >
-                <HooksContent />
+                <HooksPageContent />
               </div>
             </div>
           </div>
