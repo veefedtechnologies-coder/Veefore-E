@@ -465,23 +465,23 @@ const AnimatedDashboard = () => {
 
 
   return (
-    <div className="relative mx-auto max-w-[1000px]">
-      <div className="relative rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-red-500/80" />
-            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-            <div className="w-3 h-3 rounded-full bg-green-500/80" />
+    <div className="relative mx-auto max-w-[1000px] w-full px-4 sm:px-6 lg:px-0">
+      <div className="relative rounded-[12px] sm:rounded-[16px] lg:rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_60px_rgba(59,130,246,0.1)] sm:shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
+            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-red-500/80" />
+            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-yellow-500/80" />
+            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-green-500/80" />
           </div>
-          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 text-xs text-white/40">
-            <Clock className="w-3 h-3" />
+          <div className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/5 text-[10px] sm:text-xs text-white/40">
+            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             <span>Live Dashboard</span>
           </div>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold">V</div>
+          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] sm:text-xs font-bold">V</div>
         </div>
-        <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
-          <div className="grid grid-cols-12 gap-4">
-            <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
+        <div className="p-3 sm:p-4 lg:p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
+          <div className="grid grid-cols-12 gap-2 sm:gap-3 lg:gap-4">
+            <div ref={sidebarRef} className="col-span-3 sm:col-span-2 space-y-0.5 sm:space-y-1 relative">
               <motion.div
                 className="absolute pointer-events-none z-50"
                 style={{ width: 20, height: 20 }}
@@ -510,14 +510,15 @@ const AnimatedDashboard = () => {
                   <div 
                     key={item.name}
                     ref={el => itemRefs.current[i] = el}
-                    className={`px-3 py-2 rounded-lg text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
+                    className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[9px] sm:text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
                   >
-                    {item.name}
+                    <span className="hidden sm:inline">{item.name}</span>
+                    <span className="sm:hidden">{item.name.slice(0, 3)}</span>
                   </div>
                 )
               })}
             </div>
-            <div className="col-span-10 relative overflow-hidden" style={{ minHeight: '520px' }}>
+            <div className="col-span-9 sm:col-span-10 relative overflow-hidden" style={{ minHeight: 'clamp(280px, 50vw, 520px)' }}>
               <div 
                 className="absolute inset-0 transition-opacity duration-300 ease-in-out"
                 style={{ opacity: activePage === 0 ? 1 : 0, pointerEvents: activePage === 0 ? 'auto' : 'none' }}
@@ -684,7 +685,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
                 </div>
                 
-                <div className="hidden lg:flex items-center space-x-6 text-sm font-medium text-white/50">
+                <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
                   {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
                     <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
                       {item}
@@ -694,13 +695,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
-                <button className="text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
                 <MagneticButton 
-                  className="bg-white text-black hover:bg-white/90 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-300"
+                  className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
                   onClick={() => onNavigate('signup')}
                 >
-                  Start Free Trial
+                  <span className="hidden sm:inline">Start Free Trial</span>
+                  <span className="sm:hidden">Start Free</span>
                 </MagneticButton>
               </div>
             </div>
@@ -791,15 +793,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 1.3 }}
-            className="mt-14 flex items-center justify-center space-x-8 text-white/30 text-sm"
+            className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4"
           >
             {[
               { icon: CheckCircle, text: 'No credit card required' },
               { icon: Zap, text: '150 credits included' },
               { icon: Shield, text: 'Cancel anytime' }
             ].map((item, i) => (
-              <div key={i} className="flex items-center space-x-2">
-                <item.icon className="w-4 h-4 text-green-500/70" />
+              <div key={i} className="flex items-center space-x-1.5 sm:space-x-2">
+                <item.icon className="w-3 h-3 sm:w-4 sm:h-4 text-green-500/70" />
                 <span>{item.text}</span>
               </div>
             ))}
@@ -817,24 +819,24 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             transition={{ duration: 1, delay: 1.5 }}
             className="relative"
           >
-            {/* Side Graphics - Left (Faded, beautiful.ai style) */}
-            <div className="hidden xl:block absolute left-0 top-1/2 -translate-y-1/2 w-[220px] space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }}>
+            {/* Side Graphics - Left (Faded, beautiful.ai style) - Hidden on mobile */}
+            <div className="hidden md:block absolute left-0 top-1/2 -translate-y-1/2 w-[140px] lg:w-[180px] xl:w-[220px] space-y-3 lg:space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }}>
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 0.4, x: 0 }}
                 transition={{ delay: 2, duration: 1 }}
               >
-                <GlassCard className="p-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
-                      <TrendingUp className="w-4 h-4 text-white" />
+                <GlassCard className="p-2 lg:p-3 xl:p-4">
+                  <div className="flex items-center space-x-2 lg:space-x-3 mb-2 lg:mb-3">
+                    <div className="w-6 h-6 lg:w-7 lg:h-7 xl:w-9 xl:h-9 rounded-lg xl:rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
+                      <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-white/40">Engagement Rate</p>
-                      <p className="text-lg font-bold text-green-400">+247%</p>
+                      <p className="text-[8px] lg:text-[10px] text-white/40">Engagement Rate</p>
+                      <p className="text-sm lg:text-base xl:text-lg font-bold text-green-400">+247%</p>
                     </div>
                   </div>
-                  <div className="h-12 flex items-end space-x-1">
+                  <div className="h-8 lg:h-10 xl:h-12 flex items-end space-x-0.5 lg:space-x-1">
                     {[30, 45, 35, 60, 75, 65, 90, 85, 95].map((h, i) => (
                       <div
                         key={i}
@@ -851,22 +853,22 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 animate={{ opacity: 0.35, x: 0 }}
                 transition={{ delay: 2.2, duration: 1 }}
               >
-                <GlassCard className="p-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                      <MessageSquare className="w-4 h-4 text-white" />
+                <GlassCard className="p-2 lg:p-3 xl:p-4">
+                  <div className="flex items-center space-x-2 lg:space-x-3 mb-2 lg:mb-3">
+                    <div className="w-6 h-6 lg:w-7 lg:h-7 xl:w-9 xl:h-9 rounded-lg xl:rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-white/40">DM Responses</p>
-                      <p className="text-lg font-bold">1,847</p>
+                      <p className="text-[8px] lg:text-[10px] text-white/40">DM Responses</p>
+                      <p className="text-sm lg:text-base xl:text-lg font-bold">1,847</p>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px]">
+                  <div className="space-y-1 lg:space-y-1.5">
+                    <div className="flex items-center justify-between text-[8px] lg:text-[10px]">
                       <span className="text-white/40">Automated</span>
                       <span className="text-blue-400">94%</span>
                     </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-1 lg:h-1.5 bg-white/10 rounded-full overflow-hidden">
                       <div className="h-full w-[94%] bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full" />
                     </div>
                   </div>
@@ -874,26 +876,26 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               </motion.div>
             </div>
 
-            {/* Side Graphics - Right (Faded, beautiful.ai style) */}
-            <div className="hidden xl:block absolute right-0 top-1/2 -translate-y-1/2 w-[220px] space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to left, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to left, transparent, black 60%)' }}>
+            {/* Side Graphics - Right (Faded, beautiful.ai style) - Hidden on mobile */}
+            <div className="hidden md:block absolute right-0 top-1/2 -translate-y-1/2 w-[140px] lg:w-[180px] xl:w-[220px] space-y-3 lg:space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to left, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to left, transparent, black 60%)' }}>
               <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 0.4, x: 0 }}
                 transition={{ delay: 2.1, duration: 1 }}
               >
-                <GlassCard className="p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center">
-                      <Brain className="w-4 h-4 text-white" />
+                <GlassCard className="p-2 lg:p-3 xl:p-4">
+                  <div className="flex items-center space-x-2 lg:space-x-3 mb-1 lg:mb-2">
+                    <div className="w-6 h-6 lg:w-7 lg:h-7 xl:w-9 xl:h-9 rounded-lg xl:rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center">
+                      <Brain className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-white/40">AI Hooks Generated</p>
-                      <p className="text-lg font-bold">3,291</p>
+                      <p className="text-[8px] lg:text-[10px] text-white/40">AI Hooks Generated</p>
+                      <p className="text-sm lg:text-base xl:text-lg font-bold">3,291</p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
+                  <div className="flex flex-wrap gap-0.5 lg:gap-1 mt-1 lg:mt-2">
                     {['Trending', 'Emotional', 'Question', 'Story'].map((tag) => (
-                      <span key={tag} className="px-1.5 py-0.5 text-[9px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">{tag}</span>
+                      <span key={tag} className="px-1 lg:px-1.5 py-0.5 text-[7px] lg:text-[9px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">{tag}</span>
                     ))}
                   </div>
                 </GlassCard>
@@ -904,17 +906,17 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 animate={{ opacity: 0.35, x: 0 }}
                 transition={{ delay: 2.3, duration: 1 }}
               >
-                <GlassCard className="p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                      <Zap className="w-4 h-4 text-white" />
+                <GlassCard className="p-2 lg:p-3 xl:p-4">
+                  <div className="flex items-center space-x-2 lg:space-x-3 mb-1 lg:mb-2">
+                    <div className="w-6 h-6 lg:w-7 lg:h-7 xl:w-9 xl:h-9 rounded-lg xl:rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                      <Zap className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-white/40">Growth Velocity</p>
-                      <p className="text-lg font-bold text-amber-400">12.4x</p>
+                      <p className="text-[8px] lg:text-[10px] text-white/40">Growth Velocity</p>
+                      <p className="text-sm lg:text-base xl:text-lg font-bold text-amber-400">12.4x</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-white/30">Faster than manual engagement</p>
+                  <p className="text-[7px] lg:text-[10px] text-white/30">Faster than manual engagement</p>
                 </GlassCard>
               </motion.div>
             </div>
@@ -923,16 +925,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <div className="relative">
               <AnimatedDashboard />
 
-              {/* Floating Elements */}
+              {/* Floating Elements - Responsive */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 3, duration: 0.5 }}
-                className="absolute -bottom-6 -left-6 px-4 py-3 rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 backdrop-blur-xl z-20"
+                className="absolute -bottom-3 sm:-bottom-6 left-0 sm:-left-6 px-2 sm:px-4 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 backdrop-blur-xl z-20"
               >
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-400" />
-                  <span className="text-sm font-medium text-green-300">AI is actively engaging</span>
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
+                  <CheckCircle className="w-3 h-3 sm:w-5 sm:h-5 text-green-400" />
+                  <span className="text-[10px] sm:text-sm font-medium text-green-300">AI is actively engaging</span>
                 </div>
               </motion.div>
 
@@ -940,11 +942,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 3.2, duration: 0.5 }}
-                className="absolute -bottom-4 -right-4 px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 backdrop-blur-xl z-20"
+                className="absolute -bottom-3 sm:-bottom-4 right-0 sm:-right-4 px-2 sm:px-4 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 backdrop-blur-xl z-20"
               >
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-5 h-5 text-blue-400" />
-                  <span className="text-sm font-medium text-blue-300">24/7 Automation Active</span>
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
+                  <Zap className="w-3 h-3 sm:w-5 sm:h-5 text-blue-400" />
+                  <span className="text-[10px] sm:text-sm font-medium text-blue-300">24/7 Automation Active</span>
                 </div>
               </motion.div>
             </div>
