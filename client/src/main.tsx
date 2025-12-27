@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect, memo } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import LandingEntry from './LandingEntry'
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -8,11 +9,19 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-const LandingEntry = lazy(() => import('./LandingEntry'))
 const FullApp = lazy(() => import('./AppWrapper'))
 
 const landingRoutes = ['/', '/landing', '/waitlist']
 const isLandingRoute = (path: string) => landingRoutes.includes(path) || path === ''
+
+const AppLoader = () => (
+  <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-white/60 text-sm">Loading...</p>
+    </div>
+  </div>
+)
 
 const Router = memo(() => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname)
@@ -41,17 +50,13 @@ const Router = memo(() => {
 
   if (showFullApp) {
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<AppLoader />}>
         <FullApp />
       </Suspense>
     )
   }
 
-  return (
-    <Suspense fallback={null}>
-      <LandingEntry onNavigate={handleNavigate} />
-    </Suspense>
-  )
+  return <LandingEntry onNavigate={handleNavigate} />
 })
 
 Router.displayName = 'Router'
