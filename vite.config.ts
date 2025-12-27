@@ -30,7 +30,7 @@ export default defineConfig({
   root: path.resolve(__dirname, "client"),
   resolve: {
     preserveSymlinks: false,
-    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', '@tanstack/react-query', 'wouter'],
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', '@tanstack/react-query', 'wouter', 'framer-motion', 'three'],
     alias: {
       'three-mesh-bvh': path.resolve(__dirname, 'client/src/stubs/three-mesh-bvh.ts'),
       "@": path.resolve(__dirname, "client/src"),
@@ -41,6 +41,20 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: false,
+    target: 'esnext',
+    minify: 'esbuild',
+    cssMinify: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
   },
   optimizeDeps: {
     include: [
@@ -51,6 +65,7 @@ export default defineConfig({
       'react/jsx-dev-runtime',
       '@tanstack/react-query',
       'wouter',
+      'framer-motion',
     ],
   },
   server: {

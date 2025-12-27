@@ -2,6 +2,12 @@ import React, { Suspense, lazy, useState, useEffect, memo } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
 const LandingEntry = lazy(() => import('./LandingEntry'))
 const FullApp = lazy(() => import('./AppWrapper'))
 
