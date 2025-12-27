@@ -1,24 +1,14 @@
-import React, { Suspense, lazy, useState, useEffect } from 'react'
+import React, { Suspense, lazy, useState, useEffect, memo } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 
 const LandingEntry = lazy(() => import('./LandingEntry'))
-
 const FullApp = lazy(() => import('./AppWrapper'))
 
-const LoadingSpinner = () => (
-  <div className="min-h-screen bg-black flex items-center justify-center">
-    <div className="w-12 h-12 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-  </div>
-)
-
 const landingRoutes = ['/', '/landing', '/waitlist']
+const isLandingRoute = (path: string) => landingRoutes.includes(path) || path === ''
 
-const isLandingRoute = (path: string) => {
-  return landingRoutes.includes(path) || path === ''
-}
-
-const Router = () => {
+const Router = memo(() => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname)
   const [showFullApp, setShowFullApp] = useState(!isLandingRoute(window.location.pathname))
 
@@ -45,22 +35,19 @@ const Router = () => {
 
   if (showFullApp) {
     return (
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={null}>
         <FullApp />
       </Suspense>
     )
   }
 
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={null}>
       <LandingEntry onNavigate={handleNavigate} />
     </Suspense>
   )
-}
+})
 
-if (!React || !React.useState || !createRoot) {
-  console.error('React or createRoot is not available in main.tsx')
-  document.getElementById('root')!.innerHTML = '<div>Error: React not available</div>'
-} else {
-  createRoot(document.getElementById('root')!).render(<Router />)
-}
+Router.displayName = 'Router'
+
+createRoot(document.getElementById('root')!).render(<Router />)

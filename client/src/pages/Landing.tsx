@@ -609,12 +609,20 @@ const AnimatedDashboard = () => {
   )
 }
 
-const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+const Landing = ({ onNavigate, onReady }: { onNavigate: (page: string) => void, onReady?: () => void }) => {
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [activeCredit, setActiveCredit] = useState(500)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (onReady) {
+      requestAnimationFrame(() => {
+        onReady()
+      })
+    }
+  }, [onReady])
 
   const { scrollYProgress } = useScroll()
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0])

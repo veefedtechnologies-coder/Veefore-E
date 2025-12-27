@@ -1,23 +1,34 @@
-import React, { Suspense, lazy, useEffect, useState, memo } from 'react'
+import React, { useEffect, useState, memo, Suspense, lazy } from 'react'
 
 const Landing = lazy(() => import('./pages/Landing'))
-
-const LandingFallback = memo(() => (
-  <div className="min-h-screen bg-black flex items-center justify-center">
-    <div className="w-12 h-12 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-  </div>
-))
 
 interface LandingEntryProps {
   onNavigate: (page: string) => void
 }
 
-const LandingEntry = ({ onNavigate }: LandingEntryProps) => {
+const LandingEntry = memo(({ onNavigate }: LandingEntryProps) => {
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    if (ready) {
+      const staticHero = document.getElementById('static-hero')
+      if (staticHero) {
+        staticHero.style.transition = 'opacity 0.2s ease-out'
+        staticHero.style.opacity = '0'
+        setTimeout(() => {
+          staticHero.style.display = 'none'
+        }, 200)
+      }
+    }
+  }, [ready])
+
   return (
-    <Suspense fallback={<LandingFallback />}>
-      <Landing onNavigate={onNavigate} />
+    <Suspense fallback={null}>
+      <Landing onNavigate={onNavigate} onReady={() => setReady(true)} />
     </Suspense>
   )
-}
+})
+
+LandingEntry.displayName = 'LandingEntry'
 
 export default LandingEntry
