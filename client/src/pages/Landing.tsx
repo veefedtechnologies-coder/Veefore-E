@@ -846,13 +846,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
       </div>
 
-      {/* Navigation - sticky on mobile to avoid iOS fixed issues */}
-      <motion.nav 
-        initial={{ y: -100 }} 
-        animate={{ y: 0 }} 
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className={`${isMobile ? 'sticky' : 'fixed'} top-0 w-full z-50`}
-      >
+      {/* Navigation - use wrapper for sticky/fixed to avoid iOS Safari transform issues */}
+      <div className={`${isMobile ? 'sticky' : 'fixed'} top-0 w-full z-50`}>
+        <motion.nav 
+          initial={{ y: -100 }} 
+          animate={{ y: 0 }} 
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        >
         <div className="mx-4 mt-4">
           <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
             <div className="flex items-center justify-between">
@@ -889,10 +889,12 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </GlassCard>
         </div>
-      </motion.nav>
+        </motion.nav>
+      </div>
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden">
+        {/* Background layer */}
         <div className="absolute inset-0 z-0">
           {isMobile ? (
             <MobileBackground />
@@ -902,6 +904,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </Suspense>
           )}
         </div>
+        
+        {/* Gradient orbs layer for mobile - on top of MobileBackground */}
+        {isMobile && (
+          <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+            <GradientOrb className="w-[350px] h-[350px] -top-[50px] -left-[80px]" color="blue" />
+            <GradientOrb className="w-[280px] h-[280px] top-[40%] -right-[60px]" color="purple" />
+            <GradientOrb className="w-[200px] h-[200px] bottom-[15%] left-[30%]" color="indigo" />
+          </div>
+        )}
         
         {isMobile ? (
           <div className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center">
