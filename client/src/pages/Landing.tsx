@@ -9,7 +9,18 @@ import {
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
 
-const isMobileDevice = () => typeof window !== 'undefined' && window.innerWidth < 768
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  return isMobile
+}
 
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
@@ -42,7 +53,7 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
 }
 
 const GlassCard = ({ children, className = '', hover = true }: { children: React.ReactNode, className?: string, hover?: boolean }) => {
-  const isMobile = isMobileDevice()
+  const isMobile = useIsMobile()
   return (
     <div className={`relative ${isMobile ? 'bg-white/[0.04]' : 'backdrop-blur-xl bg-white/[0.02]'} border border-white/[0.08] rounded-[24px] overflow-hidden ${hover ? 'hover:border-white/[0.15] hover:bg-white/[0.04] transition-all duration-500' : ''} ${className}`}>
       {!isMobile && <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-transparent pointer-events-none" />}
@@ -52,7 +63,7 @@ const GlassCard = ({ children, className = '', hover = true }: { children: React
 }
 
 const MagneticButton = ({ children, className = '', onClick }: { children: React.ReactNode, className?: string, onClick?: () => void }) => {
-  const isMobile = isMobileDevice()
+  const isMobile = useIsMobile()
   const ref = useRef<HTMLButtonElement>(null)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
@@ -106,7 +117,7 @@ const taglines = [
 ]
 
 const RotatingHeroText = () => {
-  const isMobile = isMobileDevice()
+  const isMobile = useIsMobile()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
   
@@ -194,7 +205,7 @@ const RotatingHeroText = () => {
 }
 
 const AnimatedText = ({ text, className = '' }: { text: string, className?: string }) => {
-  const isMobile = isMobileDevice()
+  const isMobile = useIsMobile()
   if (isMobile) {
     return <span className={className}>{text}</span>
   }
@@ -217,7 +228,7 @@ const AnimatedText = ({ text, className = '' }: { text: string, className?: stri
 }
 
 const TiltCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => {
-  const isMobile = isMobileDevice()
+  const isMobile = useIsMobile()
   const ref = useRef<HTMLDivElement>(null)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
@@ -675,7 +686,7 @@ const AnimatedDashboard = () => {
 }
 
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
-  const isMobile = isMobileDevice()
+  const isMobile = useIsMobile()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
@@ -843,7 +854,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
-          {isMobileDevice() ? (
+          {isMobile ? (
             <MobileBackground />
           ) : (
             <Suspense fallback={<Landing3DFallback />}>
