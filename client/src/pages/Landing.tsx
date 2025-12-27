@@ -106,6 +106,7 @@ const taglines = [
 ]
 
 const RotatingHeroText = () => {
+  const isMobile = isMobileDevice()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
   
@@ -116,6 +117,36 @@ const RotatingHeroText = () => {
     }, 4000)
     return () => clearInterval(interval)
   }, [currentIndex])
+
+  if (isMobile) {
+    return (
+      <div className="relative overflow-hidden" style={{ height: 'clamp(8rem, 20vw, 16rem)', paddingBottom: '0.15em' }}>
+        {taglines.map((tagline, index) => (
+          <div
+            key={index}
+            className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-500 ${currentIndex === index ? 'opacity-100' : 'opacity-0'}`}
+            style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
+          >
+            <span className="block text-white" style={{ lineHeight: '1.15' }}>
+              {tagline.top}
+            </span>
+            <span 
+              className="block mt-1 pb-2"
+              style={{ 
+                lineHeight: '1.2',
+                background: 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent'
+              }}
+            >
+              {tagline.bottom}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="relative overflow-hidden" style={{ height: 'clamp(8rem, 20vw, 16rem)', paddingBottom: '0.15em' }}>
@@ -163,6 +194,10 @@ const RotatingHeroText = () => {
 }
 
 const AnimatedText = ({ text, className = '' }: { text: string, className?: string }) => {
+  const isMobile = isMobileDevice()
+  if (isMobile) {
+    return <span className={className}>{text}</span>
+  }
   const words = text.split(' ')
   return (
     <span className={className}>
@@ -182,6 +217,7 @@ const AnimatedText = ({ text, className = '' }: { text: string, className?: stri
 }
 
 const TiltCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => {
+  const isMobile = isMobileDevice()
   const ref = useRef<HTMLDivElement>(null)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
@@ -189,7 +225,7 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
   const rotateY = useTransform(x, [-100, 100], [-8, 8])
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!ref.current) return
+    if (isMobile || !ref.current) return
     const rect = ref.current.getBoundingClientRect()
     const centerX = rect.left + rect.width / 2
     const centerY = rect.top + rect.height / 2
@@ -198,8 +234,13 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
   }
 
   const handleMouseLeave = () => {
+    if (isMobile) return
     x.set(0)
     y.set(0)
+  }
+
+  if (isMobile) {
+    return <div ref={ref} className={className}>{children}</div>
   }
 
   return (
@@ -634,6 +675,7 @@ const AnimatedDashboard = () => {
 }
 
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+  const isMobile = isMobileDevice()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
@@ -641,9 +683,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { scrollYProgress } = useScroll()
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0])
-  const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.95])
-  const heroY = useTransform(scrollYProgress, [0, 0.15], [0, -50])
+  const heroOpacity = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0])
+  const heroScale = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0.95])
+  const heroY = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [0, isMobile ? 0 : -50])
 
   const heroFeatures = [
     {
@@ -810,95 +852,148 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           )}
         </div>
         
-        <motion.div 
-          style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
-          className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center"
-        >
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-sm text-blue-400 mb-8 backdrop-blur-xl"
-          >
-            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+        {isMobile ? (
+          <div className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center">
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-sm text-blue-400 mb-8">
               <Sparkles className="w-4 h-4" />
-            </motion.div>
-            <span className="font-medium">AI-Powered Growth Engine</span>
-          </motion.div>
-          
-          <motion.h1 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8"
-          >
-            <RotatingHeroText />
-          </motion.h1>
-          
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.8 }}
-            className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4"
-          >
-            VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
-          </motion.p>
-          
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 1 }}
-            className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4"
-          >
-            Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
-          </motion.p>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.1 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4"
-          >
-            <MagneticButton 
-              className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
-              onClick={() => onNavigate('signup')}
-            >
-              <span className="relative z-10 flex items-center">
-                Start 7-Day Free Trial
-                <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="absolute inset-[-2px] bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur-xl opacity-50" />
-              </div>
-            </MagneticButton>
+              <span className="font-medium">AI-Powered Growth Engine</span>
+            </div>
             
-            <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-hover:border-white/20 transition-all">
-                <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
-              </div>
-              <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
-            </button>
-          </motion.div>
-          
+            <h1 className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8">
+              <RotatingHeroText />
+            </h1>
+            
+            <p className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4">
+              VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
+            </p>
+            
+            <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4">
+              Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
+              <MagneticButton 
+                className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
+                onClick={() => onNavigate('signup')}
+              >
+                <span className="relative z-10 flex items-center">
+                  Start 7-Day Free Trial
+                  <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5" />
+                </span>
+              </MagneticButton>
+              
+              <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
+                </div>
+                <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
+              </button>
+            </div>
+            
+            <div className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4">
+              {[
+                { icon: CheckCircle, text: 'No credit card required' },
+                { icon: Zap, text: '150 credits included' },
+                { icon: Shield, text: 'Cancel anytime' }
+              ].map((item, i) => (
+                <div key={i} className="flex items-center space-x-1.5 sm:space-x-2">
+                  <item.icon className="w-3 h-3 sm:w-4 sm:h-4 text-green-500/70" />
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 1.3 }}
-            className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4"
+            style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
+            className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center"
           >
-            {[
-              { icon: CheckCircle, text: 'No credit card required' },
-              { icon: Zap, text: '150 credits included' },
-              { icon: Shield, text: 'Cancel anytime' }
-            ].map((item, i) => (
-              <div key={i} className="flex items-center space-x-1.5 sm:space-x-2">
-                <item.icon className="w-3 h-3 sm:w-4 sm:h-4 text-green-500/70" />
-                <span>{item.text}</span>
-              </div>
-            ))}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-sm text-blue-400 mb-8 backdrop-blur-xl"
+            >
+              <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+                <Sparkles className="w-4 h-4" />
+              </motion.div>
+              <span className="font-medium">AI-Powered Growth Engine</span>
+            </motion.div>
+            
+            <motion.h1 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8"
+            >
+              <RotatingHeroText />
+            </motion.h1>
+            
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.8 }}
+              className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4"
+            >
+              VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
+            </motion.p>
+            
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 1 }}
+              className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4"
+            >
+              Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
+            </motion.p>
+            
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 1.1 }}
+              className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4"
+            >
+              <MagneticButton 
+                className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
+                onClick={() => onNavigate('signup')}
+              >
+                <span className="relative z-10 flex items-center">
+                  Start 7-Day Free Trial
+                  <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute inset-[-2px] bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur-xl opacity-50" />
+                </div>
+              </MagneticButton>
+              
+              <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-hover:border-white/20 transition-all">
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
+                </div>
+                <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
+              </button>
+            </motion.div>
+          
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 1.3 }}
+              className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4"
+            >
+              {[
+                { icon: CheckCircle, text: 'No credit card required' },
+                { icon: Zap, text: '150 credits included' },
+                { icon: Shield, text: 'Cancel anytime' }
+              ].map((item, i) => (
+                <div key={i} className="flex items-center space-x-1.5 sm:space-x-2">
+                  <item.icon className="w-3 h-3 sm:w-4 sm:h-4 text-green-500/70" />
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </motion.div>
           </motion.div>
-        </motion.div>
+        )}
 
       </section>
 
