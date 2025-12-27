@@ -1,17 +1,12 @@
-import React, { Suspense, lazy, memo } from 'react'
-
-const Landing = lazy(() => import('./pages/Landing'))
+import { memo } from 'react'
+import Landing from './pages/Landing'
 
 interface LandingEntryProps {
   onNavigate: (page: string) => void
 }
 
 const LandingEntry = memo(({ onNavigate }: LandingEntryProps) => {
-  return (
-    <Suspense fallback={null}>
-      <Landing onNavigate={onNavigate} />
-    </Suspense>
-  )
+  return <Landing onNavigate={onNavigate} />
 })
 
 LandingEntry.displayName = 'LandingEntry'
