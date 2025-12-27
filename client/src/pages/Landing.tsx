@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react'
+import React, { useState, useEffect, useRef, Suspense, useCallback, memo, useMemo } from 'react'
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import { 
   ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp, 
@@ -10,6 +10,13 @@ import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
 
 const Landing3D = React.lazy(() => import('./Landing3D'))
+
+const Landing3DFallback = memo(() => (
+  <div className="absolute inset-0 bg-black">
+    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/30 to-black" />
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] bg-blue-600/10 rounded-full blur-[80px]" />
+  </div>
+))
 
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
   const colors = {
@@ -184,7 +191,7 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
   )
 }
 
-const DashboardPageContent = () => (
+const DashboardPageContent = memo(() => (
   <div className="space-y-4">
     <div className="grid grid-cols-4 gap-3">
       {[
@@ -232,9 +239,9 @@ const DashboardPageContent = () => (
       </div>
     </div>
   </div>
-)
+))
 
-const EngagementPageContent = () => (
+const EngagementPageContent = memo(() => (
   <div className="space-y-4">
     <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
       <div className="flex items-center justify-between mb-4">
@@ -295,9 +302,9 @@ const EngagementPageContent = () => (
       </div>
     </div>
   </div>
-)
+))
 
-const HooksPageContent = () => (
+const HooksPageContent = memo(() => (
   <div className="space-y-4">
     <div className="p-5 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
       <div className="flex items-center justify-between mb-4">
@@ -349,7 +356,7 @@ const HooksPageContent = () => (
       </div>
     </div>
   </div>
-)
+))
 
 const BASE_WIDTH = 1000
 const BASE_HEIGHT = 600
@@ -770,7 +777,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <Suspense fallback={<div className="w-full h-full bg-transparent" />}>
+          <Suspense fallback={<Landing3DFallback />}>
             <Landing3D />
           </Suspense>
         </div>
