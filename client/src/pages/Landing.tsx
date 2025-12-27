@@ -835,7 +835,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative isolate">
+    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative isolate" style={{ overflowX: 'clip' }}>
       <SEO {...seoConfig.landing} />
       
       {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
@@ -847,7 +847,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </div>
 
       {/* Navigation - use wrapper for sticky/fixed to avoid iOS Safari transform issues */}
-      <div className={`${isMobile ? 'sticky' : 'fixed'} top-0 w-full z-50`}>
+      <div className="landing-nav-wrapper w-full z-50">
         <motion.nav 
           initial={{ y: -100 }} 
           animate={{ y: 0 }} 
