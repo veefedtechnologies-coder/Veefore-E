@@ -78,7 +78,7 @@ const CharacterReveal = ({ text, isActive, isGradient = false }: { text: string,
   const characters = text.split('')
   
   return (
-    <span className={isGradient ? "bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent" : "text-white"}>
+    <span className="inline-flex flex-wrap justify-center">
       {characters.map((char, i) => (
         <motion.span
           key={i}
@@ -97,7 +97,10 @@ const CharacterReveal = ({ text, isActive, isGradient = false }: { text: string,
           style={{ 
             display: 'inline-block',
             transformOrigin: 'bottom',
-            whiteSpace: char === ' ' ? 'pre' : 'normal'
+            background: isGradient ? 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)' : 'none',
+            WebkitBackgroundClip: isGradient ? 'text' : 'unset',
+            backgroundClip: isGradient ? 'text' : 'unset',
+            color: isGradient ? 'transparent' : 'white'
           }}
         >
           {char === ' ' ? '\u00A0' : char}
@@ -118,12 +121,15 @@ const RotatingTagline = () => {
   }, [])
 
   return (
-    <div className="relative h-[1.2em]">
+    <div className="relative" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
       {taglines.map((tagline, index) => (
         <div
           key={index}
           className="absolute inset-0 flex items-center justify-center"
-          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
+          style={{ 
+            pointerEvents: currentIndex === index ? 'auto' : 'none',
+            visibility: currentIndex === index ? 'visible' : 'hidden'
+          }}
         >
           <CharacterReveal text={tagline.bottom} isActive={currentIndex === index} isGradient={true} />
         </div>
@@ -143,12 +149,15 @@ const RotatingTopLine = () => {
   }, [])
 
   return (
-    <div className="relative h-[1.2em]">
+    <div className="relative" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
       {taglines.map((tagline, index) => (
         <div
           key={index}
           className="absolute inset-0 flex items-center justify-center"
-          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
+          style={{ 
+            pointerEvents: currentIndex === index ? 'auto' : 'none',
+            visibility: currentIndex === index ? 'visible' : 'hidden'
+          }}
         >
           <CharacterReveal text={tagline.top} isActive={currentIndex === index} isGradient={false} />
         </div>
