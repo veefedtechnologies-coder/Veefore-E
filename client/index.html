@@ -76,10 +76,10 @@
     <meta property="twitter:image" content="https://veefore.com/og-image.jpg" />
     <meta property="twitter:creator" content="@veefore" />
     
-    <!-- Additional SEO Meta Tags -->
-    <meta name="theme-color" content="#2563eb" />
+    <!-- Additional SEO Meta Tags - Dark theme for landing page -->
+    <meta name="theme-color" content="#030303" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="VeeFore" />
     
     <!-- P10: PWA Manifest -->
@@ -89,7 +89,7 @@
     <meta name="apple-touch-fullscreen" content="yes" />
     <meta name="mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="format-detection" content="telephone=no" />
-    <meta name="msapplication-TileColor" content="#2563eb" />
+    <meta name="msapplication-TileColor" content="#030303" />
     <meta name="msapplication-config" content="/browserconfig.xml" />
     
     <!-- P10: Performance Hints -->
@@ -115,8 +115,8 @@
     <style>
       /* P7-5: Critical above-the-fold styles for instant LCP */
       html, body {
-        background-color: #f9fafb; /* gray-50 */
-        color: #111827; /* gray-900 */
+        background-color: #030303; /* Dark landing page background */
+        color: #f9fafb; /* Light text */
         margin: 0;
         padding: 0;
         font-family: Inter, system-ui, -apple-system, sans-serif;
@@ -124,6 +124,15 @@
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
+      }
+      
+      /* iOS Safari safe area support */
+      html {
+        background-color: #030303;
+      }
+      
+      #root {
+        background-color: #030303;
       }
       
       /* P7-5: Hero section critical styles */

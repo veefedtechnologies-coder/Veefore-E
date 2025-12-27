@@ -2,20 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Mobile landing page fixes - force all framer-motion elements to be visible */
-/* This fixes iOS Safari issue where whileInView animations don't trigger properly */
-@media (max-width: 767px) {
-  /* Target any element with inline opacity style (framer-motion sets these) */
-  .landing-mobile-fix section,
-  .landing-mobile-fix section > div,
-  .landing-mobile-fix section > div > div,
-  .landing-mobile-fix section div[style*="opacity"],
-  .landing-mobile-fix [style*="opacity: 0"],
-  .landing-mobile-fix [style] {
-    opacity: 1 !important;
-    visibility: visible !important;
-  }
-}
+/* Mobile landing page fixes - removed aggressive opacity override that was breaking text rotation */
 
 /* Global dark mode support */
 @layer base {
