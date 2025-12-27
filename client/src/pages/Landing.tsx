@@ -74,34 +74,7 @@ const taglines = [
   { top: "Smart comments.", bottom: "Smarter DMs." }
 ]
 
-const SlideText = ({ text, isActive, isExiting, isGradient = false }: { text: string, isActive: boolean, isExiting: boolean, isGradient?: boolean }) => {
-  return (
-    <motion.span
-      initial={false}
-      animate={{
-        opacity: isActive ? 1 : 0,
-        y: isActive ? 0 : (isExiting ? -80 : 80),
-        filter: isActive ? 'blur(0px)' : 'blur(6px)',
-        scale: isActive ? 1 : 0.9
-      }}
-      transition={{
-        duration: 0.8,
-        ease: [0.22, 1, 0.36, 1]
-      }}
-      style={{ 
-        display: 'inline-block',
-        background: isGradient ? 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)' : 'none',
-        WebkitBackgroundClip: isGradient ? 'text' : 'unset',
-        backgroundClip: isGradient ? 'text' : 'unset',
-        color: isGradient ? 'transparent' : 'white'
-      }}
-    >
-      {text}
-    </motion.span>
-  )
-}
-
-const RotatingTagline = () => {
+const RotatingHeroText = () => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
   
@@ -114,53 +87,45 @@ const RotatingTagline = () => {
   }, [currentIndex])
 
   return (
-    <div className="relative overflow-hidden" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
-      {taglines.map((tagline, index) => (
-        <div
-          key={index}
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
-        >
-          <SlideText 
-            text={tagline.bottom} 
-            isActive={currentIndex === index} 
-            isExiting={prevIndex === index}
-            isGradient={true} 
-          />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-const RotatingTopLine = () => {
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [prevIndex, setPrevIndex] = useState(-1)
-  
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPrevIndex(currentIndex)
-      setCurrentIndex((prev) => (prev + 1) % taglines.length)
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [currentIndex])
-
-  return (
-    <div className="relative overflow-hidden" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
-      {taglines.map((tagline, index) => (
-        <div
-          key={index}
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
-        >
-          <SlideText 
-            text={tagline.top} 
-            isActive={currentIndex === index} 
-            isExiting={prevIndex === index}
-            isGradient={false} 
-          />
-        </div>
-      ))}
+    <div className="relative overflow-hidden" style={{ height: 'clamp(7rem, 18vw, 14rem)' }}>
+      {taglines.map((tagline, index) => {
+        const isActive = currentIndex === index
+        const isExiting = prevIndex === index
+        
+        return (
+          <motion.div
+            key={index}
+            initial={false}
+            animate={{
+              opacity: isActive ? 1 : 0,
+              y: isActive ? 0 : (isExiting ? '-100%' : '100%'),
+              filter: isActive ? 'blur(0px)' : 'blur(8px)',
+              scale: isActive ? 1 : 0.95
+            }}
+            transition={{
+              duration: 0.9,
+              ease: [0.22, 1, 0.36, 1]
+            }}
+            className="absolute inset-0 flex flex-col items-center justify-center"
+            style={{ pointerEvents: isActive ? 'auto' : 'none' }}
+          >
+            <span className="block text-white leading-[1.1]">
+              {tagline.top}
+            </span>
+            <span 
+              className="block leading-[1.1] mt-1"
+              style={{ 
+                background: 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent'
+              }}
+            >
+              {tagline.bottom}
+            </span>
+          </motion.div>
+        )
+      })}
     </div>
   )
 }
@@ -770,10 +735,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             transition={{ duration: 0.8, delay: 0.3 }}
             className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8"
           >
-            <RotatingTopLine />
-            <div className="mt-2">
-              <RotatingTagline />
-            </div>
+            <RotatingHeroText />
           </motion.h1>
           
           <motion.p 
