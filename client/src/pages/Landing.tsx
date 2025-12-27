@@ -65,12 +65,11 @@ const MobileMotion = ({
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
 const MobileBackground = memo(() => (
-  <div className="absolute inset-0 bg-[#030303] overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/30 via-transparent to-transparent" />
-    {/* Visible gradient orbs for mobile - matching desktop trail effect */}
-    <div className="absolute -top-[50px] -left-[80px] w-[350px] h-[350px] bg-blue-500/25 rounded-full blur-[120px]" />
-    <div className="absolute top-[30%] -right-[60px] w-[280px] h-[280px] bg-purple-500/20 rounded-full blur-[100px]" />
-    <div className="absolute bottom-[20%] left-[20%] w-[200px] h-[200px] bg-indigo-500/18 rounded-full blur-[80px]" />
+  <div className="absolute inset-0 bg-black overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/20 via-black to-black" />
+    <div className="absolute top-[20%] left-[20%] w-[300px] h-[300px] bg-blue-600/8 rounded-full blur-[100px]" />
+    <div className="absolute bottom-[30%] right-[20%] w-[200px] h-[200px] bg-purple-600/6 rounded-full blur-[80px]" />
+    <div className="absolute top-[60%] left-[50%] w-[150px] h-[150px] bg-indigo-500/5 rounded-full blur-[60px]" />
   </div>
 ))
 
@@ -847,69 +846,50 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
       </div>
 
-      {/* Navigation - fixed on all devices */}
-      <div className="fixed top-0 w-full z-50">
-        {isMobile ? (
-          <nav>
-            <div className="mx-4 mt-4">
-              <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-8">
-                    <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
-                      <img src="/veefore-logo.png" alt="VeeFore" className="h-8 w-auto" />
-                      <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <MagneticButton 
-                      className="bg-white text-black hover:bg-white/90 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-300"
-                      onClick={() => onNavigate('signup')}
-                    >
-                      Start Free
-                    </MagneticButton>
-                  </div>
+      {/* Navigation - use wrapper for sticky/fixed to avoid iOS Safari transform issues */}
+      <div className={`${isMobile ? 'sticky' : 'fixed'} top-0 w-full z-50`}>
+        <motion.nav 
+          initial={{ y: -100 }} 
+          animate={{ y: 0 }} 
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        >
+        <div className="mx-4 mt-4">
+          <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-8">
+                <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
+                  <img 
+                    src="/veefore-logo.png" 
+                    alt="VeeFore" 
+                    className="h-8 w-auto"
+                  />
+                  <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
                 </div>
-              </GlassCard>
-            </div>
-          </nav>
-        ) : (
-          <motion.nav 
-            initial={{ y: -100 }} 
-            animate={{ y: 0 }} 
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="mx-4 mt-4">
-              <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-8">
-                    <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
-                      <img src="/veefore-logo.png" alt="VeeFore" className="h-8 w-auto" />
-                      <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
-                    </div>
-                    <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
-                      {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
-                        <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
-                          {item}
-                          <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
-                    <MagneticButton 
-                      className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
-                      onClick={() => onNavigate('signup')}
-                    >
-                      <span className="hidden sm:inline">Start Free Trial</span>
-                      <span className="sm:hidden">Start Free</span>
-                    </MagneticButton>
-                  </div>
+                
+                <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
+                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
+                    <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
+                      {item}
+                      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300" />
+                    </a>
+                  ))}
                 </div>
-              </GlassCard>
+              </div>
+
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
+                <MagneticButton 
+                  className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
+                  onClick={() => onNavigate('signup')}
+                >
+                  <span className="hidden sm:inline">Start Free Trial</span>
+                  <span className="sm:hidden">Start Free</span>
+                </MagneticButton>
+              </div>
             </div>
-          </motion.nav>
-        )}
+          </GlassCard>
+        </div>
+        </motion.nav>
       </div>
 
       {/* Hero Section */}
@@ -925,6 +905,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           )}
         </div>
         
+        {/* Gradient orbs layer for mobile - on top of MobileBackground */}
+        {isMobile && (
+          <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+            <GradientOrb className="w-[350px] h-[350px] -top-[50px] -left-[80px]" color="blue" />
+            <GradientOrb className="w-[280px] h-[280px] top-[40%] -right-[60px]" color="purple" />
+            <GradientOrb className="w-[200px] h-[200px] bottom-[15%] left-[30%]" color="indigo" />
+          </div>
+        )}
         
         {isMobile ? (
           <div className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center">
