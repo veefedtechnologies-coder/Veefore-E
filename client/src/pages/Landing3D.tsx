@@ -23,9 +23,9 @@ const Landing3D = memo(() => {
 
     let animationId: number
     let lastTime = 0
-    const targetFPS = isMobile ? 24 : 60
+    const targetFPS = isMobile ? 30 : 60
     const frameInterval = 1000 / targetFPS
-    const fadeOpacity = isMobile ? 0.12 : 0.08
+    const fadeOpacity = isMobile ? 0.04 : 0.08
     
     let particles: Array<{
       x: number
