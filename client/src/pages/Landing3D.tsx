@@ -1,15 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, memo } from 'react'
 
-const Landing3D = () => {
+const Landing3D = memo(() => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => window.innerWidth < 768
     setIsMobile(checkMobile())
     
     const handleResize = () => setIsMobile(checkMobile())
-    window.addEventListener('resize', handleResize)
+    window.addEventListener('resize', handleResize, { passive: true })
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
@@ -17,13 +18,14 @@ const Landing3D = () => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { alpha: false })
     if (!ctx) return
 
     let animationId: number
     let lastTime = 0
-    const targetFPS = isMobile ? 20 : 60
+    const targetFPS = isMobile ? 24 : 60
     const frameInterval = 1000 / targetFPS
+    const fadeOpacity = isMobile ? 0.12 : 0.08
     
     let particles: Array<{
       x: number
@@ -36,21 +38,25 @@ const Landing3D = () => {
     }> = []
 
     const resize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 2)
+      canvas.width = window.innerWidth * dpr
+      canvas.height = window.innerHeight * dpr
+      canvas.style.width = window.innerWidth + 'px'
+      canvas.style.height = window.innerHeight + 'px'
+      ctx.scale(dpr, dpr)
     }
 
     const createParticles = () => {
       particles = []
       const count = isMobile 
-        ? Math.min(25, Math.floor(window.innerWidth / 30))
-        : Math.min(80, Math.floor(window.innerWidth / 18))
+        ? Math.min(18, Math.floor(window.innerWidth / 40))
+        : Math.min(70, Math.floor(window.innerWidth / 20))
       for (let i = 0; i < count; i++) {
         particles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          vx: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.4),
-          vy: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.4),
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          vx: (Math.random() - 0.5) * (isMobile ? 0.3 : 0.4),
+          vy: (Math.random() - 0.5) * (isMobile ? 0.3 : 0.4),
           size: Math.random() * 2.5 + 0.5,
           opacity: Math.random() * 0.6 + 0.2,
           hue: 220 + Math.random() * 60
@@ -59,26 +65,24 @@ const Landing3D = () => {
     }
 
     const drawConnections = () => {
-      const maxDistance = isMobile ? 120 : 180
-      const maxConnections = isMobile ? 2 : 999
+      const maxDistance = isMobile ? 100 : 180
+      const maxDistSq = maxDistance * maxDistance
       
+      ctx.lineWidth = 0.8
       for (let i = 0; i < particles.length; i++) {
-        let connections = 0
-        for (let j = i + 1; j < particles.length && connections < maxConnections; j++) {
+        for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x
           const dy = particles[i].y - particles[j].y
           const distSq = dx * dx + dy * dy
 
-          if (distSq < maxDistance * maxDistance) {
+          if (distSq < maxDistSq) {
             const distance = Math.sqrt(distSq)
             const opacity = 0.15 * (1 - distance / maxDistance)
             ctx.beginPath()
             ctx.strokeStyle = `hsla(230, 80%, 60%, ${opacity})`
-            ctx.lineWidth = 0.8
             ctx.moveTo(particles[i].x, particles[i].y)
             ctx.lineTo(particles[j].x, particles[j].y)
             ctx.stroke()
-            connections++
           }
         }
       }
@@ -91,17 +95,20 @@ const Landing3D = () => {
       if (deltaTime < frameInterval) return
       lastTime = currentTime - (deltaTime % frameInterval)
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = `rgba(0, 0, 0, ${fadeOpacity})`
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight)
 
       drawConnections()
+
+      const w = window.innerWidth
+      const h = window.innerHeight
 
       particles.forEach(p => {
         p.x += p.vx
         p.y += p.vy
 
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1
+        if (p.x < 0 || p.x > w) p.vx *= -1
+        if (p.y < 0 || p.y > h) p.vy *= -1
 
         if (!isMobile) {
           const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 4)
@@ -122,18 +129,21 @@ const Landing3D = () => {
       })
     }
 
-    resize()
-    createParticles()
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    animationId = requestAnimationFrame(animate)
+    requestAnimationFrame(() => {
+      resize()
+      createParticles()
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight)
+      setIsLoaded(true)
+      animationId = requestAnimationFrame(animate)
+    })
 
     const handleCanvasResize = () => {
       resize()
       createParticles()
     }
 
-    window.addEventListener('resize', handleCanvasResize)
+    window.addEventListener('resize', handleCanvasResize, { passive: true })
 
     return () => {
       cancelAnimationFrame(animationId)
@@ -143,7 +153,10 @@ const Landing3D = () => {
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      <canvas ref={canvasRef} className="w-full h-full" />
+      <canvas 
+        ref={canvasRef} 
+        className={`w-full h-full transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+      />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/30 to-black pointer-events-none" />
       {!isMobile && (
         <>
@@ -157,6 +170,8 @@ const Landing3D = () => {
       )}
     </div>
   )
-}
+})
+
+Landing3D.displayName = 'Landing3D'
 
 export default Landing3D
