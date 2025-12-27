@@ -120,43 +120,93 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
 
 const AnimatedDashboard = () => {
   const [activePage, setActivePage] = useState(0)
-  const [cursorPos, setCursorPos] = useState({ x: 60, y: 80 })
+  const [cursorPos, setCursorPos] = useState({ x: 70, y: 58 })
   const [isClicking, setIsClicking] = useState(false)
+  const [animationKey, setAnimationKey] = useState(0)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   
-  const pages = ['Dashboard', 'Engagement', 'Hooks']
-  const sidebarPositions = [{ x: 60, y: 80 }, { x: 60, y: 116 }, { x: 60, y: 188 }]
+  const sidebarItems = [
+    { name: 'Dashboard', pageIndex: 0 },
+    { name: 'Engagement', pageIndex: 1 },
+    { name: 'DM Funnels', pageIndex: null },
+    { name: 'Hooks', pageIndex: 2 },
+    { name: 'Analytics', pageIndex: null }
+  ]
+  
+  const getCursorPosition = (itemIndex: number) => {
+    const baseY = 58
+    const itemHeight = 36
+    return { x: 70, y: baseY + (itemIndex * itemHeight) }
+  }
   
   useEffect(() => {
-    const cyclePages = () => {
-      const sequence = async () => {
-        await new Promise(r => setTimeout(r, 3000))
-        setCursorPos(sidebarPositions[1])
-        await new Promise(r => setTimeout(r, 800))
-        setIsClicking(true)
-        await new Promise(r => setTimeout(r, 150))
-        setIsClicking(false)
-        setActivePage(1)
-        await new Promise(r => setTimeout(r, 4000))
-        setCursorPos(sidebarPositions[2])
-        await new Promise(r => setTimeout(r, 800))
-        setIsClicking(true)
-        await new Promise(r => setTimeout(r, 150))
-        setIsClicking(false)
-        setActivePage(2)
-        await new Promise(r => setTimeout(r, 4000))
-        setCursorPos(sidebarPositions[0])
-        await new Promise(r => setTimeout(r, 800))
-        setIsClicking(true)
-        await new Promise(r => setTimeout(r, 150))
-        setIsClicking(false)
-        setActivePage(0)
-      }
-      sequence()
-      const interval = setInterval(sequence, 12500)
-      return () => clearInterval(interval)
+    let isMounted = true
+    let timeoutId: NodeJS.Timeout
+    
+    const runSequence = async () => {
+      if (!isMounted) return
+      
+      setCursorPos(getCursorPosition(0))
+      setActivePage(0)
+      setAnimationKey(k => k + 1)
+      
+      timeoutId = setTimeout(async () => {
+        if (!isMounted) return
+        setCursorPos(getCursorPosition(1))
+        
+        timeoutId = setTimeout(() => {
+          if (!isMounted) return
+          setIsClicking(true)
+          setTimeout(() => {
+            if (!isMounted) return
+            setIsClicking(false)
+            setActivePage(1)
+            setAnimationKey(k => k + 1)
+            
+            timeoutId = setTimeout(() => {
+              if (!isMounted) return
+              setCursorPos(getCursorPosition(3))
+              
+              timeoutId = setTimeout(() => {
+                if (!isMounted) return
+                setIsClicking(true)
+                setTimeout(() => {
+                  if (!isMounted) return
+                  setIsClicking(false)
+                  setActivePage(2)
+                  setAnimationKey(k => k + 1)
+                  
+                  timeoutId = setTimeout(() => {
+                    if (!isMounted) return
+                    setCursorPos(getCursorPosition(0))
+                    
+                    timeoutId = setTimeout(() => {
+                      if (!isMounted) return
+                      setIsClicking(true)
+                      setTimeout(() => {
+                        if (!isMounted) return
+                        setIsClicking(false)
+                        setActivePage(0)
+                        setAnimationKey(k => k + 1)
+                        
+                        timeoutId = setTimeout(() => runSequence(), 3000)
+                      }, 100)
+                    }, 600)
+                  }, 4000)
+                }, 100)
+              }, 600)
+            }, 4000)
+          }, 100)
+        }, 600)
+      }, 3000)
     }
-    const cleanup = cyclePages()
-    return cleanup
+    
+    runSequence()
+    
+    return () => {
+      isMounted = false
+      clearTimeout(timeoutId)
+    }
   }, [])
 
   const DashboardContent = () => (
@@ -353,18 +403,22 @@ const AnimatedDashboard = () => {
             {isClicking && <motion.div initial={{ scale: 0.5, opacity: 1 }} animate={{ scale: 2, opacity: 0 }} transition={{ duration: 0.3 }} className="absolute inset-0 rounded-full bg-blue-400/50" />}
           </motion.div>
           <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-2 space-y-3">
-              {pages.map((item, i) => (
-                <motion.div key={item} className={`px-3 py-2 rounded-lg text-xs cursor-pointer transition-all duration-300 ${activePage === i ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-white/40 hover:bg-white/5'}`}>
-                  {item}
-                </motion.div>
-              ))}
-              <div className="px-3 py-2 rounded-lg text-xs text-white/40">DM Funnels</div>
-              <div className="px-3 py-2 rounded-lg text-xs text-white/40">Analytics</div>
+            <div ref={sidebarRef} className="col-span-2 space-y-1">
+              {sidebarItems.map((item, i) => {
+                const isActive = item.pageIndex === activePage
+                return (
+                  <div 
+                    key={item.name} 
+                    className={`px-3 py-2 rounded-lg text-xs transition-all duration-200 ${isActive ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-white/40'}`}
+                  >
+                    {item.name}
+                  </div>
+                )
+              })}
             </div>
             <div className="col-span-10">
               <AnimatePresence mode="wait">
-                <motion.div key={activePage} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
+                <motion.div key={animationKey} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
                   {activePage === 0 && <DashboardContent />}
                   {activePage === 1 && <EngagementContent />}
                   {activePage === 2 && <HooksContent />}
