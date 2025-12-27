@@ -122,9 +122,8 @@ const AnimatedDashboard = () => {
   const [activePage, setActivePage] = useState(0)
   const [cursorPos, setCursorPos] = useState({ x: 50, y: 12 })
   const [isClicking, setIsClicking] = useState(false)
-  const [animationKey, setAnimationKey] = useState(0)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
-  const contentRef = useRef<HTMLDivElement>(null)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   
   const sidebarItems = [
     { name: 'Dashboard', pageIndex: 0 },
@@ -136,13 +135,13 @@ const AnimatedDashboard = () => {
   
   const getCursorPosition = useCallback((itemIndex: number) => {
     const item = itemRefs.current[itemIndex]
-    const container = contentRef.current
-    if (item && container) {
+    const sidebar = sidebarRef.current
+    if (item && sidebar) {
       const itemRect = item.getBoundingClientRect()
-      const containerRect = container.getBoundingClientRect()
+      const sidebarRect = sidebar.getBoundingClientRect()
       return {
-        x: itemRect.left - containerRect.left + itemRect.width / 2,
-        y: itemRect.top - containerRect.top + itemRect.height / 2
+        x: itemRect.left - sidebarRect.left + itemRect.width / 2 + 8,
+        y: itemRect.top - sidebarRect.top + itemRect.height / 2
       }
     }
     const baseY = 12
@@ -167,7 +166,6 @@ const AnimatedDashboard = () => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(0))
         setActivePage(0)
-        setAnimationKey(k => k + 1)
       }, 100)
       
       addTimeout(() => {
@@ -184,7 +182,6 @@ const AnimatedDashboard = () => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(1)
-        setAnimationKey(k => k + 1)
       }, 3750)
       
       addTimeout(() => {
@@ -201,7 +198,6 @@ const AnimatedDashboard = () => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(2)
-        setAnimationKey(k => k + 1)
       }, 8500)
       
       addTimeout(() => {
@@ -218,7 +214,6 @@ const AnimatedDashboard = () => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(0)
-        setAnimationKey(k => k + 1)
       }, 13250)
       
       addTimeout(() => {
@@ -417,31 +412,31 @@ const AnimatedDashboard = () => {
           </div>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold">V</div>
         </div>
-        <div ref={contentRef} className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
-          <motion.div
-            className="absolute pointer-events-none z-50"
-            style={{ width: 20, height: 20 }}
-            animate={{ 
-              left: cursorPos.x - 2, 
-              top: cursorPos.y - 2, 
-              scale: isClicking ? 0.85 : 1 
-            }}
-            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-              <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
-            </svg>
-            {isClicking && (
-              <motion.div 
-                initial={{ scale: 0.3, opacity: 0.8 }} 
-                animate={{ scale: 1.8, opacity: 0 }} 
-                transition={{ duration: 0.25 }} 
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
-              />
-            )}
-          </motion.div>
+        <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
           <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-2 space-y-1">
+            <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
+              <motion.div
+                className="absolute pointer-events-none z-50"
+                style={{ width: 20, height: 20 }}
+                animate={{ 
+                  left: cursorPos.x - 10, 
+                  top: cursorPos.y - 10, 
+                  scale: isClicking ? 0.85 : 1 
+                }}
+                transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                  <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
+                </svg>
+                {isClicking && (
+                  <motion.div 
+                    initial={{ scale: 0.3, opacity: 0.8 }} 
+                    animate={{ scale: 1.8, opacity: 0 }} 
+                    transition={{ duration: 0.25 }} 
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
+                  />
+                )}
+              </motion.div>
               {sidebarItems.map((item, i) => {
                 const isActive = item.pageIndex === activePage
                 return (
@@ -455,14 +450,31 @@ const AnimatedDashboard = () => {
                 )
               })}
             </div>
-            <div className="col-span-10">
-              <AnimatePresence mode="wait">
-                <motion.div key={animationKey} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
-                  {activePage === 0 && <DashboardContent />}
-                  {activePage === 1 && <EngagementContent />}
-                  {activePage === 2 && <HooksContent />}
-                </motion.div>
-              </AnimatePresence>
+            <div className="col-span-10 relative" style={{ minHeight: '420px' }}>
+              <motion.div 
+                className="absolute inset-0"
+                animate={{ opacity: activePage === 0 ? 1 : 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                style={{ pointerEvents: activePage === 0 ? 'auto' : 'none' }}
+              >
+                <DashboardContent />
+              </motion.div>
+              <motion.div 
+                className="absolute inset-0"
+                animate={{ opacity: activePage === 1 ? 1 : 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                style={{ pointerEvents: activePage === 1 ? 'auto' : 'none' }}
+              >
+                <EngagementContent />
+              </motion.div>
+              <motion.div 
+                className="absolute inset-0"
+                animate={{ opacity: activePage === 2 ? 1 : 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                style={{ pointerEvents: activePage === 2 ? 'auto' : 'none' }}
+              >
+                <HooksContent />
+              </motion.div>
             </div>
           </div>
         </div>
