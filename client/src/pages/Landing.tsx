@@ -443,38 +443,32 @@ const AnimatedDashboard = () => {
                   <div 
                     key={item.name}
                     ref={el => itemRefs.current[i] = el}
-                    className={`px-3 py-2 rounded-lg text-xs transition-all duration-200 ${isActive ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-white/40'}`}
+                    className={`px-3 py-2 rounded-lg text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
                   >
                     {item.name}
                   </div>
                 )
               })}
             </div>
-            <div className="col-span-10 relative" style={{ minHeight: '520px' }}>
-              <motion.div 
-                className="absolute inset-0"
-                animate={{ opacity: activePage === 0 ? 1 : 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                style={{ pointerEvents: activePage === 0 ? 'auto' : 'none' }}
+            <div className="col-span-10 relative overflow-hidden" style={{ minHeight: '520px' }}>
+              <div 
+                className="absolute inset-0 transition-opacity duration-300 ease-in-out"
+                style={{ opacity: activePage === 0 ? 1 : 0, pointerEvents: activePage === 0 ? 'auto' : 'none' }}
               >
                 <DashboardContent />
-              </motion.div>
-              <motion.div 
-                className="absolute inset-0"
-                animate={{ opacity: activePage === 1 ? 1 : 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                style={{ pointerEvents: activePage === 1 ? 'auto' : 'none' }}
+              </div>
+              <div 
+                className="absolute inset-0 transition-opacity duration-300 ease-in-out"
+                style={{ opacity: activePage === 1 ? 1 : 0, pointerEvents: activePage === 1 ? 'auto' : 'none' }}
               >
                 <EngagementContent />
-              </motion.div>
-              <motion.div 
-                className="absolute inset-0"
-                animate={{ opacity: activePage === 2 ? 1 : 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                style={{ pointerEvents: activePage === 2 ? 'auto' : 'none' }}
+              </div>
+              <div 
+                className="absolute inset-0 transition-opacity duration-300 ease-in-out"
+                style={{ opacity: activePage === 2 ? 1 : 0, pointerEvents: activePage === 2 ? 'auto' : 'none' }}
               >
                 <HooksContent />
-              </motion.div>
+              </div>
             </div>
           </div>
         </div>
