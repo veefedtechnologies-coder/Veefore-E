@@ -49,7 +49,7 @@ const Landing3D = memo(() => {
     const createParticles = () => {
       particles = []
       const count = isMobile 
-        ? Math.min(18, Math.floor(window.innerWidth / 40))
+        ? Math.min(30, Math.floor(window.innerWidth / 25))
         : Math.min(70, Math.floor(window.innerWidth / 20))
       for (let i = 0; i < count; i++) {
         particles.push({
@@ -110,7 +110,12 @@ const Landing3D = memo(() => {
         if (p.x < 0 || p.x > w) p.vx *= -1
         if (p.y < 0 || p.y > h) p.vy *= -1
 
-        if (!isMobile) {
+        if (isMobile) {
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2)
+          ctx.fillStyle = `hsla(${p.hue}, 80%, 60%, ${p.opacity * 0.3})`
+          ctx.fill()
+        } else {
           const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 4)
           gradient.addColorStop(0, `hsla(${p.hue}, 80%, 60%, ${p.opacity})`)
           gradient.addColorStop(0.5, `hsla(${p.hue}, 80%, 50%, ${p.opacity * 0.5})`)
@@ -123,7 +128,7 @@ const Landing3D = memo(() => {
         }
 
         ctx.beginPath()
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+        ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2)
         ctx.fillStyle = `hsla(${p.hue}, 90%, 70%, ${p.opacity})`
         ctx.fill()
       })
@@ -166,7 +171,10 @@ const Landing3D = memo(() => {
         </>
       )}
       {isMobile && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] bg-blue-600/10 rounded-full blur-[80px] pointer-events-none" />
+        <>
+          <div className="absolute top-1/4 left-1/4 w-[180px] h-[180px] bg-blue-600/20 rounded-full blur-[60px] pointer-events-none" />
+          <div className="absolute bottom-1/3 right-1/4 w-[150px] h-[150px] bg-purple-600/15 rounded-full blur-[50px] pointer-events-none" />
+        </>
       )}
     </div>
   )
