@@ -359,9 +359,18 @@ const AnimatedDashboard = () => {
   const [cursorPos, setCursorPos] = useState({ x: 50, y: 12 })
   const [isClicking, setIsClicking] = useState(false)
   const [scale, setScale] = useState(1)
+  const [isMobile, setIsMobile] = useState(false)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
   const sidebarRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    const checkMobile = () => window.innerWidth < 768
+    setIsMobile(checkMobile())
+    const handleResize = () => setIsMobile(checkMobile())
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   
   const sidebarItems = [
     { name: 'Dashboard', pageIndex: 0 },
@@ -388,6 +397,13 @@ const AnimatedDashboard = () => {
   }, [])
   
   useEffect(() => {
+    if (isMobile) {
+      const interval = setInterval(() => {
+        setActivePage(prev => (prev + 1) % 3)
+      }, 5000)
+      return () => clearInterval(interval)
+    }
+    
     let isMounted = true
     const timeouts: NodeJS.Timeout[] = []
     
@@ -399,8 +415,6 @@ const AnimatedDashboard = () => {
     
     const runSequence = () => {
       if (!isMounted) return
-      
-      const currentScale = wrapperRef.current ? Math.min(wrapperRef.current.offsetWidth / BASE_WIDTH, 1) : 1
       
       addTimeout(() => {
         if (!isMounted) return
@@ -472,7 +486,7 @@ const AnimatedDashboard = () => {
       isMounted = false
       timeouts.forEach(clearTimeout)
     }
-  }, [getCursorPosition])
+  }, [getCursorPosition, isMobile])
 
   useEffect(() => {
     const wrapper = wrapperRef.current
@@ -523,28 +537,30 @@ const AnimatedDashboard = () => {
         <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
           <div className="grid grid-cols-12 gap-4">
             <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
-              <motion.div
-                className="absolute pointer-events-none z-50"
-                style={{ width: 20, height: 20 }}
-                animate={{ 
-                  left: cursorPos.x - 10, 
-                  top: cursorPos.y - 10, 
-                  scale: isClicking ? 0.85 : 1 
-                }}
-                transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                  <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
-                </svg>
-                {isClicking && (
-                  <motion.div 
-                    initial={{ scale: 0.3, opacity: 0.8 }} 
-                    animate={{ scale: 1.8, opacity: 0 }} 
-                    transition={{ duration: 0.25 }} 
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
-                  />
-                )}
-              </motion.div>
+              {!isMobile && (
+                <motion.div
+                  className="absolute pointer-events-none z-50"
+                  style={{ width: 20, height: 20 }}
+                  animate={{ 
+                    left: cursorPos.x - 10, 
+                    top: cursorPos.y - 10, 
+                    scale: isClicking ? 0.85 : 1 
+                  }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                    <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
+                  </svg>
+                  {isClicking && (
+                    <motion.div 
+                      initial={{ scale: 0.3, opacity: 0.8 }} 
+                      animate={{ scale: 1.8, opacity: 0 }} 
+                      transition={{ duration: 0.25 }} 
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
+                    />
+                  )}
+                </motion.div>
+              )}
               {sidebarItems.map((item, i) => {
                 const isActive = item.pageIndex === activePage
                 return (
@@ -788,7 +804,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8 }}
-            className="text-xl md:text-2xl text-white/40 max-w-3xl mx-auto mb-6 leading-relaxed font-medium"
+            className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4"
           >
             VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
           </motion.p>
@@ -797,7 +813,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 1 }}
-            className="text-lg text-white/25 max-w-2xl mx-auto mb-12"
+            className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4"
           >
             Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
           </motion.p>
@@ -806,15 +822,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.1 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4"
           >
             <MagneticButton 
-              className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-10 py-5 text-lg font-bold overflow-hidden"
+              className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
               onClick={() => onNavigate('signup')}
             >
               <span className="relative z-10 flex items-center">
                 Start 7-Day Free Trial
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -822,11 +838,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               </div>
             </MagneticButton>
             
-            <button className="group flex items-center space-x-3 text-white/60 hover:text-white transition-colors px-6 py-4">
-              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-hover:border-white/20 transition-all">
-                <Play className="w-5 h-5 fill-current ml-0.5" />
+            <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-hover:border-white/20 transition-all">
+                <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
               </div>
-              <span className="font-semibold">Watch Demo</span>
+              <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
             </button>
           </motion.div>
           
