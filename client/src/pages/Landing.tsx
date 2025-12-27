@@ -835,11 +835,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative isolate" style={{ overflowX: 'clip' }}>
+    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative" style={{ overflowX: 'clip' }}>
       <SEO {...seoConfig.landing} />
       
-      {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
-      <div className={`${isMobile ? 'absolute h-[500vh]' : 'fixed'} inset-0 pointer-events-none overflow-hidden -z-10`}>
+      {/* Ambient Background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: -1 }}>
         <GradientOrb className={`${isMobile ? 'w-[400px] h-[400px]' : 'w-[800px] h-[800px]'} -top-[100px] -left-[100px]`} color="blue" />
         <GradientOrb className={`${isMobile ? 'w-[300px] h-[300px]' : 'w-[600px] h-[600px]'} top-[30%] -right-[100px]`} color="purple" />
         <GradientOrb className={`${isMobile ? 'w-[250px] h-[250px]' : 'w-[500px] h-[500px]'} bottom-[10%] left-[20%]`} color="indigo" />
@@ -893,7 +893,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </div>
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden isolate z-10">
+      <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden">
         {/* Background layer */}
         <div className="absolute inset-0 z-0">
           {isMobile ? (
@@ -1060,7 +1060,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Dashboard Showcase Section */}
-      <section className="relative py-8 -mt-20 z-20 isolate">
+      <section className="relative py-8 -mt-20 z-[1]">
         <div className="max-w-[1600px] mx-auto px-4">
           <motion.div 
             initial={{ opacity: 0, y: 60 }}
@@ -1204,7 +1204,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Social Proof Strip */}
-      <section className="py-16 border-y border-white/[0.03] relative isolate z-10">
+      <section className="py-16 border-y border-white/[0.03] relative">
         <div className="max-w-[1400px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -1228,7 +1228,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Problem / Philosophy Section */}
-      <section id="how-it-works" className="py-32 relative isolate z-10">
+      <section id="how-it-works" className="py-32 relative">
         <div className="max-w-[1200px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
@@ -1310,7 +1310,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Hero Features - Layer 1 */}
-      <section id="features" className="py-32 relative isolate z-10">
+      <section id="features" className="py-32 relative">
         <GradientOrb className="w-[600px] h-[600px] top-0 left-1/2 -translate-x-1/2" color="blue" />
         
         <div className="max-w-[1200px] mx-auto px-6 relative">
@@ -1392,7 +1392,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Support Features - Layer 2 */}
-      <section className="py-24 relative isolate z-10">
+      <section className="py-24 relative">
         <div className="max-w-[1200px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -1459,7 +1459,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Credit System */}
-      <section className="py-32 relative isolate z-10">
+      <section className="py-32 relative">
         <GradientOrb className="w-[500px] h-[500px] bottom-0 right-0" color="cyan" />
         
         <div className="max-w-[1200px] mx-auto px-6 relative">
@@ -1533,7 +1533,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-32 relative isolate z-10">
+      <section id="pricing" className="py-32 relative">
         <GradientOrb className="w-[600px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
         
         <div className="max-w-[1200px] mx-auto px-6 relative">
@@ -1631,7 +1631,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Free Trial */}
-      <section className="py-32 relative isolate z-10">
+      <section className="py-32 relative">
         <div className="max-w-[1200px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
@@ -1694,7 +1694,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="py-32 relative isolate z-10">
+      <section id="faq" className="py-32 relative">
         <div className="max-w-[800px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
@@ -1745,7 +1745,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-32 relative overflow-hidden isolate z-10">
+      <section className="py-32 relative overflow-hidden">
         <GradientOrb className="w-[800px] h-[800px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
         
         <div className="max-w-[900px] mx-auto px-6 text-center relative">
@@ -1776,7 +1776,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Footer */}
-      <footer className="py-20 border-t border-white/[0.05] relative isolate z-10">
+      <footer className="py-20 border-t border-white/[0.05] relative">
         <div className="max-w-[1200px] mx-auto px-6">
           <div className="grid md:grid-cols-5 gap-12 mb-16">
             <div className="md:col-span-2">
