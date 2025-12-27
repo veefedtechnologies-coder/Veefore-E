@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react'
+import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import { 
   ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp, 
@@ -120,10 +120,11 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
 
 const AnimatedDashboard = () => {
   const [activePage, setActivePage] = useState(0)
-  const [cursorPos, setCursorPos] = useState({ x: 70, y: 58 })
+  const [cursorPos, setCursorPos] = useState({ x: 50, y: 12 })
   const [isClicking, setIsClicking] = useState(false)
   const [animationKey, setAnimationKey] = useState(0)
-  const sidebarRef = useRef<HTMLDivElement>(null)
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([])
+  const contentRef = useRef<HTMLDivElement>(null)
   
   const sidebarItems = [
     { name: 'Dashboard', pageIndex: 0 },
@@ -133,81 +134,106 @@ const AnimatedDashboard = () => {
     { name: 'Analytics', pageIndex: null }
   ]
   
-  const getCursorPosition = (itemIndex: number) => {
-    const baseY = 58
-    const itemHeight = 36
-    return { x: 70, y: baseY + (itemIndex * itemHeight) }
-  }
+  const getCursorPosition = useCallback((itemIndex: number) => {
+    const item = itemRefs.current[itemIndex]
+    const container = contentRef.current
+    if (item && container) {
+      const itemRect = item.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      return {
+        x: itemRect.left - containerRect.left + itemRect.width / 2,
+        y: itemRect.top - containerRect.top + itemRect.height / 2
+      }
+    }
+    const baseY = 12
+    const itemHeight = 32
+    return { x: 50, y: baseY + (itemIndex * itemHeight) }
+  }, [])
   
   useEffect(() => {
     let isMounted = true
-    let timeoutId: NodeJS.Timeout
+    const timeouts: NodeJS.Timeout[] = []
     
-    const runSequence = async () => {
-      if (!isMounted) return
-      
-      setCursorPos(getCursorPosition(0))
-      setActivePage(0)
-      setAnimationKey(k => k + 1)
-      
-      timeoutId = setTimeout(async () => {
-        if (!isMounted) return
-        setCursorPos(getCursorPosition(1))
-        
-        timeoutId = setTimeout(() => {
-          if (!isMounted) return
-          setIsClicking(true)
-          setTimeout(() => {
-            if (!isMounted) return
-            setIsClicking(false)
-            setActivePage(1)
-            setAnimationKey(k => k + 1)
-            
-            timeoutId = setTimeout(() => {
-              if (!isMounted) return
-              setCursorPos(getCursorPosition(3))
-              
-              timeoutId = setTimeout(() => {
-                if (!isMounted) return
-                setIsClicking(true)
-                setTimeout(() => {
-                  if (!isMounted) return
-                  setIsClicking(false)
-                  setActivePage(2)
-                  setAnimationKey(k => k + 1)
-                  
-                  timeoutId = setTimeout(() => {
-                    if (!isMounted) return
-                    setCursorPos(getCursorPosition(0))
-                    
-                    timeoutId = setTimeout(() => {
-                      if (!isMounted) return
-                      setIsClicking(true)
-                      setTimeout(() => {
-                        if (!isMounted) return
-                        setIsClicking(false)
-                        setActivePage(0)
-                        setAnimationKey(k => k + 1)
-                        
-                        timeoutId = setTimeout(() => runSequence(), 3000)
-                      }, 100)
-                    }, 600)
-                  }, 4000)
-                }, 100)
-              }, 600)
-            }, 4000)
-          }, 100)
-        }, 600)
-      }, 3000)
+    const addTimeout = (fn: () => void, delay: number) => {
+      const id = setTimeout(fn, delay)
+      timeouts.push(id)
+      return id
     }
     
-    runSequence()
+    const runSequence = () => {
+      if (!isMounted) return
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setCursorPos(getCursorPosition(0))
+        setActivePage(0)
+        setAnimationKey(k => k + 1)
+      }, 100)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setCursorPos(getCursorPosition(1))
+      }, 3000)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setIsClicking(true)
+      }, 3600)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setIsClicking(false)
+        setActivePage(1)
+        setAnimationKey(k => k + 1)
+      }, 3750)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setCursorPos(getCursorPosition(3))
+      }, 7750)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setIsClicking(true)
+      }, 8350)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setIsClicking(false)
+        setActivePage(2)
+        setAnimationKey(k => k + 1)
+      }, 8500)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setCursorPos(getCursorPosition(0))
+      }, 12500)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setIsClicking(true)
+      }, 13100)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        setIsClicking(false)
+        setActivePage(0)
+        setAnimationKey(k => k + 1)
+      }, 13250)
+      
+      addTimeout(() => {
+        if (!isMounted) return
+        runSequence()
+      }, 16250)
+    }
+    
+    addTimeout(() => runSequence(), 500)
     
     return () => {
       isMounted = false
-      clearTimeout(timeoutId)
+      timeouts.forEach(clearTimeout)
     }
-  }, [])
+  }, [getCursorPosition])
 
   const DashboardContent = () => (
     <div className="space-y-4">
@@ -391,24 +417,37 @@ const AnimatedDashboard = () => {
           </div>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold">V</div>
         </div>
-        <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
+        <div ref={contentRef} className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
           <motion.div
-            className="absolute w-5 h-5 pointer-events-none z-50"
-            animate={{ x: cursorPos.x, y: cursorPos.y, scale: isClicking ? 0.8 : 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="absolute pointer-events-none z-50"
+            style={{ width: 20, height: 20 }}
+            animate={{ 
+              left: cursorPos.x - 2, 
+              top: cursorPos.y - 2, 
+              scale: isClicking ? 0.85 : 1 
+            }}
+            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
           >
-            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-lg">
-              <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#000" strokeWidth="1"/>
+            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+              <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
             </svg>
-            {isClicking && <motion.div initial={{ scale: 0.5, opacity: 1 }} animate={{ scale: 2, opacity: 0 }} transition={{ duration: 0.3 }} className="absolute inset-0 rounded-full bg-blue-400/50" />}
+            {isClicking && (
+              <motion.div 
+                initial={{ scale: 0.3, opacity: 0.8 }} 
+                animate={{ scale: 1.8, opacity: 0 }} 
+                transition={{ duration: 0.25 }} 
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
+              />
+            )}
           </motion.div>
           <div className="grid grid-cols-12 gap-4">
-            <div ref={sidebarRef} className="col-span-2 space-y-1">
+            <div className="col-span-2 space-y-1">
               {sidebarItems.map((item, i) => {
                 const isActive = item.pageIndex === activePage
                 return (
                   <div 
-                    key={item.name} 
+                    key={item.name}
+                    ref={el => itemRefs.current[i] = el}
                     className={`px-3 py-2 rounded-lg text-xs transition-all duration-200 ${isActive ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-white/40'}`}
                   >
                     {item.name}
