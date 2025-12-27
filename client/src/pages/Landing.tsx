@@ -679,8 +679,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   <img 
                     src="/veefore-logo.png" 
                     alt="VeeFore" 
-                    className="h-9 w-auto"
+                    className="h-8 w-auto"
                   />
+                  <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
                 </div>
                 
                 <div className="hidden lg:flex items-center space-x-6 text-sm font-medium text-white/50">
