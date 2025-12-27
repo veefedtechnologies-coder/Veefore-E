@@ -4,12 +4,19 @@
 
 /* Mobile landing page fixes - removed aggressive opacity override that was breaking text rotation */
 
-/* Landing page header - fixed on all devices for consistent behavior */
-.landing-nav-wrapper {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
+/* Mobile sticky header - CSS-based for reliable iOS Safari support */
+@media (max-width: 767px) {
+  .landing-nav-wrapper {
+    position: sticky !important;
+    top: 0 !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .landing-nav-wrapper {
+    position: fixed !important;
+    top: 0 !important;
+  }
 }
 
 /* Global dark mode support */
