@@ -74,64 +74,59 @@ const taglines = [
   { top: "Smart comments.", bottom: "Smarter DMs." }
 ]
 
-const CharacterReveal = ({ text, isActive, isGradient = false }: { text: string, isActive: boolean, isGradient?: boolean }) => {
-  const characters = text.split('')
-  
+const SlideText = ({ text, isActive, isExiting, isGradient = false }: { text: string, isActive: boolean, isExiting: boolean, isGradient?: boolean }) => {
   return (
-    <span className="inline-flex flex-wrap justify-center">
-      {characters.map((char, i) => (
-        <motion.span
-          key={i}
-          initial={false}
-          animate={{
-            opacity: isActive ? 1 : 0,
-            y: isActive ? 0 : 20,
-            rotateX: isActive ? 0 : 90,
-            filter: isActive ? 'blur(0px)' : 'blur(4px)'
-          }}
-          transition={{
-            duration: 0.4,
-            delay: isActive ? i * 0.03 : (characters.length - i) * 0.015,
-            ease: [0.22, 1, 0.36, 1]
-          }}
-          style={{ 
-            display: 'inline-block',
-            transformOrigin: 'bottom',
-            background: isGradient ? 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)' : 'none',
-            WebkitBackgroundClip: isGradient ? 'text' : 'unset',
-            backgroundClip: isGradient ? 'text' : 'unset',
-            color: isGradient ? 'transparent' : 'white'
-          }}
-        >
-          {char === ' ' ? '\u00A0' : char}
-        </motion.span>
-      ))}
-    </span>
+    <motion.span
+      initial={false}
+      animate={{
+        opacity: isActive ? 1 : 0,
+        y: isActive ? 0 : (isExiting ? -80 : 80),
+        filter: isActive ? 'blur(0px)' : 'blur(6px)',
+        scale: isActive ? 1 : 0.9
+      }}
+      transition={{
+        duration: 0.8,
+        ease: [0.22, 1, 0.36, 1]
+      }}
+      style={{ 
+        display: 'inline-block',
+        background: isGradient ? 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)' : 'none',
+        WebkitBackgroundClip: isGradient ? 'text' : 'unset',
+        backgroundClip: isGradient ? 'text' : 'unset',
+        color: isGradient ? 'transparent' : 'white'
+      }}
+    >
+      {text}
+    </motion.span>
   )
 }
 
 const RotatingTagline = () => {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [prevIndex, setPrevIndex] = useState(-1)
   
   useEffect(() => {
     const interval = setInterval(() => {
+      setPrevIndex(currentIndex)
       setCurrentIndex((prev) => (prev + 1) % taglines.length)
-    }, 4500)
+    }, 4000)
     return () => clearInterval(interval)
-  }, [])
+  }, [currentIndex])
 
   return (
-    <div className="relative" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
+    <div className="relative overflow-hidden" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
       {taglines.map((tagline, index) => (
         <div
           key={index}
           className="absolute inset-0 flex items-center justify-center"
-          style={{ 
-            pointerEvents: currentIndex === index ? 'auto' : 'none',
-            visibility: currentIndex === index ? 'visible' : 'hidden'
-          }}
+          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
         >
-          <CharacterReveal text={tagline.bottom} isActive={currentIndex === index} isGradient={true} />
+          <SlideText 
+            text={tagline.bottom} 
+            isActive={currentIndex === index} 
+            isExiting={prevIndex === index}
+            isGradient={true} 
+          />
         </div>
       ))}
     </div>
@@ -140,26 +135,30 @@ const RotatingTagline = () => {
 
 const RotatingTopLine = () => {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [prevIndex, setPrevIndex] = useState(-1)
   
   useEffect(() => {
     const interval = setInterval(() => {
+      setPrevIndex(currentIndex)
       setCurrentIndex((prev) => (prev + 1) % taglines.length)
-    }, 4500)
+    }, 4000)
     return () => clearInterval(interval)
-  }, [])
+  }, [currentIndex])
 
   return (
-    <div className="relative" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
+    <div className="relative overflow-hidden" style={{ minHeight: 'clamp(3rem, 8vw, 6rem)' }}>
       {taglines.map((tagline, index) => (
         <div
           key={index}
           className="absolute inset-0 flex items-center justify-center"
-          style={{ 
-            pointerEvents: currentIndex === index ? 'auto' : 'none',
-            visibility: currentIndex === index ? 'visible' : 'hidden'
-          }}
+          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
         >
-          <CharacterReveal text={tagline.top} isActive={currentIndex === index} isGradient={false} />
+          <SlideText 
+            text={tagline.top} 
+            isActive={currentIndex === index} 
+            isExiting={prevIndex === index}
+            isGradient={false} 
+          />
         </div>
       ))}
     </div>
