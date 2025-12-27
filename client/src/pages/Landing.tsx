@@ -381,21 +381,282 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </motion.div>
         </motion.div>
 
-        {/* Scroll Indicator */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 2 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2"
-        >
+      </section>
+
+      {/* Dashboard Showcase Section */}
+      <section className="relative py-8 -mt-20 z-20">
+        <div className="max-w-[1600px] mx-auto px-4">
           <motion.div 
-            animate={{ y: [0, 8, 0] }}
-            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            className="w-6 h-10 rounded-full border border-white/20 flex items-start justify-center p-2"
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 1.5 }}
+            className="relative"
           >
-            <div className="w-1 h-2 rounded-full bg-white/40" />
+            {/* Side Graphics - Left */}
+            <div className="hidden xl:block absolute left-0 top-1/2 -translate-y-1/2 -translate-x-8 w-[280px] space-y-4 z-10">
+              <motion.div
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 2, duration: 0.8 }}
+              >
+                <GlassCard className="p-5 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/40">Engagement Rate</p>
+                      <p className="text-xl font-bold text-green-400">+247%</p>
+                    </div>
+                  </div>
+                  <div className="h-16 flex items-end space-x-1">
+                    {[30, 45, 35, 60, 75, 65, 90, 85, 95].map((h, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ height: 0 }}
+                        animate={{ height: `${h}%` }}
+                        transition={{ delay: 2.2 + i * 0.1, duration: 0.5 }}
+                        className="flex-1 bg-gradient-to-t from-pink-500 to-rose-400 rounded-sm"
+                      />
+                    ))}
+                  </div>
+                </GlassCard>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 2.3, duration: 0.8 }}
+              >
+                <GlassCard className="p-5 transform rotate-3 hover:rotate-0 transition-transform duration-500">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <MessageSquare className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/40">DM Responses</p>
+                      <p className="text-xl font-bold">1,847</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-white/40">Automated</span>
+                      <span className="text-blue-400">94%</span>
+                    </div>
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: '94%' }}
+                        transition={{ delay: 2.5, duration: 1 }}
+                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
+                      />
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            </div>
+
+            {/* Side Graphics - Right */}
+            <div className="hidden xl:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-8 w-[280px] space-y-4 z-10">
+              <motion.div
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 2.1, duration: 0.8 }}
+              >
+                <GlassCard className="p-5 transform rotate-6 hover:rotate-0 transition-transform duration-500">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center">
+                      <Brain className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/40">AI Hooks Generated</p>
+                      <p className="text-xl font-bold">3,291</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {['Trending', 'Emotional', 'Question', 'Story'].map((tag) => (
+                      <span key={tag} className="px-2 py-1 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">{tag}</span>
+                    ))}
+                  </div>
+                </GlassCard>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 2.4, duration: 0.8 }}
+              >
+                <GlassCard className="p-5 transform -rotate-3 hover:rotate-0 transition-transform duration-500">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/40">Growth Velocity</p>
+                      <p className="text-xl font-bold text-amber-400">12.4x</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-white/30">Faster than manual engagement</p>
+                </GlassCard>
+              </motion.div>
+            </div>
+
+            {/* Central Dashboard */}
+            <div className="relative mx-auto max-w-[1000px]">
+              <div className="relative rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden">
+                {/* Dashboard Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                    <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 text-xs text-white/40">
+                      <Clock className="w-3 h-3" />
+                      <span>Live Dashboard</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold">V</div>
+                  </div>
+                </div>
+
+                {/* Dashboard Content - Animated Mockup */}
+                <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f]">
+                  <div className="grid grid-cols-12 gap-4">
+                    {/* Sidebar */}
+                    <div className="col-span-2 space-y-3">
+                      {['Dashboard', 'Engagement', 'DM Funnels', 'Hooks', 'Analytics'].map((item, i) => (
+                        <motion.div
+                          key={item}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 1.8 + i * 0.1 }}
+                          className={`px-3 py-2 rounded-lg text-xs ${i === 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-white/40 hover:bg-white/5'}`}
+                        >
+                          {item}
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="col-span-10 space-y-4">
+                      {/* Stats Row */}
+                      <div className="grid grid-cols-4 gap-3">
+                        {[
+                          { label: 'Total Engagements', value: '24,847', change: '+18%', color: 'blue' },
+                          { label: 'DMs Processed', value: '3,291', change: '+42%', color: 'purple' },
+                          { label: 'Hooks Created', value: '847', change: '+28%', color: 'pink' },
+                          { label: 'Credits Used', value: '892/1200', change: '74%', color: 'amber' }
+                        ].map((stat, i) => (
+                          <motion.div
+                            key={stat.label}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 2 + i * 0.1 }}
+                            className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]"
+                          >
+                            <p className="text-[10px] text-white/40 mb-1">{stat.label}</p>
+                            <div className="flex items-end justify-between">
+                              <span className="text-xl font-bold">{stat.value}</span>
+                              <span className={`text-xs text-${stat.color}-400`}>{stat.change}</span>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      {/* Chart Area */}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 2.3 }}
+                        className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06]"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-sm font-medium">Engagement Velocity</h4>
+                          <div className="flex items-center space-x-2 text-xs text-white/40">
+                            <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-1.5" />Comments</span>
+                            <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-purple-500 mr-1.5" />DMs</span>
+                          </div>
+                        </div>
+                        <div className="h-32 flex items-end space-x-2">
+                          {[40, 55, 45, 70, 60, 80, 75, 90, 85, 95, 88, 100].map((h, i) => (
+                            <motion.div
+                              key={i}
+                              initial={{ height: 0 }}
+                              animate={{ height: `${h}%` }}
+                              transition={{ delay: 2.4 + i * 0.05, duration: 0.6 }}
+                              className="flex-1 rounded-t-sm bg-gradient-to-t from-blue-600 to-blue-400"
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+
+                      {/* Activity Feed */}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 2.6 }}
+                        className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]"
+                      >
+                        <h4 className="text-sm font-medium mb-3">Recent AI Activity</h4>
+                        <div className="space-y-2">
+                          {[
+                            { icon: MessageSquare, text: 'Replied to 12 comments on latest post', time: '2m ago', color: 'blue' },
+                            { icon: Send, text: 'Processed 8 DM inquiries automatically', time: '5m ago', color: 'purple' },
+                            { icon: Sparkles, text: 'Generated 3 hook variations for carousel', time: '8m ago', color: 'pink' }
+                          ].map((activity, i) => (
+                            <motion.div
+                              key={i}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 2.7 + i * 0.1 }}
+                              className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-8 h-8 rounded-lg bg-${activity.color}-500/20 flex items-center justify-center`}>
+                                  <activity.icon className={`w-4 h-4 text-${activity.color}-400`} />
+                                </div>
+                                <span className="text-xs text-white/60">{activity.text}</span>
+                              </div>
+                              <span className="text-[10px] text-white/30">{activity.time}</span>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating Elements */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 3, duration: 0.5 }}
+                className="absolute -bottom-6 -left-6 px-4 py-3 rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 backdrop-blur-xl"
+              >
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  <span className="text-sm font-medium text-green-300">AI is actively engaging</span>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 3.2, duration: 0.5 }}
+                className="absolute -bottom-4 -right-4 px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 backdrop-blur-xl"
+              >
+                <div className="flex items-center space-x-2">
+                  <Zap className="w-5 h-5 text-blue-400" />
+                  <span className="text-sm font-medium text-blue-300">24/7 Automation Active</span>
+                </div>
+              </motion.div>
+            </div>
           </motion.div>
-        </motion.div>
+        </div>
       </section>
 
       {/* Social Proof Strip */}
