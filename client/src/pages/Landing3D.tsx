@@ -4,6 +4,15 @@ const Landing3D = memo(() => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [shouldRender, setShouldRender] = useState(false)
+
+  useEffect(() => {
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => setShouldRender(true), { timeout: 100 })
+    } else {
+      setTimeout(() => setShouldRender(true), 50)
+    }
+  }, [])
 
   useEffect(() => {
     const checkMobile = () => window.innerWidth < 768
@@ -15,6 +24,8 @@ const Landing3D = memo(() => {
   }, [])
 
   useEffect(() => {
+    if (!shouldRender) return
+    
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -154,7 +165,7 @@ const Landing3D = memo(() => {
       cancelAnimationFrame(animationId)
       window.removeEventListener('resize', handleCanvasResize)
     }
-  }, [isMobile])
+  }, [isMobile, shouldRender])
 
   return (
     <div className="absolute inset-0 overflow-hidden">
