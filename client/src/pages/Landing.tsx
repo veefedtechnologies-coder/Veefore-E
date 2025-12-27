@@ -9,7 +9,18 @@ import {
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
 
+const isMobileDevice = () => typeof window !== 'undefined' && window.innerWidth < 768
+
 const Landing3D = React.lazy(() => import('./Landing3D'))
+
+const MobileBackground = memo(() => (
+  <div className="absolute inset-0 bg-black overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/20 via-black to-black" />
+    <div className="absolute top-[20%] left-[20%] w-[300px] h-[300px] bg-blue-600/8 rounded-full blur-[100px]" />
+    <div className="absolute bottom-[30%] right-[20%] w-[200px] h-[200px] bg-purple-600/6 rounded-full blur-[80px]" />
+    <div className="absolute top-[60%] left-[50%] w-[150px] h-[150px] bg-indigo-500/5 rounded-full blur-[60px]" />
+  </div>
+))
 
 const Landing3DFallback = memo(() => (
   <div className="absolute inset-0 bg-black">
@@ -30,14 +41,18 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
   )
 }
 
-const GlassCard = ({ children, className = '', hover = true }: { children: React.ReactNode, className?: string, hover?: boolean }) => (
-  <div className={`relative backdrop-blur-xl bg-white/[0.02] border border-white/[0.08] rounded-[24px] overflow-hidden ${hover ? 'hover:border-white/[0.15] hover:bg-white/[0.04] transition-all duration-500' : ''} ${className}`}>
-    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-transparent pointer-events-none" />
-    {children}
-  </div>
-)
+const GlassCard = ({ children, className = '', hover = true }: { children: React.ReactNode, className?: string, hover?: boolean }) => {
+  const isMobile = isMobileDevice()
+  return (
+    <div className={`relative ${isMobile ? 'bg-white/[0.04]' : 'backdrop-blur-xl bg-white/[0.02]'} border border-white/[0.08] rounded-[24px] overflow-hidden ${hover ? 'hover:border-white/[0.15] hover:bg-white/[0.04] transition-all duration-500' : ''} ${className}`}>
+      {!isMobile && <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-transparent pointer-events-none" />}
+      {children}
+    </div>
+  )
+}
 
 const MagneticButton = ({ children, className = '', onClick }: { children: React.ReactNode, className?: string, onClick?: () => void }) => {
+  const isMobile = isMobileDevice()
   const ref = useRef<HTMLButtonElement>(null)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
@@ -45,7 +60,7 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
   const springY = useSpring(y, { stiffness: 300, damping: 20 })
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!ref.current) return
+    if (isMobile || !ref.current) return
     const rect = ref.current.getBoundingClientRect()
     const centerX = rect.left + rect.width / 2
     const centerY = rect.top + rect.height / 2
@@ -54,8 +69,17 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
   }
 
   const handleMouseLeave = () => {
+    if (isMobile) return
     x.set(0)
     y.set(0)
+  }
+
+  if (isMobile) {
+    return (
+      <button ref={ref} onClick={onClick} className={className}>
+        {children}
+      </button>
+    )
   }
 
   return (
@@ -777,9 +801,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <Suspense fallback={<Landing3DFallback />}>
-            <Landing3D />
-          </Suspense>
+          {isMobileDevice() ? (
+            <MobileBackground />
+          ) : (
+            <Suspense fallback={<Landing3DFallback />}>
+              <Landing3D />
+            </Suspense>
+          )}
         </div>
         
         <motion.div 
