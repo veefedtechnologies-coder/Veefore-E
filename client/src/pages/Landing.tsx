@@ -87,7 +87,7 @@ const RotatingHeroText = () => {
   }, [currentIndex])
 
   return (
-    <div className="relative overflow-hidden" style={{ height: 'clamp(7rem, 18vw, 14rem)' }}>
+    <div className="relative overflow-hidden" style={{ height: 'clamp(8rem, 20vw, 16rem)', paddingBottom: '0.15em' }}>
       {taglines.map((tagline, index) => {
         const isActive = currentIndex === index
         const isExiting = prevIndex === index
@@ -109,12 +109,13 @@ const RotatingHeroText = () => {
             className="absolute inset-0 flex flex-col items-center justify-center"
             style={{ pointerEvents: isActive ? 'auto' : 'none' }}
           >
-            <span className="block text-white leading-[1.1]">
+            <span className="block text-white" style={{ lineHeight: '1.15' }}>
               {tagline.top}
             </span>
             <span 
-              className="block leading-[1.1] mt-1"
+              className="block mt-1 pb-2"
               style={{ 
+                lineHeight: '1.2',
                 background: 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)',
                 WebkitBackgroundClip: 'text',
                 backgroundClip: 'text',
