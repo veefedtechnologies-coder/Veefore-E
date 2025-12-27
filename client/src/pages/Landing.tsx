@@ -835,18 +835,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className={`min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden ${isMobile ? 'landing-mobile-fix' : ''}`}>
+    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden">
       <SEO {...seoConfig.landing} />
       
-      {/* Ambient Background - use absolute on mobile to avoid iOS fixed stacking issues */}
-      {!isMobile && (
-        <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-          <GradientOrb className="w-[800px] h-[800px] -top-[200px] -left-[200px]" color="blue" />
-          <GradientOrb className="w-[600px] h-[600px] top-[30%] -right-[150px]" color="purple" />
-          <GradientOrb className="w-[500px] h-[500px] bottom-[10%] left-[20%]" color="indigo" />
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
-        </div>
-      )}
+      {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
+      <div className={`${isMobile ? 'absolute h-[500vh]' : 'fixed'} inset-0 pointer-events-none overflow-hidden -z-10`}>
+        <GradientOrb className={`${isMobile ? 'w-[400px] h-[400px]' : 'w-[800px] h-[800px]'} -top-[100px] -left-[100px]`} color="blue" />
+        <GradientOrb className={`${isMobile ? 'w-[300px] h-[300px]' : 'w-[600px] h-[600px]'} top-[30%] -right-[100px]`} color="purple" />
+        <GradientOrb className={`${isMobile ? 'w-[250px] h-[250px]' : 'w-[500px] h-[500px]'} bottom-[10%] left-[20%]`} color="indigo" />
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
+      </div>
 
       {/* Navigation - sticky on mobile to avoid iOS fixed issues */}
       <motion.nav 
@@ -1161,9 +1159,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               </motion.div>
             </div>
 
-            {/* Central Dashboard - Animated Motion Graphic */}
+            {/* Central Dashboard - Animated Motion Graphic - Now visible on mobile */}
             <div className="relative">
-              {!isMobile && <AnimatedDashboard />}
+              <AnimatedDashboard />
 
               {/* Floating Elements - Responsive */}
               <motion.div
