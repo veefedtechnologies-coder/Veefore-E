@@ -22,21 +22,44 @@ const useIsMobile = () => {
   return isMobile
 }
 
-// Mobile-optimized animation helper - ensures animations trigger on small screens
-const useMobileAnimation = () => {
+// Mobile-safe motion wrapper - disables whileInView on mobile to prevent invisible sections
+const MobileMotion = ({ 
+  children, 
+  className = '',
+  initial,
+  whileInView,
+  viewport,
+  transition,
+  ...props 
+}: {
+  children: React.ReactNode
+  className?: string
+  initial?: any
+  whileInView?: any
+  viewport?: any
+  transition?: any
+  [key: string]: any
+}) => {
   const isMobile = useIsMobile()
   
-  return {
-    // Viewport settings that work on mobile (trigger at 10% visibility with negative margin)
-    viewport: isMobile 
-      ? { once: true, amount: 0.05, margin: "0px 0px -50px 0px" as const }
-      : { once: true },
-    // For mobile, start visible to avoid blank sections
-    getInitial: (desktopInitial: object) => isMobile ? { opacity: 1 } : desktopInitial,
-    // For mobile, already animated state
-    getAnimate: (desktopAnimate: object) => isMobile ? { opacity: 1 } : desktopAnimate,
-    isMobile
+  // On mobile, skip the animation entirely - render content immediately visible
+  if (isMobile) {
+    return <div className={className} {...props}>{children}</div>
   }
+  
+  // On desktop, use full framer-motion animations
+  return (
+    <motion.div
+      className={className}
+      initial={initial}
+      whileInView={whileInView}
+      viewport={viewport}
+      transition={transition}
+      {...props}
+    >
+      {children}
+    </motion.div>
+  )
 }
 
 const Landing3D = React.lazy(() => import('./Landing3D'))
@@ -815,20 +838,22 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     <div ref={containerRef} className={`min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden ${isMobile ? 'landing-mobile-fix' : ''}`}>
       <SEO {...seoConfig.landing} />
       
-      {/* Ambient Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <GradientOrb className="w-[800px] h-[800px] -top-[200px] -left-[200px]" color="blue" />
-        <GradientOrb className="w-[600px] h-[600px] top-[30%] -right-[150px]" color="purple" />
-        <GradientOrb className="w-[500px] h-[500px] bottom-[10%] left-[20%]" color="indigo" />
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
-      </div>
+      {/* Ambient Background - use absolute on mobile to avoid iOS fixed stacking issues */}
+      {!isMobile && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+          <GradientOrb className="w-[800px] h-[800px] -top-[200px] -left-[200px]" color="blue" />
+          <GradientOrb className="w-[600px] h-[600px] top-[30%] -right-[150px]" color="purple" />
+          <GradientOrb className="w-[500px] h-[500px] bottom-[10%] left-[20%]" color="indigo" />
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
+        </div>
+      )}
 
-      {/* Navigation */}
+      {/* Navigation - sticky on mobile to avoid iOS fixed issues */}
       <motion.nav 
         initial={{ y: -100 }} 
         animate={{ y: 0 }} 
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed top-0 w-full z-50"
+        className={`${isMobile ? 'sticky' : 'fixed'} top-0 w-full z-50`}
       >
         <div className="mx-4 mt-4">
           <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
