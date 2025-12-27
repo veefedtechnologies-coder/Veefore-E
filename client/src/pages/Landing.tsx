@@ -674,15 +674,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <div className="mx-4 mt-4">
           <GlassCard className="max-w-[1400px] mx-auto !rounded-full px-6 py-3" hover={false}>
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-10">
-                <div className="flex items-center space-x-2.5 cursor-pointer" onClick={() => onNavigate('/')}>
-                  <div className="w-9 h-9 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                    <Rocket className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-xl font-bold tracking-tight">VeeFore</span>
+              <div className="flex items-center space-x-8">
+                <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
+                  <img 
+                    src="/veefore-logo.png" 
+                    alt="VeeFore" 
+                    className="h-9 w-auto"
+                  />
                 </div>
                 
-                <div className="hidden lg:flex items-center space-x-8 text-sm font-medium text-white/50">
+                <div className="hidden lg:flex items-center space-x-6 text-sm font-medium text-white/50">
                   {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
                     <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
                       {item}
@@ -692,10 +693,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
-                <button className="text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
+              <div className="flex items-center space-x-2">
+                <button className="text-sm font-medium text-white/60 hover:text-white transition-colors px-3 py-1.5" onClick={() => onNavigate('signin')}>Login</button>
                 <MagneticButton 
-                  className="bg-white text-black hover:bg-white/90 rounded-full px-6 py-2.5 text-sm font-semibold transition-all duration-300"
+                  className="bg-white text-black hover:bg-white/90 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300"
                   onClick={() => onNavigate('signup')}
                 >
                   Start Free Trial
