@@ -97,7 +97,7 @@ const RotatingTagline = () => {
             scale: currentIndex === index ? 1 : 0.95
           }}
           transition={{ 
-            duration: 0.5, 
+            duration: 1.2, 
             ease: [0.22, 1, 0.36, 1]
           }}
           className="absolute inset-0 flex items-center justify-center"
@@ -135,7 +135,7 @@ const RotatingTopLine = () => {
             scale: currentIndex === index ? 1 : 0.95
           }}
           transition={{ 
-            duration: 0.5, 
+            duration: 1.2, 
             ease: [0.22, 1, 0.36, 1]
           }}
           className="absolute inset-0 flex items-center justify-center text-white"
