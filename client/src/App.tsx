@@ -495,6 +495,15 @@ function App() {
       </Route>
 
       {/* Original Landing Page - Public access */}
+      <Route path="/">
+        <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+          <div className="min-h-screen">
+            <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+          </div>
+        </React.Suspense>
+      </Route>
+
+      {/* Original Landing Page - Public access */}
       <Route path="/landing">
         <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
           <div className="min-h-screen">

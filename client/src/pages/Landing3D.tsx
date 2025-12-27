@@ -476,66 +476,7 @@ const Scene = () => {
         </Suspense>
       </Canvas>
       
-      {/* UI Overlay */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-8 left-8 right-8 flex justify-between items-center pointer-events-auto">
-          <div className="text-white text-2xl font-bold">
-            VeeFore
-          </div>
-          <div className="flex space-x-4">
-            <button className="text-white/80 hover:text-white transition-colors">
-              Classic View
-            </button>
-            <button className="text-white/80 hover:text-white transition-colors">
-              Sign In
-            </button>
-            <button className="bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-white/90 transition-colors">
-              Get Started
-            </button>
-          </div>
-        </div>
-        
-        <div className="absolute bottom-8 left-8 right-8 text-center pointer-events-auto">
-          <motion.h1 
-            className="text-6xl md:text-8xl font-bold text-white mb-6"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1 }}
-          >
-            AI-Powered
-            <br />
-            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Social Media
-            </span>
-          </motion.h1>
-          
-          <motion.p 
-            className="text-xl text-white/80 mb-8 max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.3 }}
-          >
-            Transform your social media presence with advanced AI that creates, 
-            schedules, and optimizes content across all platforms.
-          </motion.p>
-          
-          <motion.div 
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.6 }}
-          >
-            <button className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-8 py-4 rounded-full font-medium text-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-300 flex items-center justify-center space-x-2">
-              <span>Start Free Trial</span>
-              <ArrowRight size={20} />
-            </button>
-            <button className="border-2 border-white/30 text-white px-8 py-4 rounded-full font-medium text-lg hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-2">
-              <Play size={20} />
-              <span>Watch Demo</span>
-            </button>
-          </motion.div>
-        </div>
-      </div>
+      {/* UI Overlay - Removed for Landing.tsx integration */}
     </div>
   )
 }
@@ -543,7 +484,7 @@ const Scene = () => {
 // Main Landing3D Component
 const Landing3D = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+    <div className="w-full h-full bg-transparent">
       <Scene />
     </div>
   )
