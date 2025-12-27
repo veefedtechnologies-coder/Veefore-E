@@ -351,12 +351,17 @@ const HooksPageContent = () => (
   </div>
 )
 
+const BASE_WIDTH = 1000
+const BASE_HEIGHT = 600
+
 const AnimatedDashboard = () => {
   const [activePage, setActivePage] = useState(0)
   const [cursorPos, setCursorPos] = useState({ x: 50, y: 12 })
   const [isClicking, setIsClicking] = useState(false)
+  const [scale, setScale] = useState(1)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
   const sidebarRef = useRef<HTMLDivElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
   
   const sidebarItems = [
     { name: 'Dashboard', pageIndex: 0 },
@@ -463,21 +468,40 @@ const AnimatedDashboard = () => {
     }
   }, [getCursorPosition])
 
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+
+    const updateScale = () => {
+      const wrapperWidth = wrapper.offsetWidth
+      const newScale = Math.min(wrapperWidth / BASE_WIDTH, 1)
+      setScale(newScale)
+    }
+
+    updateScale()
+
+    const resizeObserver = new ResizeObserver(updateScale)
+    resizeObserver.observe(wrapper)
+
+    return () => resizeObserver.disconnect()
+  }, [])
 
   return (
-    <div className="relative mx-auto max-w-[1000px] w-full px-2 sm:px-4 lg:px-0">
+    <div ref={wrapperRef} className="relative mx-auto max-w-[1000px] w-full">
       <div 
-        className="relative rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden origin-top"
         style={{ 
-          transform: 'scale(var(--dashboard-scale, 1))',
+          height: BASE_HEIGHT * scale,
+          overflow: 'hidden'
         }}
       >
-        <style>{`
-          @media (max-width: 640px) { :root { --dashboard-scale: 0.55; } }
-          @media (min-width: 641px) and (max-width: 768px) { :root { --dashboard-scale: 0.7; } }
-          @media (min-width: 769px) and (max-width: 1024px) { :root { --dashboard-scale: 0.85; } }
-          @media (min-width: 1025px) { :root { --dashboard-scale: 1; } }
-        `}</style>
+        <div 
+          className="relative rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden"
+          style={{ 
+            width: BASE_WIDTH,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          }}
+        >
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-red-500/80" />
@@ -549,6 +573,7 @@ const AnimatedDashboard = () => {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
