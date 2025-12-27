@@ -672,7 +672,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         className="fixed top-0 w-full z-50"
       >
         <div className="mx-4 mt-4">
-          <GlassCard className="max-w-[1400px] mx-auto !rounded-full px-6 py-3" hover={false}>
+          <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-8">
                 <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
@@ -693,13 +693,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <button className="text-sm font-medium text-white/60 hover:text-white transition-colors px-2 py-1" onClick={() => onNavigate('signin')}>Login</button>
+              <div className="flex items-center space-x-3">
+                <button className="text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
                 <MagneticButton 
-                  className="bg-white text-black hover:bg-white/90 rounded-full px-3 py-1.5 text-sm font-semibold transition-all duration-300"
+                  className="bg-white text-black hover:bg-white/90 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-300"
                   onClick={() => onNavigate('signup')}
                 >
-                  Start Free
+                  Start Free Trial
                 </MagneticButton>
               </div>
             </div>
