@@ -392,30 +392,28 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             transition={{ duration: 1, delay: 1.5 }}
             className="relative"
           >
-            {/* Side Graphics - Left */}
-            <div className="hidden xl:block absolute left-0 top-1/2 -translate-y-1/2 -translate-x-8 w-[280px] space-y-4 z-10">
+            {/* Side Graphics - Left (Faded, beautiful.ai style) */}
+            <div className="hidden xl:block absolute left-0 top-1/2 -translate-y-1/2 w-[220px] space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }}>
               <motion.div
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 2, duration: 0.8 }}
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 0.4, x: 0 }}
+                transition={{ delay: 2, duration: 1 }}
               >
-                <GlassCard className="p-5 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
+                <GlassCard className="p-4">
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-white" />
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/40">Engagement Rate</p>
-                      <p className="text-xl font-bold text-green-400">+247%</p>
+                      <p className="text-[10px] text-white/40">Engagement Rate</p>
+                      <p className="text-lg font-bold text-green-400">+247%</p>
                     </div>
                   </div>
-                  <div className="h-16 flex items-end space-x-1">
+                  <div className="h-12 flex items-end space-x-1">
                     {[30, 45, 35, 60, 75, 65, 90, 85, 95].map((h, i) => (
-                      <motion.div
+                      <div
                         key={i}
-                        initial={{ height: 0 }}
-                        animate={{ height: `${h}%` }}
-                        transition={{ delay: 2.2 + i * 0.1, duration: 0.5 }}
+                        style={{ height: `${h}%` }}
                         className="flex-1 bg-gradient-to-t from-pink-500 to-rose-400 rounded-sm"
                       />
                     ))}
@@ -424,79 +422,74 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 2.3, duration: 0.8 }}
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 0.35, x: 0 }}
+                transition={{ delay: 2.2, duration: 1 }}
               >
-                <GlassCard className="p-5 transform rotate-3 hover:rotate-0 transition-transform duration-500">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                      <MessageSquare className="w-5 h-5 text-white" />
+                <GlassCard className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <MessageSquare className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/40">DM Responses</p>
-                      <p className="text-xl font-bold">1,847</p>
+                      <p className="text-[10px] text-white/40">DM Responses</p>
+                      <p className="text-lg font-bold">1,847</p>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px]">
                       <span className="text-white/40">Automated</span>
                       <span className="text-blue-400">94%</span>
                     </div>
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: '94%' }}
-                        transition={{ delay: 2.5, duration: 1 }}
-                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
-                      />
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full w-[94%] bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full" />
                     </div>
                   </div>
                 </GlassCard>
               </motion.div>
             </div>
 
-            {/* Side Graphics - Right */}
-            <div className="hidden xl:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-8 w-[280px] space-y-4 z-10">
+            {/* Side Graphics - Right (Faded, beautiful.ai style) */}
+            <div className="hidden xl:block absolute right-0 top-1/2 -translate-y-1/2 w-[220px] space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to left, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to left, transparent, black 60%)' }}>
               <motion.div
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 2.1, duration: 0.8 }}
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 0.4, x: 0 }}
+                transition={{ delay: 2.1, duration: 1 }}
               >
-                <GlassCard className="p-5 transform rotate-6 hover:rotate-0 transition-transform duration-500">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center">
-                      <Brain className="w-5 h-5 text-white" />
+                <GlassCard className="p-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center">
+                      <Brain className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/40">AI Hooks Generated</p>
-                      <p className="text-xl font-bold">3,291</p>
+                      <p className="text-[10px] text-white/40">AI Hooks Generated</p>
+                      <p className="text-lg font-bold">3,291</p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mt-3">
+                  <div className="flex flex-wrap gap-1 mt-2">
                     {['Trending', 'Emotional', 'Question', 'Story'].map((tag) => (
-                      <span key={tag} className="px-2 py-1 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">{tag}</span>
+                      <span key={tag} className="px-1.5 py-0.5 text-[9px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">{tag}</span>
                     ))}
                   </div>
                 </GlassCard>
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 2.4, duration: 0.8 }}
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 0.35, x: 0 }}
+                transition={{ delay: 2.3, duration: 1 }}
               >
-                <GlassCard className="p-5 transform -rotate-3 hover:rotate-0 transition-transform duration-500">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                      <Zap className="w-5 h-5 text-white" />
+                <GlassCard className="p-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/40">Growth Velocity</p>
-                      <p className="text-xl font-bold text-amber-400">12.4x</p>
+                      <p className="text-[10px] text-white/40">Growth Velocity</p>
+                      <p className="text-lg font-bold text-amber-400">12.4x</p>
                     </div>
                   </div>
-                  <p className="text-xs text-white/30">Faster than manual engagement</p>
+                  <p className="text-[10px] text-white/30">Faster than manual engagement</p>
                 </GlassCard>
               </motion.div>
             </div>
