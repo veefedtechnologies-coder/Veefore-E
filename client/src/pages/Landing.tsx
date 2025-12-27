@@ -8,7 +8,19 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
-import { useIsMobile } from '../hooks/useIsMobile'
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  return isMobile
+}
 
 // Mobile-safe motion wrapper - disables whileInView on mobile to prevent invisible sections
 const MobileMotion = ({ 
@@ -823,19 +835,65 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className="bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative" style={{ overflowX: 'clip' }}>
+    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative isolate" style={{ overflowX: 'clip' }}>
       <SEO {...seoConfig.landing} />
       
-      {/* Ambient Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: -1 }}>
+      {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
+      <div className={`${isMobile ? 'absolute h-[500vh]' : 'fixed'} inset-0 pointer-events-none overflow-hidden -z-10`}>
         <GradientOrb className={`${isMobile ? 'w-[400px] h-[400px]' : 'w-[800px] h-[800px]'} -top-[100px] -left-[100px]`} color="blue" />
         <GradientOrb className={`${isMobile ? 'w-[300px] h-[300px]' : 'w-[600px] h-[600px]'} top-[30%] -right-[100px]`} color="purple" />
         <GradientOrb className={`${isMobile ? 'w-[250px] h-[250px]' : 'w-[500px] h-[500px]'} bottom-[10%] left-[20%]`} color="indigo" />
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
       </div>
 
+      {/* Navigation - use wrapper for sticky/fixed to avoid iOS Safari transform issues */}
+      <div className="landing-nav-wrapper w-full z-50">
+        <motion.nav 
+          initial={{ y: -100 }} 
+          animate={{ y: 0 }} 
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        >
+        <div className="mx-4 mt-4">
+          <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-8">
+                <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
+                  <img 
+                    src="/veefore-logo.png" 
+                    alt="VeeFore" 
+                    className="h-8 w-auto"
+                  />
+                  <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
+                </div>
+                
+                <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
+                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
+                    <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
+                      {item}
+                      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
+                <MagneticButton 
+                  className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
+                  onClick={() => onNavigate('signup')}
+                >
+                  <span className="hidden sm:inline">Start Free Trial</span>
+                  <span className="sm:hidden">Start Free</span>
+                </MagneticButton>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+        </motion.nav>
+      </div>
+
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden">
+      <section className="relative min-h-screen flex items-center justify-center pt-32 pb-20 overflow-hidden isolate z-10">
         {/* Background layer */}
         <div className="absolute inset-0 z-0">
           {isMobile ? (
@@ -1002,7 +1060,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Dashboard Showcase Section */}
-      <section className="relative py-8 -mt-20 z-[1]">
+      <section className="relative py-8 -mt-20 z-20 isolate">
         <div className="max-w-[1600px] mx-auto px-4">
           <motion.div 
             initial={{ opacity: 0, y: 60 }}
@@ -1146,7 +1204,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Social Proof Strip */}
-      <section className="py-16 border-y border-white/[0.03] relative">
+      <section className="py-16 border-y border-white/[0.03] relative isolate z-10">
         <div className="max-w-[1400px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -1170,7 +1228,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Problem / Philosophy Section */}
-      <section id="how-it-works" className="py-32 relative">
+      <section id="how-it-works" className="py-32 relative isolate z-10">
         <div className="max-w-[1200px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
@@ -1252,7 +1310,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Hero Features - Layer 1 */}
-      <section id="features" className="py-32 relative">
+      <section id="features" className="py-32 relative isolate z-10">
         <GradientOrb className="w-[600px] h-[600px] top-0 left-1/2 -translate-x-1/2" color="blue" />
         
         <div className="max-w-[1200px] mx-auto px-6 relative">
@@ -1334,7 +1392,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Support Features - Layer 2 */}
-      <section className="py-24 relative">
+      <section className="py-24 relative isolate z-10">
         <div className="max-w-[1200px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -1401,7 +1459,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Credit System */}
-      <section className="py-32 relative">
+      <section className="py-32 relative isolate z-10">
         <GradientOrb className="w-[500px] h-[500px] bottom-0 right-0" color="cyan" />
         
         <div className="max-w-[1200px] mx-auto px-6 relative">
@@ -1475,7 +1533,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-32 relative">
+      <section id="pricing" className="py-32 relative isolate z-10">
         <GradientOrb className="w-[600px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
         
         <div className="max-w-[1200px] mx-auto px-6 relative">
@@ -1573,7 +1631,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Free Trial */}
-      <section className="py-32 relative">
+      <section className="py-32 relative isolate z-10">
         <div className="max-w-[1200px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
@@ -1636,7 +1694,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="py-32 relative">
+      <section id="faq" className="py-32 relative isolate z-10">
         <div className="max-w-[800px] mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
@@ -1687,7 +1745,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-32 relative overflow-hidden">
+      <section className="py-32 relative overflow-hidden isolate z-10">
         <GradientOrb className="w-[800px] h-[800px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
         
         <div className="max-w-[900px] mx-auto px-6 text-center relative">
@@ -1718,7 +1776,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Footer */}
-      <footer className="py-20 border-t border-white/[0.05] relative">
+      <footer className="py-20 border-t border-white/[0.05] relative isolate z-10">
         <div className="max-w-[1200px] mx-auto px-6">
           <div className="grid md:grid-cols-5 gap-12 mb-16">
             <div className="md:col-span-2">
