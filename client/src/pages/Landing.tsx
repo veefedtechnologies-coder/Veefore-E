@@ -74,39 +74,59 @@ const taglines = [
   { top: "Smart comments.", bottom: "Smarter DMs." }
 ]
 
+const CharacterReveal = ({ text, isActive, isGradient = false }: { text: string, isActive: boolean, isGradient?: boolean }) => {
+  const characters = text.split('')
+  
+  return (
+    <span className={isGradient ? "bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent" : "text-white"}>
+      {characters.map((char, i) => (
+        <motion.span
+          key={i}
+          initial={false}
+          animate={{
+            opacity: isActive ? 1 : 0,
+            y: isActive ? 0 : 20,
+            rotateX: isActive ? 0 : 90,
+            filter: isActive ? 'blur(0px)' : 'blur(4px)'
+          }}
+          transition={{
+            duration: 0.4,
+            delay: isActive ? i * 0.03 : (characters.length - i) * 0.015,
+            ease: [0.22, 1, 0.36, 1]
+          }}
+          style={{ 
+            display: 'inline-block',
+            transformOrigin: 'bottom',
+            whiteSpace: char === ' ' ? 'pre' : 'normal'
+          }}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </motion.span>
+      ))}
+    </span>
+  )
+}
+
 const RotatingTagline = () => {
   const [currentIndex, setCurrentIndex] = useState(0)
   
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % taglines.length)
-    }, 4000)
+    }, 4500)
     return () => clearInterval(interval)
   }, [])
 
   return (
     <div className="relative h-[1.2em]">
       {taglines.map((tagline, index) => (
-        <motion.div
+        <div
           key={index}
-          initial={false}
-          animate={{ 
-            opacity: currentIndex === index ? 1 : 0,
-            y: currentIndex === index ? 0 : (index > currentIndex ? 30 : -30),
-            filter: currentIndex === index ? 'blur(0px)' : 'blur(4px)',
-            scale: currentIndex === index ? 1 : 0.95
-          }}
-          transition={{ 
-            duration: 1.2, 
-            ease: [0.22, 1, 0.36, 1]
-          }}
           className="absolute inset-0 flex items-center justify-center"
           style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
         >
-          <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            {tagline.bottom}
-          </span>
-        </motion.div>
+          <CharacterReveal text={tagline.bottom} isActive={currentIndex === index} isGradient={true} />
+        </div>
       ))}
     </div>
   )
@@ -118,31 +138,20 @@ const RotatingTopLine = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % taglines.length)
-    }, 4000)
+    }, 4500)
     return () => clearInterval(interval)
   }, [])
 
   return (
     <div className="relative h-[1.2em]">
       {taglines.map((tagline, index) => (
-        <motion.div
+        <div
           key={index}
-          initial={false}
-          animate={{ 
-            opacity: currentIndex === index ? 1 : 0,
-            y: currentIndex === index ? 0 : (index > currentIndex ? 30 : -30),
-            filter: currentIndex === index ? 'blur(0px)' : 'blur(4px)',
-            scale: currentIndex === index ? 1 : 0.95
-          }}
-          transition={{ 
-            duration: 1.2, 
-            ease: [0.22, 1, 0.36, 1]
-          }}
-          className="absolute inset-0 flex items-center justify-center text-white"
+          className="absolute inset-0 flex items-center justify-center"
           style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
         >
-          {tagline.top}
-        </motion.div>
+          <CharacterReveal text={tagline.top} isActive={currentIndex === index} isGradient={false} />
+        </div>
       ))}
     </div>
   )
