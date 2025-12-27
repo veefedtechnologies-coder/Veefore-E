@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CRITICAL: Force all framer-motion animated elements to be visible on mobile */
+/* This prevents blank sections when whileInView animations don't trigger */
+@media (max-width: 767px) {
+  /* Target the landing page specifically */
+  .landing-mobile-fix * {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  
+  /* Override any transform that might hide content */
+  .landing-mobile-fix [style] {
+    opacity: 1 !important;
+    transform: translateY(0) translateX(0) scale(1) !important;
+  }
+}
+
 /* Global dark mode support */
 @layer base {
   html {

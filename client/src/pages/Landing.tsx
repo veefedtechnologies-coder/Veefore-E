@@ -812,7 +812,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden">
+    <div ref={containerRef} className={`min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden ${isMobile ? 'landing-mobile-fix' : ''}`}>
       <SEO {...seoConfig.landing} />
       
       {/* Ambient Background */}
