@@ -8,19 +8,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
-
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
-  
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
-  
-  return isMobile
-}
+import { useIsMobile } from '../hooks/useIsMobile'
 
 // Mobile-safe motion wrapper - disables whileInView on mobile to prevent invisible sections
 const MobileMotion = ({ 
@@ -835,7 +823,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative" style={{ overflowX: 'clip' }}>
+    <div ref={containerRef} className="bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative" style={{ overflowX: 'clip' }}>
       <SEO {...seoConfig.landing} />
       
       {/* Ambient Background */}
@@ -844,52 +832,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <GradientOrb className={`${isMobile ? 'w-[300px] h-[300px]' : 'w-[600px] h-[600px]'} top-[30%] -right-[100px]`} color="purple" />
         <GradientOrb className={`${isMobile ? 'w-[250px] h-[250px]' : 'w-[500px] h-[500px]'} bottom-[10%] left-[20%]`} color="indigo" />
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
-      </div>
-
-      {/* Navigation - use wrapper for sticky/fixed to avoid iOS Safari transform issues */}
-      <div className="landing-nav-wrapper w-full z-50">
-        <motion.nav 
-          initial={{ y: -100 }} 
-          animate={{ y: 0 }} 
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        >
-        <div className="mx-4 mt-4">
-          <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-8">
-                <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
-                  <img 
-                    src="/veefore-logo.png" 
-                    alt="VeeFore" 
-                    className="h-8 w-auto"
-                  />
-                  <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
-                </div>
-                
-                <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
-                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
-                    <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
-                      {item}
-                      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
-                <MagneticButton 
-                  className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
-                  onClick={() => onNavigate('signup')}
-                >
-                  <span className="hidden sm:inline">Start Free Trial</span>
-                  <span className="sm:hidden">Start Free</span>
-                </MagneticButton>
-              </div>
-            </div>
-          </GlassCard>
-        </div>
-        </motion.nav>
       </div>
 
       {/* Hero Section */}
