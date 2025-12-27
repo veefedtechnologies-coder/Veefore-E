@@ -22,6 +22,23 @@ const useIsMobile = () => {
   return isMobile
 }
 
+// Mobile-optimized animation helper - ensures animations trigger on small screens
+const useMobileAnimation = () => {
+  const isMobile = useIsMobile()
+  
+  return {
+    // Viewport settings that work on mobile (trigger at 10% visibility with negative margin)
+    viewport: isMobile 
+      ? { once: true, amount: 0.05, margin: "0px 0px -50px 0px" as const }
+      : { once: true },
+    // For mobile, start visible to avoid blank sections
+    getInitial: (desktopInitial: object) => isMobile ? { opacity: 1 } : desktopInitial,
+    // For mobile, already animated state
+    getAnimate: (desktopAnimate: object) => isMobile ? { opacity: 1 } : desktopAnimate,
+    isMobile
+  }
+}
+
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
 const MobileBackground = memo(() => (
@@ -1158,7 +1175,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="flex flex-col md:flex-row items-center justify-between gap-8"
           >
             <p className="text-white/30 text-sm font-medium uppercase tracking-widest">Trusted by growth-focused creators</p>
@@ -1182,7 +1199,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             transition={{ duration: 0.8 }}
             className="text-center mb-20"
           >
@@ -1210,7 +1227,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   key={i}
                   initial={{ opacity: 0, x: -30 }}
                   whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
+                  viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                   transition={{ delay: i * 0.1 }}
                 >
                   <GlassCard className="p-5 flex items-center space-x-4 !bg-red-500/[0.03] !border-red-500/10">
@@ -1224,7 +1241,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <motion.div 
               initial={{ opacity: 0, x: 30 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
               transition={{ delay: 0.3 }}
             >
               <TiltCard>
@@ -1266,7 +1283,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="text-center mb-20"
           >
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
@@ -1287,7 +1304,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 key={feature.id}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                 transition={{ delay: i * 0.15 }}
               >
                 <TiltCard className="h-full">
@@ -1346,7 +1363,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="text-center mb-16"
           >
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4">
@@ -1361,7 +1378,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                 transition={{ delay: i * 0.1 }}
               >
                 <GlassCard className="p-6 text-center h-full">
@@ -1379,7 +1396,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="mt-8"
           >
             <GlassCard className="p-8 !bg-gradient-to-r !from-purple-500/[0.05] !to-indigo-500/[0.05]">
@@ -1415,7 +1432,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="text-center mb-16"
           >
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-400 uppercase tracking-widest mb-6">
@@ -1437,7 +1454,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 key={i}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                 transition={{ delay: i * 0.1 }}
               >
                 <GlassCard className="p-6 text-center !bg-amber-500/[0.02]">
@@ -1456,7 +1473,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
           >
             <GlassCard className="p-8">
               <div className="flex items-center justify-between mb-6">
@@ -1489,7 +1506,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="text-center mb-16"
           >
             <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
@@ -1521,7 +1538,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 key={plan.name}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                 transition={{ delay: i * 0.15 }}
                 className={plan.popular ? 'md:-mt-4 md:mb-4' : ''}
               >
@@ -1585,7 +1602,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="text-center mb-16"
           >
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-bold text-green-400 uppercase tracking-widest mb-6">
@@ -1610,7 +1627,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
+                  viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                   transition={{ delay: i * 0.1 }}
                 >
                   <GlassCard className="p-6 text-center relative">
@@ -1628,7 +1645,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="text-center mt-12"
           >
             <MagneticButton 
@@ -1648,7 +1665,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             className="text-center mb-16"
           >
             <h2 className="text-4xl md:text-5xl font-bold">Frequently Asked</h2>
@@ -1660,7 +1677,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 key={i}
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                 transition={{ delay: i * 0.05 }}
               >
                 <GlassCard className="overflow-hidden">
@@ -1701,7 +1718,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
           >
             <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-8">
               Ready to grow <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">actively?</span>
