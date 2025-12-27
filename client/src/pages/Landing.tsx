@@ -681,6 +681,17 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [activeCredit, setActiveCredit] = useState(500)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [showBelowFold, setShowBelowFold] = useState(!isMobile)
+
+  useEffect(() => {
+    if (isMobile && !showBelowFold) {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => setShowBelowFold(true), { timeout: 100 })
+      } else {
+        setTimeout(() => setShowBelowFold(true), 50)
+      }
+    }
+  }, [isMobile, showBelowFold])
 
   const { scrollYProgress } = useScroll()
   const heroOpacity = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0])
@@ -997,6 +1008,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       </section>
 
+      {showBelowFold && (
+      <>
       {/* Dashboard Showcase Section */}
       <section className="relative py-8 -mt-20 z-20">
         <div className="max-w-[1600px] mx-auto px-4">
@@ -1110,7 +1123,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
             {/* Central Dashboard - Animated Motion Graphic */}
             <div className="relative">
-              <AnimatedDashboard />
+              {!isMobile && <AnimatedDashboard />}
 
               {/* Floating Elements - Responsive */}
               <motion.div
@@ -1750,6 +1763,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
         </div>
       </footer>
+      </>
+      )}
     </div>
   )
 }
