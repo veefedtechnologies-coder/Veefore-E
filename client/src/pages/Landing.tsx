@@ -835,7 +835,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative landing-content-offset" style={{ overflowX: 'clip' }}>
+    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative" style={{ overflowX: 'clip' }}>
       <SEO {...seoConfig.landing} />
       
       {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
@@ -893,7 +893,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </div>
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center pt-12 pb-20 overflow-hidden">
+      <section className="relative min-h-screen flex items-center justify-center pt-24 pb-20 overflow-hidden" style={{ marginTop: '-80px', paddingTop: 'calc(80px + 6rem)' }}>
         {/* Background layer */}
         <div className="absolute inset-0 z-0">
           {isMobile ? (
