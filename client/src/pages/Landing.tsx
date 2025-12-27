@@ -450,7 +450,7 @@ const AnimatedDashboard = () => {
                 )
               })}
             </div>
-            <div className="col-span-10 relative" style={{ minHeight: '420px' }}>
+            <div className="col-span-10 relative" style={{ minHeight: '520px' }}>
               <motion.div 
                 className="absolute inset-0"
                 animate={{ opacity: activePage === 0 ? 1 : 0 }}
