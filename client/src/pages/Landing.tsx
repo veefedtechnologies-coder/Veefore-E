@@ -85,24 +85,29 @@ const RotatingTagline = () => {
   }, [])
 
   return (
-    <div className="relative h-[1.2em] overflow-hidden">
-      <AnimatePresence mode="wait">
+    <div className="relative h-[1.2em]">
+      {taglines.map((tagline, index) => (
         <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0, y: 40, filter: 'blur(8px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, y: -40, filter: 'blur(8px)' }}
+          key={index}
+          initial={false}
+          animate={{ 
+            opacity: currentIndex === index ? 1 : 0,
+            y: currentIndex === index ? 0 : (index > currentIndex ? 30 : -30),
+            filter: currentIndex === index ? 'blur(0px)' : 'blur(4px)',
+            scale: currentIndex === index ? 1 : 0.95
+          }}
           transition={{ 
-            duration: 0.6, 
+            duration: 0.5, 
             ease: [0.22, 1, 0.36, 1]
           }}
           className="absolute inset-0 flex items-center justify-center"
+          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
         >
           <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            {taglines[currentIndex].bottom}
+            {tagline.bottom}
           </span>
         </motion.div>
-      </AnimatePresence>
+      ))}
     </div>
   )
 }
@@ -118,22 +123,27 @@ const RotatingTopLine = () => {
   }, [])
 
   return (
-    <div className="relative h-[1.2em] overflow-hidden">
-      <AnimatePresence mode="wait">
+    <div className="relative h-[1.2em]">
+      {taglines.map((tagline, index) => (
         <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0, y: 40, filter: 'blur(8px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, y: -40, filter: 'blur(8px)' }}
+          key={index}
+          initial={false}
+          animate={{ 
+            opacity: currentIndex === index ? 1 : 0,
+            y: currentIndex === index ? 0 : (index > currentIndex ? 30 : -30),
+            filter: currentIndex === index ? 'blur(0px)' : 'blur(4px)',
+            scale: currentIndex === index ? 1 : 0.95
+          }}
           transition={{ 
-            duration: 0.6, 
+            duration: 0.5, 
             ease: [0.22, 1, 0.36, 1]
           }}
           className="absolute inset-0 flex items-center justify-center text-white"
+          style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
         >
-          {taglines[currentIndex].top}
+          {tagline.top}
         </motion.div>
-      </AnimatePresence>
+      ))}
     </div>
   )
 }
