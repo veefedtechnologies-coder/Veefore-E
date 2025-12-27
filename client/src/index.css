@@ -10,10 +10,6 @@
   top: 0 !important;
 }
 
-/* Landing page content offset for fixed header */
-.landing-content-offset {
-  padding-top: 80px;
-}
 
 /* Global dark mode support */
 @layer base {
