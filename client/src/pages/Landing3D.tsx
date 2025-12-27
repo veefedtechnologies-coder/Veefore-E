@@ -25,7 +25,7 @@ const Landing3D = memo(() => {
     let lastTime = 0
     const targetFPS = isMobile ? 30 : 60
     const frameInterval = 1000 / targetFPS
-    const fadeOpacity = isMobile ? 0.04 : 0.08
+    const fadeOpacity = isMobile ? 0.02 : 0.08
     
     let particles: Array<{
       x: number
@@ -55,8 +55,8 @@ const Landing3D = memo(() => {
         particles.push({
           x: Math.random() * window.innerWidth,
           y: Math.random() * window.innerHeight,
-          vx: (Math.random() - 0.5) * (isMobile ? 0.3 : 0.4),
-          vy: (Math.random() - 0.5) * (isMobile ? 0.3 : 0.4),
+          vx: (Math.random() - 0.5) * (isMobile ? 0.5 : 0.4),
+          vy: (Math.random() - 0.5) * (isMobile ? 0.5 : 0.4),
           size: Math.random() * 2.5 + 0.5,
           opacity: Math.random() * 0.6 + 0.2,
           hue: 220 + Math.random() * 60
