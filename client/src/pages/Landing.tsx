@@ -465,23 +465,34 @@ const AnimatedDashboard = () => {
 
 
   return (
-    <div className="relative mx-auto max-w-[1000px] w-full px-4 sm:px-6 lg:px-0">
-      <div className="relative rounded-[12px] sm:rounded-[16px] lg:rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_60px_rgba(59,130,246,0.1)] sm:shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden">
-        <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
-          <div className="flex items-center space-x-1.5 sm:space-x-2">
-            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-red-500/80" />
-            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-yellow-500/80" />
-            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-green-500/80" />
+    <div className="relative mx-auto max-w-[1000px] w-full px-2 sm:px-4 lg:px-0">
+      <div 
+        className="relative rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden origin-top"
+        style={{ 
+          transform: 'scale(var(--dashboard-scale, 1))',
+        }}
+      >
+        <style>{`
+          @media (max-width: 640px) { :root { --dashboard-scale: 0.55; } }
+          @media (min-width: 641px) and (max-width: 768px) { :root { --dashboard-scale: 0.7; } }
+          @media (min-width: 769px) and (max-width: 1024px) { :root { --dashboard-scale: 0.85; } }
+          @media (min-width: 1025px) { :root { --dashboard-scale: 1; } }
+        `}</style>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 rounded-full bg-red-500/80" />
+            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+            <div className="w-3 h-3 rounded-full bg-green-500/80" />
           </div>
-          <div className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/5 text-[10px] sm:text-xs text-white/40">
-            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 text-xs text-white/40">
+            <Clock className="w-3 h-3" />
             <span>Live Dashboard</span>
           </div>
-          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] sm:text-xs font-bold">V</div>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold">V</div>
         </div>
-        <div className="p-3 sm:p-4 lg:p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
-          <div className="grid grid-cols-12 gap-2 sm:gap-3 lg:gap-4">
-            <div ref={sidebarRef} className="col-span-3 sm:col-span-2 space-y-0.5 sm:space-y-1 relative">
+        <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
+          <div className="grid grid-cols-12 gap-4">
+            <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
               <motion.div
                 className="absolute pointer-events-none z-50"
                 style={{ width: 20, height: 20 }}
@@ -510,15 +521,14 @@ const AnimatedDashboard = () => {
                   <div 
                     key={item.name}
                     ref={el => itemRefs.current[i] = el}
-                    className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[9px] sm:text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
+                    className={`px-3 py-2 rounded-lg text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
                   >
-                    <span className="hidden sm:inline">{item.name}</span>
-                    <span className="sm:hidden">{item.name.slice(0, 3)}</span>
+                    {item.name}
                   </div>
                 )
               })}
             </div>
-            <div className="col-span-9 sm:col-span-10 relative overflow-hidden" style={{ minHeight: 'clamp(280px, 50vw, 520px)' }}>
+            <div className="col-span-10 relative overflow-hidden" style={{ minHeight: '520px' }}>
               <div 
                 className="absolute inset-0 transition-opacity duration-300 ease-in-out"
                 style={{ opacity: activePage === 0 ? 1 : 0, pointerEvents: activePage === 0 ? 'auto' : 'none' }}
