@@ -34,42 +34,50 @@ const Landing3D = () => {
       canvas.height = height * dpr
       canvas.style.width = `${width}px`
       canvas.style.height = `${height}px`
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.scale(dpr, dpr)
+      
+      ctx.fillStyle = '#030303'
+      ctx.fillRect(0, 0, width, height)
     }
 
     const initParticles = () => {
-      const count = Math.min(80, Math.floor(width / 20))
+      const count = Math.min(70, Math.floor(width / 22))
       particlesRef.current = []
       
       for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2
+        const speed = 0.2 + Math.random() * 0.25
         particlesRef.current.push({
           x: Math.random() * width,
           y: Math.random() * height,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          size: Math.random() * 2 + 1,
-          opacity: Math.random() * 0.5 + 0.3,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: Math.random() * 2 + 1.5,
+          opacity: Math.random() * 0.4 + 0.4,
           hue: 220 + Math.random() * 50,
           pulseOffset: Math.random() * Math.PI * 2
         })
       }
     }
 
-    const drawConnections = (time: number) => {
+    const drawConnections = () => {
       const particles = particlesRef.current
-      const connectionDistance = 150
+      const connectionDistance = 160
+
+      ctx.lineWidth = 0.5
 
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x
           const dy = particles[i].y - particles[j].y
-          const distance = Math.sqrt(dx * dx + dy * dy)
+          const distSq = dx * dx + dy * dy
 
-          if (distance < connectionDistance) {
-            const opacity = 0.12 * (1 - distance / connectionDistance)
+          if (distSq < connectionDistance * connectionDistance) {
+            const distance = Math.sqrt(distSq)
+            const opacity = 0.18 * (1 - distance / connectionDistance)
             ctx.beginPath()
-            ctx.strokeStyle = `hsla(230, 70%, 55%, ${opacity})`
-            ctx.lineWidth = 0.6
+            ctx.strokeStyle = `hsla(235, 70%, 60%, ${opacity})`
             ctx.moveTo(particles[i].x, particles[i].y)
             ctx.lineTo(particles[j].x, particles[j].y)
             ctx.stroke()
@@ -85,36 +93,36 @@ const Landing3D = () => {
         p.x += p.vx
         p.y += p.vy
 
-        if (p.x < 0) { p.x = 0; p.vx *= -1 }
-        if (p.x > width) { p.x = width; p.vx *= -1 }
-        if (p.y < 0) { p.y = 0; p.vy *= -1 }
-        if (p.y > height) { p.y = height; p.vy *= -1 }
+        if (p.x < 0) { p.x = 0; p.vx = Math.abs(p.vx) }
+        if (p.x > width) { p.x = width; p.vx = -Math.abs(p.vx) }
+        if (p.y < 0) { p.y = 0; p.vy = Math.abs(p.vy) }
+        if (p.y > height) { p.y = height; p.vy = -Math.abs(p.vy) }
 
-        const pulse = Math.sin(time * 0.001 + p.pulseOffset) * 0.15 + 0.85
+        const pulse = Math.sin(time * 0.0008 + p.pulseOffset) * 0.2 + 0.8
         const currentOpacity = p.opacity * pulse
 
-        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 6)
-        gradient.addColorStop(0, `hsla(${p.hue}, 75%, 60%, ${currentOpacity * 0.8})`)
-        gradient.addColorStop(0.4, `hsla(${p.hue}, 70%, 50%, ${currentOpacity * 0.3})`)
+        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 5)
+        gradient.addColorStop(0, `hsla(${p.hue}, 80%, 65%, ${currentOpacity * 0.7})`)
+        gradient.addColorStop(0.3, `hsla(${p.hue}, 75%, 55%, ${currentOpacity * 0.35})`)
         gradient.addColorStop(1, 'transparent')
         
         ctx.beginPath()
-        ctx.arc(p.x, p.y, p.size * 6, 0, Math.PI * 2)
+        ctx.arc(p.x, p.y, p.size * 5, 0, Math.PI * 2)
         ctx.fillStyle = gradient
         ctx.fill()
 
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        ctx.fillStyle = `hsla(${p.hue}, 85%, 70%, ${currentOpacity})`
+        ctx.fillStyle = `hsla(${p.hue}, 90%, 75%, ${currentOpacity})`
         ctx.fill()
       })
     }
 
     const animate = (time: number) => {
-      ctx.fillStyle = '#030303'
+      ctx.fillStyle = 'rgba(3, 3, 3, 0.18)'
       ctx.fillRect(0, 0, width, height)
 
-      drawConnections(time)
+      drawConnections()
       drawParticles(time)
 
       animationRef.current = requestAnimationFrame(animate)
@@ -122,6 +130,10 @@ const Landing3D = () => {
 
     resize()
     initParticles()
+    
+    ctx.fillStyle = '#030303'
+    ctx.fillRect(0, 0, width, height)
+    
     animationRef.current = requestAnimationFrame(animate)
 
     const handleResize = () => {
