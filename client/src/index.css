@@ -36,6 +36,35 @@
     transition-duration: 200ms;
   }
   
+  /* Remove default blue focus outline on click - use focus-visible for keyboard accessibility */
+  *:focus {
+    outline: none;
+  }
+  
+  /* Only show focus ring for keyboard navigation (accessibility) */
+  *:focus-visible {
+    outline: 2px solid rgb(99 102 241);
+    outline-offset: 2px;
+  }
+  
+  /* Specifically target buttons and interactive elements */
+  button:focus,
+  [role="button"]:focus,
+  a:focus,
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    box-shadow: none;
+  }
+  
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a:focus-visible {
+    outline: 2px solid rgb(99 102 241);
+    outline-offset: 2px;
+  }
+  
   /* Override for elements that shouldn't transition */
   .no-transition,
   .no-transition * {
