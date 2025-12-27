@@ -65,6 +65,79 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
   )
 }
 
+const taglines = [
+  { top: "Posting is not growth.", bottom: "Engagement is." },
+  { top: "Respond faster.", bottom: "Engage at scale." },
+  { top: "Automate engagement.", bottom: "Maintain momentum." },
+  { top: "Turn attention", bottom: "into interaction." },
+  { top: "AI that actively", bottom: "grows your account." },
+  { top: "Smart comments.", bottom: "Smarter DMs." }
+]
+
+const RotatingTagline = () => {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % taglines.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="relative h-[1.2em] overflow-hidden">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentIndex}
+          initial={{ opacity: 0, y: 40, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: -40, filter: 'blur(8px)' }}
+          transition={{ 
+            duration: 0.6, 
+            ease: [0.22, 1, 0.36, 1]
+          }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            {taglines[currentIndex].bottom}
+          </span>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  )
+}
+
+const RotatingTopLine = () => {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % taglines.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="relative h-[1.2em] overflow-hidden">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentIndex}
+          initial={{ opacity: 0, y: 40, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: -40, filter: 'blur(8px)' }}
+          transition={{ 
+            duration: 0.6, 
+            ease: [0.22, 1, 0.36, 1]
+          }}
+          className="absolute inset-0 flex items-center justify-center text-white"
+        >
+          {taglines[currentIndex].top}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  )
+}
+
 const AnimatedText = ({ text, className = '' }: { text: string, className?: string }) => {
   const words = text.split(' ')
   return (
@@ -664,17 +737,17 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <span className="font-medium">AI-Powered Growth Engine</span>
           </motion.div>
           
-          <h1 className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8">
-            <AnimatedText text="Posting is not growth." className="block text-white" />
-            <motion.span 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.6 }}
-              className="block bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent mt-2"
-            >
-              Engagement is.
-            </motion.span>
-          </h1>
+          <motion.h1 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8"
+          >
+            <RotatingTopLine />
+            <div className="mt-2">
+              <RotatingTagline />
+            </div>
+          </motion.h1>
           
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
