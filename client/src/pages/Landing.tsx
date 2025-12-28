@@ -1190,132 +1190,95 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
-      {/* How VeeFore Works - Visual Flow Section */}
-      <section className="py-20 md:py-32 relative overflow-hidden">
-        <GradientOrb className="w-[600px] h-[600px] top-1/2 left-0 -translate-x-1/2" color="blue" />
-        <GradientOrb className="w-[400px] h-[400px] top-1/4 right-0 translate-x-1/2" color="purple" />
-        
-        <div className="max-w-[1300px] mx-auto px-6 relative">
+      {/* How VeeFore Works - Clean Timeline Section */}
+      <section className="py-16 md:py-24 relative overflow-hidden">
+        <div className="max-w-[1100px] mx-auto px-6 relative">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-20"
+            className="text-center mb-14"
           >
-            <div className="inline-flex items-center space-x-2 px-5 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
-              <Zap className="w-4 h-4" />
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-white/60 uppercase tracking-widest mb-5">
+              <Zap className="w-3.5 h-3.5 text-blue-400" />
               <span>How It Works</span>
             </div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-              Your AI-powered <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">growth engine</span> in action
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4">
+              Your AI-powered <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth engine</span>
             </h2>
-            <p className="text-lg md:text-xl text-white/50 max-w-3xl mx-auto">
-              VeeFore works continuously in the background, turning your content into conversations and followers into fans.
+            <p className="text-base md:text-lg text-white/40 max-w-2xl mx-auto">
+              VeeFore works in the background, turning content into conversations and followers into fans.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-4 gap-4 md:gap-6 relative">
-            {/* Animated connecting line for desktop */}
-            <div className="hidden md:block absolute top-[72px] left-[12.5%] right-[12.5%] h-1 rounded-full overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20" />
-              <motion.div 
-                className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500"
-                animate={{ left: ['0%', '75%', '0%'] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              />
-            </div>
+          {/* Timeline flow */}
+          <div className="relative">
+            {/* Horizontal connector line - desktop only */}
+            <div className="hidden md:block absolute top-6 left-[10%] right-[10%] h-px bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-green-500/30" />
             
-            {/* Connecting arrows for desktop */}
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="hidden md:flex absolute top-[68px] items-center justify-center z-10" style={{ left: `${25 + i * 25}%`, transform: 'translateX(-50%)' }}>
+            <div className="grid md:grid-cols-4 gap-8 md:gap-4">
+              {[
+                { 
+                  step: 1, 
+                  icon: Send, 
+                  title: 'You Post', 
+                  desc: 'Create content as usual. VeeFore monitors engagement.',
+                  color: 'text-blue-400',
+                  borderColor: 'border-blue-500/30',
+                  bgColor: 'bg-blue-500/10'
+                },
+                { 
+                  step: 2, 
+                  icon: Bot, 
+                  title: 'AI Responds', 
+                  desc: 'Instant replies to comments and DMs with your voice.',
+                  color: 'text-purple-400',
+                  borderColor: 'border-purple-500/30',
+                  bgColor: 'bg-purple-500/10'
+                },
+                { 
+                  step: 3, 
+                  icon: TrendingUp, 
+                  title: 'Algorithm Boosts', 
+                  desc: 'Fast engagement signals increase your reach.',
+                  color: 'text-indigo-400',
+                  borderColor: 'border-indigo-500/30',
+                  bgColor: 'bg-indigo-500/10'
+                },
+                { 
+                  step: 4, 
+                  icon: RefreshCw, 
+                  title: 'AI Improves', 
+                  desc: 'Every interaction trains the AI to respond better.',
+                  color: 'text-green-400',
+                  borderColor: 'border-green-500/30',
+                  bgColor: 'bg-green-500/10'
+                }
+              ].map((item, i) => (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.5 + i * 0.2 }}
-                  className="w-8 h-8 rounded-full bg-[#0a0a0a] border border-white/10 flex items-center justify-center"
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+                  transition={{ delay: i * 0.1 }}
+                  className="relative"
                 >
-                  <ChevronRight className="w-4 h-4 text-white/50" />
+                  {/* Step number circle on timeline */}
+                  <div className="flex justify-center mb-4">
+                    <div className={`w-12 h-12 rounded-full ${item.bgColor} border ${item.borderColor} flex items-center justify-center relative z-10 bg-[#0a0a0a]`}>
+                      <item.icon className={`w-5 h-5 ${item.color}`} />
+                    </div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="text-center">
+                    <span className={`text-[10px] font-bold ${item.color} uppercase tracking-widest`}>Step {item.step}</span>
+                    <h4 className="text-base font-semibold mt-1 mb-2 text-white">{item.title}</h4>
+                    <p className="text-sm text-white/40 leading-relaxed">{item.desc}</p>
+                  </div>
                 </motion.div>
-              </div>
-            ))}
-            
-            {[
-              { 
-                step: '01', 
-                icon: Send, 
-                title: 'You Post Content', 
-                desc: 'Create and publish your content as usual. VeeFore monitors all engagement signals.',
-                gradient: 'from-blue-500 to-cyan-500',
-                shadowColor: 'shadow-blue-500/40',
-                bgGlow: 'bg-blue-500'
-              },
-              { 
-                step: '02', 
-                icon: Bot, 
-                title: 'AI Engages Instantly', 
-                desc: 'VeeFore responds to comments and DMs within seconds using context-aware AI.',
-                gradient: 'from-purple-500 to-pink-500',
-                shadowColor: 'shadow-purple-500/40',
-                bgGlow: 'bg-purple-500'
-              },
-              { 
-                step: '03', 
-                icon: TrendingUp, 
-                title: 'Algorithm Rewards You', 
-                desc: 'Fast engagement signals boost your algorithmic reach and visibility.',
-                gradient: 'from-indigo-500 to-purple-500',
-                shadowColor: 'shadow-indigo-500/40',
-                bgGlow: 'bg-indigo-500'
-              },
-              { 
-                step: '04', 
-                icon: RefreshCw, 
-                title: 'AI Learns & Improves', 
-                desc: 'Every interaction trains the AI to respond better, matching your voice.',
-                gradient: 'from-green-500 to-emerald-500',
-                shadowColor: 'shadow-green-500/40',
-                bgGlow: 'bg-green-500'
-              }
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.15, type: "spring", stiffness: 100 }}
-                className="relative group"
-              >
-                <div className="relative p-6 md:p-8 h-full text-center rounded-2xl bg-white/[0.02] border border-white/10 backdrop-blur-sm transition-all duration-500 group-hover:border-white/20 group-hover:bg-white/[0.04]">
-                  {/* Glow effect on hover */}
-                  <div className={`absolute -inset-px rounded-2xl ${item.bgGlow} opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-10`} />
-                  
-                  {/* Step number badge */}
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <div className={`px-3 py-1 rounded-full bg-gradient-to-r ${item.gradient} text-[10px] font-bold text-white shadow-lg ${item.shadowColor}`}>
-                      STEP {item.step}
-                    </div>
-                  </div>
-                  
-                  {/* Icon with animated ring */}
-                  <div className="relative w-16 h-16 md:w-20 md:h-20 mx-auto mb-6 mt-2">
-                    {/* Animated outer ring */}
-                    <motion.div 
-                      className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${item.gradient} opacity-20`}
-                      animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.1, 0.2] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: i * 0.3 }}
-                    />
-                    {/* Main icon container */}
-                    <div className={`relative w-full h-full rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center shadow-xl ${item.shadowColor}`}>
-                      <item.icon className="w-8 h-8 md:w-10 md:h-10 text-white" />
-                    </div>
-                  </div>
-                  
-                  <h4 className="text-lg md:text-xl font-bold mb-3 text-white">{item.title}</h4>
-                  <p className="text-sm md:text-base text-white/50 leading-relaxed">{item.desc}</p>
-                </div>
-              </motion.div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
