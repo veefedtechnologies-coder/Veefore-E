@@ -197,36 +197,6 @@ const RotatingHeroText = () => {
     return () => clearInterval(interval)
   }, [currentIndex, isReady])
 
-  if (isMobile) {
-    return (
-      <div className="relative overflow-hidden" style={{ height: 'clamp(8rem, 20vw, 16rem)', paddingBottom: '0.15em' }}>
-        {taglines.map((tagline, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-500 ${currentIndex === index ? 'opacity-100' : 'opacity-0'}`}
-            style={{ pointerEvents: currentIndex === index ? 'auto' : 'none' }}
-          >
-            <span className="block text-white" style={{ lineHeight: '1.15' }}>
-              {tagline.top}
-            </span>
-            <span 
-              className="block mt-1 pb-2"
-              style={{ 
-                lineHeight: '1.2',
-                background: 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent'
-              }}
-            >
-              {tagline.bottom}
-            </span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
   return (
     <div className="relative overflow-hidden" style={{ height: 'clamp(8rem, 20vw, 16rem)', paddingBottom: '0.15em' }}>
       {taglines.map((tagline, index) => {
@@ -240,11 +210,11 @@ const RotatingHeroText = () => {
             animate={{
               opacity: isActive ? 1 : 0,
               y: isActive ? 0 : (isExiting ? '-100%' : '100%'),
-              filter: isActive ? 'blur(0px)' : 'blur(8px)',
+              filter: isMobile ? 'none' : (isActive ? 'blur(0px)' : 'blur(8px)'),
               scale: isActive ? 1 : 0.95
             }}
             transition={{
-              duration: 0.9,
+              duration: isMobile ? 0.5 : 0.9,
               ease: [0.22, 1, 0.36, 1]
             }}
             className="absolute inset-0 flex flex-col items-center justify-center"
@@ -688,30 +658,28 @@ const AnimatedDashboard = () => {
         <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
           <div className="grid grid-cols-12 gap-4">
             <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
-              {!isMobile && (
-                <motion.div
-                  className="absolute pointer-events-none z-50"
-                  style={{ width: 20, height: 20 }}
-                  animate={{ 
-                    left: cursorPos.x - 10, 
-                    top: cursorPos.y - 10, 
-                    scale: isClicking ? 0.85 : 1 
-                  }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                    <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
-                  </svg>
-                  {isClicking && (
-                    <motion.div 
-                      initial={{ scale: 0.3, opacity: 0.8 }} 
-                      animate={{ scale: 1.8, opacity: 0 }} 
-                      transition={{ duration: 0.25 }} 
-                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
-                    />
-                  )}
-                </motion.div>
-              )}
+              <motion.div
+                className="absolute pointer-events-none z-50"
+                style={{ width: 20, height: 20 }}
+                animate={{ 
+                  left: cursorPos.x - 10, 
+                  top: cursorPos.y - 10, 
+                  scale: isClicking ? 0.85 : 1 
+                }}
+                transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                  <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
+                </svg>
+                {isClicking && (
+                  <motion.div 
+                    initial={{ scale: 0.3, opacity: 0.8 }} 
+                    animate={{ scale: 1.8, opacity: 0 }} 
+                    transition={{ duration: 0.25 }} 
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
+                  />
+                )}
+              </motion.div>
               {sidebarItems.map((item, i) => {
                 const isActive = item.pageIndex === activePage
                 return (
