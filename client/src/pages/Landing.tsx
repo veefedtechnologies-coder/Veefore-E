@@ -1192,6 +1192,73 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* How VeeFore Works - Ascending Graph Section */}
       <section className="py-16 md:py-24 relative overflow-hidden">
+        {/* Left decorative graphics - data/chart themed */}
+        <div className="hidden lg:block absolute left-0 top-1/2 -translate-y-1/2 w-48 h-96 pointer-events-none">
+          <svg viewBox="0 0 200 400" className="w-full h-full opacity-20">
+            {/* Mini bar chart */}
+            <rect x="20" y="280" width="12" height="40" fill="#3b82f6" rx="2" />
+            <rect x="38" y="260" width="12" height="60" fill="#8b5cf6" rx="2" />
+            <rect x="56" y="240" width="12" height="80" fill="#6366f1" rx="2" />
+            <rect x="74" y="220" width="12" height="100" fill="#22c55e" rx="2" />
+            {/* Connecting dots */}
+            <circle cx="26" cy="270" r="3" fill="#3b82f6" />
+            <circle cx="44" cy="250" r="3" fill="#8b5cf6" />
+            <circle cx="62" cy="230" r="3" fill="#6366f1" />
+            <circle cx="80" cy="210" r="3" fill="#22c55e" />
+            <path d="M 26 270 L 44 250 L 62 230 L 80 210" stroke="url(#leftGradient)" strokeWidth="1.5" fill="none" opacity="0.6" />
+            {/* Floating data nodes */}
+            <circle cx="140" cy="120" r="6" fill="#3b82f6" opacity="0.4" />
+            <circle cx="120" cy="160" r="4" fill="#8b5cf6" opacity="0.3" />
+            <circle cx="160" cy="180" r="5" fill="#6366f1" opacity="0.35" />
+            <line x1="140" y1="120" x2="120" y2="160" stroke="#8b5cf6" strokeWidth="1" opacity="0.2" />
+            <line x1="120" y1="160" x2="160" y2="180" stroke="#6366f1" strokeWidth="1" opacity="0.2" />
+            {/* Small pie segment */}
+            <path d="M 50 100 L 50 70 A 30 30 0 0 1 75 100 Z" fill="#3b82f6" opacity="0.3" />
+            <path d="M 50 100 L 75 100 A 30 30 0 0 1 50 130 Z" fill="#8b5cf6" opacity="0.25" />
+            <defs>
+              <linearGradient id="leftGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#3b82f6" />
+                <stop offset="100%" stopColor="#22c55e" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        
+        {/* Right decorative graphics - analytics themed */}
+        <div className="hidden lg:block absolute right-0 top-1/2 -translate-y-1/2 w-48 h-96 pointer-events-none">
+          <svg viewBox="0 0 200 400" className="w-full h-full opacity-20">
+            {/* Ascending line chart */}
+            <path d="M 100 300 C 110 290, 120 295, 130 280 C 140 265, 150 275, 160 255 C 170 235, 180 245, 190 220" 
+                  stroke="url(#rightGradient)" strokeWidth="2" fill="none" strokeLinecap="round" />
+            <circle cx="100" cy="300" r="4" fill="#3b82f6" />
+            <circle cx="130" cy="280" r="4" fill="#8b5cf6" />
+            <circle cx="160" cy="255" r="4" fill="#6366f1" />
+            <circle cx="190" cy="220" r="4" fill="#22c55e" />
+            {/* Grid lines */}
+            <line x1="90" y1="320" x2="200" y2="320" stroke="white" strokeWidth="0.5" opacity="0.1" />
+            <line x1="90" y1="280" x2="200" y2="280" stroke="white" strokeWidth="0.5" opacity="0.1" />
+            <line x1="90" y1="240" x2="200" y2="240" stroke="white" strokeWidth="0.5" opacity="0.1" />
+            <line x1="90" y1="200" x2="200" y2="200" stroke="white" strokeWidth="0.5" opacity="0.1" />
+            {/* Floating metrics */}
+            <rect x="110" y="100" width="50" height="24" rx="4" fill="#22c55e" opacity="0.2" />
+            <text x="135" y="116" fontSize="10" fill="#22c55e" textAnchor="middle" opacity="0.6">+47%</text>
+            <rect x="130" y="140" width="40" height="20" rx="4" fill="#8b5cf6" opacity="0.15" />
+            <text x="150" y="154" fontSize="9" fill="#8b5cf6" textAnchor="middle" opacity="0.5">2.4x</text>
+            {/* Scatter dots */}
+            <circle cx="60" cy="180" r="3" fill="#3b82f6" opacity="0.4" />
+            <circle cx="80" cy="160" r="2.5" fill="#8b5cf6" opacity="0.35" />
+            <circle cx="50" cy="200" r="2" fill="#6366f1" opacity="0.3" />
+            <circle cx="70" cy="220" r="3.5" fill="#22c55e" opacity="0.4" />
+            <defs>
+              <linearGradient id="rightGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#3b82f6" />
+                <stop offset="50%" stopColor="#8b5cf6" />
+                <stop offset="100%" stopColor="#22c55e" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        
         <div className="max-w-[1100px] mx-auto px-6 relative">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
