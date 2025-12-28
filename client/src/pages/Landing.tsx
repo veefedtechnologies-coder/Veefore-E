@@ -9,17 +9,29 @@ import {
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
 
+// Ultra-fast mobile detection - no state updates, immediate value
+const getIsMobileStatic = () => typeof window !== 'undefined' && window.innerWidth < 768
+
 const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  // Use static value for initial render to prevent flash
+  const [isMobile, setIsMobile] = useState(getIsMobileStatic)
   
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
   
   return isMobile
+}
+
+// Check if device should have reduced animations (low-end mobile, reduced motion preference)
+const useShouldAnimate = () => {
+  const isMobile = useIsMobile()
+  const [prefersReducedMotion] = useState(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+  return !isMobile && !prefersReducedMotion
 }
 
 // Mobile-safe motion wrapper - disables whileInView on mobile to prevent invisible sections
@@ -64,12 +76,11 @@ const MobileMotion = ({
 
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
+// Ultra-lightweight mobile background - NO blur effects for instant load
 const MobileBackground = memo(() => (
-  <div className="absolute inset-0 bg-[#030303]/90 overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/30 via-transparent to-transparent" />
-    <div className="absolute top-[20%] left-[20%] w-[300px] h-[300px] bg-blue-600/15 rounded-full blur-[100px]" />
-    <div className="absolute bottom-[30%] right-[20%] w-[200px] h-[200px] bg-purple-600/12 rounded-full blur-[80px]" />
-    <div className="absolute top-[60%] left-[50%] w-[150px] h-[150px] bg-indigo-500/10 rounded-full blur-[60px]" />
+  <div className="absolute inset-0 bg-[#030303] overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent" />
+    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent" />
   </div>
 ))
 
@@ -80,13 +91,21 @@ const Landing3DFallback = memo(() => (
   </div>
 ))
 
+// Mobile-optimized gradient orbs - use opacity gradient instead of expensive blur
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
+  const isMobile = useIsMobile()
   const colors = {
-    blue: 'from-blue-500/30 via-blue-600/20 to-transparent',
-    purple: 'from-purple-500/30 via-purple-600/20 to-transparent',
-    indigo: 'from-indigo-500/30 via-indigo-600/20 to-transparent',
-    cyan: 'from-cyan-500/20 via-cyan-600/10 to-transparent'
+    blue: isMobile ? 'bg-blue-600/10' : 'from-blue-500/30 via-blue-600/20 to-transparent',
+    purple: isMobile ? 'bg-purple-600/10' : 'from-purple-500/30 via-purple-600/20 to-transparent',
+    indigo: isMobile ? 'bg-indigo-500/8' : 'from-indigo-500/30 via-indigo-600/20 to-transparent',
+    cyan: isMobile ? 'bg-cyan-500/8' : 'from-cyan-500/20 via-cyan-600/10 to-transparent'
   }
+  
+  // On mobile, skip blur entirely for performance
+  if (isMobile) {
+    return <div className={`absolute rounded-full ${colors[color as keyof typeof colors]} ${className}`} style={{ filter: 'blur(40px)' }} />
+  }
+  
   return (
     <div className={`absolute rounded-full blur-[100px] bg-gradient-radial ${colors[color as keyof typeof colors]} ${className}`} />
   )
@@ -160,14 +179,23 @@ const RotatingHeroText = () => {
   const isMobile = useIsMobile()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
+  const [isReady, setIsReady] = useState(false)
+  
+  // Delay rotation start on mobile to allow fast initial render
+  useEffect(() => {
+    const delay = isMobile ? 2000 : 500 // Give mobile 2s head start before animations
+    const timer = setTimeout(() => setIsReady(true), delay)
+    return () => clearTimeout(timer)
+  }, [isMobile])
   
   useEffect(() => {
+    if (!isReady) return
     const interval = setInterval(() => {
       setPrevIndex(currentIndex)
       setCurrentIndex((prev) => (prev + 1) % taglines.length)
     }, 4000)
     return () => clearInterval(interval)
-  }, [currentIndex])
+  }, [currentIndex, isReady])
 
   if (isMobile) {
     return (
