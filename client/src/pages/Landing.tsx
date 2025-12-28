@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
+import veeforeLogo from '@assets/output-onlinepngtools_1749403653117_1766901238763.png'
 
 // Ultra-fast mobile detection - no state updates, immediate value
 const getIsMobileStatic = () => typeof window !== 'undefined' && window.innerWidth < 768
@@ -1652,40 +1653,17 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       <circle cx="50%" cy="50%" r="18%" fill="none" stroke="rgba(168,85,247,0.25)" strokeWidth="1" />
                     </svg>
                     
-                    {/* Center element - VeeFore Logo SVG */}
+                    {/* Center element - VeeFore Company Logo */}
                     <div className="absolute inset-0 flex items-center justify-center z-10">
                       <motion.div 
                         animate={{ scale: [1, 1.05, 1] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                        className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center"
                       >
-                        <svg viewBox="0 0 120 120" className="w-full h-full">
-                          <defs>
-                            <linearGradient id="vfLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#4F6BF2" />
-                              <stop offset="100%" stopColor="#3B4FC4" />
-                            </linearGradient>
-                          </defs>
-                          {/* V shape - matching your logo */}
-                          <path 
-                            d="M20 25 L60 95 L100 25" 
-                            stroke="url(#vfLogoGrad)" 
-                            strokeWidth="12" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            fill="none"
-                          />
-                          {/* Inner V detail */}
-                          <path 
-                            d="M35 35 L60 75 L85 35" 
-                            stroke="url(#vfLogoGrad)" 
-                            strokeWidth="6" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            fill="none"
-                            opacity="0.6"
-                          />
-                        </svg>
+                        <img 
+                          src={veeforeLogo} 
+                          alt="VeeFore" 
+                          className="w-14 h-14 md:w-16 md:h-16 object-contain"
+                        />
                       </motion.div>
                     </div>
                     
