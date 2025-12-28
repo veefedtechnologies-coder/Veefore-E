@@ -1667,43 +1667,47 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       </motion.div>
                     </div>
                     
-                    {/* 4 orbiting icons - positioned on the main orbit (40% radius) */}
-                    {[
-                      { icon: Eye, label: 'Reach', angleDeg: 315, color: 'text-cyan-400' },
-                      { icon: Heart, label: 'Engagement', angleDeg: 45, color: 'text-purple-400' },
-                      { icon: MessageSquare, label: 'Comments', angleDeg: 135, color: 'text-pink-400' },
-                      { icon: Send, label: 'DMs', angleDeg: 225, color: 'text-blue-400' }
-                    ].map((item, i) => {
-                      const radius = 40;
-                      const angleRad = (item.angleDeg * Math.PI) / 180;
-                      const x = 50 + radius * Math.cos(angleRad);
-                      const y = 50 + radius * Math.sin(angleRad);
-                      
-                      return (
-                        <motion.div
-                          key={i}
-                          className="absolute"
-                          style={{
-                            top: `${y}%`,
-                            left: `${x}%`,
-                            transform: 'translate(-50%, -50%)'
-                          }}
-                          initial={{ opacity: 0, scale: 0 }}
-                          whileInView={{ opacity: 1, scale: 1 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: i * 0.15, duration: 0.5, type: "spring" }}
-                        >
-                          <motion.div
-                            animate={{ y: [0, -3, 0] }}
-                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: i * 0.5 }}
-                            className="flex flex-col items-center"
+                    {/* Rotating container - icons revolve around the logo slowly */}
+                    <motion.div 
+                      className="absolute inset-0"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
+                    >
+                      {/* 4 orbiting icons - positioned exactly on the 2nd orbit (40% radius) */}
+                      {[
+                        { icon: Eye, label: 'Reach', angleDeg: 315, color: 'text-cyan-400' },
+                        { icon: Heart, label: 'Engagement', angleDeg: 45, color: 'text-purple-400' },
+                        { icon: MessageSquare, label: 'Comments', angleDeg: 135, color: 'text-pink-400' },
+                        { icon: Send, label: 'DMs', angleDeg: 225, color: 'text-blue-400' }
+                      ].map((item, i) => {
+                        const radius = 40;
+                        const angleRad = (item.angleDeg * Math.PI) / 180;
+                        const x = 50 + radius * Math.cos(angleRad);
+                        const y = 50 + radius * Math.sin(angleRad);
+                        
+                        return (
+                          <div
+                            key={i}
+                            className="absolute"
+                            style={{
+                              top: `${y}%`,
+                              left: `${x}%`,
+                              transform: 'translate(-50%, -50%)'
+                            }}
                           >
-                            <item.icon className={`w-7 h-7 md:w-8 md:h-8 ${item.color}`} strokeWidth={1.5} />
-                            <p className="text-[9px] text-white/50 text-center mt-1 font-medium whitespace-nowrap">{item.label}</p>
-                          </motion.div>
-                        </motion.div>
-                      );
-                    })}
+                            {/* Counter-rotate to keep icons upright */}
+                            <motion.div
+                              animate={{ rotate: -360 }}
+                              transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
+                              className="flex flex-col items-center"
+                            >
+                              <item.icon className={`w-7 h-7 md:w-8 md:h-8 ${item.color}`} strokeWidth={1.5} />
+                              <p className="text-[9px] text-white/50 text-center mt-1 font-medium whitespace-nowrap">{item.label}</p>
+                            </motion.div>
+                          </div>
+                        );
+                      })}
+                    </motion.div>
                   </div>
                 </div>
               </div>
