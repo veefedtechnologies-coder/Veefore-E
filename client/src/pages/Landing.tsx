@@ -1215,40 +1215,64 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <div className="relative">
             {/* Desktop: Ascending graph layout */}
             <div className="hidden md:block">
-              {/* SVG Graph Line */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
+              {/* SVG Graph with wavy ascending line */}
+              <svg className="absolute inset-0 w-full h-[400px] pointer-events-none" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid meet">
                 <defs>
-                  <linearGradient id="graphGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <linearGradient id="graphLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#3b82f6" />
-                    <stop offset="50%" stopColor="#8b5cf6" />
+                    <stop offset="33%" stopColor="#8b5cf6" />
+                    <stop offset="66%" stopColor="#6366f1" />
                     <stop offset="100%" stopColor="#22c55e" />
                   </linearGradient>
+                  <linearGradient id="graphFillGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.1" />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0.05" />
+                  </linearGradient>
                 </defs>
+                {/* Wavy ascending line with oscillating pattern */}
                 <motion.path
-                  d="M 10 80 L 32 60 L 55 40 L 78 20"
+                  d="M 50 340 
+                     C 80 320, 100 330, 120 310
+                     C 140 290, 160 300, 180 280
+                     C 200 260, 220 270, 250 250
+                     C 280 230, 300 245, 340 220
+                     C 380 195, 400 210, 450 185
+                     C 500 160, 520 175, 580 145
+                     C 640 115, 660 130, 720 100
+                     C 780 70, 800 85, 860 55
+                     C 920 25, 940 35, 950 30"
                   fill="none"
-                  stroke="url(#graphGradient)"
-                  strokeWidth="0.5"
+                  stroke="url(#graphLineGradient)"
+                  strokeWidth="3"
                   strokeLinecap="round"
                   initial={{ pathLength: 0 }}
                   whileInView={{ pathLength: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  transition={{ duration: 2, ease: "easeOut" }}
                 />
-                {/* Gradient fill under the line */}
+                {/* Gradient fill under the wavy line */}
                 <motion.path
-                  d="M 10 80 L 32 60 L 55 40 L 78 20 L 78 100 L 10 100 Z"
-                  fill="url(#graphGradient)"
-                  opacity="0.05"
+                  d="M 50 340 
+                     C 80 320, 100 330, 120 310
+                     C 140 290, 160 300, 180 280
+                     C 200 260, 220 270, 250 250
+                     C 280 230, 300 245, 340 220
+                     C 380 195, 400 210, 450 185
+                     C 500 160, 520 175, 580 145
+                     C 640 115, 660 130, 720 100
+                     C 780 70, 800 85, 860 55
+                     C 920 25, 940 35, 950 30
+                     L 950 400 L 50 400 Z"
+                  fill="url(#graphFillGradient)"
                   initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 0.05 }}
+                  whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.5, duration: 1 }}
                 />
               </svg>
               
-              {/* Step nodes positioned along the ascending line */}
-              <div className="relative h-[320px]">
+              {/* Step nodes positioned along the ascending wavy line */}
+              <div className="relative h-[400px]">
                 {[
                   { 
                     step: 1, 
@@ -1257,10 +1281,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     desc: 'Create content as usual',
                     metric: 'Content Live',
                     color: 'text-blue-400',
-                    borderColor: 'border-blue-500/40',
                     bgColor: 'bg-blue-500',
-                    top: '65%',
-                    left: '5%'
+                    top: '75%',
+                    left: '2%'
                   },
                   { 
                     step: 2, 
@@ -1269,10 +1292,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     desc: 'Instant comment & DM replies',
                     metric: '+Speed',
                     color: 'text-purple-400',
-                    borderColor: 'border-purple-500/40',
                     bgColor: 'bg-purple-500',
-                    top: '45%',
-                    left: '28%'
+                    top: '52%',
+                    left: '25%'
                   },
                   { 
                     step: 3, 
@@ -1281,10 +1303,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     desc: 'Engagement signals compound',
                     metric: '+Reach',
                     color: 'text-indigo-400',
-                    borderColor: 'border-indigo-500/40',
                     bgColor: 'bg-indigo-500',
-                    top: '25%',
-                    left: '51%'
+                    top: '30%',
+                    left: '52%'
                   },
                   { 
                     step: 4, 
@@ -1293,10 +1314,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     desc: 'Every interaction trains AI',
                     metric: '+Growth',
                     color: 'text-green-400',
-                    borderColor: 'border-green-500/40',
                     bgColor: 'bg-green-500',
-                    top: '5%',
-                    left: '74%'
+                    top: '8%',
+                    left: '76%'
                   }
                 ].map((item, i) => (
                   <motion.div
@@ -1304,23 +1324,26 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     initial={{ opacity: 0, scale: 0.8 }}
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
-                    transition={{ delay: 0.3 + i * 0.2, type: "spring", stiffness: 100 }}
+                    transition={{ delay: 0.5 + i * 0.3, type: "spring", stiffness: 100 }}
                     className="absolute"
                     style={{ top: item.top, left: item.left }}
                   >
                     <div className="flex items-start gap-3">
-                      {/* Node circle */}
-                      <div className={`w-10 h-10 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg shrink-0`}>
-                        <item.icon className="w-5 h-5 text-white" />
+                      {/* Node circle with glow */}
+                      <div className="relative">
+                        <div className={`absolute inset-0 ${item.bgColor} rounded-full blur-md opacity-40`} />
+                        <div className={`relative w-11 h-11 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg`}>
+                          <item.icon className="w-5 h-5 text-white" />
+                        </div>
                       </div>
                       {/* Content card */}
-                      <div className="bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 min-w-[160px]">
+                      <div className="bg-[#0d0d0d]/80 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 min-w-[170px]">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`text-[10px] font-bold ${item.color} uppercase`}>Step {item.step}</span>
-                          <span className={`text-[10px] font-medium ${item.color} bg-white/5 px-1.5 py-0.5 rounded`}>{item.metric}</span>
+                          <span className={`text-[10px] font-medium ${item.color} bg-white/10 px-1.5 py-0.5 rounded`}>{item.metric}</span>
                         </div>
                         <h4 className="text-sm font-semibold text-white mb-0.5">{item.title}</h4>
-                        <p className="text-xs text-white/40">{item.desc}</p>
+                        <p className="text-xs text-white/50">{item.desc}</p>
                       </div>
                     </div>
                   </motion.div>
