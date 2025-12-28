@@ -5,7 +5,8 @@ import {
   Users, Sparkles, Brain, Rocket, ChevronDown, Plus, Minus,
   Target, Clock, Shield, BarChart3, Send, Layers, Eye, Activity,
   ChevronRight, Star, Crown, Gauge, RefreshCw, Lock, Unlock, ArrowUpRight,
-  X, Instagram, Twitter, Linkedin, Award, Mail, XCircle, Heart
+  X, Instagram, Twitter, Linkedin, Award, Mail, XCircle, Heart,
+  MessageCircle, Check
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
@@ -1192,189 +1193,170 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* How VeeFore Works - Ascending Graph Section */}
       <section className="py-16 md:py-24 relative overflow-hidden">
-        {/* Left Side - Multiple Layered Decorative Elements */}
-        {/* Layer 1: Large constellation cluster - top left */}
-        <div className="hidden lg:block absolute -left-10 top-20 w-64 h-64 pointer-events-none">
-          <svg viewBox="0 0 250 250" className="w-full h-full">
-            <defs>
-              <radialGradient id="leftGlow1" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            {/* Central glowing orb */}
-            <circle cx="180" cy="120" r="40" fill="url(#leftGlow1)" />
-            <circle cx="180" cy="120" r="8" fill="#3b82f6" opacity="0.6" />
-            <circle cx="180" cy="120" r="4" fill="#3b82f6" opacity="0.9" />
-            {/* Orbital ring */}
-            <circle cx="180" cy="120" r="30" fill="none" stroke="#3b82f6" strokeWidth="0.5" opacity="0.3" strokeDasharray="4 4" />
-            {/* Connected nodes */}
-            <circle cx="140" cy="80" r="5" fill="#8b5cf6" opacity="0.5" />
-            <circle cx="210" cy="160" r="6" fill="#6366f1" opacity="0.4" />
-            <circle cx="150" cy="170" r="4" fill="#22c55e" opacity="0.5" />
-            <line x1="180" y1="120" x2="140" y2="80" stroke="#8b5cf6" strokeWidth="1" opacity="0.3" />
-            <line x1="180" y1="120" x2="210" y2="160" stroke="#6366f1" strokeWidth="1" opacity="0.25" />
-            <line x1="180" y1="120" x2="150" y2="170" stroke="#22c55e" strokeWidth="1" opacity="0.3" />
-            <line x1="140" y1="80" x2="150" y2="170" stroke="#8b5cf6" strokeWidth="0.5" opacity="0.15" />
-          </svg>
+        {/* Left Side - Meaningful Social Media Context Graphics */}
+        {/* Incoming comments/engagement waiting to be answered */}
+        <div className="hidden lg:block absolute left-4 top-32 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.5 }}
+            className="bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <MessageCircle className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-[10px] text-white/50">New comments</span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-pink-400 to-purple-500" />
+                <div className="h-2 w-20 bg-white/10 rounded" />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500" />
+                <div className="h-2 w-16 bg-white/10 rounded" />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-emerald-500" />
+                <div className="h-2 w-24 bg-white/10 rounded" />
+              </div>
+            </div>
+            <div className="mt-2 text-[9px] text-orange-400/70 flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" />
+              <span>Waiting for reply...</span>
+            </div>
+          </motion.div>
         </div>
         
-        {/* Layer 2: Data grid pattern - left middle */}
-        <div className="hidden lg:block absolute left-0 top-1/3 w-40 h-80 pointer-events-none">
-          <svg viewBox="0 0 160 320" className="w-full h-full">
-            {/* Grid dots */}
-            {[0, 1, 2, 3, 4].map((row) => (
-              [0, 1, 2].map((col) => (
-                <circle 
-                  key={`grid-${row}-${col}`}
-                  cx={30 + col * 35} 
-                  cy={40 + row * 60} 
-                  r={2 + (row + col) * 0.3}
-                  fill={['#3b82f6', '#8b5cf6', '#6366f1', '#22c55e'][(row + col) % 4]}
-                  opacity={0.15 + (row * 0.05)}
-                />
-              ))
-            ))}
-            {/* Connecting lines */}
-            <path d="M 30 40 L 65 100 L 100 160 L 65 220 L 100 280" stroke="url(#leftGridGradient)" strokeWidth="1" fill="none" opacity="0.2" />
-            <defs>
-              <linearGradient id="leftGridGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#22c55e" />
-              </linearGradient>
-            </defs>
-          </svg>
+        {/* Manual work indicator - time consuming */}
+        <div className="hidden lg:block absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.7 }}
+            className="text-center"
+          >
+            <div className="bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2 mb-2">
+              <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Without AI</div>
+              <div className="text-lg font-bold text-red-400/60">2-4 hrs</div>
+              <div className="text-[9px] text-white/30">daily replies</div>
+            </div>
+            <svg className="w-6 h-10 mx-auto text-white/20" viewBox="0 0 24 40">
+              <path d="M12 5 L12 30 M7 25 L12 30 L17 25" stroke="currentColor" strokeWidth="1.5" fill="none" />
+            </svg>
+          </motion.div>
         </div>
         
-        {/* Layer 3: Floating analytics nodes - left bottom */}
-        <div className="hidden lg:block absolute left-5 bottom-10 w-56 h-56 pointer-events-none">
-          <svg viewBox="0 0 220 220" className="w-full h-full">
-            <defs>
-              <radialGradient id="leftGlow2" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            {/* Small chart element */}
-            <rect x="60" y="140" width="8" height="25" rx="2" fill="#3b82f6" opacity="0.3" />
-            <rect x="75" y="125" width="8" height="40" rx="2" fill="#8b5cf6" opacity="0.35" />
-            <rect x="90" y="110" width="8" height="55" rx="2" fill="#6366f1" opacity="0.4" />
-            <rect x="105" y="95" width="8" height="70" rx="2" fill="#22c55e" opacity="0.45" />
-            {/* Trend line above bars */}
-            <path d="M 64 135 Q 79 115, 94 100 T 109 85" stroke="url(#leftTrendGradient)" strokeWidth="1.5" fill="none" opacity="0.5" />
-            {/* Floating node cluster */}
-            <circle cx="170" cy="80" r="25" fill="url(#leftGlow2)" />
-            <circle cx="170" cy="80" r="6" fill="#22c55e" opacity="0.5" />
-            <circle cx="185" cy="100" r="3" fill="#8b5cf6" opacity="0.4" />
-            <circle cx="150" cy="95" r="4" fill="#6366f1" opacity="0.35" />
-            <line x1="170" y1="80" x2="185" y2="100" stroke="#8b5cf6" strokeWidth="0.8" opacity="0.3" />
-            <line x1="170" y1="80" x2="150" y2="95" stroke="#6366f1" strokeWidth="0.8" opacity="0.25" />
-            <defs>
-              <linearGradient id="leftTrendGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#22c55e" />
-              </linearGradient>
-            </defs>
-          </svg>
+        {/* DM inbox preview */}
+        <div className="hidden lg:block absolute left-6 bottom-24 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.9 }}
+            className="bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Send className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-[10px] text-white/50">DM requests</span>
+              <span className="text-[9px] bg-purple-500/20 text-purple-400 px-1.5 rounded-full">12</span>
+            </div>
+            <div className="space-y-1">
+              <div className="h-2 w-24 bg-white/10 rounded" />
+              <div className="h-2 w-20 bg-white/10 rounded" />
+            </div>
+          </motion.div>
         </div>
         
-        {/* Right Side - Multiple Layered Decorative Elements */}
-        {/* Layer 1: Large orbital cluster - top right */}
-        <div className="hidden lg:block absolute -right-10 top-16 w-72 h-72 pointer-events-none">
-          <svg viewBox="0 0 280 280" className="w-full h-full">
-            <defs>
-              <radialGradient id="rightGlow1" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            {/* Central hub */}
-            <circle cx="80" cy="140" r="50" fill="url(#rightGlow1)" />
-            <circle cx="80" cy="140" r="10" fill="#8b5cf6" opacity="0.5" />
-            <circle cx="80" cy="140" r="5" fill="#8b5cf6" opacity="0.8" />
-            {/* Double orbital rings */}
-            <circle cx="80" cy="140" r="35" fill="none" stroke="#8b5cf6" strokeWidth="0.5" opacity="0.25" />
-            <circle cx="80" cy="140" r="45" fill="none" stroke="#6366f1" strokeWidth="0.3" opacity="0.2" strokeDasharray="6 6" />
-            {/* Satellite nodes */}
-            <circle cx="40" cy="100" r="6" fill="#3b82f6" opacity="0.45" />
-            <circle cx="120" cy="180" r="7" fill="#22c55e" opacity="0.4" />
-            <circle cx="50" cy="190" r="5" fill="#6366f1" opacity="0.35" />
-            <circle cx="130" cy="110" r="4" fill="#8b5cf6" opacity="0.5" />
-            {/* Connection lines */}
-            <line x1="80" y1="140" x2="40" y2="100" stroke="#3b82f6" strokeWidth="1" opacity="0.3" />
-            <line x1="80" y1="140" x2="120" y2="180" stroke="#22c55e" strokeWidth="1" opacity="0.25" />
-            <line x1="80" y1="140" x2="50" y2="190" stroke="#6366f1" strokeWidth="0.8" opacity="0.2" />
-            <line x1="80" y1="140" x2="130" y2="110" stroke="#8b5cf6" strokeWidth="0.8" opacity="0.3" />
-            <line x1="40" y1="100" x2="130" y2="110" stroke="#3b82f6" strokeWidth="0.5" opacity="0.15" />
-            <line x1="120" y1="180" x2="50" y2="190" stroke="#22c55e" strokeWidth="0.5" opacity="0.15" />
-          </svg>
+        {/* Right Side - Results & Growth Graphics */}
+        {/* AI auto-reply indicator */}
+        <div className="hidden lg:block absolute right-4 top-28 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.6 }}
+            className="bg-white/[0.03] border border-green-500/20 rounded-xl px-3 py-2 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Bot className="w-3.5 h-3.5 text-green-400" />
+              <span className="text-[10px] text-green-400/80">AI Auto-replied</span>
+              <Check className="w-3 h-3 text-green-400" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-pink-400 to-purple-500" />
+                <div className="flex-1 h-2 bg-green-500/20 rounded" />
+                <Check className="w-2.5 h-2.5 text-green-400/60" />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500" />
+                <div className="flex-1 h-2 bg-green-500/20 rounded" />
+                <Check className="w-2.5 h-2.5 text-green-400/60" />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-emerald-500" />
+                <div className="flex-1 h-2 bg-green-500/20 rounded" />
+                <Check className="w-2.5 h-2.5 text-green-400/60" />
+              </div>
+            </div>
+            <div className="mt-2 text-[9px] text-green-400/70 flex items-center gap-1">
+              <Zap className="w-2.5 h-2.5" />
+              <span>Replied in 2 seconds</span>
+            </div>
+          </motion.div>
         </div>
         
-        {/* Layer 2: Ascending data points - right middle */}
-        <div className="hidden lg:block absolute right-0 top-1/3 w-48 h-72 pointer-events-none">
-          <svg viewBox="0 0 190 280" className="w-full h-full">
-            {/* Ascending wave with data points */}
-            <path d="M 20 250 C 40 240, 50 245, 60 230 C 70 215, 80 225, 90 200 C 100 175, 110 185, 120 155 C 130 125, 140 135, 150 100 C 160 65, 170 75, 180 45" 
-                  stroke="url(#rightWaveGradient)" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
-            {/* Data point nodes along the wave */}
-            <circle cx="30" cy="245" r="4" fill="#3b82f6" opacity="0.5" />
-            <circle cx="60" cy="230" r="4.5" fill="#8b5cf6" opacity="0.45" />
-            <circle cx="90" cy="200" r="5" fill="#8b5cf6" opacity="0.5" />
-            <circle cx="120" cy="155" r="5.5" fill="#6366f1" opacity="0.55" />
-            <circle cx="150" cy="100" r="6" fill="#6366f1" opacity="0.5" />
-            <circle cx="175" cy="50" r="6.5" fill="#22c55e" opacity="0.55" />
-            {/* Glow behind top node */}
-            <circle cx="175" cy="50" r="20" fill="#22c55e" opacity="0.1" />
-            <defs>
-              <linearGradient id="rightWaveGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="50%" stopColor="#8b5cf6" />
-                <stop offset="100%" stopColor="#22c55e" />
-              </linearGradient>
-            </defs>
-          </svg>
+        {/* Engagement growth metrics */}
+        <div className="hidden lg:block absolute right-2 top-1/2 -translate-y-1/4 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.8 }}
+            className="space-y-2"
+          >
+            <div className="bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2 text-center">
+              <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Engagement</div>
+              <div className="text-lg font-bold text-green-400">+147%</div>
+              <div className="text-[9px] text-white/30">this month</div>
+            </div>
+            <div className="bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2 text-center">
+              <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Response</div>
+              <div className="text-lg font-bold text-purple-400">{"<"}3s</div>
+              <div className="text-[9px] text-white/30">avg time</div>
+            </div>
+          </motion.div>
         </div>
         
-        {/* Layer 3: Network cluster - right bottom */}
-        <div className="hidden lg:block absolute right-10 bottom-5 w-52 h-52 pointer-events-none">
-          <svg viewBox="0 0 210 210" className="w-full h-full">
-            <defs>
-              <radialGradient id="rightGlow2" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            {/* Central glow */}
-            <circle cx="80" cy="100" r="35" fill="url(#rightGlow2)" />
-            {/* Network nodes */}
-            <circle cx="80" cy="100" r="7" fill="#6366f1" opacity="0.5" />
-            <circle cx="45" cy="70" r="5" fill="#3b82f6" opacity="0.45" />
-            <circle cx="115" cy="75" r="4" fill="#8b5cf6" opacity="0.4" />
-            <circle cx="110" cy="130" r="5.5" fill="#22c55e" opacity="0.45" />
-            <circle cx="50" cy="135" r="4.5" fill="#8b5cf6" opacity="0.4" />
-            <circle cx="30" cy="105" r="3" fill="#6366f1" opacity="0.35" />
-            <circle cx="130" cy="100" r="3.5" fill="#3b82f6" opacity="0.4" />
-            {/* Network connections */}
-            <line x1="80" y1="100" x2="45" y2="70" stroke="#3b82f6" strokeWidth="0.8" opacity="0.3" />
-            <line x1="80" y1="100" x2="115" y2="75" stroke="#8b5cf6" strokeWidth="0.8" opacity="0.25" />
-            <line x1="80" y1="100" x2="110" y2="130" stroke="#22c55e" strokeWidth="0.8" opacity="0.3" />
-            <line x1="80" y1="100" x2="50" y2="135" stroke="#8b5cf6" strokeWidth="0.8" opacity="0.25" />
-            <line x1="80" y1="100" x2="30" y2="105" stroke="#6366f1" strokeWidth="0.6" opacity="0.2" />
-            <line x1="80" y1="100" x2="130" y2="100" stroke="#3b82f6" strokeWidth="0.6" opacity="0.2" />
-            <line x1="45" y1="70" x2="115" y2="75" stroke="#8b5cf6" strokeWidth="0.4" opacity="0.15" />
-            <line x1="110" y1="130" x2="50" y2="135" stroke="#22c55e" strokeWidth="0.4" opacity="0.15" />
-            {/* Outer scattered nodes */}
-            <circle cx="160" cy="60" r="2.5" fill="#3b82f6" opacity="0.3" />
-            <circle cx="170" cy="150" r="3" fill="#22c55e" opacity="0.25" />
-            <circle cx="20" cy="160" r="2" fill="#8b5cf6" opacity="0.25" />
-          </svg>
+        {/* Follower growth indicator */}
+        <div className="hidden lg:block absolute right-6 bottom-20 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 1 }}
+            className="bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Users className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-[10px] text-white/50">Follower growth</span>
+            </div>
+            <div className="flex items-end gap-1 h-8">
+              <div className="w-2 bg-blue-500/40 rounded-t" style={{ height: '30%' }} />
+              <div className="w-2 bg-blue-500/50 rounded-t" style={{ height: '45%' }} />
+              <div className="w-2 bg-purple-500/50 rounded-t" style={{ height: '55%' }} />
+              <div className="w-2 bg-purple-500/60 rounded-t" style={{ height: '70%' }} />
+              <div className="w-2 bg-green-500/70 rounded-t" style={{ height: '90%' }} />
+              <div className="w-2 bg-green-500 rounded-t" style={{ height: '100%' }} />
+            </div>
+            <div className="mt-1.5 text-[9px] text-green-400/70 flex items-center gap-1">
+              <TrendingUp className="w-2.5 h-2.5" />
+              <span>+2.4K this week</span>
+            </div>
+          </motion.div>
         </div>
-        
-        {/* Extra floating particles */}
-        <div className="hidden lg:block absolute left-20 top-1/2 w-3 h-3 rounded-full bg-blue-500/30 blur-sm" />
-        <div className="hidden lg:block absolute left-32 top-2/3 w-2 h-2 rounded-full bg-purple-500/25" />
-        <div className="hidden lg:block absolute right-24 top-1/4 w-2.5 h-2.5 rounded-full bg-green-500/30" />
-        <div className="hidden lg:block absolute right-16 bottom-1/3 w-2 h-2 rounded-full bg-indigo-500/25 blur-sm" />
         
         <div className="max-w-[1100px] mx-auto px-6 relative">
           <motion.div 
