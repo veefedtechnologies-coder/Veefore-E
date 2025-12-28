@@ -4,7 +4,8 @@ import {
   ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp, 
   Users, Sparkles, Brain, Rocket, ChevronDown, Plus, Minus,
   Target, Clock, Shield, BarChart3, Send, Layers, Eye, Activity,
-  ChevronRight, Star, Crown, Gauge, RefreshCw, Lock, Unlock, ArrowUpRight
+  ChevronRight, Star, Crown, Gauge, RefreshCw, Lock, Unlock, ArrowUpRight,
+  X, Instagram, Twitter, Linkedin, Award, Mail, XCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
@@ -1189,27 +1190,153 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
-      {/* Social Proof Strip */}
-      <section className="py-16 border-y border-white/[0.03] relative">
+      {/* Enhanced Social Proof Section */}
+      <section className="py-20 md:py-28 relative">
         <div className="max-w-[1400px] mx-auto px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            className="text-center mb-12"
+          >
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-xs font-bold text-yellow-400 uppercase tracking-widest mb-6">
+              <Award className="w-4 h-4" />
+              <span>Creator Success Stories</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+              Loved by <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">growth-focused</span> creators
+            </h2>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-16">
+            {[
+              {
+                quote: "VeeFore transformed my engagement game. I went from manually replying to comments for 3 hours daily to spending just 10 minutes reviewing AI responses.",
+                name: "Sarah Chen",
+                handle: "@sarahcreates",
+                metric: "+247%",
+                metricLabel: "Engagement Rate",
+                gradient: "from-pink-500 to-rose-500"
+              },
+              {
+                quote: "The DM automation is insane. I'm capturing leads and responding to inquiries even while I sleep. My conversion rate has never been higher.",
+                name: "Marcus Rodriguez", 
+                handle: "@marcusgrowth",
+                metric: "3x",
+                metricLabel: "Faster Responses",
+                gradient: "from-blue-500 to-cyan-500"
+              },
+              {
+                quote: "Finally, a tool that understands engagement is the real growth lever. The hook intelligence feature alone has doubled my reach.",
+                name: "Priya Sharma",
+                handle: "@priyabuilds",
+                metric: "2.4x",
+                metricLabel: "Reach Increase",
+                gradient: "from-purple-500 to-indigo-500"
+              }
+            ].map((testimonial, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+                transition={{ delay: i * 0.15 }}
+              >
+                <TiltCard className="h-full">
+                  <GlassCard className="p-6 md:p-8 h-full flex flex-col">
+                    <div className="flex items-center space-x-1 mb-4">
+                      {[1, 2, 3, 4, 5].map((j) => (
+                        <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                      ))}
+                    </div>
+                    
+                    <p className="text-white/70 text-sm md:text-base leading-relaxed flex-1 mb-6">"{testimonial.quote}"</p>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${testimonial.gradient} flex items-center justify-center text-white font-bold text-sm`}>
+                          {testimonial.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{testimonial.name}</p>
+                          <p className="text-xs text-white/40">{testimonial.handle}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-xl font-bold bg-gradient-to-r ${testimonial.gradient} bg-clip-text text-transparent`}>{testimonial.metric}</p>
+                        <p className="text-[10px] text-white/40">{testimonial.metricLabel}</p>
+                      </div>
+                    </div>
+                  </GlassCard>
+                </TiltCard>
+              </motion.div>
+            ))}
+          </div>
+
           <motion.div 
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="flex flex-col md:flex-row items-center justify-between gap-8"
+            className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center"
           >
-            <p className="text-white/30 text-sm font-medium uppercase tracking-widest">Trusted by growth-focused creators</p>
-            <div className="flex items-center space-x-12">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center space-x-1">
-                  {[1, 2, 3, 4, 5].map((j) => (
-                    <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                  ))}
-                  <span className="ml-2 text-white/40 text-sm">5.0</span>
+            <p className="text-white/30 text-sm font-medium uppercase tracking-widest">Trusted by creators worldwide</p>
+            <div className="flex items-center space-x-8 md:space-x-12">
+              <div className="flex items-center space-x-1">
+                {[1, 2, 3, 4, 5].map((j) => (
+                  <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                ))}
+                <span className="ml-2 text-white/60 text-sm font-medium">5.0 Rating</span>
+              </div>
+              <div className="flex -space-x-2">
+                {['from-blue-500 to-cyan-500', 'from-purple-500 to-pink-500', 'from-green-500 to-emerald-500', 'from-orange-500 to-red-500', 'from-indigo-500 to-purple-500'].map((gradient, i) => (
+                  <div key={i} className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} border-2 border-[#030303] flex items-center justify-center text-[10px] font-bold text-white`}>
+                    {String.fromCharCode(65 + i)}
+                  </div>
+                ))}
+                <div className="w-8 h-8 rounded-full bg-white/10 border-2 border-[#030303] flex items-center justify-center text-[10px] font-medium text-white/60">
+                  +9k
                 </div>
-              ))}
+              </div>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Stats/Metrics Showcase Section */}
+      <section className="py-16 md:py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5" />
+        
+        <div className="max-w-[1200px] mx-auto px-6 relative">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+            {[
+              { value: '5M+', label: 'Engagements Automated', gradient: 'from-blue-400 to-cyan-400' },
+              { value: '10K+', label: 'Active Creators', gradient: 'from-purple-400 to-pink-400' },
+              { value: '24/7', label: 'Automation Uptime', gradient: 'from-green-400 to-emerald-400' },
+              { value: '12.4x', label: 'Faster Than Manual', gradient: 'from-orange-400 to-amber-400' }
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+                transition={{ delay: i * 0.1, type: 'spring', stiffness: 200 }}
+                className="text-center"
+              >
+                <GlassCard className="p-6 md:p-8">
+                  <motion.p 
+                    className={`text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r ${stat.gradient} bg-clip-text text-transparent mb-2`}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+                    transition={{ delay: i * 0.1 + 0.2 }}
+                  >
+                    {stat.value}
+                  </motion.p>
+                  <p className="text-xs md:text-sm text-white/40 font-medium">{stat.label}</p>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -1290,6 +1417,143 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   </div>
                 </GlassCard>
               </TiltCard>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* What VeeFore is NOT - Clarity Section */}
+      <section className="py-24 relative">
+        <div className="max-w-[1200px] mx-auto px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-16"
+          >
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400 uppercase tracking-widest mb-6">
+              <XCircle className="w-4 h-4" />
+              <span>Important Clarity</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+              What VeeFore is <span className="text-red-400">NOT</span>
+            </h2>
+            <p className="text-lg text-white/40 max-w-2xl mx-auto">
+              To stay focused and deliver real value, we're clear about what we're not.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {[
+              { title: 'A scheduler with AI', icon: Clock },
+              { title: 'A content writing tool', icon: MessageSquare },
+              { title: 'A generic "all-in-one" dashboard', icon: Layers },
+              { title: 'An analytics-heavy platform', icon: BarChart3 },
+              { title: 'A vanity-metric tracker', icon: TrendingUp }
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <GlassCard className="p-5 md:p-6 !bg-red-500/[0.03] !border-red-500/20 h-full">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-3">
+                      <item.icon className="w-5 h-5 text-red-400" />
+                    </div>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <X className="w-4 h-4 text-red-500 shrink-0" />
+                      <span className="text-xs font-bold text-red-400 uppercase">NOT</span>
+                    </div>
+                    <p className="text-sm text-white/60">{item.title}</p>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Who is VeeFore For - Target Audience Section */}
+      <section className="py-24 relative">
+        <div className="max-w-[1200px] mx-auto px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-16"
+          >
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-bold text-green-400 uppercase tracking-widest mb-6">
+              <Target className="w-4 h-4" />
+              <span>Target Audience</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+              Who is VeeFore <span className="text-green-400">for?</span>
+            </h2>
+          </motion.div>
+
+          <div className="grid lg:grid-cols-2 gap-8">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            >
+              <GlassCard className="p-8 !bg-gradient-to-br !from-green-500/[0.05] !to-emerald-500/[0.05] !border-green-500/20 h-full">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 text-green-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-green-400">VeeFore is FOR</h3>
+                </div>
+                <div className="space-y-4">
+                  {[
+                    { text: 'Instagram & short-form creators', icon: Instagram },
+                    { text: '5k–200k follower range', icon: Users },
+                    { text: 'Creators who value time', icon: Clock },
+                    { text: 'Creators who want scale without spam', icon: Zap }
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center space-x-4 group">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <item.icon className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-white/70">{item.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            >
+              <GlassCard className="p-8 !bg-white/[0.01] h-full">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                    <X className="w-6 h-6 text-white/40" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white/40">VeeFore is NOT for</h3>
+                </div>
+                <div className="space-y-4">
+                  {[
+                    'Casual posters',
+                    'Hobby accounts',
+                    'People seeking free tools'
+                  ].map((text, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0">
+                        <X className="w-5 h-5 text-white/30" />
+                      </div>
+                      <span className="text-white/40">{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
             </motion.div>
           </div>
         </div>
@@ -1467,8 +1731,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </p>
           </motion.div>
           
-          {/* Credit Actions */}
-          <div className="grid grid-cols-5 gap-4 mb-12">
+          {/* Credit Actions - Responsive Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
             {creditActions.map((item, i) => (
               <motion.div
                 key={i}
@@ -1477,13 +1741,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                 transition={{ delay: i * 0.1 }}
               >
-                <GlassCard className="p-6 text-center !bg-amber-500/[0.02]">
-                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
-                    <item.icon className="w-6 h-6 text-amber-400" />
+                <GlassCard className="p-4 md:p-6 text-center !bg-amber-500/[0.02] hover:!bg-amber-500/[0.05] transition-all">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
+                    <item.icon className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
                   </div>
-                  <p className="text-xs text-white/50 mb-2">{item.action}</p>
-                  <p className="text-2xl font-bold text-amber-400">1</p>
-                  <p className="text-xs text-white/30">credit</p>
+                  <p className="text-[10px] md:text-xs text-white/50 mb-2">{item.action}</p>
+                  <p className="text-xl md:text-2xl font-bold text-amber-400">1</p>
+                  <p className="text-[10px] md:text-xs text-white/30">credit</p>
                 </GlassCard>
               </motion.div>
             ))}
@@ -1495,10 +1759,18 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
           >
-            <GlassCard className="p-8">
-              <div className="flex items-center justify-between mb-6">
+            <GlassCard className="p-6 md:p-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h4 className="font-bold">Monthly Credit Usage</h4>
-                <div className="text-3xl font-bold text-amber-400">{activeCredit.toLocaleString()}</div>
+                <motion.div 
+                  className="text-3xl md:text-4xl font-bold text-amber-400"
+                  key={activeCredit}
+                  initial={{ scale: 1.1 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300 }}
+                >
+                  {activeCredit.toLocaleString()}
+                </motion.div>
               </div>
               <input 
                 type="range" 
@@ -1508,10 +1780,112 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 onChange={(e) => setActiveCredit(Number(e.target.value))}
                 className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-amber-500/30"
               />
-              <div className="flex justify-between mt-4 text-sm text-white/30">
+              <div className="flex justify-between mt-4 text-xs md:text-sm text-white/30">
                 <span>Starter (300)</span>
                 <span>Growth (1,200)</span>
                 <span>Pro (3,000)</span>
+              </div>
+            </GlassCard>
+          </motion.div>
+
+          {/* Credit Add-ons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            className="mt-8"
+          >
+            <div className="text-center mb-6">
+              <h4 className="text-lg font-bold text-white/80 mb-2">Need more credits?</h4>
+              <p className="text-sm text-white/40">Purchase add-on packs anytime</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { credits: 200, price: 199 },
+                { credits: 500, price: 399 },
+                { credits: 1000, price: 699 }
+              ].map((addon, i) => (
+                <GlassCard key={i} className="p-5 text-center hover:!border-amber-500/30 transition-all cursor-pointer group">
+                  <div className="flex items-center justify-center space-x-2 mb-2">
+                    <Plus className="w-4 h-4 text-amber-400" />
+                    <span className="text-2xl font-bold text-amber-400 group-hover:scale-110 transition-transform">{addon.credits}</span>
+                    <span className="text-sm text-white/40">credits</span>
+                  </div>
+                  <p className="text-lg font-bold text-white">₹{addon.price}</p>
+                  <p className="text-xs text-white/30 mt-1">One-time purchase</p>
+                </GlassCard>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* VeeFore vs Traditional Tools - Comparison Section */}
+      <section className="py-24 relative">
+        <div className="max-w-[1200px] mx-auto px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-16"
+          >
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-400 uppercase tracking-widest mb-6">
+              <BarChart3 className="w-4 h-4" />
+              <span>Comparison</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+              VeeFore vs <span className="text-indigo-400">Traditional Tools</span>
+            </h2>
+            <p className="text-lg text-white/40 max-w-2xl mx-auto">
+              See why creators are switching to VeeFore
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+          >
+            <GlassCard className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="p-4 md:p-6 text-left text-sm font-bold text-white/60">Category</th>
+                      <th className="p-4 md:p-6 text-center text-sm font-bold text-white/40">Traditional Tools</th>
+                      <th className="p-4 md:p-6 text-center text-sm font-bold bg-gradient-to-r from-blue-500/10 to-purple-500/10">
+                        <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">VeeFore</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { category: 'Primary Focus', traditional: 'Posting & Scheduling', veefore: 'Engagement & Growth' },
+                      { category: 'Automation', traditional: 'None or Basic', veefore: 'AI-Driven Smart Automation' },
+                      { category: 'Intelligence', traditional: 'Static Analytics', veefore: 'Actionable Recommendations' },
+                      { category: 'Growth Approach', traditional: 'Passive / Manual', veefore: 'Active & Automatic' },
+                      { category: 'DM Handling', traditional: 'Manual Only', veefore: 'Smart AI Funnels' },
+                      { category: 'Learning', traditional: 'No Adaptation', veefore: 'Adaptive AI Loop' }
+                    ].map((row, i) => (
+                      <tr key={i} className="border-b border-white/5 last:border-0">
+                        <td className="p-4 md:p-6 text-sm font-medium text-white/80">{row.category}</td>
+                        <td className="p-4 md:p-6 text-center">
+                          <div className="flex items-center justify-center space-x-2">
+                            <X className="w-4 h-4 text-red-400/60" />
+                            <span className="text-sm text-white/40">{row.traditional}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 md:p-6 text-center bg-gradient-to-r from-blue-500/5 to-purple-500/5">
+                          <div className="flex items-center justify-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-green-400" />
+                            <span className="text-sm text-white/80 font-medium">{row.veefore}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </GlassCard>
           </motion.div>
@@ -1762,8 +2136,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Footer */}
-      <footer className="py-20 border-t border-white/[0.05] relative">
-        <div className="max-w-[1200px] mx-auto px-6">
+      <footer className="py-20 border-t border-white/[0.05] relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-500/[0.02] to-transparent" />
+        
+        <div className="max-w-[1200px] mx-auto px-6 relative">
           <div className="grid md:grid-cols-5 gap-12 mb-16">
             <div className="md:col-span-2">
               <div className="flex items-center space-x-2.5 mb-6">
@@ -1772,9 +2148,25 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
                 <span className="text-xl font-bold">VeeFore</span>
               </div>
-              <p className="text-white/30 text-sm leading-relaxed max-w-xs">
+              <p className="text-white/30 text-sm leading-relaxed max-w-xs mb-6">
                 AI-powered Growth Engine that actively increases engagement, reach, and visibility for creators — automatically.
               </p>
+              
+              <div className="flex items-center space-x-3">
+                {[
+                  { icon: Twitter, href: '#', gradient: 'from-blue-400 to-cyan-400' },
+                  { icon: Instagram, href: '#', gradient: 'from-pink-500 to-purple-500' },
+                  { icon: Linkedin, href: '#', gradient: 'from-blue-600 to-blue-400' }
+                ].map((social, i) => (
+                  <a 
+                    key={i}
+                    href={social.href}
+                    className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-gradient-to-br hover:${social.gradient} transition-all duration-300 group`}
+                  >
+                    <social.icon className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" />
+                  </a>
+                ))}
+              </div>
             </div>
             
             {[
@@ -1793,8 +2185,39 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             ))}
           </div>
           
-          <div className="pt-8 border-t border-white/[0.05] text-center text-white/20 text-sm">
-            © 2025 VeeFore. Built for serious creators.
+          <div className="mb-12">
+            <GlassCard className="p-6 md:p-8 !bg-gradient-to-r !from-blue-500/[0.05] !to-purple-500/[0.05]">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="text-center md:text-left">
+                  <h4 className="font-bold text-lg mb-1">Stay in the loop</h4>
+                  <p className="text-sm text-white/40">Get growth tips and VeeFore updates in your inbox</p>
+                </div>
+                <div className="flex w-full md:w-auto">
+                  <div className="relative flex-1 md:w-72">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                    <input 
+                      type="email" 
+                      placeholder="Enter your email"
+                      className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-l-xl text-sm placeholder:text-white/30 focus:outline-none focus:border-blue-500/50 transition-colors"
+                    />
+                  </div>
+                  <button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-r-xl text-sm font-bold hover:opacity-90 transition-opacity whitespace-nowrap">
+                    Subscribe
+                  </button>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+          
+          <div className="pt-8 border-t border-white/[0.05] flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-white/20 text-sm">
+              © 2025 VeeFore. Built for serious creators.
+            </p>
+            <div className="flex items-center space-x-6 text-sm text-white/30">
+              <span className="hover:text-white cursor-pointer transition-colors">Privacy Policy</span>
+              <span className="hover:text-white cursor-pointer transition-colors">Terms of Service</span>
+              <span className="hover:text-white cursor-pointer transition-colors">Cookie Policy</span>
+            </div>
           </div>
         </div>
       </footer>
