@@ -1190,14 +1190,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
-      {/* How VeeFore Works - Clean Timeline Section */}
+      {/* How VeeFore Works - Ascending Graph Section */}
       <section className="py-16 md:py-24 relative overflow-hidden">
         <div className="max-w-[1100px] mx-auto px-6 relative">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-14"
+            className="text-center mb-12"
           >
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-white/60 uppercase tracking-widest mb-5">
               <Zap className="w-3.5 h-3.5 text-blue-400" />
@@ -1207,74 +1207,159 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               Your AI-powered <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth engine</span>
             </h2>
             <p className="text-base md:text-lg text-white/40 max-w-2xl mx-auto">
-              VeeFore works in the background, turning content into conversations and followers into fans.
+              Each step compounds your engagement, building momentum that algorithms reward.
             </p>
           </motion.div>
 
-          {/* Timeline flow */}
+          {/* Ascending Graph Visualization */}
           <div className="relative">
-            {/* Horizontal connector line - desktop only */}
-            <div className="hidden md:block absolute top-6 left-[10%] right-[10%] h-px bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-green-500/30" />
+            {/* Desktop: Ascending graph layout */}
+            <div className="hidden md:block">
+              {/* SVG Graph Line */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="graphGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#3b82f6" />
+                    <stop offset="50%" stopColor="#8b5cf6" />
+                    <stop offset="100%" stopColor="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M 10 80 L 32 60 L 55 40 L 78 20"
+                  fill="none"
+                  stroke="url(#graphGradient)"
+                  strokeWidth="0.5"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0 }}
+                  whileInView={{ pathLength: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                />
+                {/* Gradient fill under the line */}
+                <motion.path
+                  d="M 10 80 L 32 60 L 55 40 L 78 20 L 78 100 L 10 100 Z"
+                  fill="url(#graphGradient)"
+                  opacity="0.05"
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 0.05 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.5, duration: 1 }}
+                />
+              </svg>
+              
+              {/* Step nodes positioned along the ascending line */}
+              <div className="relative h-[320px]">
+                {[
+                  { 
+                    step: 1, 
+                    icon: Send, 
+                    title: 'You Post', 
+                    desc: 'Create content as usual',
+                    metric: 'Content Live',
+                    color: 'text-blue-400',
+                    borderColor: 'border-blue-500/40',
+                    bgColor: 'bg-blue-500',
+                    top: '65%',
+                    left: '5%'
+                  },
+                  { 
+                    step: 2, 
+                    icon: Bot, 
+                    title: 'AI Responds', 
+                    desc: 'Instant comment & DM replies',
+                    metric: '+Speed',
+                    color: 'text-purple-400',
+                    borderColor: 'border-purple-500/40',
+                    bgColor: 'bg-purple-500',
+                    top: '45%',
+                    left: '28%'
+                  },
+                  { 
+                    step: 3, 
+                    icon: TrendingUp, 
+                    title: 'Algorithm Boosts', 
+                    desc: 'Engagement signals compound',
+                    metric: '+Reach',
+                    color: 'text-indigo-400',
+                    borderColor: 'border-indigo-500/40',
+                    bgColor: 'bg-indigo-500',
+                    top: '25%',
+                    left: '51%'
+                  },
+                  { 
+                    step: 4, 
+                    icon: RefreshCw, 
+                    title: 'AI Improves', 
+                    desc: 'Every interaction trains AI',
+                    metric: '+Growth',
+                    color: 'text-green-400',
+                    borderColor: 'border-green-500/40',
+                    bgColor: 'bg-green-500',
+                    top: '5%',
+                    left: '74%'
+                  }
+                ].map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 + i * 0.2, type: "spring", stiffness: 100 }}
+                    className="absolute"
+                    style={{ top: item.top, left: item.left }}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Node circle */}
+                      <div className={`w-10 h-10 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg shrink-0`}>
+                        <item.icon className="w-5 h-5 text-white" />
+                      </div>
+                      {/* Content card */}
+                      <div className="bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 min-w-[160px]">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold ${item.color} uppercase`}>Step {item.step}</span>
+                          <span className={`text-[10px] font-medium ${item.color} bg-white/5 px-1.5 py-0.5 rounded`}>{item.metric}</span>
+                        </div>
+                        <h4 className="text-sm font-semibold text-white mb-0.5">{item.title}</h4>
+                        <p className="text-xs text-white/40">{item.desc}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
             
-            <div className="grid md:grid-cols-4 gap-8 md:gap-4">
+            {/* Mobile: Vertical ascending layout */}
+            <div className="md:hidden space-y-4">
               {[
-                { 
-                  step: 1, 
-                  icon: Send, 
-                  title: 'You Post', 
-                  desc: 'Create content as usual. VeeFore monitors engagement.',
-                  color: 'text-blue-400',
-                  borderColor: 'border-blue-500/30',
-                  bgColor: 'bg-blue-500/10'
-                },
-                { 
-                  step: 2, 
-                  icon: Bot, 
-                  title: 'AI Responds', 
-                  desc: 'Instant replies to comments and DMs with your voice.',
-                  color: 'text-purple-400',
-                  borderColor: 'border-purple-500/30',
-                  bgColor: 'bg-purple-500/10'
-                },
-                { 
-                  step: 3, 
-                  icon: TrendingUp, 
-                  title: 'Algorithm Boosts', 
-                  desc: 'Fast engagement signals increase your reach.',
-                  color: 'text-indigo-400',
-                  borderColor: 'border-indigo-500/30',
-                  bgColor: 'bg-indigo-500/10'
-                },
-                { 
-                  step: 4, 
-                  icon: RefreshCw, 
-                  title: 'AI Improves', 
-                  desc: 'Every interaction trains the AI to respond better.',
-                  color: 'text-green-400',
-                  borderColor: 'border-green-500/30',
-                  bgColor: 'bg-green-500/10'
-                }
+                { step: 1, icon: Send, title: 'You Post', desc: 'Create content as usual', metric: 'Content Live', color: 'text-blue-400', bgColor: 'bg-blue-500' },
+                { step: 2, icon: Bot, title: 'AI Responds', desc: 'Instant comment & DM replies', metric: '+Speed', color: 'text-purple-400', bgColor: 'bg-purple-500' },
+                { step: 3, icon: TrendingUp, title: 'Algorithm Boosts', desc: 'Engagement signals compound', metric: '+Reach', color: 'text-indigo-400', bgColor: 'bg-indigo-500' },
+                { step: 4, icon: RefreshCw, title: 'AI Improves', desc: 'Every interaction trains AI', metric: '+Growth', color: 'text-green-400', bgColor: 'bg-green-500' }
               ].map((item, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="relative"
+                  className="flex items-center gap-4 relative"
                 >
-                  {/* Step number circle on timeline */}
-                  <div className="flex justify-center mb-4">
-                    <div className={`w-12 h-12 rounded-full ${item.bgColor} border ${item.borderColor} flex items-center justify-center relative z-10 bg-[#0a0a0a]`}>
-                      <item.icon className={`w-5 h-5 ${item.color}`} />
-                    </div>
+                  {/* Vertical connector line */}
+                  {i < 3 && (
+                    <div className="absolute left-5 top-12 w-px h-8 bg-gradient-to-b from-white/20 to-white/5" />
+                  )}
+                  {/* Node */}
+                  <div className={`w-10 h-10 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg shrink-0`}>
+                    <item.icon className="w-5 h-5 text-white" />
                   </div>
-                  
                   {/* Content */}
-                  <div className="text-center">
-                    <span className={`text-[10px] font-bold ${item.color} uppercase tracking-widest`}>Step {item.step}</span>
-                    <h4 className="text-base font-semibold mt-1 mb-2 text-white">{item.title}</h4>
-                    <p className="text-sm text-white/40 leading-relaxed">{item.desc}</p>
+                  <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold ${item.color} uppercase`}>Step {item.step}</span>
+                      <span className={`text-[10px] font-medium ${item.color} bg-white/5 px-1.5 py-0.5 rounded`}>{item.metric}</span>
+                    </div>
+                    <h4 className="text-sm font-semibold text-white">{item.title}</h4>
+                    <p className="text-xs text-white/40">{item.desc}</p>
                   </div>
                 </motion.div>
               ))}
