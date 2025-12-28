@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     
     <!-- ULTRA-EARLY: GraphQL Warning Suppression (First thing in head) -->
     <script>
@@ -115,7 +115,7 @@
     <style>
       /* P7-5: Critical above-the-fold styles for instant LCP */
       html, body {
-        background-color: #030303; /* Dark landing page background */
+        background-color: #030303 !important; /* Dark landing page background */
         color: #f9fafb; /* Light text */
         margin: 0;
         padding: 0;
@@ -124,15 +124,29 @@
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
+        /* iOS Safari safe area support */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
       }
       
-      /* iOS Safari safe area support */
+      /* iOS Safari safe area support - ensure full coverage */
       html {
-        background-color: #030303;
+        background-color: #030303 !important;
+        min-height: 100%;
+        min-height: -webkit-fill-available;
+      }
+      
+      body {
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
       }
       
       #root {
-        background-color: #030303;
+        background-color: #030303 !important;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
       }
       
       /* P7-5: Hero section critical styles */
@@ -192,32 +206,8 @@
         contain: layout style paint;
       }
       
-      /* Dark mode support */
-      @media (prefers-color-scheme: dark) {
-        html, body {
-          background-color: #111827; /* gray-900 */
-          color: #f9fafb; /* gray-50 */
-        }
-        .nav-header {
-          background: rgba(17, 24, 39, 0.95);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-      }
-      
-      /* Override for when dark class is explicitly set */
-      html.dark, html.dark body {
-        background-color: #111827 !important; /* gray-900 */
-        color: #f9fafb !important; /* gray-50 */
-      }
-      
-      html.light, html.light body {
-        background-color: #f9fafb !important; /* gray-50 */
-        color: #111827 !important; /* gray-900 */
-      }
-      
-      #root {
-        min-height: 100vh;
-      }
+      /* Landing page always uses dark theme */
+      /* App pages respect theme preference */
     </style>
     
     <!-- CRITICAL: Early GraphQL warning suppression (must run before any external libraries) -->
