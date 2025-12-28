@@ -1634,100 +1634,98 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
                 
                 <div className="relative">
-                  <div className="aspect-square max-w-[320px] md:max-w-[380px] mx-auto relative">
+                  <div className="w-[300px] h-[300px] md:w-[360px] md:h-[360px] mx-auto relative">
                     {/* Background glow from center logo */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500/40 via-purple-500/30 to-transparent blur-2xl" />
+                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-transparent blur-3xl" />
                     </div>
                     
-                    {/* Orbit ring - the path where icons revolve */}
-                    <div className="absolute inset-[12%] rounded-full border border-dashed border-white/15" />
+                    {/* Multiple orbit rings */}
+                    <svg className="absolute inset-0 w-full h-full">
+                      {/* Outermost orbit ring */}
+                      <circle cx="50%" cy="50%" r="48%" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="6 6" />
+                      {/* Main orbit ring where icons are placed */}
+                      <circle cx="50%" cy="50%" r="40%" fill="none" stroke="rgba(139,92,246,0.2)" strokeWidth="1.5" />
+                      {/* Inner orbit ring */}
+                      <circle cx="50%" cy="50%" r="28%" fill="none" stroke="rgba(59,130,246,0.15)" strokeWidth="1" strokeDasharray="4 8" />
+                      {/* Innermost glow ring */}
+                      <circle cx="50%" cy="50%" r="18%" fill="none" stroke="rgba(168,85,247,0.25)" strokeWidth="1" />
+                    </svg>
                     
-                    {/* Inner glow ring */}
-                    <motion.div 
-                      className="absolute inset-[30%] rounded-full border border-purple-500/25"
-                      animate={{ scale: [1, 1.05, 1], opacity: [0.25, 0.4, 0.25] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    />
-                    
-                    {/* Center element - VeeFore Company Logo */}
+                    {/* Center element - VeeFore Logo SVG */}
                     <div className="absolute inset-0 flex items-center justify-center z-10">
                       <motion.div 
                         animate={{ scale: [1, 1.05, 1] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center"
                       >
-                        <img 
-                          src="/assets/veefore-logo.png" 
-                          alt="VeeFore" 
-                          className="w-14 h-14 md:w-16 md:h-16 object-contain"
-                        />
+                        <svg viewBox="0 0 120 120" className="w-full h-full">
+                          <defs>
+                            <linearGradient id="vfLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#4F6BF2" />
+                              <stop offset="100%" stopColor="#3B4FC4" />
+                            </linearGradient>
+                          </defs>
+                          {/* V shape - matching your logo */}
+                          <path 
+                            d="M20 25 L60 95 L100 25" 
+                            stroke="url(#vfLogoGrad)" 
+                            strokeWidth="12" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            fill="none"
+                          />
+                          {/* Inner V detail */}
+                          <path 
+                            d="M35 35 L60 75 L85 35" 
+                            stroke="url(#vfLogoGrad)" 
+                            strokeWidth="6" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            fill="none"
+                            opacity="0.6"
+                          />
+                        </svg>
                       </motion.div>
                     </div>
                     
-                    {/* Rotating orbit container with 4 icons */}
-                    <motion.div
-                      className="absolute inset-[12%]"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-                    >
-                      {/* Icons positioned at cardinal points on the orbit */}
-                      {[
-                        { icon: Eye, label: 'Reach', position: 'top', color: 'text-cyan-400' },
-                        { icon: Heart, label: 'Engagement', position: 'right', color: 'text-purple-400' },
-                        { icon: MessageSquare, label: 'Comments', position: 'bottom', color: 'text-pink-400' },
-                        { icon: Send, label: 'DMs', position: 'left', color: 'text-blue-400' }
-                      ].map((item, i) => {
-                        const positionStyles: Record<string, React.CSSProperties> = {
-                          top: { top: 0, left: '50%', transform: 'translate(-50%, -50%)' },
-                          right: { top: '50%', right: 0, transform: 'translate(50%, -50%)' },
-                          bottom: { bottom: 0, left: '50%', transform: 'translate(-50%, 50%)' },
-                          left: { top: '50%', left: 0, transform: 'translate(-50%, -50%)' }
-                        };
-                        
-                        return (
+                    {/* 4 orbiting icons - positioned on the main orbit (40% radius) */}
+                    {[
+                      { icon: Eye, label: 'Reach', angleDeg: 315, color: 'text-cyan-400' },
+                      { icon: Heart, label: 'Engagement', angleDeg: 45, color: 'text-purple-400' },
+                      { icon: MessageSquare, label: 'Comments', angleDeg: 135, color: 'text-pink-400' },
+                      { icon: Send, label: 'DMs', angleDeg: 225, color: 'text-blue-400' }
+                    ].map((item, i) => {
+                      const radius = 40;
+                      const angleRad = (item.angleDeg * Math.PI) / 180;
+                      const x = 50 + radius * Math.cos(angleRad);
+                      const y = 50 + radius * Math.sin(angleRad);
+                      
+                      return (
+                        <motion.div
+                          key={i}
+                          className="absolute"
+                          style={{
+                            top: `${y}%`,
+                            left: `${x}%`,
+                            transform: 'translate(-50%, -50%)'
+                          }}
+                          initial={{ opacity: 0, scale: 0 }}
+                          whileInView={{ opacity: 1, scale: 1 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: i * 0.15, duration: 0.5, type: "spring" }}
+                        >
                           <motion.div
-                            key={i}
-                            className="absolute"
-                            style={positionStyles[item.position]}
-                            initial={{ opacity: 0, scale: 0 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: i * 0.15, duration: 0.4, type: "spring" }}
+                            animate={{ y: [0, -3, 0] }}
+                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: i * 0.5 }}
+                            className="flex flex-col items-center"
                           >
-                            {/* Counter-rotate to keep icons upright */}
-                            <motion.div
-                              animate={{ rotate: -360 }}
-                              transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-                              className="flex flex-col items-center"
-                            >
-                              <item.icon className={`w-7 h-7 md:w-8 md:h-8 ${item.color}`} strokeWidth={1.5} />
-                              <p className="text-[9px] text-white/50 text-center mt-0.5 font-medium whitespace-nowrap">{item.label}</p>
-                            </motion.div>
+                            <item.icon className={`w-7 h-7 md:w-8 md:h-8 ${item.color}`} strokeWidth={1.5} />
+                            <p className="text-[9px] text-white/50 text-center mt-1 font-medium whitespace-nowrap">{item.label}</p>
                           </motion.div>
-                        );
-                      })}
-                    </motion.div>
-                    
-                    {/* Static orbit path overlay */}
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                      <circle
-                        cx="50%"
-                        cy="50%"
-                        r="38%"
-                        fill="none"
-                        stroke="url(#orbitLineGradient)"
-                        strokeWidth="1"
-                        strokeDasharray="4 8"
-                        opacity="0.3"
-                      />
-                      <defs>
-                        <linearGradient id="orbitLineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#3b82f6" />
-                          <stop offset="50%" stopColor="#8b5cf6" />
-                          <stop offset="100%" stopColor="#ec4899" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
