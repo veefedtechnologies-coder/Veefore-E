@@ -1191,31 +1191,54 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* How VeeFore Works - Visual Flow Section */}
-      <section className="py-20 md:py-28 relative overflow-hidden">
-        <GradientOrb className="w-[500px] h-[500px] top-1/2 left-0 -translate-x-1/2" color="blue" />
+      <section className="py-20 md:py-32 relative overflow-hidden">
+        <GradientOrb className="w-[600px] h-[600px] top-1/2 left-0 -translate-x-1/2" color="blue" />
+        <GradientOrb className="w-[400px] h-[400px] top-1/4 right-0 translate-x-1/2" color="purple" />
         
-        <div className="max-w-[1200px] mx-auto px-6 relative">
+        <div className="max-w-[1300px] mx-auto px-6 relative">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
+            <div className="inline-flex items-center space-x-2 px-5 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
               <Zap className="w-4 h-4" />
               <span>How It Works</span>
             </div>
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-              Your AI-powered <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth engine</span> in action
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
+              Your AI-powered <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">growth engine</span> in action
             </h2>
-            <p className="text-lg text-white/40 max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-white/50 max-w-3xl mx-auto">
               VeeFore works continuously in the background, turning your content into conversations and followers into fans.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-4 gap-6 relative">
-            {/* Connecting line for desktop */}
-            <div className="hidden md:block absolute top-16 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-indigo-500/30" />
+          <div className="grid md:grid-cols-4 gap-4 md:gap-6 relative">
+            {/* Animated connecting line for desktop */}
+            <div className="hidden md:block absolute top-[72px] left-[12.5%] right-[12.5%] h-1 rounded-full overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20" />
+              <motion.div 
+                className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500"
+                animate={{ left: ['0%', '75%', '0%'] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
+            
+            {/* Connecting arrows for desktop */}
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="hidden md:flex absolute top-[68px] items-center justify-center z-10" style={{ left: `${25 + i * 25}%`, transform: 'translateX(-50%)' }}>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.5 + i * 0.2 }}
+                  className="w-8 h-8 rounded-full bg-[#0a0a0a] border border-white/10 flex items-center justify-center"
+                >
+                  <ChevronRight className="w-4 h-4 text-white/50" />
+                </motion.div>
+              </div>
+            ))}
             
             {[
               { 
@@ -1223,46 +1246,74 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 icon: Send, 
                 title: 'You Post Content', 
                 desc: 'Create and publish your content as usual. VeeFore monitors all engagement signals.',
-                gradient: 'from-blue-500 to-cyan-500'
+                gradient: 'from-blue-500 to-cyan-500',
+                shadowColor: 'shadow-blue-500/40',
+                bgGlow: 'bg-blue-500'
               },
               { 
                 step: '02', 
                 icon: Bot, 
                 title: 'AI Engages Instantly', 
                 desc: 'VeeFore responds to comments and DMs within seconds using context-aware AI.',
-                gradient: 'from-purple-500 to-pink-500'
+                gradient: 'from-purple-500 to-pink-500',
+                shadowColor: 'shadow-purple-500/40',
+                bgGlow: 'bg-purple-500'
               },
               { 
                 step: '03', 
                 icon: TrendingUp, 
                 title: 'Algorithm Rewards You', 
                 desc: 'Fast engagement signals boost your algorithmic reach and visibility.',
-                gradient: 'from-indigo-500 to-purple-500'
+                gradient: 'from-indigo-500 to-purple-500',
+                shadowColor: 'shadow-indigo-500/40',
+                bgGlow: 'bg-indigo-500'
               },
               { 
                 step: '04', 
                 icon: RefreshCw, 
                 title: 'AI Learns & Improves', 
                 desc: 'Every interaction trains the AI to respond better, matching your voice.',
-                gradient: 'from-green-500 to-emerald-500'
+                gradient: 'from-green-500 to-emerald-500',
+                shadowColor: 'shadow-green-500/40',
+                bgGlow: 'bg-green-500'
               }
             ].map((item, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.15 }}
-                className="relative"
+                transition={{ delay: i * 0.15, type: "spring", stiffness: 100 }}
+                className="relative group"
               >
-                <GlassCard className="p-6 h-full text-center">
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center mx-auto mb-5 shadow-lg relative z-10`}>
-                    <item.icon className="w-7 h-7 text-white" />
+                <div className="relative p-6 md:p-8 h-full text-center rounded-2xl bg-white/[0.02] border border-white/10 backdrop-blur-sm transition-all duration-500 group-hover:border-white/20 group-hover:bg-white/[0.04]">
+                  {/* Glow effect on hover */}
+                  <div className={`absolute -inset-px rounded-2xl ${item.bgGlow} opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-10`} />
+                  
+                  {/* Step number badge */}
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <div className={`px-3 py-1 rounded-full bg-gradient-to-r ${item.gradient} text-[10px] font-bold text-white shadow-lg ${item.shadowColor}`}>
+                      STEP {item.step}
+                    </div>
                   </div>
-                  <span className={`text-xs font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent mb-2 block`}>STEP {item.step}</span>
-                  <h4 className="text-lg font-bold mb-2">{item.title}</h4>
-                  <p className="text-sm text-white/50">{item.desc}</p>
-                </GlassCard>
+                  
+                  {/* Icon with animated ring */}
+                  <div className="relative w-16 h-16 md:w-20 md:h-20 mx-auto mb-6 mt-2">
+                    {/* Animated outer ring */}
+                    <motion.div 
+                      className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${item.gradient} opacity-20`}
+                      animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.1, 0.2] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: i * 0.3 }}
+                    />
+                    {/* Main icon container */}
+                    <div className={`relative w-full h-full rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center shadow-xl ${item.shadowColor}`}>
+                      <item.icon className="w-8 h-8 md:w-10 md:h-10 text-white" />
+                    </div>
+                  </div>
+                  
+                  <h4 className="text-lg md:text-xl font-bold mb-3 text-white">{item.title}</h4>
+                  <p className="text-sm md:text-base text-white/50 leading-relaxed">{item.desc}</p>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -1270,99 +1321,172 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Algorithm Impact - Why Engagement Velocity Matters */}
-      <section className="py-16 md:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/[0.02] to-transparent" />
+      <section className="py-20 md:py-28 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/[0.03] to-transparent" />
+        <GradientOrb className="w-[500px] h-[500px] bottom-0 right-0 translate-x-1/2 translate-y-1/2" color="purple" />
         
-        <div className="max-w-[1200px] mx-auto px-6 relative">
+        <div className="max-w-[1300px] mx-auto px-6 relative">
           <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+            transition={{ duration: 0.6 }}
           >
-            <GlassCard className="p-8 md:p-12 !bg-gradient-to-br !from-blue-500/[0.05] !to-purple-500/[0.05]">
-              <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <div className="relative p-8 md:p-14 rounded-3xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/10 backdrop-blur-sm overflow-hidden">
+              {/* Background decorative elements */}
+              <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl" />
+              
+              <div className="grid lg:grid-cols-2 gap-12 items-center relative">
                 <div>
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-4">
-                    <Brain className="w-3 h-3" />
-                    <span>Algorithm Science</span>
-                  </div>
-                  <h3 className="text-2xl md:text-4xl font-bold mb-4">
-                    Why <span className="text-blue-400">speed</span> matters to algorithms
-                  </h3>
-                  <p className="text-white/50 mb-6 leading-relaxed">
-                    Social platforms reward accounts that generate quick, meaningful engagement. The first 30 minutes after posting are critical for algorithmic amplification.
-                  </p>
+                  <motion.div 
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
+                      <Brain className="w-4 h-4" />
+                      <span>Algorithm Science</span>
+                    </div>
+                    <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-tight">
+                      Why <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">speed</span> matters to algorithms
+                    </h3>
+                    <p className="text-white/60 mb-8 text-lg leading-relaxed">
+                      Social platforms reward accounts that generate quick, meaningful engagement. The first <span className="text-blue-400 font-semibold">30 minutes</span> after posting are critical for algorithmic amplification.
+                    </p>
+                  </motion.div>
+                  
                   <div className="space-y-4">
                     {[
-                      { signal: 'Fast comment replies', impact: 'Signals active community' },
-                      { signal: 'Conversation depth', impact: 'Increases post distribution' },
-                      { signal: 'DM response rate', impact: 'Improves account ranking' },
-                      { signal: 'Consistent engagement', impact: 'Builds algorithmic trust' }
+                      { signal: 'Fast comment replies', impact: 'Signals active community', percent: 95, color: 'from-blue-500 to-cyan-500' },
+                      { signal: 'Conversation depth', impact: 'Increases post distribution', percent: 88, color: 'from-purple-500 to-pink-500' },
+                      { signal: 'DM response rate', impact: 'Improves account ranking', percent: 82, color: 'from-indigo-500 to-purple-500' },
+                      { signal: 'Consistent engagement', impact: 'Builds algorithmic trust', percent: 90, color: 'from-green-500 to-emerald-500' }
                     ].map((item, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                        <span className="text-white/70 text-sm">{item.signal}</span>
-                        <span className="text-xs text-blue-400 font-medium">{item.impact}</span>
-                      </div>
+                      <motion.div 
+                        key={i}
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.3 + i * 0.1 }}
+                        className="group"
+                      >
+                        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all duration-300">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-white font-medium">{item.signal}</span>
+                            <span className="text-xs text-white/40 font-medium">{item.impact}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                            <motion.div 
+                              className={`h-full rounded-full bg-gradient-to-r ${item.color}`}
+                              initial={{ width: 0 }}
+                              whileInView={{ width: `${item.percent}%` }}
+                              viewport={{ once: true }}
+                              transition={{ delay: 0.5 + i * 0.1, duration: 0.8, ease: "easeOut" }}
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
                 
                 <div className="relative">
                   <div className="aspect-square max-w-md mx-auto relative">
-                    {/* Animated visualization */}
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10" />
+                    {/* Background glow */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-transparent blur-2xl" />
                     
-                    {/* Center icon */}
+                    {/* Outer ring with gradient */}
                     <motion.div 
-                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/30"
+                      className="absolute inset-4 rounded-full border-2 border-dashed border-white/10"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                    />
+                    
+                    {/* Middle ring */}
+                    <motion.div 
+                      className="absolute inset-12 rounded-full border border-blue-500/20"
+                      animate={{ rotate: -360 }}
+                      transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+                    />
+                    
+                    {/* Inner ring with pulse */}
+                    <motion.div 
+                      className="absolute inset-20 rounded-full border border-purple-500/30"
+                      animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    
+                    {/* Center element */}
+                    <motion.div 
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-28 md:h-28"
                       animate={{ scale: [1, 1.05, 1] }}
                       transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                     >
-                      <Rocket className="w-10 h-10 text-white" />
+                      <div className="w-full h-full rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-2xl shadow-purple-500/30">
+                        <Rocket className="w-12 h-12 text-white" />
+                      </div>
                     </motion.div>
                     
                     {/* Orbiting elements */}
                     {[
-                      { icon: MessageSquare, label: 'Comments', delay: 0, color: 'bg-pink-500' },
-                      { icon: Send, label: 'DMs', delay: 0.5, color: 'bg-blue-500' },
-                      { icon: Heart, label: 'Engagement', delay: 1, color: 'bg-purple-500' },
-                      { icon: Eye, label: 'Reach', delay: 1.5, color: 'bg-cyan-500' }
+                      { icon: MessageSquare, label: 'Comments', angle: 0, color: 'from-pink-500 to-rose-500', delay: 0 },
+                      { icon: Send, label: 'DMs', angle: 90, color: 'from-blue-500 to-cyan-500', delay: 0.5 },
+                      { icon: Heart, label: 'Engagement', angle: 180, color: 'from-purple-500 to-indigo-500', delay: 1 },
+                      { icon: Eye, label: 'Reach', angle: 270, color: 'from-cyan-500 to-teal-500', delay: 1.5 }
                     ].map((item, i) => (
                       <motion.div
                         key={i}
                         className="absolute"
                         style={{
-                          top: `${50 + 35 * Math.sin((i * Math.PI) / 2)}%`,
-                          left: `${50 + 35 * Math.cos((i * Math.PI) / 2)}%`,
+                          top: `${50 + 38 * Math.sin((item.angle * Math.PI) / 180)}%`,
+                          left: `${50 + 38 * Math.cos((item.angle * Math.PI) / 180)}%`,
                           transform: 'translate(-50%, -50%)'
                         }}
                         initial={{ opacity: 0, scale: 0 }}
                         whileInView={{ opacity: 1, scale: 1 }}
                         viewport={{ once: true }}
-                        transition={{ delay: item.delay, duration: 0.5 }}
+                        transition={{ delay: item.delay, duration: 0.5, type: "spring" }}
                       >
-                        <div className={`w-12 h-12 rounded-xl ${item.color} flex items-center justify-center shadow-lg`}>
-                          <item.icon className="w-6 h-6 text-white" />
-                        </div>
-                        <p className="text-[10px] text-white/40 text-center mt-1">{item.label}</p>
+                        <motion.div
+                          animate={{ y: [0, -5, 0] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: item.delay }}
+                        >
+                          <div className={`w-14 h-14 md:w-16 md:h-16 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-xl`}>
+                            <item.icon className="w-7 h-7 md:w-8 md:h-8 text-white" />
+                          </div>
+                          <p className="text-xs text-white/50 text-center mt-2 font-medium">{item.label}</p>
+                        </motion.div>
                       </motion.div>
                     ))}
                     
-                    {/* Pulse rings */}
-                    <motion.div 
-                      className="absolute inset-[15%] rounded-full border border-blue-500/20"
-                      animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.2, 0.5] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    />
-                    <motion.div 
-                      className="absolute inset-[5%] rounded-full border border-purple-500/10"
-                      animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.1, 0.3] }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                    />
+                    {/* Animated connection lines */}
+                    <svg className="absolute inset-0 w-full h-full" style={{ transform: 'rotate(-45deg)' }}>
+                      <motion.circle
+                        cx="50%"
+                        cy="50%"
+                        r="35%"
+                        fill="none"
+                        stroke="url(#lineGradient)"
+                        strokeWidth="1"
+                        strokeDasharray="10 10"
+                        initial={{ strokeDashoffset: 0 }}
+                        animate={{ strokeDashoffset: -100 }}
+                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                      />
+                      <defs>
+                        <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                          <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.3" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
                   </div>
                 </div>
               </div>
-            </GlassCard>
+            </div>
           </motion.div>
         </div>
       </section>
