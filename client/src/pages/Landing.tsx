@@ -501,15 +501,16 @@ const AnimatedDashboard = () => {
     { name: 'Analytics', pageIndex: null }
   ]
   
-  const getCursorPosition = useCallback((itemIndex: number, currentScale: number) => {
+  const getCursorPosition = useCallback((itemIndex: number) => {
     const item = itemRefs.current[itemIndex]
     const sidebar = sidebarRef.current
-    if (item && sidebar && currentScale > 0) {
+    if (item && sidebar) {
       const itemRect = item.getBoundingClientRect()
       const sidebarRect = sidebar.getBoundingClientRect()
+      const parentScale = sidebarRect.width > 0 ? (item.offsetWidth / (itemRect.width || 1)) : 1
       return {
-        x: (itemRect.left - sidebarRect.left + itemRect.width / 2 + 8) / currentScale,
-        y: (itemRect.top - sidebarRect.top + itemRect.height / 2) / currentScale
+        x: ((itemRect.left - sidebarRect.left) * parentScale) + item.offsetWidth / 2 + 8,
+        y: ((itemRect.top - sidebarRect.top) * parentScale) + item.offsetHeight / 2
       }
     }
     const baseY = 12
@@ -539,15 +540,13 @@ const AnimatedDashboard = () => {
       
       addTimeout(() => {
         if (!isMounted) return
-        const s = wrapperRef.current ? Math.min(wrapperRef.current.offsetWidth / BASE_WIDTH, 1) : 1
-        setCursorPos(getCursorPosition(0, s))
+        setCursorPos(getCursorPosition(0))
         setActivePage(0)
       }, 100)
       
       addTimeout(() => {
         if (!isMounted) return
-        const s = wrapperRef.current ? Math.min(wrapperRef.current.offsetWidth / BASE_WIDTH, 1) : 1
-        setCursorPos(getCursorPosition(1, s))
+        setCursorPos(getCursorPosition(1))
       }, 3000)
       
       addTimeout(() => {
@@ -563,8 +562,7 @@ const AnimatedDashboard = () => {
       
       addTimeout(() => {
         if (!isMounted) return
-        const s = wrapperRef.current ? Math.min(wrapperRef.current.offsetWidth / BASE_WIDTH, 1) : 1
-        setCursorPos(getCursorPosition(3, s))
+        setCursorPos(getCursorPosition(3))
       }, 7750)
       
       addTimeout(() => {
@@ -580,8 +578,7 @@ const AnimatedDashboard = () => {
       
       addTimeout(() => {
         if (!isMounted) return
-        const s = wrapperRef.current ? Math.min(wrapperRef.current.offsetWidth / BASE_WIDTH, 1) : 1
-        setCursorPos(getCursorPosition(0, s))
+        setCursorPos(getCursorPosition(0))
       }, 12500)
       
       addTimeout(() => {
