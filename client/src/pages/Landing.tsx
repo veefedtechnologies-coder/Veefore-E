@@ -1635,57 +1635,42 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 
                 <div className="relative">
                   <div className="aspect-square max-w-md mx-auto relative flex items-center justify-center">
-                    {/* Background glow */}
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-transparent blur-2xl" />
+                    {/* Background glow from center logo */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-transparent blur-3xl" />
+                    </div>
                     
-                    {/* Outer orbit ring */}
-                    <div className="absolute w-[85%] h-[85%] rounded-full border border-dashed border-white/10" />
+                    {/* Orbit ring where icons revolve */}
+                    <div className="absolute w-[75%] h-[75%] rounded-full border border-dashed border-white/10" />
                     
-                    {/* Middle orbit ring */}
-                    <div className="absolute w-[60%] h-[60%] rounded-full border border-blue-500/20" />
-                    
-                    {/* Inner orbit ring with pulse */}
+                    {/* Inner glow ring */}
                     <motion.div 
-                      className="absolute w-[35%] h-[35%] rounded-full border border-purple-500/30"
-                      animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
+                      className="absolute w-[40%] h-[40%] rounded-full border border-purple-500/20"
+                      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                     />
                     
-                    {/* Center element - VeeFore Logo */}
+                    {/* Center element - VeeFore Company Logo */}
                     <motion.div 
-                      className="absolute w-20 h-20 md:w-24 md:h-24 flex items-center justify-center z-10"
-                      animate={{ scale: [1, 1.05, 1] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                      className="absolute flex items-center justify-center z-10"
+                      animate={{ scale: [1, 1.03, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                     >
-                      <div className="w-full h-full rounded-2xl bg-white/[0.05] border border-white/20 backdrop-blur-sm flex items-center justify-center">
-                        <svg viewBox="0 0 100 100" className="w-12 h-12 md:w-14 md:h-14">
-                          <defs>
-                            <linearGradient id="veeforeLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#3b82f6" />
-                              <stop offset="50%" stopColor="#8b5cf6" />
-                              <stop offset="100%" stopColor="#a855f7" />
-                            </linearGradient>
-                          </defs>
-                          <path 
-                            d="M25 25 L50 75 L75 25 M50 75 L50 45" 
-                            stroke="url(#veeforeLogoGradient)" 
-                            strokeWidth="8" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            fill="none"
-                          />
-                        </svg>
-                      </div>
+                      <img 
+                        src="/attached_assets/output-onlinepngtools_1749403653117_1766900612840.png" 
+                        alt="VeeFore Logo" 
+                        className="w-16 h-16 md:w-20 md:h-20 object-contain"
+                      />
                     </motion.div>
                     
-                    {/* Orbiting elements - positioned on the outer orbit ring */}
+                    {/* Orbiting icons - no background, just icons revolving like planets */}
                     {[
-                      { icon: Eye, label: 'Reach', angle: -45, color: 'text-cyan-400', borderColor: 'border-cyan-500/30', delay: 0 },
-                      { icon: Heart, label: 'Engagement', angle: 45, color: 'text-purple-400', borderColor: 'border-purple-500/30', delay: 0.5 },
-                      { icon: MessageSquare, label: 'Comments', angle: 135, color: 'text-pink-400', borderColor: 'border-pink-500/30', delay: 1 },
-                      { icon: Send, label: 'DMs', angle: 225, color: 'text-blue-400', borderColor: 'border-blue-500/30', delay: 1.5 }
+                      { icon: Eye, label: 'Reach', angle: -60, color: 'text-cyan-400', delay: 0 },
+                      { icon: Heart, label: 'Engagement', angle: 30, color: 'text-purple-400', delay: 0.5 },
+                      { icon: MessageSquare, label: 'Comments', angle: 120, color: 'text-pink-400', delay: 1 },
+                      { icon: Send, label: 'DMs', angle: 210, color: 'text-blue-400', delay: 1.5 }
                     ].map((item, i) => {
-                      const orbitRadius = 42.5;
+                      const orbitRadius = 37.5;
                       const angleRad = (item.angle * Math.PI) / 180;
                       const x = 50 + orbitRadius * Math.cos(angleRad);
                       const y = 50 + orbitRadius * Math.sin(angleRad);
@@ -1705,38 +1690,39 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                           transition={{ delay: item.delay, duration: 0.5, type: "spring" }}
                         >
                           <motion.div
-                            animate={{ y: [0, -4, 0] }}
-                            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: item.delay }}
+                            animate={{ 
+                              y: [0, -3, 0],
+                              rotate: [0, 5, -5, 0]
+                            }}
+                            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: item.delay }}
                             className="flex flex-col items-center"
                           >
-                            <div className={`w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/[0.05] backdrop-blur-sm border ${item.borderColor} flex items-center justify-center`}>
-                              <item.icon className={`w-6 h-6 md:w-7 md:h-7 ${item.color}`} />
-                            </div>
-                            <p className="text-[10px] text-white/50 text-center mt-1.5 font-medium">{item.label}</p>
+                            <item.icon className={`w-8 h-8 md:w-10 md:h-10 ${item.color} drop-shadow-lg`} strokeWidth={1.5} />
+                            <p className="text-[10px] text-white/50 text-center mt-1 font-medium">{item.label}</p>
                           </motion.div>
                         </motion.div>
                       );
                     })}
                     
-                    {/* Animated connection lines */}
+                    {/* Animated orbit path */}
                     <svg className="absolute inset-0 w-full h-full pointer-events-none">
                       <motion.circle
                         cx="50%"
                         cy="50%"
-                        r="42.5%"
+                        r="37.5%"
                         fill="none"
                         stroke="url(#orbitLineGradient)"
                         strokeWidth="1"
-                        strokeDasharray="8 12"
+                        strokeDasharray="6 10"
                         initial={{ strokeDashoffset: 0 }}
                         animate={{ strokeDashoffset: -100 }}
-                        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
                       />
                       <defs>
                         <linearGradient id="orbitLineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
-                          <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.2" />
-                          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.2" />
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
+                          <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.15" />
+                          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.15" />
                         </linearGradient>
                       </defs>
                     </svg>
