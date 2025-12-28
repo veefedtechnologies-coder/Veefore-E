@@ -1634,95 +1634,97 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
                 
                 <div className="relative">
-                  <div className="aspect-square max-w-md mx-auto relative flex items-center justify-center">
+                  <div className="aspect-square max-w-[320px] md:max-w-[380px] mx-auto relative">
                     {/* Background glow from center logo */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-transparent blur-3xl" />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500/40 via-purple-500/30 to-transparent blur-2xl" />
                     </div>
                     
-                    {/* Orbit ring where icons revolve */}
-                    <div className="absolute w-[75%] h-[75%] rounded-full border border-dashed border-white/10" />
+                    {/* Orbit ring - the path where icons revolve */}
+                    <div className="absolute inset-[12%] rounded-full border border-dashed border-white/15" />
                     
                     {/* Inner glow ring */}
                     <motion.div 
-                      className="absolute w-[40%] h-[40%] rounded-full border border-purple-500/20"
-                      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+                      className="absolute inset-[30%] rounded-full border border-purple-500/25"
+                      animate={{ scale: [1, 1.05, 1], opacity: [0.25, 0.4, 0.25] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                     />
                     
                     {/* Center element - VeeFore Company Logo */}
-                    <motion.div 
-                      className="absolute flex items-center justify-center z-10"
-                      animate={{ scale: [1, 1.03, 1] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                      <motion.div 
+                        animate={{ scale: [1, 1.05, 1] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                      >
+                        <img 
+                          src="/assets/veefore-logo.png" 
+                          alt="VeeFore" 
+                          className="w-14 h-14 md:w-16 md:h-16 object-contain"
+                        />
+                      </motion.div>
+                    </div>
+                    
+                    {/* Rotating orbit container with 4 icons */}
+                    <motion.div
+                      className="absolute inset-[12%]"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
                     >
-                      <img 
-                        src="/attached_assets/output-onlinepngtools_1749403653117_1766900612840.png" 
-                        alt="VeeFore Logo" 
-                        className="w-16 h-16 md:w-20 md:h-20 object-contain"
-                      />
+                      {/* Icons positioned at cardinal points on the orbit */}
+                      {[
+                        { icon: Eye, label: 'Reach', position: 'top', color: 'text-cyan-400' },
+                        { icon: Heart, label: 'Engagement', position: 'right', color: 'text-purple-400' },
+                        { icon: MessageSquare, label: 'Comments', position: 'bottom', color: 'text-pink-400' },
+                        { icon: Send, label: 'DMs', position: 'left', color: 'text-blue-400' }
+                      ].map((item, i) => {
+                        const positionStyles: Record<string, React.CSSProperties> = {
+                          top: { top: 0, left: '50%', transform: 'translate(-50%, -50%)' },
+                          right: { top: '50%', right: 0, transform: 'translate(50%, -50%)' },
+                          bottom: { bottom: 0, left: '50%', transform: 'translate(-50%, 50%)' },
+                          left: { top: '50%', left: 0, transform: 'translate(-50%, -50%)' }
+                        };
+                        
+                        return (
+                          <motion.div
+                            key={i}
+                            className="absolute"
+                            style={positionStyles[item.position]}
+                            initial={{ opacity: 0, scale: 0 }}
+                            whileInView={{ opacity: 1, scale: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: i * 0.15, duration: 0.4, type: "spring" }}
+                          >
+                            {/* Counter-rotate to keep icons upright */}
+                            <motion.div
+                              animate={{ rotate: -360 }}
+                              transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                              className="flex flex-col items-center"
+                            >
+                              <item.icon className={`w-7 h-7 md:w-8 md:h-8 ${item.color}`} strokeWidth={1.5} />
+                              <p className="text-[9px] text-white/50 text-center mt-0.5 font-medium whitespace-nowrap">{item.label}</p>
+                            </motion.div>
+                          </motion.div>
+                        );
+                      })}
                     </motion.div>
                     
-                    {/* Orbiting icons - no background, just icons revolving like planets */}
-                    {[
-                      { icon: Eye, label: 'Reach', angle: -60, color: 'text-cyan-400', delay: 0 },
-                      { icon: Heart, label: 'Engagement', angle: 30, color: 'text-purple-400', delay: 0.5 },
-                      { icon: MessageSquare, label: 'Comments', angle: 120, color: 'text-pink-400', delay: 1 },
-                      { icon: Send, label: 'DMs', angle: 210, color: 'text-blue-400', delay: 1.5 }
-                    ].map((item, i) => {
-                      const orbitRadius = 37.5;
-                      const angleRad = (item.angle * Math.PI) / 180;
-                      const x = 50 + orbitRadius * Math.cos(angleRad);
-                      const y = 50 + orbitRadius * Math.sin(angleRad);
-                      
-                      return (
-                        <motion.div
-                          key={i}
-                          className="absolute"
-                          style={{
-                            top: `${y}%`,
-                            left: `${x}%`,
-                            transform: 'translate(-50%, -50%)'
-                          }}
-                          initial={{ opacity: 0, scale: 0 }}
-                          whileInView={{ opacity: 1, scale: 1 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: item.delay, duration: 0.5, type: "spring" }}
-                        >
-                          <motion.div
-                            animate={{ 
-                              y: [0, -3, 0],
-                              rotate: [0, 5, -5, 0]
-                            }}
-                            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: item.delay }}
-                            className="flex flex-col items-center"
-                          >
-                            <item.icon className={`w-8 h-8 md:w-10 md:h-10 ${item.color} drop-shadow-lg`} strokeWidth={1.5} />
-                            <p className="text-[10px] text-white/50 text-center mt-1 font-medium">{item.label}</p>
-                          </motion.div>
-                        </motion.div>
-                      );
-                    })}
-                    
-                    {/* Animated orbit path */}
+                    {/* Static orbit path overlay */}
                     <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                      <motion.circle
+                      <circle
                         cx="50%"
                         cy="50%"
-                        r="37.5%"
+                        r="38%"
                         fill="none"
                         stroke="url(#orbitLineGradient)"
                         strokeWidth="1"
-                        strokeDasharray="6 10"
-                        initial={{ strokeDashoffset: 0 }}
-                        animate={{ strokeDashoffset: -100 }}
-                        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                        strokeDasharray="4 8"
+                        opacity="0.3"
                       />
                       <defs>
                         <linearGradient id="orbitLineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
-                          <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.15" />
-                          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.15" />
+                          <stop offset="0%" stopColor="#3b82f6" />
+                          <stop offset="50%" stopColor="#8b5cf6" />
+                          <stop offset="100%" stopColor="#ec4899" />
                         </linearGradient>
                       </defs>
                     </svg>
