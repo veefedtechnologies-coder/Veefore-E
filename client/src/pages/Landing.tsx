@@ -1568,23 +1568,23 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Algorithm Impact - Why Engagement Velocity Matters */}
-      <section className="py-20 md:py-28 relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-28 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/[0.03] to-transparent" />
-        <GradientOrb className="w-[500px] h-[500px] bottom-0 right-0 translate-x-1/2 translate-y-1/2" color="purple" />
+        <GradientOrb className="w-[300px] sm:w-[400px] md:w-[500px] h-[300px] sm:h-[400px] md:h-[500px] bottom-0 right-0 translate-x-1/2 translate-y-1/2" color="purple" />
         
-        <div className="max-w-[1300px] mx-auto px-6 relative">
+        <div className="max-w-[1300px] mx-auto px-4 sm:px-6 relative">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             transition={{ duration: 0.6 }}
           >
-            <div className="relative p-8 md:p-14 rounded-3xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/10 backdrop-blur-sm overflow-hidden">
+            <div className="relative p-4 sm:p-6 md:p-8 lg:p-14 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/10 backdrop-blur-sm overflow-hidden">
               {/* Background decorative elements */}
-              <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl" />
+              <div className="absolute top-0 right-0 w-48 sm:w-64 md:w-96 h-48 sm:h-64 md:h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-32 sm:w-48 md:w-64 h-32 sm:h-48 md:h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl" />
               
-              <div className="grid lg:grid-cols-2 gap-12 items-center relative">
+              <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center relative">
                 <div>
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
@@ -1592,19 +1592,19 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     viewport={{ once: true }}
                     transition={{ delay: 0.2 }}
                   >
-                    <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
-                      <Brain className="w-4 h-4" />
+                    <div className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-[10px] sm:text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 sm:mb-6">
+                      <Brain className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span>Algorithm Science</span>
                     </div>
-                    <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-tight">
+                    <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 leading-tight">
                       Why <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">speed</span> matters to algorithms
                     </h3>
-                    <p className="text-white/60 mb-8 text-lg leading-relaxed">
+                    <p className="text-white/60 mb-6 sm:mb-8 text-sm sm:text-base md:text-lg leading-relaxed">
                       Social platforms reward accounts that generate quick, meaningful engagement. The first <span className="text-blue-400 font-semibold">30 minutes</span> after posting are critical for algorithmic amplification.
                     </p>
                   </motion.div>
                   
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {[
                       { signal: 'Fast comment replies', impact: 'Signals active community', icon: Zap, color: 'text-blue-400' },
                       { signal: 'Conversation depth', impact: 'Increases post distribution', icon: MessageSquare, color: 'text-purple-400' },
@@ -1619,23 +1619,23 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         transition={{ delay: 0.3 + i * 0.1 }}
                         className="group"
                       >
-                        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all duration-300 flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center ${item.color}`}>
-                            <item.icon className="w-5 h-5" />
+                        <div className="p-3 sm:p-4 rounded-lg sm:rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all duration-300 flex items-center gap-3 sm:gap-4">
+                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center ${item.color}`}>
+                            <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
                           </div>
-                          <div className="flex-1">
-                            <span className="text-white font-medium block">{item.signal}</span>
-                            <span className="text-xs text-white/40">{item.impact}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-white font-medium block text-sm sm:text-base truncate">{item.signal}</span>
+                            <span className="text-[10px] sm:text-xs text-white/40 truncate block">{item.impact}</span>
                           </div>
-                          <CheckCircle className="w-5 h-5 text-green-400/60" />
+                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400/60 shrink-0" />
                         </div>
                       </motion.div>
                     ))}
                   </div>
                 </div>
                 
-                <div className="relative">
-                  <div className="w-[300px] h-[300px] md:w-[360px] md:h-[360px] mx-auto relative">
+                <div className="relative mt-6 lg:mt-0">
+                  <div className="w-[220px] h-[220px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px] lg:w-[360px] lg:h-[360px] mx-auto relative">
                     {/* Background glow from center logo */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-transparent blur-3xl" />
@@ -1662,7 +1662,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         <img 
                           src={veeforeLogo} 
                           alt="VeeFore" 
-                          className="w-20 h-20 md:w-24 md:h-24 object-contain"
+                          className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 object-contain"
                         />
                       </motion.div>
                     </div>
@@ -1701,8 +1701,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                               transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
                               className="flex flex-col items-center"
                             >
-                              <item.icon className={`w-7 h-7 md:w-8 md:h-8 ${item.color}`} strokeWidth={1.5} />
-                              <p className="text-[9px] text-white/50 text-center mt-1 font-medium whitespace-nowrap">{item.label}</p>
+                              <item.icon className={`w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 ${item.color}`} strokeWidth={1.5} />
+                              <p className="text-[7px] sm:text-[8px] md:text-[9px] text-white/50 text-center mt-0.5 sm:mt-1 font-medium whitespace-nowrap">{item.label}</p>
                             </motion.div>
                           </div>
                         );
