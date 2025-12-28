@@ -88,6 +88,8 @@
     "three": "^0.182.0",
     "three-mesh-bvh": "^0.8.3",
     "uuid": "^11.1.0",
+    "vite-plugin-pwa": "^1.2.0",
+    "workbox-window": "^7.4.0",
     "wouter": "^3.9.0",
     "ws": "^8.18.3",
     "zod": "^3.25.76",
