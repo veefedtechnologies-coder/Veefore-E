@@ -519,13 +519,6 @@ const AnimatedDashboard = () => {
   }, [])
   
   useEffect(() => {
-    if (isMobile) {
-      const interval = setInterval(() => {
-        setActivePage(prev => (prev + 1) % 3)
-      }, 5000)
-      return () => clearInterval(interval)
-    }
-    
     let isMounted = true
     const timeouts: NodeJS.Timeout[] = []
     
