@@ -5,7 +5,7 @@ import {
   Users, Sparkles, Brain, Rocket, ChevronDown, Plus, Minus,
   Target, Clock, Shield, BarChart3, Send, Layers, Eye, Activity,
   ChevronRight, Star, Crown, Gauge, RefreshCw, Lock, Unlock, ArrowUpRight,
-  X, Instagram, Twitter, Linkedin, Award, Mail, XCircle
+  X, Instagram, Twitter, Linkedin, Award, Mail, XCircle, Heart
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
@@ -1190,153 +1190,180 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
-      {/* Enhanced Social Proof Section */}
-      <section className="py-20 md:py-28 relative">
-        <div className="max-w-[1400px] mx-auto px-6">
+      {/* How VeeFore Works - Visual Flow Section */}
+      <section className="py-20 md:py-28 relative overflow-hidden">
+        <GradientOrb className="w-[500px] h-[500px] top-1/2 left-0 -translate-x-1/2" color="blue" />
+        
+        <div className="max-w-[1200px] mx-auto px-6 relative">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-12"
+            className="text-center mb-16"
           >
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-xs font-bold text-yellow-400 uppercase tracking-widest mb-6">
-              <Award className="w-4 h-4" />
-              <span>Creator Success Stories</span>
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
+              <Zap className="w-4 h-4" />
+              <span>How It Works</span>
             </div>
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-              Loved by <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">growth-focused</span> creators
+              Your AI-powered <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth engine</span> in action
             </h2>
+            <p className="text-lg text-white/40 max-w-2xl mx-auto">
+              VeeFore works continuously in the background, turning your content into conversations and followers into fans.
+            </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-16">
+          <div className="grid md:grid-cols-4 gap-6 relative">
+            {/* Connecting line for desktop */}
+            <div className="hidden md:block absolute top-16 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-indigo-500/30" />
+            
             {[
-              {
-                quote: "VeeFore transformed my engagement game. I went from manually replying to comments for 3 hours daily to spending just 10 minutes reviewing AI responses.",
-                name: "Sarah Chen",
-                handle: "@sarahcreates",
-                metric: "+247%",
-                metricLabel: "Engagement Rate",
-                gradient: "from-pink-500 to-rose-500"
+              { 
+                step: '01', 
+                icon: Send, 
+                title: 'You Post Content', 
+                desc: 'Create and publish your content as usual. VeeFore monitors all engagement signals.',
+                gradient: 'from-blue-500 to-cyan-500'
               },
-              {
-                quote: "The DM automation is insane. I'm capturing leads and responding to inquiries even while I sleep. My conversion rate has never been higher.",
-                name: "Marcus Rodriguez", 
-                handle: "@marcusgrowth",
-                metric: "3x",
-                metricLabel: "Faster Responses",
-                gradient: "from-blue-500 to-cyan-500"
+              { 
+                step: '02', 
+                icon: Bot, 
+                title: 'AI Engages Instantly', 
+                desc: 'VeeFore responds to comments and DMs within seconds using context-aware AI.',
+                gradient: 'from-purple-500 to-pink-500'
               },
-              {
-                quote: "Finally, a tool that understands engagement is the real growth lever. The hook intelligence feature alone has doubled my reach.",
-                name: "Priya Sharma",
-                handle: "@priyabuilds",
-                metric: "2.4x",
-                metricLabel: "Reach Increase",
-                gradient: "from-purple-500 to-indigo-500"
+              { 
+                step: '03', 
+                icon: TrendingUp, 
+                title: 'Algorithm Rewards You', 
+                desc: 'Fast engagement signals boost your algorithmic reach and visibility.',
+                gradient: 'from-indigo-500 to-purple-500'
+              },
+              { 
+                step: '04', 
+                icon: RefreshCw, 
+                title: 'AI Learns & Improves', 
+                desc: 'Every interaction trains the AI to respond better, matching your voice.',
+                gradient: 'from-green-500 to-emerald-500'
               }
-            ].map((testimonial, i) => (
+            ].map((item, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
                 transition={{ delay: i * 0.15 }}
+                className="relative"
               >
-                <TiltCard className="h-full">
-                  <GlassCard className="p-6 md:p-8 h-full flex flex-col">
-                    <div className="flex items-center space-x-1 mb-4">
-                      {[1, 2, 3, 4, 5].map((j) => (
-                        <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                      ))}
-                    </div>
-                    
-                    <p className="text-white/70 text-sm md:text-base leading-relaxed flex-1 mb-6">"{testimonial.quote}"</p>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${testimonial.gradient} flex items-center justify-center text-white font-bold text-sm`}>
-                          {testimonial.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm">{testimonial.name}</p>
-                          <p className="text-xs text-white/40">{testimonial.handle}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-xl font-bold bg-gradient-to-r ${testimonial.gradient} bg-clip-text text-transparent`}>{testimonial.metric}</p>
-                        <p className="text-[10px] text-white/40">{testimonial.metricLabel}</p>
-                      </div>
-                    </div>
-                  </GlassCard>
-                </TiltCard>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div 
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center"
-          >
-            <p className="text-white/30 text-sm font-medium uppercase tracking-widest">Trusted by creators worldwide</p>
-            <div className="flex items-center space-x-8 md:space-x-12">
-              <div className="flex items-center space-x-1">
-                {[1, 2, 3, 4, 5].map((j) => (
-                  <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                ))}
-                <span className="ml-2 text-white/60 text-sm font-medium">5.0 Rating</span>
-              </div>
-              <div className="flex -space-x-2">
-                {['from-blue-500 to-cyan-500', 'from-purple-500 to-pink-500', 'from-green-500 to-emerald-500', 'from-orange-500 to-red-500', 'from-indigo-500 to-purple-500'].map((gradient, i) => (
-                  <div key={i} className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} border-2 border-[#030303] flex items-center justify-center text-[10px] font-bold text-white`}>
-                    {String.fromCharCode(65 + i)}
+                <GlassCard className="p-6 h-full text-center">
+                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center mx-auto mb-5 shadow-lg relative z-10`}>
+                    <item.icon className="w-7 h-7 text-white" />
                   </div>
-                ))}
-                <div className="w-8 h-8 rounded-full bg-white/10 border-2 border-[#030303] flex items-center justify-center text-[10px] font-medium text-white/60">
-                  +9k
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Stats/Metrics Showcase Section */}
-      <section className="py-16 md:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5" />
-        
-        <div className="max-w-[1200px] mx-auto px-6 relative">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            {[
-              { value: '5M+', label: 'Engagements Automated', gradient: 'from-blue-400 to-cyan-400' },
-              { value: '10K+', label: 'Active Creators', gradient: 'from-purple-400 to-pink-400' },
-              { value: '24/7', label: 'Automation Uptime', gradient: 'from-green-400 to-emerald-400' },
-              { value: '12.4x', label: 'Faster Than Manual', gradient: 'from-orange-400 to-amber-400' }
-            ].map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.1, type: 'spring', stiffness: 200 }}
-                className="text-center"
-              >
-                <GlassCard className="p-6 md:p-8">
-                  <motion.p 
-                    className={`text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r ${stat.gradient} bg-clip-text text-transparent mb-2`}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                    transition={{ delay: i * 0.1 + 0.2 }}
-                  >
-                    {stat.value}
-                  </motion.p>
-                  <p className="text-xs md:text-sm text-white/40 font-medium">{stat.label}</p>
+                  <span className={`text-xs font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent mb-2 block`}>STEP {item.step}</span>
+                  <h4 className="text-lg font-bold mb-2">{item.title}</h4>
+                  <p className="text-sm text-white/50">{item.desc}</p>
                 </GlassCard>
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Algorithm Impact - Why Engagement Velocity Matters */}
+      <section className="py-16 md:py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/[0.02] to-transparent" />
+        
+        <div className="max-w-[1200px] mx-auto px-6 relative">
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
+          >
+            <GlassCard className="p-8 md:p-12 !bg-gradient-to-br !from-blue-500/[0.05] !to-purple-500/[0.05]">
+              <div className="grid lg:grid-cols-2 gap-10 items-center">
+                <div>
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-4">
+                    <Brain className="w-3 h-3" />
+                    <span>Algorithm Science</span>
+                  </div>
+                  <h3 className="text-2xl md:text-4xl font-bold mb-4">
+                    Why <span className="text-blue-400">speed</span> matters to algorithms
+                  </h3>
+                  <p className="text-white/50 mb-6 leading-relaxed">
+                    Social platforms reward accounts that generate quick, meaningful engagement. The first 30 minutes after posting are critical for algorithmic amplification.
+                  </p>
+                  <div className="space-y-4">
+                    {[
+                      { signal: 'Fast comment replies', impact: 'Signals active community' },
+                      { signal: 'Conversation depth', impact: 'Increases post distribution' },
+                      { signal: 'DM response rate', impact: 'Improves account ranking' },
+                      { signal: 'Consistent engagement', impact: 'Builds algorithmic trust' }
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                        <span className="text-white/70 text-sm">{item.signal}</span>
+                        <span className="text-xs text-blue-400 font-medium">{item.impact}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="relative">
+                  <div className="aspect-square max-w-md mx-auto relative">
+                    {/* Animated visualization */}
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10" />
+                    
+                    {/* Center icon */}
+                    <motion.div 
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/30"
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <Rocket className="w-10 h-10 text-white" />
+                    </motion.div>
+                    
+                    {/* Orbiting elements */}
+                    {[
+                      { icon: MessageSquare, label: 'Comments', delay: 0, color: 'bg-pink-500' },
+                      { icon: Send, label: 'DMs', delay: 0.5, color: 'bg-blue-500' },
+                      { icon: Heart, label: 'Engagement', delay: 1, color: 'bg-purple-500' },
+                      { icon: Eye, label: 'Reach', delay: 1.5, color: 'bg-cyan-500' }
+                    ].map((item, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute"
+                        style={{
+                          top: `${50 + 35 * Math.sin((i * Math.PI) / 2)}%`,
+                          left: `${50 + 35 * Math.cos((i * Math.PI) / 2)}%`,
+                          transform: 'translate(-50%, -50%)'
+                        }}
+                        initial={{ opacity: 0, scale: 0 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: item.delay, duration: 0.5 }}
+                      >
+                        <div className={`w-12 h-12 rounded-xl ${item.color} flex items-center justify-center shadow-lg`}>
+                          <item.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <p className="text-[10px] text-white/40 text-center mt-1">{item.label}</p>
+                      </motion.div>
+                    ))}
+                    
+                    {/* Pulse rings */}
+                    <motion.div 
+                      className="absolute inset-[15%] rounded-full border border-blue-500/20"
+                      animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.2, 0.5] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    <motion.div 
+                      className="absolute inset-[5%] rounded-full border border-purple-500/10"
+                      animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.1, 0.3] }}
+                      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+          </motion.div>
         </div>
       </section>
 
@@ -1418,61 +1445,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </GlassCard>
               </TiltCard>
             </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* What VeeFore is NOT - Clarity Section */}
-      <section className="py-24 relative">
-        <div className="max-w-[1200px] mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400 uppercase tracking-widest mb-6">
-              <XCircle className="w-4 h-4" />
-              <span>Important Clarity</span>
-            </div>
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-              What VeeFore is <span className="text-red-400">NOT</span>
-            </h2>
-            <p className="text-lg text-white/40 max-w-2xl mx-auto">
-              To stay focused and deliver real value, we're clear about what we're not.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {[
-              { title: 'A scheduler with AI', icon: Clock },
-              { title: 'A content writing tool', icon: MessageSquare },
-              { title: 'A generic "all-in-one" dashboard', icon: Layers },
-              { title: 'An analytics-heavy platform', icon: BarChart3 },
-              { title: 'A vanity-metric tracker', icon: TrendingUp }
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <GlassCard className="p-5 md:p-6 !bg-red-500/[0.03] !border-red-500/20 h-full">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-3">
-                      <item.icon className="w-5 h-5 text-red-400" />
-                    </div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <X className="w-4 h-4 text-red-500 shrink-0" />
-                      <span className="text-xs font-bold text-red-400 uppercase">NOT</span>
-                    </div>
-                    <p className="text-sm text-white/60">{item.title}</p>
-                  </div>
-                </GlassCard>
-              </motion.div>
-            ))}
           </div>
         </div>
       </section>
