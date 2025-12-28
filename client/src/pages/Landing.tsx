@@ -1662,7 +1662,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         <img 
                           src={veeforeLogo} 
                           alt="VeeFore" 
-                          className="w-14 h-14 md:w-16 md:h-16 object-contain"
+                          className="w-20 h-20 md:w-24 md:h-24 object-contain"
                         />
                       </motion.div>
                     </div>
