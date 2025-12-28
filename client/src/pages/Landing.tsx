@@ -1603,12 +1603,12 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     </p>
                   </motion.div>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {[
-                      { signal: 'Fast comment replies', impact: 'Signals active community', percent: 95, color: 'from-blue-500 to-cyan-500' },
-                      { signal: 'Conversation depth', impact: 'Increases post distribution', percent: 88, color: 'from-purple-500 to-pink-500' },
-                      { signal: 'DM response rate', impact: 'Improves account ranking', percent: 82, color: 'from-indigo-500 to-purple-500' },
-                      { signal: 'Consistent engagement', impact: 'Builds algorithmic trust', percent: 90, color: 'from-green-500 to-emerald-500' }
+                      { signal: 'Fast comment replies', impact: 'Signals active community', icon: Zap, color: 'text-blue-400' },
+                      { signal: 'Conversation depth', impact: 'Increases post distribution', icon: MessageSquare, color: 'text-purple-400' },
+                      { signal: 'DM response rate', impact: 'Improves account ranking', icon: Send, color: 'text-indigo-400' },
+                      { signal: 'Consistent engagement', impact: 'Builds algorithmic trust', icon: TrendingUp, color: 'text-green-400' }
                     ].map((item, i) => (
                       <motion.div 
                         key={i}
@@ -1618,20 +1618,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         transition={{ delay: 0.3 + i * 0.1 }}
                         className="group"
                       >
-                        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all duration-300">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-white font-medium">{item.signal}</span>
-                            <span className="text-xs text-white/40 font-medium">{item.impact}</span>
+                        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all duration-300 flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center ${item.color}`}>
+                            <item.icon className="w-5 h-5" />
                           </div>
-                          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-                            <motion.div 
-                              className={`h-full rounded-full bg-gradient-to-r ${item.color}`}
-                              initial={{ width: 0 }}
-                              whileInView={{ width: `${item.percent}%` }}
-                              viewport={{ once: true }}
-                              transition={{ delay: 0.5 + i * 0.1, duration: 0.8, ease: "easeOut" }}
-                            />
+                          <div className="flex-1">
+                            <span className="text-white font-medium block">{item.signal}</span>
+                            <span className="text-xs text-white/40">{item.impact}</span>
                           </div>
+                          <CheckCircle className="w-5 h-5 text-green-400/60" />
                         </div>
                       </motion.div>
                     ))}
@@ -1639,93 +1634,109 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
                 
                 <div className="relative">
-                  <div className="aspect-square max-w-md mx-auto relative">
+                  <div className="aspect-square max-w-md mx-auto relative flex items-center justify-center">
                     {/* Background glow */}
                     <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-transparent blur-2xl" />
                     
-                    {/* Outer ring with gradient */}
-                    <motion.div 
-                      className="absolute inset-4 rounded-full border-2 border-dashed border-white/10"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-                    />
+                    {/* Outer orbit ring */}
+                    <div className="absolute w-[85%] h-[85%] rounded-full border border-dashed border-white/10" />
                     
-                    {/* Middle ring */}
-                    <motion.div 
-                      className="absolute inset-12 rounded-full border border-blue-500/20"
-                      animate={{ rotate: -360 }}
-                      transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-                    />
+                    {/* Middle orbit ring */}
+                    <div className="absolute w-[60%] h-[60%] rounded-full border border-blue-500/20" />
                     
-                    {/* Inner ring with pulse */}
+                    {/* Inner orbit ring with pulse */}
                     <motion.div 
-                      className="absolute inset-20 rounded-full border border-purple-500/30"
+                      className="absolute w-[35%] h-[35%] rounded-full border border-purple-500/30"
                       animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                     />
                     
-                    {/* Center element */}
+                    {/* Center element - VeeFore Logo */}
                     <motion.div 
-                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-28 md:h-28"
+                      className="absolute w-20 h-20 md:w-24 md:h-24 flex items-center justify-center z-10"
                       animate={{ scale: [1, 1.05, 1] }}
                       transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                     >
-                      <div className="w-full h-full rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-2xl shadow-purple-500/30">
-                        <Rocket className="w-12 h-12 text-white" />
+                      <div className="w-full h-full rounded-2xl bg-white/[0.05] border border-white/20 backdrop-blur-sm flex items-center justify-center">
+                        <svg viewBox="0 0 100 100" className="w-12 h-12 md:w-14 md:h-14">
+                          <defs>
+                            <linearGradient id="veeforeLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#3b82f6" />
+                              <stop offset="50%" stopColor="#8b5cf6" />
+                              <stop offset="100%" stopColor="#a855f7" />
+                            </linearGradient>
+                          </defs>
+                          <path 
+                            d="M25 25 L50 75 L75 25 M50 75 L50 45" 
+                            stroke="url(#veeforeLogoGradient)" 
+                            strokeWidth="8" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            fill="none"
+                          />
+                        </svg>
                       </div>
                     </motion.div>
                     
-                    {/* Orbiting elements */}
+                    {/* Orbiting elements - positioned on the outer orbit ring */}
                     {[
-                      { icon: MessageSquare, label: 'Comments', angle: 0, color: 'from-pink-500 to-rose-500', delay: 0 },
-                      { icon: Send, label: 'DMs', angle: 90, color: 'from-blue-500 to-cyan-500', delay: 0.5 },
-                      { icon: Heart, label: 'Engagement', angle: 180, color: 'from-purple-500 to-indigo-500', delay: 1 },
-                      { icon: Eye, label: 'Reach', angle: 270, color: 'from-cyan-500 to-teal-500', delay: 1.5 }
-                    ].map((item, i) => (
-                      <motion.div
-                        key={i}
-                        className="absolute"
-                        style={{
-                          top: `${50 + 38 * Math.sin((item.angle * Math.PI) / 180)}%`,
-                          left: `${50 + 38 * Math.cos((item.angle * Math.PI) / 180)}%`,
-                          transform: 'translate(-50%, -50%)'
-                        }}
-                        initial={{ opacity: 0, scale: 0 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: item.delay, duration: 0.5, type: "spring" }}
-                      >
+                      { icon: Eye, label: 'Reach', angle: -45, color: 'text-cyan-400', borderColor: 'border-cyan-500/30', delay: 0 },
+                      { icon: Heart, label: 'Engagement', angle: 45, color: 'text-purple-400', borderColor: 'border-purple-500/30', delay: 0.5 },
+                      { icon: MessageSquare, label: 'Comments', angle: 135, color: 'text-pink-400', borderColor: 'border-pink-500/30', delay: 1 },
+                      { icon: Send, label: 'DMs', angle: 225, color: 'text-blue-400', borderColor: 'border-blue-500/30', delay: 1.5 }
+                    ].map((item, i) => {
+                      const orbitRadius = 42.5;
+                      const angleRad = (item.angle * Math.PI) / 180;
+                      const x = 50 + orbitRadius * Math.cos(angleRad);
+                      const y = 50 + orbitRadius * Math.sin(angleRad);
+                      
+                      return (
                         <motion.div
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: item.delay }}
+                          key={i}
+                          className="absolute"
+                          style={{
+                            top: `${y}%`,
+                            left: `${x}%`,
+                            transform: 'translate(-50%, -50%)'
+                          }}
+                          initial={{ opacity: 0, scale: 0 }}
+                          whileInView={{ opacity: 1, scale: 1 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: item.delay, duration: 0.5, type: "spring" }}
                         >
-                          <div className={`w-14 h-14 md:w-16 md:h-16 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-xl`}>
-                            <item.icon className="w-7 h-7 md:w-8 md:h-8 text-white" />
-                          </div>
-                          <p className="text-xs text-white/50 text-center mt-2 font-medium">{item.label}</p>
+                          <motion.div
+                            animate={{ y: [0, -4, 0] }}
+                            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: item.delay }}
+                            className="flex flex-col items-center"
+                          >
+                            <div className={`w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/[0.05] backdrop-blur-sm border ${item.borderColor} flex items-center justify-center`}>
+                              <item.icon className={`w-6 h-6 md:w-7 md:h-7 ${item.color}`} />
+                            </div>
+                            <p className="text-[10px] text-white/50 text-center mt-1.5 font-medium">{item.label}</p>
+                          </motion.div>
                         </motion.div>
-                      </motion.div>
-                    ))}
+                      );
+                    })}
                     
                     {/* Animated connection lines */}
-                    <svg className="absolute inset-0 w-full h-full" style={{ transform: 'rotate(-45deg)' }}>
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
                       <motion.circle
                         cx="50%"
                         cy="50%"
-                        r="35%"
+                        r="42.5%"
                         fill="none"
-                        stroke="url(#lineGradient)"
+                        stroke="url(#orbitLineGradient)"
                         strokeWidth="1"
-                        strokeDasharray="10 10"
+                        strokeDasharray="8 12"
                         initial={{ strokeDashoffset: 0 }}
                         animate={{ strokeDashoffset: -100 }}
-                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
                       />
                       <defs>
-                        <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-                          <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.3" />
-                          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.3" />
+                        <linearGradient id="orbitLineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
+                          <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.2" />
+                          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.2" />
                         </linearGradient>
                       </defs>
                     </svg>
