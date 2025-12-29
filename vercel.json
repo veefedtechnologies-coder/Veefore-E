@@ -1,5 +1,4 @@
 {
-  "framework": "vite",
   "buildCommand": "npm run client:build",
   "outputDirectory": "dist/public",
   "rewrites": [
