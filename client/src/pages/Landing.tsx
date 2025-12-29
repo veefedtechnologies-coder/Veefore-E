@@ -1,81 +1,22 @@
-import React, { useState, useEffect, useRef, Suspense, useCallback, memo, useMemo } from 'react'
+import React, { useState, useEffect, useRef, Suspense, useCallback, memo } from 'react'
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
-import { 
-  ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp, 
-  Users, Sparkles, Brain, Rocket, ChevronDown, Plus, Minus,
-  Target, Clock, Shield, BarChart3, Send, Layers, Eye, Activity,
-  ChevronRight, Star, Crown, Gauge, RefreshCw, Lock, Unlock, ArrowUpRight,
-  X, Instagram, Twitter, Linkedin, Award, Mail, XCircle, Heart,
+import {
+  ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp,
+  Users, Sparkles, Brain, Rocket, ChevronDown, Plus,
+  Target, Clock, Shield, BarChart3, Send, Layers, Eye,
+  ChevronRight, Crown, Gauge, RefreshCw, Lock, Unlock,
+  X, Instagram, Twitter, Linkedin, Mail,
   MessageCircle, Check
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { SEO, seoConfig } from '@/lib/seo-optimization'
-import veeforeLogo from '@assets/output-onlinepngtools_1749403653117_1766901238763.png'
-
-// Ultra-fast mobile detection - no state updates, immediate value
-const getIsMobileStatic = () => typeof window !== 'undefined' && window.innerWidth < 768
-
-const useIsMobile = () => {
-  // Use static value for initial render to prevent flash
-  const [isMobile, setIsMobile] = useState(getIsMobileStatic)
-  
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
-  
-  return isMobile
-}
+import { useIsMobile } from '../hooks/use-is-mobile';
+import GlassCard from '../components/GlassCard';
+import { PricingScrollAnimation } from '../components/PricingScrollAnimation';
 
 // Check if device should have reduced animations (low-end mobile, reduced motion preference)
-const useShouldAnimate = () => {
-  const isMobile = useIsMobile()
-  const [prefersReducedMotion] = useState(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-  return !isMobile && !prefersReducedMotion
-}
 
-// Mobile-safe motion wrapper - disables whileInView on mobile to prevent invisible sections
-const MobileMotion = ({ 
-  children, 
-  className = '',
-  initial,
-  whileInView,
-  viewport,
-  transition,
-  ...props 
-}: {
-  children: React.ReactNode
-  className?: string
-  initial?: any
-  whileInView?: any
-  viewport?: any
-  transition?: any
-  [key: string]: any
-}) => {
-  const isMobile = useIsMobile()
-  
-  // On mobile, skip the animation entirely - render content immediately visible
-  if (isMobile) {
-    return <div className={className} {...props}>{children}</div>
-  }
-  
-  // On desktop, use full framer-motion animations
-  return (
-    <motion.div
-      className={className}
-      initial={initial}
-      whileInView={whileInView}
-      viewport={viewport}
-      transition={transition}
-      {...props}
-    >
-      {children}
-    </motion.div>
-  )
-}
+
+
 
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
@@ -94,6 +35,7 @@ const Landing3DFallback = memo(() => (
   </div>
 ))
 
+import StickyScrollFeatures from '../components/StickyScrollFeatures';
 // Mobile-optimized gradient orbs - use opacity gradient instead of expensive blur
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
   const isMobile = useIsMobile()
@@ -103,24 +45,14 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
     indigo: isMobile ? 'bg-indigo-500/8' : 'from-indigo-500/30 via-indigo-600/20 to-transparent',
     cyan: isMobile ? 'bg-cyan-500/8' : 'from-cyan-500/20 via-cyan-600/10 to-transparent'
   }
-  
+
   // On mobile, skip blur entirely for performance
   if (isMobile) {
     return <div className={`absolute rounded-full ${colors[color as keyof typeof colors]} ${className}`} style={{ filter: 'blur(40px)' }} />
   }
-  
+
   return (
     <div className={`absolute rounded-full blur-[100px] bg-gradient-radial ${colors[color as keyof typeof colors]} ${className}`} />
-  )
-}
-
-const GlassCard = ({ children, className = '', hover = true }: { children: React.ReactNode, className?: string, hover?: boolean }) => {
-  const isMobile = useIsMobile()
-  return (
-    <div className={`relative ${isMobile ? 'bg-white/[0.04]' : 'backdrop-blur-xl bg-white/[0.02]'} border border-white/[0.08] rounded-[24px] overflow-hidden ${hover ? 'hover:border-white/[0.15] hover:bg-white/[0.04] transition-all duration-500' : ''} ${className}`}>
-      {!isMobile && <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-transparent pointer-events-none" />}
-      {children}
-    </div>
   )
 }
 
@@ -183,14 +115,14 @@ const RotatingHeroText = () => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
   const [isReady, setIsReady] = useState(false)
-  
+
   // Delay rotation start on mobile to allow fast initial render
   useEffect(() => {
     const delay = isMobile ? 2000 : 500 // Give mobile 2s head start before animations
     const timer = setTimeout(() => setIsReady(true), delay)
     return () => clearTimeout(timer)
   }, [isMobile])
-  
+
   useEffect(() => {
     if (!isReady) return
     const interval = setInterval(() => {
@@ -205,7 +137,7 @@ const RotatingHeroText = () => {
       {taglines.map((tagline, index) => {
         const isActive = currentIndex === index
         const isExiting = prevIndex === index
-        
+
         return (
           <motion.div
             key={index}
@@ -226,9 +158,9 @@ const RotatingHeroText = () => {
             <span className="block text-white" style={{ lineHeight: '1.15' }}>
               {tagline.top}
             </span>
-            <span 
+            <span
               className="block mt-1 pb-2"
-              style={{ 
+              style={{
                 lineHeight: '1.2',
                 background: 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)',
                 WebkitBackgroundClip: 'text',
@@ -245,28 +177,7 @@ const RotatingHeroText = () => {
   )
 }
 
-const AnimatedText = ({ text, className = '' }: { text: string, className?: string }) => {
-  const isMobile = useIsMobile()
-  if (isMobile) {
-    return <span className={className}>{text}</span>
-  }
-  const words = text.split(' ')
-  return (
-    <span className={className}>
-      {words.map((word, i) => (
-        <motion.span
-          key={i}
-          initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          transition={{ duration: 0.6, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-          className="inline-block mr-[0.25em]"
-        >
-          {word}
-        </motion.span>
-      ))}
-    </span>
-  )
-}
+
 
 const TiltCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => {
   const isMobile = useIsMobile()
@@ -487,7 +398,7 @@ const AnimatedDashboard = () => {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
   const sidebarRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  
+
   useEffect(() => {
     const checkMobile = () => window.innerWidth < 768
     setIsMobile(checkMobile())
@@ -495,7 +406,7 @@ const AnimatedDashboard = () => {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
-  
+
   const sidebarItems = [
     { name: 'Dashboard', pageIndex: 0 },
     { name: 'Engagement', pageIndex: 1 },
@@ -503,7 +414,7 @@ const AnimatedDashboard = () => {
     { name: 'Hooks', pageIndex: 2 },
     { name: 'Analytics', pageIndex: null }
   ]
-  
+
   const getCursorPosition = useCallback((itemIndex: number) => {
     const item = itemRefs.current[itemIndex]
     const sidebar = sidebarRef.current
@@ -520,82 +431,82 @@ const AnimatedDashboard = () => {
     const itemHeight = 32
     return { x: 50, y: baseY + (itemIndex * itemHeight) }
   }, [])
-  
+
   useEffect(() => {
     let isMounted = true
     const timeouts: NodeJS.Timeout[] = []
-    
+
     const addTimeout = (fn: () => void, delay: number) => {
       const id = setTimeout(fn, delay)
       timeouts.push(id)
       return id
     }
-    
+
     const runSequence = () => {
       if (!isMounted) return
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(0))
         setActivePage(0)
       }, 100)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(1))
       }, 3000)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(true)
       }, 3600)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(1)
       }, 3750)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(3))
       }, 7750)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(true)
       }, 8350)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(2)
       }, 8500)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(0))
       }, 12500)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(true)
       }, 13100)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(0)
       }, 13250)
-      
+
       addTimeout(() => {
         if (!isMounted) return
         runSequence()
       }, 16250)
     }
-    
+
     addTimeout(() => runSequence(), 500)
-    
+
     return () => {
       isMounted = false
       timeouts.forEach(clearTimeout)
@@ -622,92 +533,92 @@ const AnimatedDashboard = () => {
 
   return (
     <div ref={wrapperRef} className="relative mx-auto max-w-[1000px] w-full">
-      <div 
-        style={{ 
+      <div
+        style={{
           height: BASE_HEIGHT * scale,
           overflow: 'hidden'
         }}
       >
-        <div 
+        <div
           className="relative rounded-[20px] border border-white/10 bg-[#0a0a0a] shadow-[0_0_100px_rgba(59,130,246,0.15)] overflow-hidden"
-          style={{ 
+          style={{
             width: BASE_WIDTH,
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
           }}
         >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-red-500/80" />
-            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-            <div className="w-3 h-3 rounded-full bg-green-500/80" />
-          </div>
-          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 text-xs text-white/40">
-            <Clock className="w-3 h-3" />
-            <span>Live Dashboard</span>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold">V</div>
-        </div>
-        <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
-          <div className="grid grid-cols-12 gap-4">
-            <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
-              <motion.div
-                className="absolute pointer-events-none z-50"
-                style={{ width: 20, height: 20 }}
-                animate={{ 
-                  left: cursorPos.x - 10, 
-                  top: cursorPos.y - 10, 
-                  scale: isClicking ? 0.85 : 1 
-                }}
-                transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                  <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5"/>
-                </svg>
-                {isClicking && (
-                  <motion.div 
-                    initial={{ scale: 0.3, opacity: 0.8 }} 
-                    animate={{ scale: 1.8, opacity: 0 }} 
-                    transition={{ duration: 0.25 }} 
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60" 
-                  />
-                )}
-              </motion.div>
-              {sidebarItems.map((item, i) => {
-                const isActive = item.pageIndex === activePage
-                return (
-                  <div 
-                    key={item.name}
-                    ref={el => itemRefs.current[i] = el}
-                    className={`px-3 py-2 rounded-lg text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
-                  >
-                    {item.name}
-                  </div>
-                )
-              })}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d0d0d]">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded-full bg-red-500/80" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+              <div className="w-3 h-3 rounded-full bg-green-500/80" />
             </div>
-            <div className="col-span-10 relative overflow-hidden" style={{ minHeight: '520px' }}>
-              <div 
-                className="absolute inset-0 transition-opacity duration-300 ease-in-out"
-                style={{ opacity: activePage === 0 ? 1 : 0, pointerEvents: activePage === 0 ? 'auto' : 'none' }}
-              >
-                <DashboardPageContent />
+            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 text-xs text-white/40">
+              <Clock className="w-3 h-3" />
+              <span>Live Dashboard</span>
+            </div>
+            <img src="/veefore-logo.png" alt="Veefore" className="w-8 h-8 object-contain" />
+          </div>
+          <div className="p-6 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] relative">
+            <div className="grid grid-cols-12 gap-4">
+              <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
+                <motion.div
+                  className="absolute pointer-events-none z-50"
+                  style={{ width: 20, height: 20 }}
+                  animate={{
+                    left: cursorPos.x - 10,
+                    top: cursorPos.y - 10,
+                    scale: isClicking ? 0.85 : 1
+                  }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                    <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" fill="#fff" stroke="#1a1a1a" strokeWidth="1.5" />
+                  </svg>
+                  {isClicking && (
+                    <motion.div
+                      initial={{ scale: 0.3, opacity: 0.8 }}
+                      animate={{ scale: 1.8, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-400/60"
+                    />
+                  )}
+                </motion.div>
+                {sidebarItems.map((item, i) => {
+                  const isActive = item.pageIndex === activePage
+                  return (
+                    <div
+                      key={item.name}
+                      ref={el => { itemRefs.current[i] = el }}
+                      className={`px-3 py-2 rounded-lg text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
+                    >
+                      {item.name}
+                    </div>
+                  )
+                })}
               </div>
-              <div 
-                className="absolute inset-0 transition-opacity duration-300 ease-in-out"
-                style={{ opacity: activePage === 1 ? 1 : 0, pointerEvents: activePage === 1 ? 'auto' : 'none' }}
-              >
-                <EngagementPageContent />
-              </div>
-              <div 
-                className="absolute inset-0 transition-opacity duration-300 ease-in-out"
-                style={{ opacity: activePage === 2 ? 1 : 0, pointerEvents: activePage === 2 ? 'auto' : 'none' }}
-              >
-                <HooksPageContent />
+              <div className="col-span-10 relative overflow-hidden" style={{ minHeight: '520px' }}>
+                <div
+                  className="absolute inset-0 transition-opacity duration-300 ease-in-out"
+                  style={{ opacity: activePage === 0 ? 1 : 0, pointerEvents: activePage === 0 ? 'auto' : 'none' }}
+                >
+                  <DashboardPageContent />
+                </div>
+                <div
+                  className="absolute inset-0 transition-opacity duration-300 ease-in-out"
+                  style={{ opacity: activePage === 1 ? 1 : 0, pointerEvents: activePage === 1 ? 'auto' : 'none' }}
+                >
+                  <EngagementPageContent />
+                </div>
+                <div
+                  className="absolute inset-0 transition-opacity duration-300 ease-in-out"
+                  style={{ opacity: activePage === 2 ? 1 : 0, pointerEvents: activePage === 2 ? 'auto' : 'none' }}
+                >
+                  <HooksPageContent />
+                </div>
               </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
@@ -717,12 +628,23 @@ const AnimatedDashboard = () => {
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
+
+  // HUD State for Algorithm Science section
+  const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [activeCredit, setActiveCredit] = useState(500)
+  const [isScrolled, setIsScrolled] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { scrollYProgress } = useScroll()
+  const { scrollY, scrollYProgress } = useScroll()
+
+  useEffect(() => {
+    return scrollY.on('change', (latest) => {
+      setIsScrolled(latest > 50)
+    })
+  }, [scrollY])
+
   const heroOpacity = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0])
   const heroScale = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0.95])
   const heroY = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [0, isMobile ? 0 : -50])
@@ -824,9 +746,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   ]
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative" style={{ overflowX: 'clip' }}>
+    <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
       <SEO {...seoConfig.landing} />
-      
+
       {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
       <div className={`${isMobile ? 'absolute h-[500vh]' : 'fixed'} inset-0 pointer-events-none overflow-hidden -z-10`}>
         <GradientOrb className={`${isMobile ? 'w-[400px] h-[400px]' : 'w-[800px] h-[800px]'} -top-[100px] -left-[100px]`} color="blue" />
@@ -837,47 +759,55 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* Navigation - use wrapper for sticky/fixed to avoid iOS Safari transform issues */}
       <div className="landing-nav-wrapper w-full z-50">
-        <motion.nav 
-          initial={{ y: -100 }} 
-          animate={{ y: 0 }} 
+        <motion.nav
+          initial={{ y: -100 }}
+          animate={{ y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-        <div className="mx-4 mt-4">
-          <GlassCard className="max-w-[1200px] mx-auto !rounded-full px-5 py-2.5" hover={false}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-8">
-                <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
-                  <img 
-                    src="/veefore-logo.png" 
-                    alt="VeeFore" 
-                    className="h-8 w-auto"
-                  />
-                  <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
-                </div>
-                
-                <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
-                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
-                    <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
-                      {item}
-                      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300" />
-                    </a>
-                  ))}
-                </div>
-              </div>
+          <div className={`transition-all duration-500 ease-in-out ${isScrolled ? 'mx-4 mt-4' : 'mx-4 mt-4'}`}>
+            <GlassCard 
+              className={`mx-auto transition-all duration-500 ease-in-out ${
+                isScrolled 
+                  ? 'max-w-[1200px] !rounded-full bg-black/50 backdrop-blur-md border-white/10 shadow-lg px-5 py-2.5' 
+                  : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-8 py-4'
+              }`} 
+              hover={false}
+              showGradient={isScrolled}
+            >
+              <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
+                <div className="flex items-center space-x-8">
+                  <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
+                    <img
+                      src="/veefore-logo.png"
+                      alt="VeeFore"
+                      className="h-8 w-auto"
+                    />
+                    <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
+                  </div>
 
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
-                <MagneticButton 
-                  className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
-                  onClick={() => onNavigate('signup')}
-                >
-                  <span className="hidden sm:inline">Start Free Trial</span>
-                  <span className="sm:hidden">Start Free</span>
-                </MagneticButton>
+                  <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
+                    {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
+                      <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
+                        {item}
+                        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
+                  <MagneticButton
+                    className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
+                    onClick={() => onNavigate('signup')}
+                  >
+                    <span className="hidden sm:inline">Start Free Trial</span>
+                    <span className="sm:hidden">Start Free</span>
+                  </MagneticButton>
+                </div>
               </div>
-            </div>
-          </GlassCard>
-        </div>
+            </GlassCard>
+          </div>
         </motion.nav>
       </div>
 
@@ -893,7 +823,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </Suspense>
           )}
         </div>
-        
+
         {/* Gradient orbs layer for mobile - on top of MobileBackground */}
         {isMobile && (
           <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
@@ -902,28 +832,25 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <GradientOrb className="w-[200px] h-[200px] bottom-[15%] left-[30%]" color="indigo" />
           </div>
         )}
-        
+
         {isMobile ? (
           <div className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center">
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-sm text-blue-400 mb-8">
-              <Sparkles className="w-4 h-4" />
-              <span className="font-medium">AI-Powered Growth Engine</span>
-            </div>
-            
+
+
             <h1 className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8">
               <RotatingHeroText />
             </h1>
-            
+
             <p className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4">
               VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
             </p>
-            
+
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4">
               Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
-              <MagneticButton 
+              <MagneticButton
                 className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
                 onClick={() => onNavigate('signup')}
               >
@@ -932,7 +859,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5" />
                 </span>
               </MagneticButton>
-              
+
               <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                   <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
@@ -940,7 +867,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
               </button>
             </div>
-            
+
             <div className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4">
               {[
                 { icon: CheckCircle, text: 'No credit card required' },
@@ -955,23 +882,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </div>
         ) : (
-          <motion.div 
+          <motion.div
             style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
             className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center"
           >
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-sm text-blue-400 mb-8 backdrop-blur-xl"
-            >
-              <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
-                <Sparkles className="w-4 h-4" />
-              </motion.div>
-              <span className="font-medium">AI-Powered Growth Engine</span>
-            </motion.div>
-            
-            <motion.h1 
+
+
+            <motion.h1
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
@@ -979,8 +896,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             >
               <RotatingHeroText />
             </motion.h1>
-            
-            <motion.p 
+
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.8 }}
@@ -988,8 +905,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             >
               VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
             </motion.p>
-            
-            <motion.p 
+
+            <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 1 }}
@@ -997,14 +914,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             >
               Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
             </motion.p>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 1.1 }}
               className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4"
             >
-              <MagneticButton 
+              <MagneticButton
                 className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
                 onClick={() => onNavigate('signup')}
               >
@@ -1017,7 +934,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   <div className="absolute inset-[-2px] bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur-xl opacity-50" />
                 </div>
               </MagneticButton>
-              
+
               <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-hover:border-white/20 transition-all">
                   <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
@@ -1025,8 +942,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
               </button>
             </motion.div>
-          
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 1.3 }}
@@ -1049,16 +966,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Dashboard Showcase Section */}
-      <section className="relative py-8 -mt-20 z-20">
-        <div className="max-w-[1600px] mx-auto px-4">
-          <motion.div 
+      <section className="relative py-8 -mt-20 z-20 w-full overflow-hidden">
+        <div className="w-full px-4 md:px-8">
+          <motion.div
             initial={{ opacity: 0, y: 60 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 1.5 }}
-            className="relative"
+            className="relative w-full"
           >
             {/* Side Graphics - Left (Faded, beautiful.ai style) - Hidden on mobile */}
-            <div className="hidden md:block absolute left-0 top-1/2 -translate-y-1/2 w-[140px] lg:w-[180px] xl:w-[220px] space-y-3 lg:space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }}>
+            <div className="hidden md:block absolute left-4 lg:left-8 xl:left-12 top-1/2 -translate-y-1/2 w-[140px] lg:w-[180px] xl:w-[220px] space-y-3 lg:space-y-4 z-0 pointer-events-none" style={{ maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }}>
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 0.4, x: 0 }}
@@ -1192,12 +1109,174 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
+      {/* Trusted By Top Brands Section */}
+      <section className="py-16 md:py-24 relative overflow-hidden bg-transparent w-full">
+        <div className="w-full px-4 md:px-8">
+          <div className="text-center mb-12 md:mb-16">
+            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-400 uppercase tracking-widest mb-6">
+              <span>Trusted Partners</span>
+            </div>
+            <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Trusted By Top Brands</h3>
+            <p className="text-base text-white/50">Join thousands of creators using Veefore to grow their presence</p>
+          </div>
+
+          {/* Infinite Scrolling Logos Container */}
+          <div className="relative">
+            <div className="flex overflow-hidden">
+              {[0, 1].map((index) => (
+                <motion.div
+                  key={index}
+                  className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16"
+                  animate={{ x: ["0%", "-100%"] }}
+                  transition={{
+                    duration: 30,
+                    repeat: Infinity,
+                    ease: "linear"
+                  }}
+                >
+                  {[
+                    {
+                      name: "Meta",
+                      category: "Social Media Leader",
+                      icon: (
+                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <title>Meta</title>
+                          <path d="M6.897 4h-.024l-.031 2.615h.022c1.715 0 3.046 1.357 5.94 6.246l.175.297.012.02 1.62-2.438-.012-.019a48.763 48.763 0 00-1.098-1.716 28.01 28.01 0 00-1.175-1.629C10.413 4.932 8.812 4 6.896 4z" fill="url(#lobe-icons-meta-fill-0)"></path>
+                          <path d="M6.873 4C4.95 4.01 3.247 5.258 2.02 7.17a4.352 4.352 0 00-.01.017l2.254 1.231.011-.017c.718-1.083 1.61-1.774 2.568-1.785h.021L6.896 4h-.023z" fill="url(#lobe-icons-meta-fill-1)"></path>
+                          <path d="M2.019 7.17l-.011.017C1.2 8.447.598 9.995.274 11.664l-.005.022 2.534.6.004-.022c.27-1.467.786-2.828 1.456-3.845l.011-.017L2.02 7.17z" fill="url(#lobe-icons-meta-fill-2)"></path>
+                          <path d="M2.807 12.264l-2.533-.6-.005.022c-.177.918-.267 1.851-.269 2.786v.023l2.598.233v-.023a12.591 12.591 0 01.21-2.44z" fill="url(#lobe-icons-meta-fill-3)"></path>
+                          <path d="M2.677 15.537a5.462 5.462 0 01-.079-.813v-.022L0 14.468v.024a8.89 8.89 0 00.146 1.652l2.535-.585a4.106 4.106 0 01-.004-.022z" fill="url(#lobe-icons-meta-fill-4)"></path>
+                          <path d="M3.27 16.89c-.284-.31-.484-.756-.589-1.328l-.004-.021-2.535.585.004.021c.192 1.01.568 1.85 1.106 2.487l.014.017 2.018-1.745a2.106 2.106 0 01-.015-.016z" fill="url(#lobe-icons-meta-fill-5)"></path>
+                          <path d="M10.78 9.654c-1.528 2.35-2.454 3.825-2.454 3.825-2.035 3.2-2.739 3.917-3.871 3.917a1.545 1.545 0 01-1.186-.508l-2.017 1.744.014.017C2.01 19.518 3.058 20 4.356 20c1.963 0 3.374-.928 5.884-5.33l1.766-3.13a41.283 41.283 0 00-1.227-1.886z" fill="#0082FB"></path>
+                          <path d="M13.502 5.946l-.016.016c-.4.43-.786.908-1.16 1.416.378.483.768 1.024 1.175 1.63.48-.743.928-1.345 1.367-1.807l.016-.016-1.382-1.24z" fill="url(#lobe-icons-meta-fill-6)"></path>
+                          <path d="M20.918 5.713C19.853 4.633 18.583 4 17.225 4c-1.432 0-2.637.787-3.723 1.944l-.016.016 1.382 1.24.016-.017c.715-.747 1.408-1.12 2.176-1.12.826 0 1.6.39 2.27 1.075l.015.016 1.589-1.425-.016-.016z" fill="#0082FB"></path>
+                          <path d="M23.998 14.125c-.06-3.467-1.27-6.566-3.064-8.396l-.016-.016-1.588 1.424.015.016c1.35 1.392 2.277 3.98 2.361 6.971v.023h2.292v-.022z" fill="url(#lobe-icons-meta-fill-7)"></path>
+                          <path d="M23.998 14.15v-.023h-2.292v.022c.004.14.006.282.006.424 0 .815-.121 1.474-.368 1.95l-.011.022 1.708 1.782.013-.02c.62-.96.946-2.293.946-3.91 0-.083 0-.165-.002-.247z" fill="url(#lobe-icons-meta-fill-8)"></path>
+                          <path d="M21.344 16.52l-.011.02c-.214.402-.519.67-.917.787l.778 2.462a3.493 3.493 0 00.438-.182 3.558 3.558 0 001.366-1.218l.044-.065.012-.02-1.71-1.784z" fill="url(#lobe-icons-meta-fill-9)"></path>
+                          <path d="M19.92 17.393c-.262 0-.492-.039-.718-.14l-.798 2.522c.449.153.927.222 1.46.222.492 0 .943-.073 1.352-.215l-.78-2.462c-.167.05-.341.075-.517.073z" fill="url(#lobe-icons-meta-fill-10)"></path>
+                          <path d="M18.323 16.534l-.014-.017-1.836 1.914.016.017c.637.682 1.246 1.105 1.937 1.337l.797-2.52c-.291-.125-.573-.353-.9-.731z" fill="url(#lobe-icons-meta-fill-11)"></path>
+                          <path d="M18.309 16.515c-.55-.642-1.232-1.712-2.303-3.44l-1.396-2.336-.011-.02-1.62 2.438.012.02.989 1.668c.959 1.61 1.74 2.774 2.493 3.585l.016.016 1.834-1.914a2.353 2.353 0 01-.014-.017z" fill="url(#lobe-icons-meta-fill-12)"></path>
+                          <defs>
+                            <linearGradient id="lobe-icons-meta-fill-0" x1="75.897%" x2="26.312%" y1="89.199%" y2="12.194%"><stop offset=".06%" stopColor="#0867DF"></stop><stop offset="45.39%" stopColor="#0668E1"></stop><stop offset="85.91%" stopColor="#0064E0"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-1" x1="21.67%" x2="97.068%" y1="75.874%" y2="23.985%"><stop offset="13.23%" stopColor="#0064DF"></stop><stop offset="99.88%" stopColor="#0064E0"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-2" x1="38.263%" x2="60.895%" y1="89.127%" y2="16.131%"><stop offset="1.47%" stopColor="#0072EC"></stop><stop offset="68.81%" stopColor="#0064DF"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-3" x1="47.032%" x2="52.15%" y1="90.19%" y2="15.745%"><stop offset="7.31%" stopColor="#007CF6"></stop><stop offset="99.43%" stopColor="#0072EC"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-4" x1="52.155%" x2="47.591%" y1="58.301%" y2="37.004%"><stop offset="7.31%" stopColor="#007FF9"></stop><stop offset="100%" stopColor="#007CF6"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-5" x1="37.689%" x2="61.961%" y1="12.502%" y2="63.624%"><stop offset="7.31%" stopColor="#007FF9"></stop><stop offset="100%" stopColor="#0082FB"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-6" x1="34.808%" x2="62.313%" y1="68.859%" y2="23.174%"><stop offset="27.99%" stopColor="#007FF8"></stop><stop offset="91.41%" stopColor="#0082FB"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-7" x1="43.762%" x2="57.602%" y1="6.235%" y2="98.514%"><stop offset="0%" stopColor="#0082FB"></stop><stop offset="99.95%" stopColor="#0081FA"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-8" x1="60.055%" x2="39.88%" y1="4.661%" y2="69.077%"><stop offset="6.19%" stopColor="#0081FA"></stop><stop offset="100%" stopColor="#0080F9"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-9" x1="30.282%" x2="61.081%" y1="59.32%" y2="33.244%"><stop offset="0%" stopColor="#027AF3"></stop><stop offset="100%" stopColor="#0080F9"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-10" x1="20.433%" x2="82.112%" y1="50.001%" y2="50.001%"><stop offset="0%" stopColor="#0377EF"></stop><stop offset="99.94%" stopColor="#0279F1"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-11" x1="40.303%" x2="72.394%" y1="35.298%" y2="57.811%"><stop offset=".19%" stopColor="#0471E9"></stop><stop offset="100%" stopColor="#0377EF"></stop></linearGradient>
+                            <linearGradient id="lobe-icons-meta-fill-12" x1="32.254%" x2="68.003%" y1="19.719%" y2="84.908%"><stop offset="27.65%" stopColor="#0867DF"></stop><stop offset="100%" stopColor="#0471E9"></stop></linearGradient>
+                          </defs>
+                        </svg>
+                      )
+                    },
+                    {
+                      name: "WhatsApp",
+                      category: "Messaging Platform",
+                      icon: (
+                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#25D366' }}>
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                        </svg>
+                      )
+                    },
+                    {
+                      name: "Instagram",
+                      category: "Social Platform",
+                      icon: (
+                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
+                          <defs>
+                            <linearGradient id="igGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                              <stop offset="0%" stopColor="#f09433" />
+                              <stop offset="25%" stopColor="#e6683c" />
+                              <stop offset="50%" stopColor="#dc2743" />
+                              <stop offset="75%" stopColor="#cc2366" />
+                              <stop offset="100%" stopColor="#bc1888" />
+                            </linearGradient>
+                          </defs>
+                          <path fill="url(#igGradient)" d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.069-4.85.069-3.204 0-3.584-.012-4.849-.069-3.225-.149-4.771-1.664-4.919-4.919-.058-1.265-.069-1.644-.069-4.849 0-3.204.012-3.584.069-4.849.149-3.225 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                        </svg>
+                      )
+                    },
+                    {
+                      name: "ChatGPT",
+                      category: "AI Assistant",
+                      icon: (
+                        <svg
+                          className="w-10 h-10"
+                          xmlns="http://www.w3.org/2000/svg"
+                          shapeRendering="geometricPrecision"
+                          textRendering="geometricPrecision"
+                          imageRendering="optimizeQuality"
+                          fillRule="evenodd"
+                          clipRule="evenodd"
+                          viewBox="0 0 512 509.639"
+                        >
+                          <path fill="#fff" d="M115.612 0h280.775C459.974 0 512 52.026 512 115.612v278.415c0 63.587-52.026 115.613-115.613 115.613H115.612C52.026 509.64 0 457.614 0 394.027V115.612C0 52.026 52.026 0 115.612 0z" />
+                          <path fillRule="nonzero" fill="black" d="M412.037 221.764a90.834 90.834 0 004.648-28.67 90.79 90.79 0 00-12.443-45.87c-16.37-28.496-46.738-46.089-79.605-46.089-6.466 0-12.943.683-19.264 2.04a90.765 90.765 0 00-67.881-30.515h-.576c-.059.002-.149.002-.216.002-39.807 0-75.108 25.686-87.346 63.554-25.626 5.239-47.748 21.31-60.682 44.03a91.873 91.873 0 00-12.407 46.077 91.833 91.833 0 0023.694 61.553 90.802 90.802 0 00-4.649 28.67 90.804 90.804 0 0012.442 45.87c16.369 28.504 46.74 46.087 79.61 46.087a91.81 91.81 0 0019.253-2.04 90.783 90.783 0 0067.887 30.516h.576l.234-.001c39.829 0 75.119-25.686 87.357-63.588 25.626-5.242 47.748-21.312 60.682-44.033a91.718 91.718 0 0012.383-46.035 91.83 91.83 0 00-23.693-61.553l-.004-.005zM275.102 413.161h-.094a68.146 68.146 0 01-43.611-15.8 56.936 56.936 0 002.155-1.221l72.54-41.901a11.799 11.799 0 005.962-10.251V241.651l30.661 17.704c.326.163.55.479.596.84v84.693c-.042 37.653-30.554 68.198-68.21 68.273h.001zm-146.689-62.649a68.128 68.128 0 01-9.152-34.085c0-3.904.341-7.817 1.005-11.663.539.323 1.48.897 2.155 1.285l72.54 41.901a11.832 11.832 0 0011.918-.002l88.563-51.137v35.408a1.1 1.1 0 01-.438.94l-73.33 42.339a68.43 68.43 0 01-34.11 9.12 68.359 68.359 0 01-59.15-34.11l-.001.004zm-19.083-158.36a68.044 68.044 0 0135.538-29.934c0 .625-.036 1.731-.036 2.5v83.801l-.001.07a11.79 11.79 0 005.954 10.242l88.564 51.13-30.661 17.704a1.096 1.096 0 01-1.034.093l-73.337-42.375a68.36 68.36 0 01-34.095-59.143 68.412 68.412 0 019.112-34.085l-.004-.003zm251.907 58.621l-88.563-51.137 30.661-17.697a1.097 1.097 0 011.034-.094l73.337 42.339c21.109 12.195 34.132 34.746 34.132 59.132 0 28.604-17.849 54.199-44.686 64.078v-86.308c.004-.032.004-.065.004-.096 0-4.219-2.261-8.119-5.919-10.217zm30.518-45.93c-.539-.331-1.48-.898-2.155-1.286l-72.54-41.901a11.842 11.842 0 00-5.958-1.611c-2.092 0-4.15.558-5.957 1.611l-88.564 51.137v-35.408l-.001-.061a1.1 1.1 0 01.44-.88l73.33-42.303a68.301 68.301 0 0134.108-9.129c37.704 0 68.281 30.577 68.281 68.281a68.69 68.69 0 01-.984 11.545v.005zm-191.843 63.109l-30.668-17.704a1.09 1.09 0 01-.596-.84v-84.692c.016-37.685 30.593-68.236 68.281-68.236a68.332 68.332 0 0143.689 15.804 63.09 63.09 0 00-2.155 1.222l-72.54 41.9a11.794 11.794 0 00-5.961 10.248v.068l-.05 102.23zm16.655-35.91l39.445-22.782 39.444 22.767v45.55l-39.444 22.767-39.445-22.767v-45.535z" /></svg>
+                      )
+                    },
+                    {
+                      name: "YouTube",
+                      category: "Video Platform",
+                      icon: (
+                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#FF0000' }}>
+                          <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                        </svg>
+                      )
+                    },
+                    {
+                      name: "Twitter",
+                      category: "Social Network",
+                      icon: (
+                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" transform="scale(0.85)">
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                        </svg>
+                      )
+                    },
+                    {
+                      name: "LinkedIn",
+                      category: "Professional Network",
+                      icon: (
+                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#0077B5' }}>
+                          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                        </svg>
+                      )
+                    }
+                  ].map((brand, i) => (
+                    <div key={i} className="flex flex-col items-center justify-center min-w-[150px] md:min-w-[180px]">
+                      <div className="flex items-center space-x-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 md:px-6 md:py-4 hover:bg-white/10 transition-all cursor-pointer group w-full justify-center">
+                        <div className="flex items-center justify-center transition-transform group-hover:scale-110">
+                          {brand.icon}
+                        </div>
+                        <div>
+                          <p className="text-white font-bold text-base md:text-lg">{brand.name}</p>
+                          <p className="text-white/40 text-[10px] md:text-xs">{brand.category}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Gradient overlays for smooth fade effect */}
+            <div className="absolute top-0 left-0 w-12 md:w-32 h-full bg-gradient-to-r from-black to-transparent z-10 pointer-events-none"></div>
+            <div className="absolute top-0 right-0 w-12 md:w-32 h-full bg-gradient-to-l from-black to-transparent z-10 pointer-events-none"></div>
+          </div>
+        </div>
+      </section>
+
       {/* How VeeFore Works - Ascending Graph Section */}
-      <section className="py-16 md:py-24 relative overflow-hidden">
+      {/* How VeeFore Works - Ascending Graph Section */}
+      <section className="relative py-20 z-20 overflow-hidden">
         {/* Left Side - Meaningful Social Media Context Graphics with fade */}
         {/* Left fade overlay */}
         <div className="hidden lg:block absolute left-0 top-0 bottom-0 w-64 pointer-events-none bg-gradient-to-r from-transparent via-transparent to-transparent z-10" />
-        
+
         {/* Incoming comments/engagement waiting to be answered */}
         <div className="hidden lg:block absolute left-6 top-28 pointer-events-none opacity-60">
           <motion.div
@@ -1232,7 +1311,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </motion.div>
         </div>
-        
+
         {/* Manual work indicator - time consuming */}
         <div className="hidden lg:block absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
           <motion.div
@@ -1253,7 +1332,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </svg>
           </motion.div>
         </div>
-        
+
         {/* DM inbox preview */}
         <div className="hidden lg:block absolute left-8 bottom-20 pointer-events-none opacity-55">
           <motion.div
@@ -1275,7 +1354,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </motion.div>
         </div>
-        
+
         {/* Right Side - Results & Growth Graphics with fade */}
         {/* AI auto-reply indicator */}
         <div className="hidden lg:block absolute right-6 top-24 pointer-events-none opacity-60">
@@ -1315,7 +1394,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </motion.div>
         </div>
-        
+
         {/* Engagement growth metrics */}
         <div className="hidden lg:block absolute right-4 top-1/2 -translate-y-1/4 pointer-events-none opacity-50">
           <motion.div
@@ -1338,7 +1417,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </motion.div>
         </div>
-        
+
         {/* Follower growth indicator */}
         <div className="hidden lg:block absolute right-8 bottom-16 pointer-events-none opacity-55">
           <motion.div
@@ -1367,9 +1446,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </motion.div>
         </div>
-        
+
+
         <div className="max-w-[1100px] mx-auto px-6 relative">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
@@ -1446,14 +1526,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   transition={{ delay: 0.5, duration: 1 }}
                 />
               </svg>
-              
+
               {/* Step nodes positioned along the ascending wavy line */}
               <div className="relative h-[400px]">
                 {[
-                  { 
-                    step: 1, 
-                    icon: Send, 
-                    title: 'You Post', 
+                  {
+                    step: 1,
+                    icon: Send,
+                    title: 'You Post',
                     desc: 'Create content as usual',
                     metric: 'Content Live',
                     color: 'text-blue-400',
@@ -1461,10 +1541,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     top: '75%',
                     left: '2%'
                   },
-                  { 
-                    step: 2, 
-                    icon: Bot, 
-                    title: 'AI Responds', 
+                  {
+                    step: 2,
+                    icon: Bot,
+                    title: 'AI Responds',
                     desc: 'Instant comment & DM replies',
                     metric: '+Speed',
                     color: 'text-purple-400',
@@ -1472,10 +1552,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     top: '52%',
                     left: '25%'
                   },
-                  { 
-                    step: 3, 
-                    icon: TrendingUp, 
-                    title: 'Algorithm Boosts', 
+                  {
+                    step: 3,
+                    icon: TrendingUp,
+                    title: 'Algorithm Boosts',
                     desc: 'Engagement signals compound',
                     metric: '+Reach',
                     color: 'text-indigo-400',
@@ -1483,10 +1563,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     top: '30%',
                     left: '52%'
                   },
-                  { 
-                    step: 4, 
-                    icon: RefreshCw, 
-                    title: 'AI Improves', 
+                  {
+                    step: 4,
+                    icon: RefreshCw,
+                    title: 'AI Improves',
                     desc: 'Every interaction trains AI',
                     metric: '+Growth',
                     color: 'text-green-400',
@@ -1526,67 +1606,93 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 ))}
               </div>
             </div>
-            
-            {/* Mobile: Vertical ascending layout */}
-            <div className="md:hidden space-y-4">
-              {[
-                { step: 1, icon: Send, title: 'You Post', desc: 'Create content as usual', metric: 'Content Live', color: 'text-blue-400', bgColor: 'bg-blue-500' },
-                { step: 2, icon: Bot, title: 'AI Responds', desc: 'Instant comment & DM replies', metric: '+Speed', color: 'text-purple-400', bgColor: 'bg-purple-500' },
-                { step: 3, icon: TrendingUp, title: 'Algorithm Boosts', desc: 'Engagement signals compound', metric: '+Reach', color: 'text-indigo-400', bgColor: 'bg-indigo-500' },
-                { step: 4, icon: RefreshCw, title: 'AI Improves', desc: 'Every interaction trains AI', metric: '+Growth', color: 'text-green-400', bgColor: 'bg-green-500' }
-              ].map((item, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
+
+            {/* Mobile: Vertical curved layout */}
+            <div className="md:hidden relative px-4">
+              {/* Curved SVG connector */}
+              <svg className="absolute left-0 top-0 w-full h-full pointer-events-none" viewBox="0 0 100 400" preserveAspectRatio="none">
+                <motion.path
+                  d="M 20 20 Q 30 80, 20 120 Q 10 160, 20 200 Q 30 240, 20 280 Q 10 320, 20 360"
+                  fill="none"
+                  stroke="url(#mobileGradient)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0 }}
+                  whileInView={{ pathLength: 1 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-4 relative"
-                >
-                  {/* Vertical connector line */}
-                  {i < 3 && (
-                    <div className="absolute left-5 top-12 w-px h-8 bg-gradient-to-b from-white/20 to-white/5" />
-                  )}
-                  {/* Node */}
-                  <div className={`w-10 h-10 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg shrink-0`}>
-                    <item.icon className="w-5 h-5 text-white" />
-                  </div>
-                  {/* Content */}
-                  <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-bold ${item.color} uppercase`}>Step {item.step}</span>
-                      <span className={`text-[10px] font-medium ${item.color} bg-white/5 px-1.5 py-0.5 rounded`}>{item.metric}</span>
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                />
+                <defs>
+                  <linearGradient id="mobileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                    <stop offset="33%" stopColor="#8b5cf6" stopOpacity="0.3" />
+                    <stop offset="66%" stopColor="#6366f1" stopOpacity="0.3" />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0.3" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              {/* Steps */}
+              <div className="space-y-6 relative">
+                {[
+                  { step: 1, icon: Send, title: 'You Post', desc: 'Create content as usual', metric: 'Content Live', color: 'text-blue-400', bgColor: 'bg-blue-500' },
+                  { step: 2, icon: Bot, title: 'AI Responds', desc: 'Instant comment & DM replies', metric: '+Speed', color: 'text-purple-400', bgColor: 'bg-purple-500' },
+                  { step: 3, icon: TrendingUp, title: 'Algorithm Boosts', desc: 'Engagement signals compound', metric: '+Reach', color: 'text-indigo-400', bgColor: 'bg-indigo-500' },
+                  { step: 4, icon: RefreshCw, title: 'AI Improves', desc: 'Every interaction trains AI', metric: '+Growth', color: 'text-green-400', bgColor: 'bg-green-500' }
+                ].map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.15 }}
+                    className="flex items-center gap-3"
+                  >
+                    {/* Node with glow */}
+                    <div className="relative shrink-0">
+                      <div className={`absolute inset-0 ${item.bgColor} rounded-full blur-md opacity-40`} />
+                      <div className={`relative w-11 h-11 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg`}>
+                        <item.icon className="w-5 h-5 text-white" />
+                      </div>
                     </div>
-                    <h4 className="text-sm font-semibold text-white">{item.title}</h4>
-                    <p className="text-xs text-white/40">{item.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
+                    {/* Content */}
+                    <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold ${item.color} uppercase tracking-wider`}>Step {item.step}</span>
+                        <span className={`text-[10px] font-medium ${item.color} bg-white/10 px-2 py-0.5 rounded-full`}>{item.metric}</span>
+                      </div>
+                      <h4 className="text-sm font-semibold text-white mb-0.5">{item.title}</h4>
+                      <p className="text-xs text-white/50">{item.desc}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
+
+
       {/* Algorithm Impact - Why Engagement Velocity Matters */}
-      <section className="py-12 sm:py-16 md:py-20 lg:py-28 relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-28 relative overflow-hidden w-full">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/[0.03] to-transparent" />
         <GradientOrb className="w-[300px] sm:w-[400px] md:w-[500px] h-[300px] sm:h-[400px] md:h-[500px] bottom-0 right-0 translate-x-1/2 translate-y-1/2" color="purple" />
-        
-        <div className="max-w-[1300px] mx-auto px-4 sm:px-6 relative">
+
+        <div className="w-full px-4 sm:px-6 md:px-12 lg:px-20 relative">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
             transition={{ duration: 0.6 }}
           >
-            <div className="relative p-4 sm:p-6 md:p-8 lg:p-14 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/10 backdrop-blur-sm overflow-hidden">
+            <div className="relative overflow-hidden">
               {/* Background decorative elements */}
-              <div className="absolute top-0 right-0 w-48 sm:w-64 md:w-96 h-48 sm:h-64 md:h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-32 sm:w-48 md:w-64 h-32 sm:h-48 md:h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl" />
-              
+              <div className="absolute top-0 right-0 w-48 sm:w-64 md:w-96 h-48 sm:h-64 md:h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl opacity-50" />
+              <div className="absolute bottom-0 left-0 w-32 sm:w-48 md:w-64 h-32 sm:h-48 md:h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl opacity-50" />
+
               <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center relative">
                 <div>
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
@@ -1603,111 +1709,115 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       Social platforms reward accounts that generate quick, meaningful engagement. The first <span className="text-blue-400 font-semibold">30 minutes</span> after posting are critical for algorithmic amplification.
                     </p>
                   </motion.div>
-                  
-                  <div className="space-y-2 sm:space-y-3">
-                    {[
-                      { signal: 'Fast comment replies', impact: 'Signals active community', icon: Zap, color: 'text-blue-400' },
-                      { signal: 'Conversation depth', impact: 'Increases post distribution', icon: MessageSquare, color: 'text-purple-400' },
-                      { signal: 'DM response rate', impact: 'Improves account ranking', icon: Send, color: 'text-indigo-400' },
-                      { signal: 'Consistent engagement', impact: 'Builds algorithmic trust', icon: TrendingUp, color: 'text-green-400' }
-                    ].map((item, i) => (
-                      <motion.div 
-                        key={i}
-                        initial={{ opacity: 0, x: -20 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.3 + i * 0.1 }}
-                        className="group"
-                      >
-                        <div className="p-3 sm:p-4 rounded-lg sm:rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all duration-300 flex items-center gap-3 sm:gap-4">
-                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center ${item.color}`}>
-                            <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-white font-medium block text-sm sm:text-base truncate">{item.signal}</span>
-                            <span className="text-[10px] sm:text-xs text-white/40 truncate block">{item.impact}</span>
-                          </div>
-                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400/60 shrink-0" />
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
                 </div>
-                
-                <div className="relative mt-6 lg:mt-0">
-                  <div className="w-[220px] h-[220px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px] lg:w-[360px] lg:h-[360px] mx-auto relative">
-                    {/* Background glow from center logo */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-transparent blur-3xl" />
-                    </div>
-                    
-                    {/* Multiple orbit rings */}
-                    <svg className="absolute inset-0 w-full h-full">
-                      {/* Outermost orbit ring */}
-                      <circle cx="50%" cy="50%" r="48%" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="6 6" />
-                      {/* Main orbit ring where icons are placed */}
-                      <circle cx="50%" cy="50%" r="40%" fill="none" stroke="rgba(139,92,246,0.2)" strokeWidth="1.5" />
-                      {/* Inner orbit ring */}
-                      <circle cx="50%" cy="50%" r="28%" fill="none" stroke="rgba(59,130,246,0.15)" strokeWidth="1" strokeDasharray="4 8" />
-                      {/* Innermost glow ring */}
-                      <circle cx="50%" cy="50%" r="18%" fill="none" stroke="rgba(168,85,247,0.25)" strokeWidth="1" />
-                    </svg>
-                    
-                    {/* Center element - VeeFore Company Logo */}
-                    <div className="absolute inset-0 flex items-center justify-center z-10">
-                      <motion.div 
-                        animate={{ scale: [1, 1.05, 1] }}
-                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                      >
-                        <img 
-                          src={veeforeLogo} 
-                          alt="VeeFore" 
-                          className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 object-contain"
-                        />
-                      </motion.div>
-                    </div>
-                    
-                    {/* Rotating container - icons revolve around the logo slowly */}
-                    <motion.div 
-                      className="absolute inset-0"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
-                    >
-                      {/* 4 orbiting icons - positioned exactly on the 2nd orbit (40% radius) */}
-                      {[
-                        { icon: Eye, label: 'Reach', angleDeg: 315, color: 'text-cyan-400' },
-                        { icon: Heart, label: 'Engagement', angleDeg: 45, color: 'text-purple-400' },
-                        { icon: MessageSquare, label: 'Comments', angleDeg: 135, color: 'text-pink-400' },
-                        { icon: Send, label: 'DMs', angleDeg: 225, color: 'text-blue-400' }
-                      ].map((item, i) => {
-                        const radius = 40;
-                        const angleRad = (item.angleDeg * Math.PI) / 180;
-                        const x = 50 + radius * Math.cos(angleRad);
-                        const y = 50 + radius * Math.sin(angleRad);
-                        
-                        return (
-                          <div
-                            key={i}
-                            className="absolute"
-                            style={{
-                              top: `${y}%`,
-                              left: `${x}%`,
-                              transform: 'translate(-50%, -50%)'
+
+                <div className="relative w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#050505] backdrop-blur-2xl border border-white/5 shadow-2xl group/hud">
+                  {/* Premium Ambient Background Effects */}
+                  <div className="absolute inset-0 opacity-40 pointer-events-none">
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '4s' }} />
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-900/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }} />
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 md:p-8 relative z-10 items-center">
+
+                    {/* Left Column: Primary Metric */}
+                    <div className="flex flex-col justify-center relative">
+                      {/* Decorative vertical line */}
+                      <div className="absolute left-0 top-10 bottom-10 w-[1px] bg-gradient-to-b from-transparent via-blue-500/20 to-transparent hidden lg:block -ml-8" />
+
+                      <div className="relative pl-4">
+                        <div className="flex items-baseline space-x-2">
+                          <motion.span
+                            key={hudActiveSignal}
+                            initial={{ opacity: 0.9, filter: 'blur(0px)' }}
+                            animate={{
+                              opacity: 1,
+                              filter: 'blur(0px)',
+                              textShadow: hudActiveSignal ? '0 0 50px rgba(59,130,246,0.4)' : 'none'
                             }}
+                            className="text-5xl sm:text-6xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60"
                           >
-                            {/* Counter-rotate to keep icons upright */}
-                            <motion.div
-                              animate={{ rotate: -360 }}
-                              transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
-                              className="flex flex-col items-center"
-                            >
-                              <item.icon className={`w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 ${item.color}`} strokeWidth={1.5} />
-                              <p className="text-[7px] sm:text-[8px] md:text-[9px] text-white/50 text-center mt-0.5 sm:mt-1 font-medium whitespace-nowrap">{item.label}</p>
-                            </motion.div>
+                            {hudActiveSignal ? 98 + hudActiveSignal : 98}
+                          </motion.span>
+                          <span className="text-3xl text-blue-400/50 font-light">%</span>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          <p className="text-2xl text-white/90 font-semibold tracking-wide flex items-center gap-2">
+                            Efficiency Score
+                            <span className="relative flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                            </span>
+                          </p>
+                          <p className="text-lg text-white/50 leading-relaxed max-w-md font-medium">
+                            Real-time probability of algorithmic amplification based on current content velocity.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Premium Glass Cards */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        {
+                          id: 1,
+                          label: 'Velocity',
+                          value: '12ms',
+                          sub: 'Response',
+                          icon: Zap,
+                          gradient: 'from-blue-500/10 to-transparent'
+                        },
+                        {
+                          id: 2,
+                          label: 'Depth',
+                          value: '4.2x',
+                          sub: 'Threads',
+                          icon: Layers,
+                          gradient: 'from-purple-500/10 to-transparent'
+                        },
+                        {
+                          id: 3,
+                          label: 'Trust',
+                          value: '100',
+                          sub: 'Health',
+                          icon: Shield,
+                          gradient: 'from-emerald-500/10 to-transparent'
+                        },
+                        {
+                          id: 4,
+                          label: 'Authority',
+                          value: 'Top 1%',
+                          sub: 'Rank',
+                          icon: Crown,
+                          gradient: 'from-amber-500/10 to-transparent'
+                        }
+                      ].map((item) => (
+                        <motion.div
+                          key={item.id}
+                          onHoverStart={() => setHudActiveSignal(item.id)}
+                          onHoverEnd={() => setHudActiveSignal(null)}
+                          whileHover={{ y: -2, scale: 1.01 }}
+                          className="relative overflow-hidden rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 cursor-default group transition-all duration-300 hover:border-white/15 hover:bg-white/[0.04] hover:shadow-lg min-h-[90px] flex flex-col justify-between"
+                        >
+                          {/* Hover Gradient Background */}
+                          <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+
+                          <div className="relative z-10 w-full">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="text-[10px] font-bold text-white/30 group-hover:text-white/60 transition-colors uppercase tracking-wider">{item.label}</span>
+                              <item.icon className="w-3 h-3 text-white/20 group-hover:text-white/80 transition-colors" />
+                            </div>
+
+                            <div className="mt-2">
+                              <span className={`text-xl font-bold text-white tracking-tight group-hover:scale-105 inline-block transition-transform duration-300 origin-left`}>
+                                {item.value}
+                              </span>
+                              <p className="text-[9px] text-white/30 font-medium mt-0 leading-tight">{item.sub}</p>
+                            </div>
                           </div>
-                        );
-                      })}
-                    </motion.div>
+                        </motion.div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1716,77 +1826,111 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
+      {/* Sticky Scroll "Story" Features */}
+      <StickyScrollFeatures />
+
+
       {/* Problem / Philosophy Section */}
-      <section id="how-it-works" className="py-32 relative">
-        <div className="max-w-[1200px] mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400 uppercase tracking-widest mb-6">
+      <section id="how-it-works" className="py-16 md:py-32 relative overflow-hidden w-full">
+        {/* Background Gradients */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-red-500/5 rounded-full blur-[60px] md:blur-[100px] pointer-events-none" />
+        <div className="absolute right-0 bottom-0 w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-blue-500/5 rounded-full blur-[60px] md:blur-[100px] pointer-events-none" />
+
+        <div className="w-full px-4 md:px-12 lg:px-20 relative z-10">
+          <div className="text-center mb-12 md:mb-20">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center space-x-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] md:text-xs font-bold text-red-400 uppercase tracking-widest mb-4 md:mb-6"
+            >
+              <span className="flex h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-red-500 animate-pulse mr-1.5 md:mr-2" />
               <span>The Real Problem</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Why Creators <span className="text-red-400">Fail</span>
-            </h2>
-            <p className="text-xl text-white/40 max-w-2xl mx-auto">
-              Most tools focus on posting, scheduling, and analytics. But creators don't fail because they lack tools.
-            </p>
-          </motion.div>
-          
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
-            <div className="space-y-4">
+            </motion.div>
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight mb-4 md:mb-6"
+            >
+              Why Creators <span className="text-red-500 drop-shadow-sm">Fail</span>
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="text-sm sm:text-lg md:text-xl text-white/40 max-w-2xl mx-auto leading-relaxed"
+            >
+              Most tools focus on posting, scheduling, and analytics. <br className="hidden md:block" />
+              But creators don't fail because they lack tools.
+            </motion.p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-20 items-stretch">
+            {/* Left Column: The Failures */}
+            <div className="space-y-3 md:space-y-4 flex flex-col justify-center">
               {[
-                'They cannot engage consistently',
-                'They miss comments and DMs',
-                'They lose algorithm momentum',
-                'They burn time on repetitive actions',
-                'They do not know why content works'
+                { title: 'Inconsistent Engagement', desc: 'Cannot keep up with comments & DMs manually' },
+                { title: 'Missed Opportunities', desc: 'Leads slip through cracks in untracked DMs' },
+                { title: 'Algorithm Momentum Loss', desc: 'Slow responses kill viral potential instantly' },
+                { title: 'Time Burnout', desc: 'hours wasted on repetitive, low-value typing' },
+                { title: 'Blind Creation', desc: 'Posting without knowing what actually hooks' }
               ].map((item, i) => (
-                <motion.div 
+                <motion.div
                   key={i}
                   initial={{ opacity: 0, x: -30 }}
                   whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                  transition={{ delay: i * 0.1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 + (i * 0.1) }}
                 >
-                  <GlassCard className="p-5 flex items-center space-x-4 !bg-red-500/[0.03] !border-red-500/10">
-                    <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                    <span className="text-white/60">{item}</span>
+                  <GlassCard
+                    className="p-3 md:p-5 flex items-center space-x-3 md:space-x-5 !bg-red-500/[0.02] !border-red-500/10 group hover:!bg-red-500/[0.06] hover:!border-red-500/30 transition-all duration-300"
+                  >
+                    <div className="h-9 w-9 md:h-12 md:w-12 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 border border-red-500/20 group-hover:bg-red-500/20 group-hover:scale-110 transition-all duration-300">
+                      <X className="w-4 h-4 md:w-6 md:h-6 text-red-500" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm md:text-lg font-bold text-white/90 group-hover:text-red-100 transition-colors mb-0.5 md:mb-0">{item.title}</h4>
+                      <p className="text-xs md:text-sm text-white/40 group-hover:text-white/60 transition-colors leading-snug">{item.desc}</p>
+                    </div>
                   </GlassCard>
                 </motion.div>
               ))}
             </div>
-            
-            <motion.div 
+
+            {/* Right Column: The Solution Philosophy */}
+            <motion.div
               initial={{ opacity: 0, x: 30 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-              transition={{ delay: 0.3 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.4 }}
+              className="h-full mt-6 lg:mt-0"
             >
-              <TiltCard>
-                <GlassCard className="p-10 !bg-gradient-to-br !from-blue-500/[0.08] !to-purple-500/[0.08]">
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
+              <TiltCard className="h-full">
+                <GlassCard className="p-5 md:p-12 h-full flex flex-col justify-center !bg-gradient-to-br !from-blue-500/[0.05] !via-purple-500/[0.05] !to-transparent border-t border-white/10">
+                  <div className="inline-flex self-start items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 text-[10px] md:text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 md:mb-8">
                     <span>VeeFore's Philosophy</span>
                   </div>
-                  <h3 className="text-3xl font-bold mb-6">Growth-First Approach</h3>
-                  
-                  <div className="space-y-6">
+                  <h3 className="text-2xl md:text-4xl font-bold mb-6 md:mb-8 leading-tight">
+                    Growth-First <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Approach</span>
+                  </h3>
+
+                  <div className="space-y-5 md:space-y-8">
                     {[
-                      { title: 'Engagement before volume', sub: 'Interact first, post second' },
-                      { title: 'Interaction before impressions', sub: 'Turn eyeballs into conversations' },
-                      { title: 'Momentum before aesthetics', sub: 'Keep the wheel turning automatically' }
+                      { title: 'Engagement before volume', sub: 'Interact first, post second. The algorithm rewards community.', icon: MessageSquare, color: 'text-blue-400', bg: 'bg-blue-500/20' },
+                      { title: 'Interaction before impressions', sub: 'Turn eyeballs into conversations. Conversations convert.', icon: Users, color: 'text-purple-400', bg: 'bg-purple-500/20' },
+                      { title: 'Momentum before aesthetics', sub: 'Keep the wheel turning automatically. Consistency wins.', icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/20' }
                     ].map((item, i) => (
-                      <div key={i} className="flex items-start space-x-4 group">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center shrink-0 group-hover:from-blue-500/30 group-hover:to-purple-500/30 transition-all">
-                          <TrendingUp className="w-5 h-5 text-blue-400" />
+                      <div key={i} className="flex items-start space-x-3 md:space-x-5 group">
+                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl ${item.bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+                          <item.icon className={`w-5 h-5 md:w-6 md:h-6 ${item.color}`} />
                         </div>
                         <div>
-                          <h4 className="font-bold text-white/90">{item.title}</h4>
-                          <p className="text-sm text-white/40">{item.sub}</p>
+                          <h4 className="text-sm md:text-lg font-bold text-white/90 mb-0.5 md:mb-1 group-hover:text-white transition-colors">{item.title}</h4>
+                          <p className="text-xs md:text-sm text-white/40 leading-relaxed group-hover:text-white/60 transition-colors">{item.sub}</p>
                         </div>
                       </div>
                     ))}
@@ -1799,15 +1943,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Who is VeeFore For - Target Audience Section */}
-      <section className="py-24 relative">
-        <div className="max-w-[1200px] mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
+      <section className="py-24 relative w-full overflow-hidden">
+        <div className="w-full px-4 md:px-12 lg:px-20">
+          <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-bold text-green-400 uppercase tracking-widest mb-6">
               <Target className="w-4 h-4" />
               <span>Target Audience</span>
@@ -1815,14 +1953,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
               Who is VeeFore <span className="text-green-400">for?</span>
             </h2>
-          </motion.div>
+          </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            >
+            <div>
               <GlassCard className="p-8 !bg-gradient-to-br !from-green-500/[0.05] !to-emerald-500/[0.05] !border-green-500/20 h-full">
                 <div className="flex items-center space-x-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
@@ -1846,13 +1980,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   ))}
                 </div>
               </GlassCard>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            >
+            <div>
               <GlassCard className="p-8 !bg-white/[0.01] h-full">
                 <div className="flex items-center space-x-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
@@ -1875,22 +2005,17 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   ))}
                 </div>
               </GlassCard>
-            </motion.div>
+            </div>
           </div>
         </div>
-      </section>
+      </section >
 
       {/* Hero Features - Layer 1 */}
-      <section id="features" className="py-32 relative">
+      < section id="features" className="py-32 relative" >
         <GradientOrb className="w-[600px] h-[600px] top-0 left-1/2 -translate-x-1/2" color="blue" />
-        
+
         <div className="max-w-[1200px] mx-auto px-6 relative">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-20"
-          >
+          <div className="text-center mb-20">
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
               <Layers className="w-4 h-4" />
               <span>Hero Growth Features</span>
@@ -1901,34 +2026,27 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <p className="text-xl text-white/40 max-w-2xl mx-auto">
               These features are VeeFore's public identity. They're what users remember and talk about.
             </p>
-          </motion.div>
-          
+          </div>
+
           <div className="grid md:grid-cols-3 gap-6">
-            {heroFeatures.map((feature, i) => (
-              <motion.div
-                key={feature.id}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.15 }}
-              >
+            {heroFeatures.map((feature) => (
+              <div key={feature.id}>
                 <TiltCard className="h-full">
-                  <GlassCard 
-                    className={`p-8 h-full cursor-pointer transition-all duration-500 ${
-                      expandedFeature === feature.id ? '!border-blue-500/30 !bg-blue-500/[0.05]' : ''
-                    }`}
+                  <GlassCard
+                    className={`p-8 h-full cursor-pointer transition-all duration-500 ${expandedFeature === feature.id ? '!border-blue-500/30 !bg-blue-500/[0.05]' : ''
+                      }`}
                     onClick={() => setExpandedFeature(expandedFeature === feature.id ? null : feature.id)}
                   >
                     <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 shadow-lg`}>
                       <feature.icon className="w-7 h-7 text-white" />
                     </div>
-                    
+
                     <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                     <p className="text-white/50 text-sm mb-4">{feature.tagline}</p>
-                    
+
                     <AnimatePresence>
                       {expandedFeature === feature.id && (
-                        <motion.div 
+                        <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
@@ -1949,43 +2067,32 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    
+
                     <button className="flex items-center space-x-1 text-blue-400 text-sm font-medium mt-4 group">
                       <span>{expandedFeature === feature.id ? 'Show Less' : 'Learn More'}</span>
                       <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${expandedFeature === feature.id ? 'rotate-180' : ''}`} />
                     </button>
                   </GlassCard>
                 </TiltCard>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
-      </section>
+      </section >
 
       {/* Support Features - Layer 2 */}
-      <section className="py-24 relative">
+      < section className="py-24 relative" >
         <div className="max-w-[1200px] mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-16"
-          >
+          <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4">
               <span>Core Support Systems</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-bold">Features that <span className="text-indigo-400">Enable</span> Growth</h2>
-          </motion.div>
-          
+          </div>
+
           <div className="grid md:grid-cols-4 gap-4">
             {supportFeatures.map((feature, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.1 }}
-              >
+              <div key={i}>
                 <GlassCard className="p-6 text-center h-full">
                   <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
                     <feature.icon className="w-6 h-6 text-indigo-400" />
@@ -1993,17 +2100,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   <h4 className="font-bold mb-1">{feature.title}</h4>
                   <p className="text-xs text-white/40">{feature.desc}</p>
                 </GlassCard>
-              </motion.div>
+              </div>
             ))}
           </div>
-          
-          {/* Adaptive AI Loop */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="mt-8"
-          >
+
+          <div className="mt-8">
             <GlassCard className="p-8 !bg-gradient-to-r !from-purple-500/[0.05] !to-indigo-500/[0.05]">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center space-x-6">
@@ -2025,21 +2126,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
               </div>
             </GlassCard>
-          </motion.div>
+          </div>
         </div>
-      </section>
+      </section >
 
       {/* Credit System */}
-      <section className="py-32 relative">
+      < section className="py-32 relative" >
         <GradientOrb className="w-[500px] h-[500px] bottom-0 right-0" color="cyan" />
-        
+
         <div className="max-w-[1200px] mx-auto px-6 relative">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-16"
-          >
+          <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-400 uppercase tracking-widest mb-6">
               <Gauge className="w-4 h-4" />
               <span>Credit System</span>
@@ -2050,18 +2146,12 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <p className="text-xl text-white/40 max-w-2xl mx-auto">
               1 Credit = 1 AI Action. No hidden costs, no complexity.
             </p>
-          </motion.div>
-          
+          </div>
+
           {/* Credit Actions - Responsive Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
             {creditActions.map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.1 }}
-              >
+              <div key={i}>
                 <GlassCard className="p-4 md:p-6 text-center !bg-amber-500/[0.02] hover:!bg-amber-500/[0.05] transition-all">
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
                     <item.icon className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
@@ -2070,20 +2160,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   <p className="text-xl md:text-2xl font-bold text-amber-400">1</p>
                   <p className="text-[10px] md:text-xs text-white/30">credit</p>
                 </GlassCard>
-              </motion.div>
+              </div>
             ))}
           </div>
-          
-          {/* Credit Slider */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-          >
+
+          <div>
             <GlassCard className="p-6 md:p-8">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h4 className="font-bold">Monthly Credit Usage</h4>
-                <motion.div 
+                <motion.div
                   className="text-3xl md:text-4xl font-bold text-amber-400"
                   key={activeCredit}
                   initial={{ scale: 1.1 }}
@@ -2093,10 +2178,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   {activeCredit.toLocaleString()}
                 </motion.div>
               </div>
-              <input 
-                type="range" 
-                min="100" 
-                max="3000" 
+              <input
+                type="range"
+                min="100"
+                max="3000"
                 value={activeCredit}
                 onChange={(e) => setActiveCredit(Number(e.target.value))}
                 className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-amber-500/30"
@@ -2107,15 +2192,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 <span>Pro (3,000)</span>
               </div>
             </GlassCard>
-          </motion.div>
+          </div>
 
-          {/* Credit Add-ons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="mt-8"
-          >
+          <div className="mt-8">
             <div className="text-center mb-6">
               <h4 className="text-lg font-bold text-white/80 mb-2">Need more credits?</h4>
               <p className="text-sm text-white/40">Purchase add-on packs anytime</p>
@@ -2137,14 +2216,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </GlassCard>
               ))}
             </div>
-          </motion.div>
+          </div>
         </div>
-      </section>
+      </section >
 
       {/* VeeFore vs Traditional Tools - Comparison Section */}
-      <section className="py-24 relative">
+      < section className="py-24 relative" >
         <div className="max-w-[1200px] mx-auto px-6">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
@@ -2211,74 +2290,70 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </GlassCard>
           </motion.div>
         </div>
-      </section>
+      </section >
 
       {/* Pricing */}
-      <section id="pricing" className="py-32 relative">
+      < section id="pricing" className="pt-32 pb-0 relative" >
         <GradientOrb className="w-[600px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
-        
+
         <div className="max-w-[1200px] mx-auto px-6 relative">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-16"
-          >
+          <div className="text-center mb-16">
             <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
               Choose your <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth speed</span>
             </h2>
             <p className="text-xl text-white/40 max-w-2xl mx-auto mb-10">
               We don't sell features. We sell saved time, increased engagement, and automation leverage.
             </p>
-            
+
             <div className="inline-flex items-center p-1 rounded-full bg-white/5 border border-white/10">
-              <button 
-                onClick={() => setBillingCycle('monthly')} 
+              <button
+                onClick={() => setBillingCycle('monthly')}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${billingCycle === 'monthly' ? 'bg-white text-black' : 'text-white/50 hover:text-white'}`}
               >
                 Monthly
               </button>
-              <button 
-                onClick={() => setBillingCycle('yearly')} 
+              <button
+                onClick={() => setBillingCycle('yearly')}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${billingCycle === 'yearly' ? 'bg-white text-black' : 'text-white/50 hover:text-white'}`}
               >
                 Yearly <span className="text-green-500 ml-1 text-xs">-17%</span>
               </button>
             </div>
-          </motion.div>
-          
-          <div className="grid md:grid-cols-3 gap-6">
+          </div>
+
+          {/* Mobile View - Sticky Stack */}
+          <div className="md:hidden flex flex-col space-y-6 pb-8">
             {pricingPlans.map((plan, i) => (
-              <motion.div
+              <div
                 key={plan.name}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.15 }}
-                className={plan.popular ? 'md:-mt-4 md:mb-4' : ''}
+                className="sticky transition-all duration-300"
+                style={{ 
+                  top: `calc(5rem + ${i * 1.5}rem)`,
+                  zIndex: i + 1
+                }}
               >
-                <TiltCard className="h-full">
-                  <GlassCard className={`p-8 h-full flex flex-col !bg-gradient-to-br ${plan.gradient} ${plan.border} relative`}>
-                    {plan.popular && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-500 text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-500/30">
-                        Most Popular
-                      </div>
-                    )}
-                    
-                    <div className="mb-6">
+                <TiltCard className="h-full group">
+                  {plan.popular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-auto max-w-full px-4 py-1 rounded-full bg-blue-500 text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-500/30 text-white z-30 whitespace-nowrap pointer-events-none">
+                      Most Popular
+                    </div>
+                  )}
+                  <GlassCard className={`p-6 h-full flex flex-col !bg-gradient-to-br ${plan.gradient} ${plan.border} relative shadow-xl`}>
+
+                    <div className="mb-4">
                       <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
                       <p className="text-sm text-white/40">{plan.description}</p>
                     </div>
-                    
+
                     <div className="mb-6">
                       <div className="flex items-baseline">
-                        <span className="text-5xl font-bold">₹{plan.price.toLocaleString()}</span>
+                        <span className="text-4xl font-bold">₹{plan.price.toLocaleString()}</span>
                         <span className="text-white/40 ml-2">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                       </div>
                       <p className="text-sm text-white/30 mt-1">{plan.credits.toLocaleString()} credits/month</p>
                     </div>
-                    
-                    <div className="space-y-3 mb-8 flex-1">
+
+                    <div className="space-y-3 mb-6 flex-1">
                       {plan.features.map((feature, j) => (
                         <div key={j} className="flex items-center space-x-2 text-sm text-white/60">
                           <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
@@ -2292,34 +2367,35 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         </div>
                       ))}
                     </div>
-                    
-                    <MagneticButton 
-                      className={`w-full rounded-full py-4 font-bold transition-all ${
-                        plan.popular 
-                          ? 'bg-white text-black hover:bg-white/90' 
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                      }`}
+
+                    <MagneticButton
+                      className={`w-full rounded-full py-3 font-bold transition-all ${plan.popular
+                        ? 'bg-white text-black hover:bg-white/90'
+                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                        }`}
                       onClick={() => onNavigate('signup')}
                     >
                       Get Started
                     </MagneticButton>
                   </GlassCard>
                 </TiltCard>
-              </motion.div>
+              </div>
             ))}
           </div>
+
+          {/* Desktop View - Scroll Animation */}
+          <PricingScrollAnimation 
+            pricingPlans={pricingPlans} 
+            billingCycle={billingCycle} 
+            onNavigate={onNavigate} 
+          />
         </div>
-      </section>
+      </section >
 
       {/* Free Trial */}
-      <section className="py-32 relative">
+      < section className="pt-0 pb-32 relative" >
         <div className="max-w-[1200px] mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-16"
-          >
+          <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-bold text-green-400 uppercase tracking-widest mb-6">
               <Unlock className="w-4 h-4" />
               <span>7-Day Free Trial</span>
@@ -2330,21 +2406,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <p className="text-lg text-white/40 max-w-xl mx-auto">
               150 credits • 1 social account • No credit card required
             </p>
-          </motion.div>
-          
+          </div>
+
           <div className="relative">
             {/* Timeline line */}
             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-green-500/30 to-transparent hidden md:block" />
-            
+
             <div className="grid md:grid-cols-5 gap-4">
               {trialDays.map((item, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                  transition={{ delay: i * 0.1 }}
-                >
+                <div key={i}>
                   <GlassCard className="p-6 text-center relative">
                     <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4 text-green-400 font-bold text-sm">
                       {item.day}
@@ -2352,51 +2422,35 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     <h4 className="font-bold mb-1 text-sm">{item.title}</h4>
                     <p className="text-xs text-white/40">{item.desc}</p>
                   </GlassCard>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
-          
-          <motion.div 
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mt-12"
-          >
-            <MagneticButton 
+
+          <div className="text-center mt-12">
+            <MagneticButton
               className="bg-green-600 hover:bg-green-500 text-white rounded-full px-12 py-5 text-lg font-bold shadow-xl shadow-green-600/20"
               onClick={() => onNavigate('signup')}
             >
               Start Your Free Trial
               <ArrowRight className="inline-block ml-2 w-5 h-5" />
             </MagneticButton>
-          </motion.div>
+          </div>
         </div>
-      </section>
+      </section >
 
       {/* FAQ */}
-      <section id="faq" className="py-32 relative">
+      < section id="faq" className="py-32 relative" >
         <div className="max-w-[800px] mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-16"
-          >
+          <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold">Frequently Asked</h2>
-          </motion.div>
-          
+          </div>
+
           <div className="space-y-3">
             {faqs.map((faq, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-                transition={{ delay: i * 0.05 }}
-              >
+              <div key={i}>
                 <GlassCard className="overflow-hidden">
-                  <button 
+                  <button
                     onClick={() => setActiveFaq(activeFaq === i ? null : i)}
                     className="w-full p-6 flex items-center justify-between text-left"
                   >
@@ -2407,7 +2461,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   </button>
                   <AnimatePresence>
                     {activeFaq === i && (
-                      <motion.div 
+                      <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
@@ -2419,16 +2473,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     )}
                   </AnimatePresence>
                 </GlassCard>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
-      </section>
+      </section >
 
       {/* Final CTA */}
-      <section className="py-32 relative overflow-hidden">
+      < section className="py-32 relative overflow-hidden" >
         <GradientOrb className="w-[800px] h-[800px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
-        
+
         <div className="max-w-[900px] mx-auto px-6 text-center relative">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
@@ -2441,8 +2495,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <p className="text-xl text-white/40 max-w-2xl mx-auto mb-12">
               Join serious creators who value time, want scale without spam, and understand that engagement velocity is the key to growth.
             </p>
-            
-            <MagneticButton 
+
+            <MagneticButton
               className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-14 py-6 text-xl font-bold overflow-hidden"
               onClick={() => onNavigate('signup')}
             >
@@ -2454,12 +2508,12 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </MagneticButton>
           </motion.div>
         </div>
-      </section>
+      </section >
 
       {/* Footer */}
-      <footer className="py-20 border-t border-white/[0.05] relative overflow-hidden">
+      < footer className="py-20 border-t border-white/[0.05] relative overflow-hidden" >
         <div className="absolute inset-0 bg-gradient-to-t from-blue-500/[0.02] to-transparent" />
-        
+
         <div className="max-w-[1200px] mx-auto px-6 relative">
           <div className="grid md:grid-cols-5 gap-12 mb-16">
             <div className="md:col-span-2">
@@ -2472,14 +2526,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <p className="text-white/30 text-sm leading-relaxed max-w-xs mb-6">
                 AI-powered Growth Engine that actively increases engagement, reach, and visibility for creators — automatically.
               </p>
-              
+
               <div className="flex items-center space-x-3">
                 {[
                   { icon: Twitter, href: '#', gradient: 'from-blue-400 to-cyan-400' },
                   { icon: Instagram, href: '#', gradient: 'from-pink-500 to-purple-500' },
                   { icon: Linkedin, href: '#', gradient: 'from-blue-600 to-blue-400' }
                 ].map((social, i) => (
-                  <a 
+                  <a
                     key={i}
                     href={social.href}
                     className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-gradient-to-br hover:${social.gradient} transition-all duration-300 group`}
@@ -2489,7 +2543,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 ))}
               </div>
             </div>
-            
+
             {[
               { title: 'Product', links: ['Features', 'Pricing', 'Free Trial', 'Changelog'] },
               { title: 'Company', links: ['About', 'Blog', 'Careers', 'Contact'] },
@@ -2505,7 +2559,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               </div>
             ))}
           </div>
-          
+
           <div className="mb-12">
             <GlassCard className="p-6 md:p-8 !bg-gradient-to-r !from-blue-500/[0.05] !to-purple-500/[0.05]">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -2516,8 +2570,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 <div className="flex w-full md:w-auto">
                   <div className="relative flex-1 md:w-72">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input 
-                      type="email" 
+                    <input
+                      type="email"
                       placeholder="Enter your email"
                       className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-l-xl text-sm placeholder:text-white/30 focus:outline-none focus:border-blue-500/50 transition-colors"
                     />
@@ -2529,7 +2583,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               </div>
             </GlassCard>
           </div>
-          
+
           <div className="pt-8 border-t border-white/[0.05] flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-white/20 text-sm">
               © 2025 VeeFore. Built for serious creators.
@@ -2541,8 +2595,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
           </div>
         </div>
-      </footer>
-    </div>
+      </footer >
+    </div >
   )
 }
 
