@@ -63,13 +63,19 @@ export async function setupVite(app: Express, server: Server) {
 
   // Use Vite middleware to handle all module requests
   app.use(vite.middlewares);
-  
+
   // Handle all other requests (SPA routing)
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
-    
-    // Skip API routes
-    if (url.startsWith('/api/') || url.startsWith('/uploads/') || url.startsWith('/metrics/')) {
+
+    // Skip API routes and static asset patterns
+    if (
+      url.startsWith('/api/') ||
+      url.startsWith('/uploads/') ||
+      url.startsWith('/metrics/') ||
+      url.startsWith('/.well-known/') ||
+      path.extname(url) !== ''
+    ) {
       return next();
     }
 
