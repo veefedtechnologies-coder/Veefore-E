@@ -12,6 +12,7 @@ import { SEO, seoConfig } from '@/lib/seo-optimization'
 import { useIsMobile } from '../hooks/use-is-mobile';
 import GlassCard from '../components/GlassCard';
 import { PricingScrollAnimation } from '../components/PricingScrollAnimation';
+import { ExpandableFeatures } from '../components/ExpandableFeatures';
 
 // Check if device should have reduced animations (low-end mobile, reduced motion preference)
 
