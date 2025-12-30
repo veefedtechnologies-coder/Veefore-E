@@ -2,17 +2,22 @@ import React, { useState, useEffect, useRef, Suspense, useCallback, memo } from 
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp,
-  Users, Sparkles, Brain, Rocket, ChevronDown, Plus,
-  Target, Clock, Shield, BarChart3, Send, Layers, Eye,
-  ChevronRight, Crown, Gauge, RefreshCw, Lock, Unlock,
+  Users, Sparkles, Brain, Rocket, Plus,
+  Clock, Shield, BarChart3, Send, Layers,
+  Crown, RefreshCw, Lock,
   X, Instagram, Twitter, Linkedin, Mail,
-  MessageCircle, Check
+  MessageCircle, Check, DollarSign, Search
 } from 'lucide-react'
-import { SEO, seoConfig } from '@/lib/seo-optimization'
+import { SEO, seoConfig } from '../lib/seo-optimization'
 import { useIsMobile } from '../hooks/use-is-mobile';
 import GlassCard from '../components/GlassCard';
 import { PricingScrollAnimation } from '../components/PricingScrollAnimation';
-import { ExpandableFeatures } from '../components/ExpandableFeatures';
+import { CinematicFeatures } from '../components/CinematicFeatures';
+import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals';
+import TargetAudienceSection from '../components/TargetAudienceSection';
+import GrowthEngineSection from '../components/GrowthEngineSection';
+import CreditSystemSection from '../components/CreditSystemSection';
+import BetaLaunchSection from '../components/BetaLaunchSection';
 
 // Check if device should have reduced animations (low-end mobile, reduced motion preference)
 
@@ -111,7 +116,38 @@ const taglines = [
   { top: "Smart comments.", bottom: "Smarter DMs." }
 ]
 
-const RotatingHeroText = () => {
+const Marquee = memo(({ children, direction = 'left' }: { children: React.ReactNode, direction?: 'left' | 'right' }) => {
+  return (
+    <div className="flex overflow-hidden w-full mask-linear-fade">
+      <motion.div
+        className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16 shrink-0 will-change-transform"
+        animate={{ x: direction === 'left' ? ["0%", "-100%"] : ["-100%", "0%"] }}
+        transition={{
+          duration: 40, // Slower, smoother
+          repeat: Infinity,
+          ease: "linear",
+          repeatType: "loop"
+        }}
+      >
+        {children}
+      </motion.div>
+      <motion.div
+        className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16 shrink-0 will-change-transform"
+        animate={{ x: direction === 'left' ? ["0%", "-100%"] : ["-100%", "0%"] }}
+        transition={{
+          duration: 40,
+          repeat: Infinity,
+          ease: "linear",
+          repeatType: "loop"
+        }}
+      >
+        {children}
+      </motion.div>
+    </div>
+  )
+})
+
+const RotatingHeroText = memo(() => {
   const isMobile = useIsMobile()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
@@ -119,7 +155,7 @@ const RotatingHeroText = () => {
 
   // Delay rotation start on mobile to allow fast initial render
   useEffect(() => {
-    const delay = isMobile ? 2000 : 500 // Give mobile 2s head start before animations
+    const delay = isMobile ? 2000 : 500
     const timer = setTimeout(() => setIsReady(true), delay)
     return () => clearTimeout(timer)
   }, [isMobile])
@@ -153,7 +189,7 @@ const RotatingHeroText = () => {
               duration: isMobile ? 0.5 : 0.9,
               ease: [0.22, 1, 0.36, 1]
             }}
-            className="absolute inset-0 flex flex-col items-center justify-center"
+            className="absolute inset-0 flex flex-col items-center justify-center will-change-transform"
             style={{ pointerEvents: isActive ? 'auto' : 'none' }}
           >
             <span className="block text-white" style={{ lineHeight: '1.15' }}>
@@ -176,7 +212,7 @@ const RotatingHeroText = () => {
       })}
     </div>
   )
-}
+})
 
 
 
@@ -390,7 +426,7 @@ const HooksPageContent = memo(() => (
 const BASE_WIDTH = 1000
 const BASE_HEIGHT = 600
 
-const AnimatedDashboard = () => {
+const AnimatedDashboard = memo(() => {
   const [activePage, setActivePage] = useState(0)
   const [cursorPos, setCursorPos] = useState({ x: 50, y: 12 })
   const [isClicking, setIsClicking] = useState(false)
@@ -564,7 +600,7 @@ const AnimatedDashboard = () => {
             <div className="grid grid-cols-12 gap-4">
               <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
                 <motion.div
-                  className="absolute pointer-events-none z-50"
+                  className="absolute pointer-events-none z-50 will-change-transform"
                   style={{ width: 20, height: 20 }}
                   animate={{
                     left: cursorPos.x - 10,
@@ -624,7 +660,7 @@ const AnimatedDashboard = () => {
       </div>
     </div>
   )
-}
+})
 
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
@@ -634,7 +670,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-  const [activeCredit, setActiveCredit] = useState(500)
   const [isScrolled, setIsScrolled] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -658,7 +693,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       tagline: 'Increase engagement velocity and consistency.',
       description: 'Fast, meaningful engagement directly boosts algorithmic reach. This is VeeFore\'s strongest differentiator.',
       details: ['Context-aware comment replies', 'Priority handling of high-value comments', 'Human-like tone control', 'Platform-safe automation limits'],
-      gradient: 'from-blue-500 to-cyan-500'
+      gradient: 'from-blue-500 to-cyan-500',
+      visual: <EngagementVisual />
     },
     {
       id: 'dm-automation',
@@ -667,7 +703,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       tagline: 'Turn DMs into scalable growth and monetization channels.',
       description: 'Creators lose opportunities in DMs. VeeFore captures them without spam.',
       details: ['Keyword-triggered replies', 'Lead qualification logic', 'Creator-defined safety boundaries', 'Advanced follow-up funnels'],
-      gradient: 'from-purple-500 to-pink-500'
+      gradient: 'from-purple-500 to-pink-500',
+      visual: <DMVisual />
     },
     {
       id: 'hook-intelligence',
@@ -676,23 +713,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       tagline: 'Remove guesswork from content creation.',
       description: 'Creators don\'t need trends. They need explanations. VeeFore provides intelligence, not noise.',
       details: ['Competitor hook extraction', 'Emotional pattern analysis', 'Niche-specific suggestions', 'Viral pattern prediction'],
-      gradient: 'from-indigo-500 to-purple-500'
+      gradient: 'from-indigo-500 to-purple-500',
+      visual: <HookVisual />
     }
-  ]
-
-  const supportFeatures = [
-    { icon: Sparkles, title: 'AI Caption Engine', desc: 'Hook-aligned captions with CTA optimization' },
-    { icon: Clock, title: 'Smart Scheduler', desc: 'Best-time recommendations with feedback loops' },
-    { icon: Eye, title: 'Competitor Intel', desc: 'Top-performing posts and pattern analysis' },
-    { icon: RefreshCw, title: 'Adaptive Learning', desc: 'AI learns and improves from your results' }
-  ]
-
-  const creditActions = [
-    { action: 'Generate Hook', icon: Sparkles },
-    { action: 'Create Caption', icon: MessageSquare },
-    { action: 'Reply Comment', icon: Send },
-    { action: 'DM Response', icon: Bot },
-    { action: 'Competitor Scan', icon: Eye }
   ]
 
   const pricingPlans = [
@@ -729,20 +752,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     }
   ]
 
-  const trialDays = [
-    { day: '1', title: 'Connect & Create', desc: 'Link your account, generate first hooks' },
-    { day: '2', title: 'Schedule & Automate', desc: 'Enable comment automation' },
-    { day: '3', title: 'See Results', desc: 'First engagement data appears' },
-    { day: '4-5', title: 'Hit Limits', desc: 'Experience upgrade motivation' },
-    { day: '6-7', title: 'Decide', desc: 'Upgrade or explore alternatives' }
-  ]
+
 
   const faqs = [
     { q: "What exactly is VeeFore?", a: "VeeFore is an AI-powered Growth Engine that actively increases engagement, reach, and visibility for creators — automatically. Unlike schedulers or content tools, VeeFore participates in your growth through AI-driven engagement automation, hook intelligence, and smart DM funnels." },
     { q: "How is VeeFore different from other tools?", a: "Most tools help you create and schedule. VeeFore helps you RESPOND faster, ENGAGE at scale, and MAINTAIN momentum. We follow a Growth-First philosophy: engagement before volume, interaction before impressions." },
     { q: "Is the automation safe?", a: "Absolutely. VeeFore uses context-aware AI with human-like tone control and strictly adheres to platform-safe automation limits. Our system mimics natural engagement patterns to protect your account." },
     { q: "How does the credit system work?", a: "1 Credit = 1 AI Action. Actions include generating hooks, creating captions, replying to comments or DMs. Credits reset monthly. Starter gets 300, Growth gets 1,200, Pro gets 3,000 credits." },
-    { q: "What's included in the free trial?", a: "7 days of Growth plan access with limits: 150 credits, 1 social account, capped automation. Experience real AI automation. No credit card required." },
+    { q: "What do I get by joining the beta?", a: "Beta members get 500 bonus credits, a surprise exclusive feature, 30 days free trial when we launch, and priority email updates about pricing and new features." },
     { q: "Who is VeeFore for?", a: "Instagram & short-form creators with 5k-200k followers who value time and want scale without spam. Not for casual posters or hobby accounts." }
   ]
 
@@ -766,12 +783,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className={`transition-all duration-500 ease-in-out ${isScrolled ? 'mx-4 mt-4' : 'mx-4 mt-4'}`}>
-            <GlassCard 
-              className={`mx-auto transition-all duration-500 ease-in-out ${
-                isScrolled 
-                  ? 'max-w-[1200px] !rounded-full bg-black/50 backdrop-blur-md border-white/10 shadow-lg px-5 py-2.5' 
-                  : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-8 py-4'
-              }`} 
+            <GlassCard
+              className={`mx-auto transition-all duration-500 ease-in-out ${isScrolled
+                ? 'max-w-[1200px] !rounded-full bg-black/50 backdrop-blur-md border-white/10 shadow-lg px-5 py-2.5'
+                : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-8 py-4'
+                }`}
               hover={false}
               showGradient={isScrolled}
             >
@@ -1123,146 +1139,133 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
           {/* Infinite Scrolling Logos Container */}
           <div className="relative">
-            <div className="flex overflow-hidden">
-              {[0, 1].map((index) => (
-                <motion.div
-                  key={index}
-                  className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16"
-                  animate={{ x: ["0%", "-100%"] }}
-                  transition={{
-                    duration: 30,
-                    repeat: Infinity,
-                    ease: "linear"
-                  }}
-                >
-                  {[
-                    {
-                      name: "Meta",
-                      category: "Social Media Leader",
-                      icon: (
-                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <title>Meta</title>
-                          <path d="M6.897 4h-.024l-.031 2.615h.022c1.715 0 3.046 1.357 5.94 6.246l.175.297.012.02 1.62-2.438-.012-.019a48.763 48.763 0 00-1.098-1.716 28.01 28.01 0 00-1.175-1.629C10.413 4.932 8.812 4 6.896 4z" fill="url(#lobe-icons-meta-fill-0)"></path>
-                          <path d="M6.873 4C4.95 4.01 3.247 5.258 2.02 7.17a4.352 4.352 0 00-.01.017l2.254 1.231.011-.017c.718-1.083 1.61-1.774 2.568-1.785h.021L6.896 4h-.023z" fill="url(#lobe-icons-meta-fill-1)"></path>
-                          <path d="M2.019 7.17l-.011.017C1.2 8.447.598 9.995.274 11.664l-.005.022 2.534.6.004-.022c.27-1.467.786-2.828 1.456-3.845l.011-.017L2.02 7.17z" fill="url(#lobe-icons-meta-fill-2)"></path>
-                          <path d="M2.807 12.264l-2.533-.6-.005.022c-.177.918-.267 1.851-.269 2.786v.023l2.598.233v-.023a12.591 12.591 0 01.21-2.44z" fill="url(#lobe-icons-meta-fill-3)"></path>
-                          <path d="M2.677 15.537a5.462 5.462 0 01-.079-.813v-.022L0 14.468v.024a8.89 8.89 0 00.146 1.652l2.535-.585a4.106 4.106 0 01-.004-.022z" fill="url(#lobe-icons-meta-fill-4)"></path>
-                          <path d="M3.27 16.89c-.284-.31-.484-.756-.589-1.328l-.004-.021-2.535.585.004.021c.192 1.01.568 1.85 1.106 2.487l.014.017 2.018-1.745a2.106 2.106 0 01-.015-.016z" fill="url(#lobe-icons-meta-fill-5)"></path>
-                          <path d="M10.78 9.654c-1.528 2.35-2.454 3.825-2.454 3.825-2.035 3.2-2.739 3.917-3.871 3.917a1.545 1.545 0 01-1.186-.508l-2.017 1.744.014.017C2.01 19.518 3.058 20 4.356 20c1.963 0 3.374-.928 5.884-5.33l1.766-3.13a41.283 41.283 0 00-1.227-1.886z" fill="#0082FB"></path>
-                          <path d="M13.502 5.946l-.016.016c-.4.43-.786.908-1.16 1.416.378.483.768 1.024 1.175 1.63.48-.743.928-1.345 1.367-1.807l.016-.016-1.382-1.24z" fill="url(#lobe-icons-meta-fill-6)"></path>
-                          <path d="M20.918 5.713C19.853 4.633 18.583 4 17.225 4c-1.432 0-2.637.787-3.723 1.944l-.016.016 1.382 1.24.016-.017c.715-.747 1.408-1.12 2.176-1.12.826 0 1.6.39 2.27 1.075l.015.016 1.589-1.425-.016-.016z" fill="#0082FB"></path>
-                          <path d="M23.998 14.125c-.06-3.467-1.27-6.566-3.064-8.396l-.016-.016-1.588 1.424.015.016c1.35 1.392 2.277 3.98 2.361 6.971v.023h2.292v-.022z" fill="url(#lobe-icons-meta-fill-7)"></path>
-                          <path d="M23.998 14.15v-.023h-2.292v.022c.004.14.006.282.006.424 0 .815-.121 1.474-.368 1.95l-.011.022 1.708 1.782.013-.02c.62-.96.946-2.293.946-3.91 0-.083 0-.165-.002-.247z" fill="url(#lobe-icons-meta-fill-8)"></path>
-                          <path d="M21.344 16.52l-.011.02c-.214.402-.519.67-.917.787l.778 2.462a3.493 3.493 0 00.438-.182 3.558 3.558 0 001.366-1.218l.044-.065.012-.02-1.71-1.784z" fill="url(#lobe-icons-meta-fill-9)"></path>
-                          <path d="M19.92 17.393c-.262 0-.492-.039-.718-.14l-.798 2.522c.449.153.927.222 1.46.222.492 0 .943-.073 1.352-.215l-.78-2.462c-.167.05-.341.075-.517.073z" fill="url(#lobe-icons-meta-fill-10)"></path>
-                          <path d="M18.323 16.534l-.014-.017-1.836 1.914.016.017c.637.682 1.246 1.105 1.937 1.337l.797-2.52c-.291-.125-.573-.353-.9-.731z" fill="url(#lobe-icons-meta-fill-11)"></path>
-                          <path d="M18.309 16.515c-.55-.642-1.232-1.712-2.303-3.44l-1.396-2.336-.011-.02-1.62 2.438.012.02.989 1.668c.959 1.61 1.74 2.774 2.493 3.585l.016.016 1.834-1.914a2.353 2.353 0 01-.014-.017z" fill="url(#lobe-icons-meta-fill-12)"></path>
-                          <defs>
-                            <linearGradient id="lobe-icons-meta-fill-0" x1="75.897%" x2="26.312%" y1="89.199%" y2="12.194%"><stop offset=".06%" stopColor="#0867DF"></stop><stop offset="45.39%" stopColor="#0668E1"></stop><stop offset="85.91%" stopColor="#0064E0"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-1" x1="21.67%" x2="97.068%" y1="75.874%" y2="23.985%"><stop offset="13.23%" stopColor="#0064DF"></stop><stop offset="99.88%" stopColor="#0064E0"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-2" x1="38.263%" x2="60.895%" y1="89.127%" y2="16.131%"><stop offset="1.47%" stopColor="#0072EC"></stop><stop offset="68.81%" stopColor="#0064DF"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-3" x1="47.032%" x2="52.15%" y1="90.19%" y2="15.745%"><stop offset="7.31%" stopColor="#007CF6"></stop><stop offset="99.43%" stopColor="#0072EC"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-4" x1="52.155%" x2="47.591%" y1="58.301%" y2="37.004%"><stop offset="7.31%" stopColor="#007FF9"></stop><stop offset="100%" stopColor="#007CF6"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-5" x1="37.689%" x2="61.961%" y1="12.502%" y2="63.624%"><stop offset="7.31%" stopColor="#007FF9"></stop><stop offset="100%" stopColor="#0082FB"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-6" x1="34.808%" x2="62.313%" y1="68.859%" y2="23.174%"><stop offset="27.99%" stopColor="#007FF8"></stop><stop offset="91.41%" stopColor="#0082FB"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-7" x1="43.762%" x2="57.602%" y1="6.235%" y2="98.514%"><stop offset="0%" stopColor="#0082FB"></stop><stop offset="99.95%" stopColor="#0081FA"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-8" x1="60.055%" x2="39.88%" y1="4.661%" y2="69.077%"><stop offset="6.19%" stopColor="#0081FA"></stop><stop offset="100%" stopColor="#0080F9"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-9" x1="30.282%" x2="61.081%" y1="59.32%" y2="33.244%"><stop offset="0%" stopColor="#027AF3"></stop><stop offset="100%" stopColor="#0080F9"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-10" x1="20.433%" x2="82.112%" y1="50.001%" y2="50.001%"><stop offset="0%" stopColor="#0377EF"></stop><stop offset="99.94%" stopColor="#0279F1"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-11" x1="40.303%" x2="72.394%" y1="35.298%" y2="57.811%"><stop offset=".19%" stopColor="#0471E9"></stop><stop offset="100%" stopColor="#0377EF"></stop></linearGradient>
-                            <linearGradient id="lobe-icons-meta-fill-12" x1="32.254%" x2="68.003%" y1="19.719%" y2="84.908%"><stop offset="27.65%" stopColor="#0867DF"></stop><stop offset="100%" stopColor="#0471E9"></stop></linearGradient>
-                          </defs>
-                        </svg>
-                      )
-                    },
-                    {
-                      name: "WhatsApp",
-                      category: "Messaging Platform",
-                      icon: (
-                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#25D366' }}>
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                        </svg>
-                      )
-                    },
-                    {
-                      name: "Instagram",
-                      category: "Social Platform",
-                      icon: (
-                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
-                          <defs>
-                            <linearGradient id="igGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                              <stop offset="0%" stopColor="#f09433" />
-                              <stop offset="25%" stopColor="#e6683c" />
-                              <stop offset="50%" stopColor="#dc2743" />
-                              <stop offset="75%" stopColor="#cc2366" />
-                              <stop offset="100%" stopColor="#bc1888" />
-                            </linearGradient>
-                          </defs>
-                          <path fill="url(#igGradient)" d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.069-4.85.069-3.204 0-3.584-.012-4.849-.069-3.225-.149-4.771-1.664-4.919-4.919-.058-1.265-.069-1.644-.069-4.849 0-3.204.012-3.584.069-4.849.149-3.225 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                        </svg>
-                      )
-                    },
-                    {
-                      name: "ChatGPT",
-                      category: "AI Assistant",
-                      icon: (
-                        <svg
-                          className="w-10 h-10"
-                          xmlns="http://www.w3.org/2000/svg"
-                          shapeRendering="geometricPrecision"
-                          textRendering="geometricPrecision"
-                          imageRendering="optimizeQuality"
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          viewBox="0 0 512 509.639"
-                        >
-                          <path fill="#fff" d="M115.612 0h280.775C459.974 0 512 52.026 512 115.612v278.415c0 63.587-52.026 115.613-115.613 115.613H115.612C52.026 509.64 0 457.614 0 394.027V115.612C0 52.026 52.026 0 115.612 0z" />
-                          <path fillRule="nonzero" fill="black" d="M412.037 221.764a90.834 90.834 0 004.648-28.67 90.79 90.79 0 00-12.443-45.87c-16.37-28.496-46.738-46.089-79.605-46.089-6.466 0-12.943.683-19.264 2.04a90.765 90.765 0 00-67.881-30.515h-.576c-.059.002-.149.002-.216.002-39.807 0-75.108 25.686-87.346 63.554-25.626 5.239-47.748 21.31-60.682 44.03a91.873 91.873 0 00-12.407 46.077 91.833 91.833 0 0023.694 61.553 90.802 90.802 0 00-4.649 28.67 90.804 90.804 0 0012.442 45.87c16.369 28.504 46.74 46.087 79.61 46.087a91.81 91.81 0 0019.253-2.04 90.783 90.783 0 0067.887 30.516h.576l.234-.001c39.829 0 75.119-25.686 87.357-63.588 25.626-5.242 47.748-21.312 60.682-44.033a91.718 91.718 0 0012.383-46.035 91.83 91.83 0 00-23.693-61.553l-.004-.005zM275.102 413.161h-.094a68.146 68.146 0 01-43.611-15.8 56.936 56.936 0 002.155-1.221l72.54-41.901a11.799 11.799 0 005.962-10.251V241.651l30.661 17.704c.326.163.55.479.596.84v84.693c-.042 37.653-30.554 68.198-68.21 68.273h.001zm-146.689-62.649a68.128 68.128 0 01-9.152-34.085c0-3.904.341-7.817 1.005-11.663.539.323 1.48.897 2.155 1.285l72.54 41.901a11.832 11.832 0 0011.918-.002l88.563-51.137v35.408a1.1 1.1 0 01-.438.94l-73.33 42.339a68.43 68.43 0 01-34.11 9.12 68.359 68.359 0 01-59.15-34.11l-.001.004zm-19.083-158.36a68.044 68.044 0 0135.538-29.934c0 .625-.036 1.731-.036 2.5v83.801l-.001.07a11.79 11.79 0 005.954 10.242l88.564 51.13-30.661 17.704a1.096 1.096 0 01-1.034.093l-73.337-42.375a68.36 68.36 0 01-34.095-59.143 68.412 68.412 0 019.112-34.085l-.004-.003zm251.907 58.621l-88.563-51.137 30.661-17.697a1.097 1.097 0 011.034-.094l73.337 42.339c21.109 12.195 34.132 34.746 34.132 59.132 0 28.604-17.849 54.199-44.686 64.078v-86.308c.004-.032.004-.065.004-.096 0-4.219-2.261-8.119-5.919-10.217zm30.518-45.93c-.539-.331-1.48-.898-2.155-1.286l-72.54-41.901a11.842 11.842 0 00-5.958-1.611c-2.092 0-4.15.558-5.957 1.611l-88.564 51.137v-35.408l-.001-.061a1.1 1.1 0 01.44-.88l73.33-42.303a68.301 68.301 0 0134.108-9.129c37.704 0 68.281 30.577 68.281 68.281a68.69 68.69 0 01-.984 11.545v.005zm-191.843 63.109l-30.668-17.704a1.09 1.09 0 01-.596-.84v-84.692c.016-37.685 30.593-68.236 68.281-68.236a68.332 68.332 0 0143.689 15.804 63.09 63.09 0 00-2.155 1.222l-72.54 41.9a11.794 11.794 0 00-5.961 10.248v.068l-.05 102.23zm16.655-35.91l39.445-22.782 39.444 22.767v45.55l-39.444 22.767-39.445-22.767v-45.535z" /></svg>
-                      )
-                    },
-                    {
-                      name: "YouTube",
-                      category: "Video Platform",
-                      icon: (
-                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#FF0000' }}>
-                          <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                        </svg>
-                      )
-                    },
-                    {
-                      name: "Twitter",
-                      category: "Social Network",
-                      icon: (
-                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" transform="scale(0.85)">
-                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                        </svg>
-                      )
-                    },
-                    {
-                      name: "LinkedIn",
-                      category: "Professional Network",
-                      icon: (
-                        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#0077B5' }}>
-                          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                        </svg>
-                      )
-                    }
-                  ].map((brand, i) => (
-                    <div key={i} className="flex flex-col items-center justify-center min-w-[150px] md:min-w-[180px]">
-                      <div className="flex items-center space-x-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 md:px-6 md:py-4 hover:bg-white/10 transition-all cursor-pointer group w-full justify-center">
-                        <div className="flex items-center justify-center transition-transform group-hover:scale-110">
-                          {brand.icon}
-                        </div>
-                        <div>
-                          <p className="text-white font-bold text-base md:text-lg">{brand.name}</p>
-                          <p className="text-white/40 text-[10px] md:text-xs">{brand.category}</p>
-                        </div>
-                      </div>
+            <Marquee>
+              {[
+                {
+                  name: "Meta",
+                  category: "Social Media Leader",
+                  icon: (
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <title>Meta</title>
+                      <path d="M6.897 4h-.024l-.031 2.615h.022c1.715 0 3.046 1.357 5.94 6.246l.175.297.012.02 1.62-2.438-.012-.019a48.763 48.763 0 00-1.098-1.716 28.01 28.01 0 00-1.175-1.629C10.413 4.932 8.812 4 6.896 4z" fill="url(#lobe-icons-meta-fill-0)"></path>
+                      <path d="M6.873 4C4.95 4.01 3.247 5.258 2.02 7.17a4.352 4.352 0 00-.01.017l2.254 1.231.011-.017c.718-1.083 1.61-1.774 2.568-1.785h.021L6.896 4h-.023z" fill="url(#lobe-icons-meta-fill-1)"></path>
+                      <path d="M2.019 7.17l-.011.017C1.2 8.447.598 9.995.274 11.664l-.005.022 2.534.6.004-.022c.27-1.467.786-2.828 1.456-3.845l.011-.017L2.02 7.17z" fill="url(#lobe-icons-meta-fill-2)"></path>
+                      <path d="M2.807 12.264l-2.533-.6-.005.022c-.177.918-.267 1.851-.269 2.786v.023l2.598.233v-.023a12.591 12.591 0 01.21-2.44z" fill="url(#lobe-icons-meta-fill-3)"></path>
+                      <path d="M2.677 15.537a5.462 5.462 0 01-.079-.813v-.022L0 14.468v.024a8.89 8.89 0 00.146 1.652l2.535-.585a4.106 4.106 0 01-.004-.022z" fill="url(#lobe-icons-meta-fill-4)"></path>
+                      <path d="M3.27 16.89c-.284-.31-.484-.756-.589-1.328l-.004-.021-2.535.585.004.021c.192 1.01.568 1.85 1.106 2.487l.014.017 2.018-1.745a2.106 2.106 0 01-.015-.016z" fill="url(#lobe-icons-meta-fill-5)"></path>
+                      <path d="M10.78 9.654c-1.528 2.35-2.454 3.825-2.454 3.825-2.035 3.2-2.739 3.917-3.871 3.917a1.545 1.545 0 01-1.186-.508l-2.017 1.744.014.017C2.01 19.518 3.058 20 4.356 20c1.963 0 3.374-.928 5.884-5.33l1.766-3.13a41.283 41.283 0 00-1.227-1.886z" fill="#0082FB"></path>
+                      <path d="M13.502 5.946l-.016.016c-.4.43-.786.908-1.16 1.416.378.483.768 1.024 1.175 1.63.48-.743.928-1.345 1.367-1.807l.016-.016-1.382-1.24z" fill="url(#lobe-icons-meta-fill-6)"></path>
+                      <path d="M20.918 5.713C19.853 4.633 18.583 4 17.225 4c-1.432 0-2.637.787-3.723 1.944l-.016.016 1.382 1.24.016-.017c.715-.747 1.408-1.12 2.176-1.12.826 0 1.6.39 2.27 1.075l.015.016 1.589-1.425-.016-.016z" fill="#0082FB"></path>
+                      <path d="M23.998 14.125c-.06-3.467-1.27-6.566-3.064-8.396l-.016-.016-1.588 1.424.015.016c1.35 1.392 2.277 3.98 2.361 6.971v.023h2.292v-.022z" fill="url(#lobe-icons-meta-fill-7)"></path>
+                      <path d="M23.998 14.15v-.023h-2.292v.022c.004.14.006.282.006.424 0 .815-.121 1.474-.368 1.95l-.011.022 1.708 1.782.013-.02c.62-.96.946-2.293.946-3.91 0-.083 0-.165-.002-.247z" fill="url(#lobe-icons-meta-fill-8)"></path>
+                      <path d="M21.344 16.52l-.011.02c-.214.402-.519.67-.917.787l.778 2.462a3.493 3.493 0 00.438-.182 3.558 3.558 0 001.366-1.218l.044-.065.012-.02-1.71-1.784z" fill="url(#lobe-icons-meta-fill-9)"></path>
+                      <path d="M19.92 17.393c-.262 0-.492-.039-.718-.14l-.798 2.522c.449.153.927.222 1.46.222.492 0 .943-.073 1.352-.215l-.78-2.462c-.167.05-.341.075-.517.073z" fill="url(#lobe-icons-meta-fill-10)"></path>
+                      <path d="M18.323 16.534l-.014-.017-1.836 1.914.016.017c.637.682 1.246 1.105 1.937 1.337l.797-2.52c-.291-.125-.573-.353-.9-.731z" fill="url(#lobe-icons-meta-fill-11)"></path>
+                      <path d="M18.309 16.515c-.55-.642-1.232-1.712-2.303-3.44l-1.396-2.336-.011-.02-1.62 2.438.012.02.989 1.668c.959 1.61 1.74 2.774 2.493 3.585l.016.016 1.834-1.914a2.353 2.353 0 01-.014-.017z" fill="url(#lobe-icons-meta-fill-12)"></path>
+                      <defs>
+                        <linearGradient id="lobe-icons-meta-fill-0" x1="75.897%" x2="26.312%" y1="89.199%" y2="12.194%"><stop offset=".06%" stopColor="#0867DF"></stop><stop offset="45.39%" stopColor="#0668E1"></stop><stop offset="85.91%" stopColor="#0064E0"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-1" x1="21.67%" x2="97.068%" y1="75.874%" y2="23.985%"><stop offset="13.23%" stopColor="#0064DF"></stop><stop offset="99.88%" stopColor="#0064E0"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-2" x1="38.263%" x2="60.895%" y1="89.127%" y2="16.131%"><stop offset="1.47%" stopColor="#0072EC"></stop><stop offset="68.81%" stopColor="#0064DF"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-3" x1="47.032%" x2="52.15%" y1="90.19%" y2="15.745%"><stop offset="7.31%" stopColor="#007CF6"></stop><stop offset="99.43%" stopColor="#0072EC"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-4" x1="52.155%" x2="47.591%" y1="58.301%" y2="37.004%"><stop offset="7.31%" stopColor="#007FF9"></stop><stop offset="100%" stopColor="#007CF6"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-5" x1="37.689%" x2="61.961%" y1="12.502%" y2="63.624%"><stop offset="7.31%" stopColor="#007FF9"></stop><stop offset="100%" stopColor="#0082FB"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-6" x1="34.808%" x2="62.313%" y1="68.859%" y2="23.174%"><stop offset="27.99%" stopColor="#007FF8"></stop><stop offset="91.41%" stopColor="#0082FB"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-7" x1="43.762%" x2="57.602%" y1="6.235%" y2="98.514%"><stop offset="0%" stopColor="#0082FB"></stop><stop offset="99.95%" stopColor="#0081FA"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-8" x1="60.055%" x2="39.88%" y1="4.661%" y2="69.077%"><stop offset="6.19%" stopColor="#0081FA"></stop><stop offset="100%" stopColor="#0080F9"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-9" x1="30.282%" x2="61.081%" y1="59.32%" y2="33.244%"><stop offset="0%" stopColor="#027AF3"></stop><stop offset="100%" stopColor="#0080F9"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-10" x1="20.433%" x2="82.112%" y1="50.001%" y2="50.001%"><stop offset="0%" stopColor="#0377EF"></stop><stop offset="99.94%" stopColor="#0279F1"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-11" x1="40.303%" x2="72.394%" y1="35.298%" y2="57.811%"><stop offset=".19%" stopColor="#0471E9"></stop><stop offset="100%" stopColor="#0377EF"></stop></linearGradient>
+                        <linearGradient id="lobe-icons-meta-fill-12" x1="32.254%" x2="68.003%" y1="19.719%" y2="84.908%"><stop offset="27.65%" stopColor="#0867DF"></stop><stop offset="100%" stopColor="#0471E9"></stop></linearGradient>
+                      </defs>
+                    </svg>
+                  )
+                },
+                {
+                  name: "WhatsApp",
+                  category: "Messaging Platform",
+                  icon: (
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#25D366' }}>
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                    </svg>
+                  )
+                },
+                {
+                  name: "Instagram",
+                  category: "Social Platform",
+                  icon: (
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
+                      <defs>
+                        <linearGradient id="igGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#f09433" />
+                          <stop offset="25%" stopColor="#e6683c" />
+                          <stop offset="50%" stopColor="#dc2743" />
+                          <stop offset="75%" stopColor="#cc2366" />
+                          <stop offset="100%" stopColor="#bc1888" />
+                        </linearGradient>
+                      </defs>
+                      <path fill="url(#igGradient)" d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.069-4.85.069-3.204 0-3.584-.012-4.849-.069-3.225-.149-4.771-1.664-4.919-4.919-.058-1.265-.069-1.644-.069-4.849 0-3.204.012-3.584.069-4.849.149-3.225 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                    </svg>
+                  )
+                },
+                {
+                  name: "ChatGPT",
+                  category: "AI Assistant",
+                  icon: (
+                    <svg
+                      className="w-10 h-10"
+                      xmlns="http://www.w3.org/2000/svg"
+                      shapeRendering="geometricPrecision"
+                      textRendering="geometricPrecision"
+                      imageRendering="optimizeQuality"
+                      fillRule="evenodd"
+                      clipRule="evenodd"
+                      viewBox="0 0 512 509.639"
+                    >
+                      <path fill="#fff" d="M115.612 0h280.775C459.974 0 512 52.026 512 115.612v278.415c0 63.587-52.026 115.613-115.613 115.613H115.612C52.026 509.64 0 457.614 0 394.027V115.612C0 52.026 52.026 0 115.612 0z" />
+                      <path fillRule="nonzero" fill="black" d="M412.037 221.764a90.834 90.834 0 004.648-28.67 90.79 90.79 0 00-12.443-45.87c-16.37-28.496-46.738-46.089-79.605-46.089-6.466 0-12.943.683-19.264 2.04a90.765 90.765 0 00-67.881-30.515h-.576c-.059.002-.149.002-.216.002-39.807 0-75.108 25.686-87.346 63.554-25.626 5.239-47.748 21.31-60.682 44.03a91.873 91.873 0 00-12.407 46.077 91.833 91.833 0 0023.694 61.553 90.802 90.802 0 00-4.649 28.67 90.804 90.804 0 0012.442 45.87c16.369 28.504 46.74 46.087 79.61 46.087a91.81 91.81 0 0019.253-2.04 90.783 90.783 0 0067.887 30.516h.576l.234-.001c39.829 0 75.119-25.686 87.357-63.588 25.626-5.242 47.748-21.312 60.682-44.033a91.718 91.718 0 0012.383-46.035 91.83 91.83 0 00-23.693-61.553l-.004-.005zM275.102 413.161h-.094a68.146 68.146 0 01-43.611-15.8 56.936 56.936 0 002.155-1.221l72.54-41.901a11.799 11.799 0 005.962-10.251V241.651l30.661 17.704c.326.163.55.479.596.84v84.693c-.042 37.653-30.554 68.198-68.21 68.273h.001zm-146.689-62.649a68.128 68.128 0 01-9.152-34.085c0-3.904.341-7.817 1.005-11.663.539.323 1.48.897 2.155 1.285l72.54 41.901a11.832 11.832 0 0011.918-.002l88.563-51.137v35.408a1.1 1.1 0 01-.438.94l-73.33 42.339a68.43 68.43 0 01-34.11 9.12 68.359 68.359 0 01-59.15-34.11l-.001.004zm-19.083-158.36a68.044 68.044 0 0135.538-29.934c0 .625-.036 1.731-.036 2.5v83.801l-.001.07a11.79 11.79 0 005.954 10.242l88.564 51.13-30.661 17.704a1.096 1.096 0 01-1.034.093l-73.337-42.375a68.36 68.36 0 01-34.095-59.143 68.412 68.412 0 019.112-34.085l-.004-.003zm251.907 58.621l-88.563-51.137 30.661-17.697a1.097 1.097 0 011.034-.094l73.337 42.339c21.109 12.195 34.132 34.746 34.132 59.132 0 28.604-17.849 54.199-44.686 64.078v-86.308c.004-.032.004-.065.004-.096 0-4.219-2.261-8.119-5.919-10.217zm30.518-45.93c-.539-.331-1.48-.898-2.155-1.286l-72.54-41.901a11.842 11.842 0 00-5.958-1.611c-2.092 0-4.15.558-5.957 1.611l-88.564 51.137v-35.408l-.001-.061a1.1 1.1 0 01.44-.88l73.33-42.303a68.301 68.301 0 0134.108-9.129c37.704 0 68.281 30.577 68.281 68.281a68.69 68.69 0 01-.984 11.545v.005zm-191.843 63.109l-30.668-17.704a1.09 1.09 0 01-.596-.84v-84.692c.016-37.685 30.593-68.236 68.281-68.236a68.332 68.332 0 0143.689 15.804 63.09 63.09 0 00-2.155 1.222l-72.54 41.9a11.794 11.794 0 00-5.961 10.248v.068l-.05 102.23zm16.655-35.91l39.445-22.782 39.444 22.767v45.55l-39.444 22.767-39.445-22.767v-45.535z" /></svg>
+                  )
+                },
+                {
+                  name: "YouTube",
+                  category: "Video Platform",
+                  icon: (
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#FF0000' }}>
+                      <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                    </svg>
+                  )
+                },
+                {
+                  name: "Twitter",
+                  category: "Social Network",
+                  icon: (
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" transform="scale(0.85)">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                    </svg>
+                  )
+                },
+                {
+                  name: "LinkedIn",
+                  category: "Professional Network",
+                  icon: (
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#0077B5' }}>
+                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                    </svg>
+                  )
+                }
+              ].map((brand, i) => (
+                <div key={i} className="flex flex-col items-center justify-center min-w-[150px] md:min-w-[180px]">
+                  <div className="flex items-center space-x-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 md:px-6 md:py-4 hover:bg-white/10 transition-all cursor-pointer group w-full justify-center">
+                    <div className="flex items-center justify-center transition-transform group-hover:scale-110">
+                      {brand.icon}
                     </div>
-                  ))}
-                </motion.div>
+                    <div>
+                      <p className="text-white font-bold text-base md:text-lg">{brand.name}</p>
+                      <p className="text-white/40 text-[10px] md:text-xs">{brand.category}</p>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </div>
+            </Marquee>
 
             {/* Gradient overlays for smooth fade effect */}
             <div className="absolute top-0 left-0 w-12 md:w-32 h-full bg-gradient-to-r from-black to-transparent z-10 pointer-events-none"></div>
@@ -1473,7 +1476,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             {/* Desktop: Ascending graph layout */}
             <div className="hidden md:block">
               {/* SVG Graph with wavy ascending line */}
-              <svg className="absolute inset-0 w-full h-[400px] pointer-events-none" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid meet">
+              <svg className="absolute inset-0 w-full h-[400px] pointer-events-none will-change-transform" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid meet">
                 <defs>
                   <linearGradient id="graphLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#3b82f6" />
@@ -1582,7 +1585,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.5 + i * 0.3, type: "spring", stiffness: 100 }}
-                    className="absolute"
+                    className="absolute will-change-transform"
                     style={{ top: item.top, left: item.left }}
                   >
                     <div className="flex items-start gap-3">
@@ -1611,7 +1614,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             {/* Mobile: Vertical curved layout */}
             <div className="md:hidden relative px-4">
               {/* Curved SVG connector */}
-              <svg className="absolute left-0 top-0 w-full h-full pointer-events-none" viewBox="0 0 100 400" preserveAspectRatio="none">
+              <svg className="absolute left-0 top-0 w-full h-full pointer-events-none will-change-transform" viewBox="0 0 100 400" preserveAspectRatio="none">
                 <motion.path
                   d="M 20 20 Q 30 80, 20 120 Q 10 160, 20 200 Q 30 240, 20 280 Q 10 320, 20 360"
                   fill="none"
@@ -1944,286 +1947,39 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Who is VeeFore For - Target Audience Section */}
-      <section className="py-24 relative w-full overflow-hidden">
-        <div className="w-full px-4 md:px-12 lg:px-20">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-bold text-green-400 uppercase tracking-widest mb-6">
-              <Target className="w-4 h-4" />
-              <span>Target Audience</span>
-            </div>
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-              Who is VeeFore <span className="text-green-400">for?</span>
-            </h2>
-          </div>
+      <TargetAudienceSection />
 
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div>
-              <GlassCard className="p-8 !bg-gradient-to-br !from-green-500/[0.05] !to-emerald-500/[0.05] !border-green-500/20 h-full">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6 text-green-400" />
-                  </div>
-                  <h3 className="text-xl font-bold text-green-400">VeeFore is FOR</h3>
-                </div>
-                <div className="space-y-4">
-                  {[
-                    { text: 'Instagram & short-form creators', icon: Instagram },
-                    { text: '5k–200k follower range', icon: Users },
-                    { text: 'Creators who value time', icon: Clock },
-                    { text: 'Creators who want scale without spam', icon: Zap }
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center space-x-4 group">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                        <item.icon className="w-5 h-5 text-white" />
-                      </div>
-                      <span className="text-white/70">{item.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </GlassCard>
-            </div>
-
-            <div>
-              <GlassCard className="p-8 !bg-white/[0.01] h-full">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                    <X className="w-6 h-6 text-white/40" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white/40">VeeFore is NOT for</h3>
-                </div>
-                <div className="space-y-4">
-                  {[
-                    'Casual posters',
-                    'Hobby accounts',
-                    'People seeking free tools'
-                  ].map((text, i) => (
-                    <div key={i} className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                        <X className="w-5 h-5 text-white/30" />
-                      </div>
-                      <span className="text-white/40">{text}</span>
-                    </div>
-                  ))}
-                </div>
-              </GlassCard>
-            </div>
+      {/* Hero Features - Cinematic Scroll */}
+      <section id="features" className="relative bg-black">
+        <div className="py-24 text-center">
+          <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
+            <Layers className="w-4 h-4" />
+            <span>GAME-CHANGING FEATURES</span>
           </div>
+          <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
+            Everything You Need to <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Scale</span>
+          </h2>
+          <p className="text-xl text-white/40 max-w-2xl mx-auto px-4">
+            Stop guessing. Start growing. VeeFore gives you the AI-powered tools to create, engage, and convert like top 1% creators.
+          </p>
         </div>
-      </section >
 
-      {/* Hero Features - Layer 1 */}
-      < section id="features" className="py-32 relative" >
-        <GradientOrb className="w-[600px] h-[600px] top-0 left-1/2 -translate-x-1/2" color="blue" />
+        <CinematicFeatures features={heroFeatures} />
+      </section>
 
-        <div className="max-w-[1200px] mx-auto px-6 relative">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">
-              <Layers className="w-4 h-4" />
-              <span>Hero Growth Features</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              The USP <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Drivers</span>
-            </h2>
-            <p className="text-xl text-white/40 max-w-2xl mx-auto">
-              These features are VeeFore's public identity. They're what users remember and talk about.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {heroFeatures.map((feature) => (
-              <div key={feature.id}>
-                <TiltCard className="h-full">
-                  <GlassCard
-                    className={`p-8 h-full cursor-pointer transition-all duration-500 ${expandedFeature === feature.id ? '!border-blue-500/30 !bg-blue-500/[0.05]' : ''
-                      }`}
-                    onClick={() => setExpandedFeature(expandedFeature === feature.id ? null : feature.id)}
-                  >
-                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 shadow-lg`}>
-                      <feature.icon className="w-7 h-7 text-white" />
-                    </div>
-
-                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                    <p className="text-white/50 text-sm mb-4">{feature.tagline}</p>
-
-                    <AnimatePresence>
-                      {expandedFeature === feature.id && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="pt-4 border-t border-white/10">
-                            <p className="text-white/40 text-sm mb-4">{feature.description}</p>
-                            <ul className="space-y-2">
-                              {feature.details.map((detail, j) => (
-                                <li key={j} className="flex items-center space-x-2 text-sm">
-                                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                                  <span className="text-white/60">{detail}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    <button className="flex items-center space-x-1 text-blue-400 text-sm font-medium mt-4 group">
-                      <span>{expandedFeature === feature.id ? 'Show Less' : 'Learn More'}</span>
-                      <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${expandedFeature === feature.id ? 'rotate-180' : ''}`} />
-                    </button>
-                  </GlassCard>
-                </TiltCard>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section >
-
-      {/* Support Features - Layer 2 */}
-      < section className="py-24 relative" >
-        <div className="max-w-[1200px] mx-auto px-6">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4">
-              <span>Core Support Systems</span>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold">Features that <span className="text-indigo-400">Enable</span> Growth</h2>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-4">
-            {supportFeatures.map((feature, i) => (
-              <div key={i}>
-                <GlassCard className="p-6 text-center h-full">
-                  <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
-                    <feature.icon className="w-6 h-6 text-indigo-400" />
-                  </div>
-                  <h4 className="font-bold mb-1">{feature.title}</h4>
-                  <p className="text-xs text-white/40">{feature.desc}</p>
-                </GlassCard>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8">
-            <GlassCard className="p-8 !bg-gradient-to-r !from-purple-500/[0.05] !to-indigo-500/[0.05]">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center space-x-6">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-xl shadow-purple-500/20">
-                    <RefreshCw className="w-8 h-8 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-1">Intelligence Engine</p>
-                    <h4 className="text-2xl font-bold">Adaptive AI Growth Loop</h4>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3 text-sm text-white/40 flex-wrap justify-center">
-                  {['Post', 'Collect Data', 'AI Learns', 'Improve'].map((step, i) => (
-                    <React.Fragment key={step}>
-                      <span className={`px-3 py-1.5 rounded-full ${i === 3 ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5'}`}>{step}</span>
-                      {i < 3 && <ChevronRight className="w-4 h-4 text-white/20" />}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-            </GlassCard>
-          </div>
-        </div>
-      </section >
+      {/* Support Features - Growth Engine Section */}
+      <GrowthEngineSection />
 
       {/* Credit System */}
-      < section className="py-32 relative" >
-        <GradientOrb className="w-[500px] h-[500px] bottom-0 right-0" color="cyan" />
+      <CreditSystemSection />
 
-        <div className="max-w-[1200px] mx-auto px-6 relative">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-400 uppercase tracking-widest mb-6">
-              <Gauge className="w-4 h-4" />
-              <span>Credit System</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Simple. <span className="text-amber-400">Fair.</span> Predictable.
-            </h2>
-            <p className="text-xl text-white/40 max-w-2xl mx-auto">
-              1 Credit = 1 AI Action. No hidden costs, no complexity.
-            </p>
-          </div>
+      {/* VeeFore vs Traditional Tools - "The Evolution" Section */}
+      <section className="py-24 relative overflow-hidden">
+        {/* Background Atmosphere */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-900/5 to-transparent pointer-events-none" />
+        <GradientOrb className="w-[500px] h-[500px] top-1/2 right-0 translate-x-1/2 -translate-y-1/2 opacity-30" color="indigo" />
 
-          {/* Credit Actions - Responsive Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
-            {creditActions.map((item, i) => (
-              <div key={i}>
-                <GlassCard className="p-4 md:p-6 text-center !bg-amber-500/[0.02] hover:!bg-amber-500/[0.05] transition-all">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
-                    <item.icon className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
-                  </div>
-                  <p className="text-[10px] md:text-xs text-white/50 mb-2">{item.action}</p>
-                  <p className="text-xl md:text-2xl font-bold text-amber-400">1</p>
-                  <p className="text-[10px] md:text-xs text-white/30">credit</p>
-                </GlassCard>
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <GlassCard className="p-6 md:p-8">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                <h4 className="font-bold">Monthly Credit Usage</h4>
-                <motion.div
-                  className="text-3xl md:text-4xl font-bold text-amber-400"
-                  key={activeCredit}
-                  initial={{ scale: 1.1 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                >
-                  {activeCredit.toLocaleString()}
-                </motion.div>
-              </div>
-              <input
-                type="range"
-                min="100"
-                max="3000"
-                value={activeCredit}
-                onChange={(e) => setActiveCredit(Number(e.target.value))}
-                className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-amber-500/30"
-              />
-              <div className="flex justify-between mt-4 text-xs md:text-sm text-white/30">
-                <span>Starter (300)</span>
-                <span>Growth (1,200)</span>
-                <span>Pro (3,000)</span>
-              </div>
-            </GlassCard>
-          </div>
-
-          <div className="mt-8">
-            <div className="text-center mb-6">
-              <h4 className="text-lg font-bold text-white/80 mb-2">Need more credits?</h4>
-              <p className="text-sm text-white/40">Purchase add-on packs anytime</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { credits: 200, price: 199 },
-                { credits: 500, price: 399 },
-                { credits: 1000, price: 699 }
-              ].map((addon, i) => (
-                <GlassCard key={i} className="p-5 text-center hover:!border-amber-500/30 transition-all cursor-pointer group">
-                  <div className="flex items-center justify-center space-x-2 mb-2">
-                    <Plus className="w-4 h-4 text-amber-400" />
-                    <span className="text-2xl font-bold text-amber-400 group-hover:scale-110 transition-transform">{addon.credits}</span>
-                    <span className="text-sm text-white/40">credits</span>
-                  </div>
-                  <p className="text-lg font-bold text-white">₹{addon.price}</p>
-                  <p className="text-xs text-white/30 mt-1">One-time purchase</p>
-                </GlassCard>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section >
-
-      {/* VeeFore vs Traditional Tools - Comparison Section */}
-      < section className="py-24 relative" >
-        <div className="max-w-[1200px] mx-auto px-6">
+        <div className="max-w-[1100px] mx-auto px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -2233,65 +1989,106 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           >
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-400 uppercase tracking-widest mb-6">
               <BarChart3 className="w-4 h-4" />
-              <span>Comparison</span>
+              <span>The Evolution</span>
             </div>
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-              VeeFore vs <span className="text-indigo-400">Traditional Tools</span>
+              Stop <span className="text-white/40 decoration-red-500/50 line-through">Managing</span>. Start <span className="text-indigo-400">Scaling</span>.
             </h2>
             <p className="text-lg text-white/40 max-w-2xl mx-auto">
-              See why creators are switching to VeeFore
+              Traditional tools were built for 2015. VeeFore is built for the AI era.
             </p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-          >
-            <GlassCard className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[600px]">
-                  <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="p-4 md:p-6 text-left text-sm font-bold text-white/60">Category</th>
-                      <th className="p-4 md:p-6 text-center text-sm font-bold text-white/40">Traditional Tools</th>
-                      <th className="p-4 md:p-6 text-center text-sm font-bold bg-gradient-to-r from-blue-500/10 to-purple-500/10">
-                        <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">VeeFore</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { category: 'Primary Focus', traditional: 'Posting & Scheduling', veefore: 'Engagement & Growth' },
-                      { category: 'Automation', traditional: 'None or Basic', veefore: 'AI-Driven Smart Automation' },
-                      { category: 'Intelligence', traditional: 'Static Analytics', veefore: 'Actionable Recommendations' },
-                      { category: 'Growth Approach', traditional: 'Passive / Manual', veefore: 'Active & Automatic' },
-                      { category: 'DM Handling', traditional: 'Manual Only', veefore: 'Smart AI Funnels' },
-                      { category: 'Learning', traditional: 'No Adaptation', veefore: 'Adaptive AI Loop' }
-                    ].map((row, i) => (
-                      <tr key={i} className="border-b border-white/5 last:border-0">
-                        <td className="p-4 md:p-6 text-sm font-medium text-white/80">{row.category}</td>
-                        <td className="p-4 md:p-6 text-center">
-                          <div className="flex items-center justify-center space-x-2">
-                            <X className="w-4 h-4 text-red-400/60" />
-                            <span className="text-sm text-white/40">{row.traditional}</span>
+          <div className="space-y-4">
+            {[
+              {
+                oldTitle: "Manual Grinding",
+                oldDesc: "Hours of typing replies one by one. Slow, exhausting, and unscalable.",
+                oldIcon: X,
+                newTitle: "Velocity Engine",
+                newDesc: "AI replies instantly with context. Boosts algorithm scores while you sleep.",
+                newIcon: Zap,
+                gradient: "from-blue-600 to-cyan-500",
+                metric: "< 2s Response"
+              },
+              {
+                oldTitle: "Leaking Bucket",
+                oldDesc: "Missed leads and forgotten follow-ups. Money left on the table daily.",
+                oldIcon: Lock,
+                newTitle: "Conversion Machine",
+                newDesc: "24/7 Sales Funnel that qualifies leads and sends payment links automatically.",
+                newIcon: DollarSign,
+                gradient: "from-emerald-600 to-green-500",
+                metric: "+24% Sales"
+              },
+              {
+                oldTitle: "Guesswork",
+                oldDesc: "Posting blindly and hoping for luck without understanding viral drivers.",
+                oldIcon: Search,
+                newTitle: "Viral Intelligence",
+                newDesc: "Analyze top performers to extract exact hooks and patterns that guarantee reach.",
+                newIcon: Brain,
+                gradient: "from-purple-600 to-pink-500",
+                metric: "94% Accuracy"
+              }
+            ].map((card, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <div className="group relative overflow-hidden rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all duration-500">
+                  {/* Subtle hover glow */}
+                  <div className={`absolute inset-0 bg-gradient-to-r ${card.gradient} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-500 pointer-events-none`} />
+
+                  <div className="flex flex-col md:flex-row items-stretch">
+                    {/* Old Way - 40% width */}
+                    <div className="p-6 md:p-8 md:w-[40%] flex flex-col justify-center border-b md:border-b-0 md:border-r border-white/5 bg-white/[0.01]">
+                      <div className="flex items-center space-x-3 mb-3 opacity-40 grayscale transition-all duration-500 group-hover:grayscale-0 group-hover:opacity-60">
+                        <card.oldIcon size={18} />
+                        <h3 className="text-xs font-bold uppercase tracking-widest">{card.oldTitle}</h3>
+                      </div>
+                      <p className="text-sm text-white/30 leading-relaxed">{card.oldDesc}</p>
+                    </div>
+
+                    {/* New Way - 60% width */}
+                    <div className="p-6 md:p-8 md:w-[60%] flex flex-col justify-center relative">
+                      <div className="absolute top-3 right-4 md:top-4 md:right-6 text-[9px] font-mono uppercase tracking-widest text-white/20">VeeFore</div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-4 sm:gap-0">
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-2.5 rounded-xl bg-gradient-to-br ${card.gradient} text-white shadow-lg shadow-black/50`}>
+                            <card.newIcon size={20} />
                           </div>
-                        </td>
-                        <td className="p-4 md:p-6 text-center bg-gradient-to-r from-blue-500/5 to-purple-500/5">
-                          <div className="flex items-center justify-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-green-400" />
-                            <span className="text-sm text-white/80 font-medium">{row.veefore}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </GlassCard>
-          </motion.div>
+                          <h3 className="text-xl font-bold text-white tracking-tight">{card.newTitle}</h3>
+                        </div>
+                        {/* Metric */}
+                        <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 w-fit">
+                          <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${card.gradient}`} />
+                          <span className="text-xs font-mono font-medium text-white/70">{card.metric}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm md:text-base text-white/50 pl-0 md:pl-[58px] leading-relaxed group-hover:text-white/70 transition-colors duration-300">
+                        {card.newDesc}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="mt-16 text-center">
+            <MagneticButton
+              className="bg-white text-black hover:bg-white/90 rounded-full px-8 py-3 text-sm font-bold transition-all duration-300 shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.5)]"
+              onClick={() => onNavigate('signup')}
+            >
+              Switch to VeeFore Now
+            </MagneticButton>
+          </div>
         </div>
-      </section >
+      </section>
 
       {/* Pricing */}
       < section id="pricing" className="pt-32 pb-0 relative" >
@@ -2328,7 +2125,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <div
                 key={plan.name}
                 className="sticky transition-all duration-300"
-                style={{ 
+                style={{
                   top: `calc(5rem + ${i * 1.5}rem)`,
                   zIndex: i + 1
                 }}
@@ -2385,60 +2182,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
 
           {/* Desktop View - Scroll Animation */}
-          <PricingScrollAnimation 
-            pricingPlans={pricingPlans} 
-            billingCycle={billingCycle} 
-            onNavigate={onNavigate} 
+          <PricingScrollAnimation
+            pricingPlans={pricingPlans}
+            billingCycle={billingCycle}
+            onNavigate={onNavigate}
           />
         </div>
       </section >
 
-      {/* Free Trial */}
-      < section className="pt-0 pb-32 relative" >
-        <div className="max-w-[1200px] mx-auto px-6">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-bold text-green-400 uppercase tracking-widest mb-6">
-              <Unlock className="w-4 h-4" />
-              <span>7-Day Free Trial</span>
-            </div>
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
-              Experience real <span className="text-green-400">automation</span>
-            </h2>
-            <p className="text-lg text-white/40 max-w-xl mx-auto">
-              150 credits • 1 social account • No credit card required
-            </p>
-          </div>
-
-          <div className="relative">
-            {/* Timeline line */}
-            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-green-500/30 to-transparent hidden md:block" />
-
-            <div className="grid md:grid-cols-5 gap-4">
-              {trialDays.map((item, i) => (
-                <div key={i}>
-                  <GlassCard className="p-6 text-center relative">
-                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4 text-green-400 font-bold text-sm">
-                      {item.day}
-                    </div>
-                    <h4 className="font-bold mb-1 text-sm">{item.title}</h4>
-                    <p className="text-xs text-white/40">{item.desc}</p>
-                  </GlassCard>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="text-center mt-12">
-            <MagneticButton
-              className="bg-green-600 hover:bg-green-500 text-white rounded-full px-12 py-5 text-lg font-bold shadow-xl shadow-green-600/20"
-              onClick={() => onNavigate('signup')}
-            >
-              Start Your Free Trial
-              <ArrowRight className="inline-block ml-2 w-5 h-5" />
-            </MagneticButton>
-          </div>
-        </div>
-      </section >
+      {/* Beta Launch */}
+      <BetaLaunchSection onNavigate={onNavigate} />
 
       {/* FAQ */}
       < section id="faq" className="py-32 relative" >
@@ -2482,7 +2235,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* Final CTA */}
       < section className="py-32 relative overflow-hidden" >
-        <GradientOrb className="w-[800px] h-[800px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
+        <GradientOrb className="w-[800px] h-[800px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="purple" />
 
         <div className="max-w-[900px] mx-auto px-6 text-center relative">
           <motion.div
@@ -2491,21 +2244,21 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
           >
             <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-8">
-              Ready to grow <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">actively?</span>
+              Don't miss the <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">beta launch</span>
             </h2>
             <p className="text-xl text-white/40 max-w-2xl mx-auto mb-12">
-              Join serious creators who value time, want scale without spam, and understand that engagement velocity is the key to growth.
+              Be among the first creators to experience VeeFore. Limited spots available for early adopters who want to grow smarter.
             </p>
 
             <MagneticButton
-              className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-14 py-6 text-xl font-bold overflow-hidden"
+              className="group relative bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full px-14 py-6 text-xl font-bold overflow-hidden"
               onClick={() => onNavigate('signup')}
             >
               <span className="relative z-10 flex items-center">
-                Start Your 7-Day Free Trial
+                Join Beta Waitlist
                 <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
               </span>
-              <div className="absolute inset-[-2px] bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity" />
+              <div className="absolute inset-[-2px] bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity" />
             </MagneticButton>
           </motion.div>
         </div>

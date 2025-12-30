@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, memo } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 
@@ -52,7 +52,7 @@ const features = [
 ];
 
 // Screen content with responsive adjustments
-const ScreenContent = ({ feature, isMobile = false }: { feature: any, isMobile?: boolean }) => {
+const ScreenContent = memo(({ feature, isMobile = false }: { feature: any, isMobile?: boolean }) => {
     return (
         <div className="h-full w-full p-4 md:p-8 pt-8 md:pt-10 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden">
 
@@ -125,6 +125,7 @@ const ScreenContent = ({ feature, isMobile = false }: { feature: any, isMobile?:
                                 key={i}
                                 initial={{ opacity: 0, x: -20 }}
                                 whileInView={{ opacity: 1, x: 0 }}
+                                viewport={{ once: true }}
                                 transition={{ delay: i * 0.3 }}
                                 className="flex items-center space-x-3 md:space-x-5 bg-white/5 p-3 md:p-4 rounded-xl backdrop-blur-sm"
                             >
@@ -147,9 +148,9 @@ const ScreenContent = ({ feature, isMobile = false }: { feature: any, isMobile?:
             <div className={`absolute -top-32 -left-32 w-60 h-60 md:w-80 md:h-80 bg-${feature.color}-500/10 rounded-full blur-[60px] md:blur-[80px] pointer-events-none`} />
         </div>
     );
-};
+});
 
-const IPhoneScreen = ({ feature }: { feature: any }) => {
+const IPhoneScreen = memo(({ feature }: { feature: any }) => {
     return (
         <div className="w-full h-full flex flex-col items-center justify-center p-4">
             {/* iPhone Frame - Responsive Height/Aspect Ratio */}
@@ -171,10 +172,10 @@ const IPhoneScreen = ({ feature }: { feature: any }) => {
             </div>
         </div>
     );
-};
+});
 
 // Keep original LaptopScreen for backward compatibility (not used in carousel)
-const LaptopScreen = ({ feature }: { feature: any }) => {
+const LaptopScreen = memo(({ feature }: { feature: any }) => {
     return (
         <div className="w-full h-full flex flex-col items-center justify-center">
             {/* MacBook Screen */}
@@ -189,7 +190,7 @@ const LaptopScreen = ({ feature }: { feature: any }) => {
             <div className="w-[95%] h-1 bg-zinc-900/50 rounded-b-sm" />
         </div>
     );
-};
+});
 
 export default function StickyScrollFeatures() {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -499,7 +500,7 @@ export default function StickyScrollFeatures() {
                                     <motion.div
                                         key={index}
                                         style={{ y }}
-                                        className="absolute inset-0 flex items-center justify-center"
+                                        className="absolute inset-0 flex items-center justify-center will-change-transform"
                                     >
                                         {/* Desktop: Laptop Screen */}
                                         <div className="hidden md:block w-full h-full">
@@ -525,7 +526,7 @@ export default function StickyScrollFeatures() {
                                 <motion.div
                                     key={index}
                                     style={{ opacity }}
-                                    className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] bg-${feature.color}-500 blur-[80px] md:blur-[120px] rounded-full opacity-20`}
+                                    className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] bg-${feature.color}-500 blur-[80px] md:blur-[120px] rounded-full opacity-20 will-change-[opacity]`}
                                 />
                             );
                         })}

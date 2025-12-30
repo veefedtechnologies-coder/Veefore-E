@@ -21,7 +21,7 @@ import { createMediaUpload } from './infrastructure/media-upload';
 
 export { initializeLeaderElection } from './infrastructure/leader-election';
 
-export async function registerRoutes(app: Express, storage: IStorage, _upload?: multer.Multer): Promise<Server> {
+export async function registerRoutes(app: Express, storage: IStorage, httpServer: Server, _upload?: multer.Multer): Promise<void> {
   const mediaUpload = createMediaUpload();
 
   app.use('/api', defaultWorkspaceEnforcer(storage));
@@ -48,11 +48,7 @@ export async function registerRoutes(app: Express, storage: IStorage, _upload?: 
   app.use('/api/auth', authRateLimiter, bruteForceMiddleware, authRoutes);
   
   app.use('/api/auth-cookies', authRateLimiter, bruteForceMiddleware, authCookiesRouter);
-
-  const httpServer = createServer(app);
   
   setupVideoWebSocket(httpServer);
   console.log('[WS] Video WebSocket server initialized on /ws/video');
-
-  return httpServer;
 }

@@ -42,14 +42,13 @@ export async function setupVite(app: Express, server: Server) {
       server: server,
     },
     allowedHosts: true,
-    host: '0.0.0.0',
-    port: 5000,
-    strictPort: true,
     cors: true,
   };
 
   // Let Vite load its own config file automatically - vite.config.ts handles root directory
   const vite = await createViteServer({
+    configFile: path.resolve(__dirname, "..", "client", "vite.config.ts"),
+    root: path.resolve(__dirname, "..", "client"),
     customLogger: {
       ...viteLogger,
       error: (msg: string, options?: any) => {
