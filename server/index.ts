@@ -518,6 +518,13 @@ app.use((req, res, next) => {
   });
   }
   
+  // Create HTTP server early to pass to registerRoutes
+  const { createServer } = await import('http');
+  const httpServer = createServer(app);
+  (httpServer as any).keepAliveTimeout = 65000;
+  (httpServer as any).headersTimeout = 66000;
+  (httpServer as any).requestTimeout = 0;
+
   // Start the background scheduler service
   startSchedulerService(storage as any);
   
@@ -525,7 +532,7 @@ app.use((req, res, next) => {
   // This ensures only one instance runs polling when scaling horizontally
   console.log('[SMART POLLING] Instagram polling initialization delegated to routes.ts with leader election');
   
-  const server = await registerRoutes(app, storage as any, upload);
+  await registerRoutes(app, storage as any, httpServer, upload);
   
   // Initialize leader election for Instagram polling AFTER routes are registered
   // Use setTimeout to ensure the event loop has processed all pending connections
@@ -1003,13 +1010,7 @@ app.use((req, res, next) => {
   });
 
   // Set up WebSocket server for real-time chat streaming
-  const { createServer } = await import('http');
   const { WebSocketServer } = await import('ws');
-  
-  const httpServer = createServer(app);
-  (httpServer as any).keepAliveTimeout = 65000;
-  (httpServer as any).headersTimeout = 66000;
-  (httpServer as any).requestTimeout = 0;
   
   // Initialize logger for metrics system
   Logger.configure({
@@ -1051,123 +1052,7 @@ app.use((req, res, next) => {
     console.log('⚠️ Rate Limiting: Using memory-based fallbacks without Redis persistence');
   }
   
-  const wss = new WebSocketServer({ server: httpServer });
-  
-  // Add global error handler for WebSocket server
-  wss.on('error', (error) => {
-    console.error('[WebSocket Server] Error:', error.message);
-    // Don't crash the server, just log the error
-  });
-  
-  // Store WebSocket connections by conversation ID
-  const wsConnections = new Map<number, Set<any>>();
-  
-  // Store buffered messages for conversations without active connections
-  const messageBuffer = new Map<number, any[]>();
-  
-  // Helper function to safely send WebSocket messages
-  const safeSend = (ws: any, message: any) => {
-    try {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify(message));
-      }
-    } catch (error) {
-      console.error('[WebSocket] Send error:', error);
-    }
-  };
-  
-  wss.on('connection', (ws, req) => {
-    console.log('[WebSocket] New client connected for chat streaming');
-    
-    // Add error handling to prevent crashes
-    ws.on('error', (error) => {
-      console.error('[WebSocket] Connection error:', error.message);
-      // Don't crash the server, just log the error
-    });
-    
-    ws.on('close', (code, reason) => {
-      console.log(`[WebSocket] Client disconnected: ${code} ${reason}`);
-      // Clean up connections
-      for (const [convId, connections] of wsConnections.entries()) {
-        if (connections.has(ws)) {
-          connections.delete(ws);
-          if (connections.size === 0) {
-            wsConnections.delete(convId);
-          }
-        }
-      }
-    });
-    
-    ws.on('message', (message) => {
-      try {
-        const data = JSON.parse(message.toString());
-        console.log('[WebSocket] Received:', data);
-        
-        if (data.type === 'subscribe' && data.conversationId) {
-          const convId = parseInt(data.conversationId);
-          if (!wsConnections.has(convId)) {
-            wsConnections.set(convId, new Set());
-          }
-          wsConnections.get(convId)!.add(ws);
-          console.log(`[WebSocket] Client subscribed to conversation ${convId}`);
-          
-          // Send subscription confirmation
-          safeSend(ws, { type: 'subscribed', conversationId: convId });
-          
-          // Send any buffered messages immediately
-          const buffered = messageBuffer.get(convId);
-          if (buffered && buffered.length > 0) {
-            console.log(`[WebSocket] Sending ${buffered.length} buffered messages to new client`);
-            buffered.forEach(message => {
-              safeSend(ws, message);
-            });
-            // Clear buffer after sending
-            messageBuffer.delete(convId);
-          }
-        }
-      } catch (error) {
-        console.error('[WebSocket] Parse error:', error);
-      }
-    });
-    
-    ws.on('close', () => {
-      // Remove from all conversations
-      for (const [, connections] of wsConnections) {
-        connections.delete(ws);
-      }
-      console.log('[WebSocket] Client disconnected');
-    });
-  });
-  
-  // Function to broadcast to all clients in a conversation
-  (global as any).broadcastToConversation = (conversationId: number, data: any) => {
-    const connections = wsConnections.get(conversationId);
-    console.log(`[WebSocket] Broadcasting to conversation ${conversationId}, connections: ${connections?.size || 0}`);
-    
-    if (connections && connections.size > 0) {
-      connections.forEach(ws => {
-        if (ws.readyState === 1) { // WebSocket.OPEN
-          safeSend(ws, data);
-          console.log(`[WebSocket] Sent ${data.type} to client for conversation ${conversationId}`);
-        } else {
-          console.log(`[WebSocket] Removing closed connection for conversation ${conversationId}`);
-          connections.delete(ws);
-        }
-      });
-    } else {
-      // Buffer the message for when client connects
-      if (data.type === 'status') {
-        if (!messageBuffer.has(conversationId)) {
-          messageBuffer.set(conversationId, []);
-        }
-        messageBuffer.get(conversationId)!.push(data);
-        console.log(`[WebSocket] Buffered ${data.type} message for conversation ${conversationId}`);
-      } else {
-        console.log(`[WebSocket] No active connections for conversation ${conversationId}`);
-        console.log(`[WebSocket] Active conversations:`, Array.from(wsConnections.keys()));
-      }
-    }
-  };
+
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -1267,7 +1152,7 @@ app.use((req, res, next) => {
     
     try {
       if (setupVite) {
-        await setupVite(app, server);
+        await setupVite(app, httpServer);
         console.log('[DEBUG] Vite setup completed successfully - serving React application');
       } else {
         throw new Error('setupVite not available');
@@ -1387,6 +1272,124 @@ app.use((req, res, next) => {
       }
     }
   }
+
+  const wss = new WebSocketServer({ server: httpServer });
+  
+  // Add global error handler for WebSocket server
+  wss.on('error', (error) => {
+    console.error('[WebSocket Server] Error:', error.message);
+    // Don't crash the server, just log the error
+  });
+  
+  // Store WebSocket connections by conversation ID
+  const wsConnections = new Map<number, Set<any>>();
+  
+  // Store buffered messages for conversations without active connections
+  const messageBuffer = new Map<number, any[]>();
+  
+  // Helper function to safely send WebSocket messages
+  const safeSend = (ws: any, message: any) => {
+    try {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify(message));
+      }
+    } catch (error) {
+      console.error('[WebSocket] Send error:', error);
+    }
+  };
+  
+  wss.on('connection', (ws, req) => {
+    console.log('[WebSocket] New client connected for chat streaming');
+    
+    // Add error handling to prevent crashes
+    ws.on('error', (error) => {
+      console.error('[WebSocket] Connection error:', error.message);
+      // Don't crash the server, just log the error
+    });
+    
+    ws.on('close', (code, reason) => {
+      console.log(`[WebSocket] Client disconnected: ${code} ${reason}`);
+      // Clean up connections
+      for (const [convId, connections] of wsConnections.entries()) {
+        if (connections.has(ws)) {
+          connections.delete(ws);
+          if (connections.size === 0) {
+            wsConnections.delete(convId);
+          }
+        }
+      }
+    });
+    
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        console.log('[WebSocket] Received:', data);
+        
+        if (data.type === 'subscribe' && data.conversationId) {
+          const convId = parseInt(data.conversationId);
+          if (!wsConnections.has(convId)) {
+            wsConnections.set(convId, new Set());
+          }
+          wsConnections.get(convId)!.add(ws);
+          console.log(`[WebSocket] Client subscribed to conversation ${convId}`);
+          
+          // Send subscription confirmation
+          safeSend(ws, { type: 'subscribed', conversationId: convId });
+          
+          // Send any buffered messages immediately
+          const buffered = messageBuffer.get(convId);
+          if (buffered && buffered.length > 0) {
+            console.log(`[WebSocket] Sending ${buffered.length} buffered messages to new client`);
+            buffered.forEach(message => {
+              safeSend(ws, message);
+            });
+            // Clear buffer after sending
+            messageBuffer.delete(convId);
+          }
+        }
+      } catch (error) {
+        console.error('[WebSocket] Parse error:', error);
+      }
+    });
+    
+    ws.on('close', () => {
+      // Remove from all conversations
+      for (const [, connections] of wsConnections) {
+        connections.delete(ws);
+      }
+      console.log('[WebSocket] Client disconnected');
+    });
+  });
+  
+  // Function to broadcast to all clients in a conversation
+  (global as any).broadcastToConversation = (conversationId: number, data: any) => {
+    const connections = wsConnections.get(conversationId);
+    console.log(`[WebSocket] Broadcasting to conversation ${conversationId}, connections: ${connections?.size || 0}`);
+    
+    if (connections && connections.size > 0) {
+      connections.forEach(ws => {
+        if (ws.readyState === 1) { // WebSocket.OPEN
+          safeSend(ws, data);
+          console.log(`[WebSocket] Sent ${data.type} to client for conversation ${conversationId}`);
+        } else {
+          console.log(`[WebSocket] Removing closed connection for conversation ${conversationId}`);
+          connections.delete(ws);
+        }
+      });
+    } else {
+      // Buffer the message for when client connects
+      if (data.type === 'status') {
+        if (!messageBuffer.has(conversationId)) {
+          messageBuffer.set(conversationId, []);
+        }
+        messageBuffer.get(conversationId)!.push(data);
+        console.log(`[WebSocket] Buffered ${data.type} message for conversation ${conversationId}`);
+      } else {
+        console.log(`[WebSocket] No active connections for conversation ${conversationId}`);
+        console.log(`[WebSocket] Active conversations:`, Array.from(wsConnections.keys()));
+      }
+    }
+  };
 
   // ALWAYS serve the API on port 5000
   const port = 5000;
