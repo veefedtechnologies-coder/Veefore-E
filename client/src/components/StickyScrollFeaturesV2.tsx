@@ -127,31 +127,36 @@ function mapRange(value: number, inMin: number, inMax: number, outMin: number, o
 const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, isMobile?: boolean }) => {
     const colors = colorMap[feature.color];
     
+    // Use smaller sizing for mobile mockups to prevent content cutoff
+    const baseClasses = isMobile 
+        ? "h-full w-full p-2 sm:p-3 pt-8 sm:pt-10 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden"
+        : "h-full w-full p-4 md:p-6 lg:p-8 pt-10 md:pt-12 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden";
+    
     return (
-        <div className="h-full w-full p-4 md:p-6 lg:p-8 pt-10 md:pt-12 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden">
+        <div className={baseClasses}>
             {feature.screen.type === 'analysis' && (
-                <div className="space-y-4 md:space-y-6 h-full flex flex-col justify-center">
-                    <div className="bg-white/5 rounded-2xl p-4 md:p-6 border border-white/10 backdrop-blur-sm">
-                        <h4 className="text-xs md:text-sm text-white/50 uppercase tracking-widest mb-4 md:mb-6">{feature.screen.title}</h4>
-                        <div className="flex justify-between items-end mb-4 md:mb-6">
+                <div className={`${isMobile ? 'space-y-2 sm:space-y-3' : 'space-y-4 md:space-y-6'} h-full flex flex-col justify-center`}>
+                    <div className={`bg-white/5 ${isMobile ? 'rounded-xl p-2 sm:p-3' : 'rounded-2xl p-4 md:p-6'} border border-white/10 backdrop-blur-sm`}>
+                        <h4 className={`${isMobile ? 'text-[8px] sm:text-[10px] mb-2 sm:mb-3' : 'text-xs md:text-sm mb-4 md:mb-6'} text-white/50 uppercase tracking-widest`}>{feature.screen.title}</h4>
+                        <div className={`flex justify-between items-end ${isMobile ? 'mb-2 sm:mb-3' : 'mb-4 md:mb-6'}`}>
                             <div>
-                                <div className="text-3xl md:text-5xl font-bold text-white mb-1 md:mb-2">High</div>
-                                <div className="text-xs md:text-sm text-white/50">Potential</div>
+                                <div className={`${isMobile ? 'text-lg sm:text-xl' : 'text-3xl md:text-5xl'} font-bold text-white mb-0.5 md:mb-2`}>High</div>
+                                <div className={`${isMobile ? 'text-[8px] sm:text-[10px]' : 'text-xs md:text-sm'} text-white/50`}>Potential</div>
                             </div>
                             <div className="text-right">
-                                <div className={`text-3xl md:text-5xl font-bold ${feature.screen.stats?.[0]?.color}`}>{feature.screen.stats?.[0]?.value}</div>
+                                <div className={`${isMobile ? 'text-lg sm:text-xl' : 'text-3xl md:text-5xl'} font-bold ${feature.screen.stats?.[0]?.color}`}>{feature.screen.stats?.[0]?.value}</div>
                             </div>
                         </div>
-                        <div className="h-2 md:h-3 bg-white/10 rounded-full overflow-hidden">
+                        <div className={`${isMobile ? 'h-1.5 sm:h-2' : 'h-2 md:h-3'} bg-white/10 rounded-full overflow-hidden`}>
                             <div className={`h-full w-[98%] bg-gradient-to-r ${colors.gradient}`} />
                         </div>
                     </div>
 
-                    <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-3 gap-4'}`}>
+                    <div className={`grid ${isMobile ? 'grid-cols-1 gap-1.5 sm:gap-2' : 'grid-cols-3 gap-4'}`}>
                         {feature.screen.points?.map((point: string, i: number) => (
-                            <div key={i} className="flex items-center space-x-2 md:space-x-3 bg-white/5 p-3 md:p-4 rounded-xl border border-white/5 backdrop-blur-sm">
-                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 shrink-0" />
-                                <span className="text-xs md:text-sm text-white/80 truncate">{point}</span>
+                            <div key={i} className={`flex items-center ${isMobile ? 'space-x-1.5 sm:space-x-2 p-1.5 sm:p-2 rounded-lg' : 'space-x-2 md:space-x-3 p-3 md:p-4 rounded-xl'} bg-white/5 border border-white/5 backdrop-blur-sm`}>
+                                <div className={`${isMobile ? 'w-1 h-1 sm:w-1.5 sm:h-1.5' : 'w-1.5 h-1.5 md:w-2 md:h-2'} rounded-full bg-blue-500 shrink-0`} />
+                                <span className={`${isMobile ? 'text-[8px] sm:text-[10px]' : 'text-xs md:text-sm'} text-white/80 truncate`}>{point}</span>
                             </div>
                         ))}
                     </div>
@@ -159,43 +164,43 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
             )}
 
             {feature.screen.type === 'chat' && (
-                <div className="space-y-4 md:space-y-6 h-full justify-center flex flex-col px-4 md:px-12">
+                <div className={`${isMobile ? 'space-y-2 sm:space-y-3 px-1 sm:px-2' : 'space-y-4 md:space-y-6 px-4 md:px-12'} h-full justify-center flex flex-col`}>
                     {feature.screen.messages?.map((msg, i: number) => (
                         <div
                             key={i}
-                            className={`max-w-[85%] md:max-w-[70%] p-4 md:p-5 rounded-2xl ${msg.user === 'me'
+                            className={`${isMobile ? 'max-w-[90%] p-2 sm:p-3 rounded-xl' : 'max-w-[85%] md:max-w-[70%] p-4 md:p-5 rounded-2xl'} ${msg.user === 'me'
                                 ? 'bg-purple-500 text-white self-end rounded-br-none ml-auto'
                                 : 'bg-white/10 text-white self-start rounded-bl-none backdrop-blur-sm'
                                 }`}
                         >
-                            <p className="text-sm md:text-base font-medium">{msg.text}</p>
-                            <p className={`text-[10px] md:text-xs mt-2 opacity-60 ${msg.user === 'me' ? 'text-white' : 'text-white/60'}`}>{msg.time}</p>
+                            <p className={`${isMobile ? 'text-[10px] sm:text-xs' : 'text-sm md:text-base'} font-medium`}>{msg.text}</p>
+                            <p className={`${isMobile ? 'text-[8px] sm:text-[9px] mt-1' : 'text-[10px] md:text-xs mt-2'} opacity-60 ${msg.user === 'me' ? 'text-white' : 'text-white/60'}`}>{msg.time}</p>
                         </div>
                     ))}
                 </div>
             )}
 
             {feature.screen.type === 'sales' && (
-                <div className="h-full flex flex-col justify-center space-y-6 md:space-y-8 px-4 md:px-12">
-                    <div className="text-center mb-4 md:mb-6">
-                        <div className="w-16 h-16 md:w-20 md:h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 animate-pulse">
-                            <DollarSign className="w-8 h-8 md:w-10 md:h-10 text-green-400" />
+                <div className={`h-full flex flex-col justify-center ${isMobile ? 'space-y-3 sm:space-y-4 px-1 sm:px-2' : 'space-y-6 md:space-y-8 px-4 md:px-12'}`}>
+                    <div className={`text-center ${isMobile ? 'mb-1 sm:mb-2' : 'mb-4 md:mb-6'}`}>
+                        <div className={`${isMobile ? 'w-10 h-10 sm:w-12 sm:h-12 mb-2 sm:mb-3' : 'w-16 h-16 md:w-20 md:h-20 mb-4 md:mb-6'} bg-green-500/20 rounded-full flex items-center justify-center mx-auto animate-pulse`}>
+                            <DollarSign className={`${isMobile ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-8 h-8 md:w-10 md:h-10'} text-green-400`} />
                         </div>
-                        <h4 className="font-bold text-xl md:text-2xl">{feature.screen.title}</h4>
+                        <h4 className={`font-bold ${isMobile ? 'text-sm sm:text-base' : 'text-xl md:text-2xl'}`}>{feature.screen.title}</h4>
                     </div>
 
-                    <div className="space-y-3 md:space-y-5">
+                    <div className={`${isMobile ? 'space-y-1.5 sm:space-y-2' : 'space-y-3 md:space-y-5'}`}>
                         {feature.screen.steps?.map((step, i: number) => (
                             <div
                                 key={i}
-                                className="flex items-center space-x-3 md:space-x-5 bg-white/5 p-3 md:p-4 rounded-xl backdrop-blur-sm"
+                                className={`flex items-center ${isMobile ? 'space-x-2 sm:space-x-3 p-1.5 sm:p-2 rounded-lg' : 'space-x-3 md:space-x-5 p-3 md:p-4 rounded-xl'} bg-white/5 backdrop-blur-sm`}
                             >
-                                <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 shrink-0 ${step.status === 'complete' ? 'bg-green-500 border-green-500' : 'bg-transparent border-green-500/30'
+                                <div className={`${isMobile ? 'w-5 h-5 sm:w-6 sm:h-6 border' : 'w-8 h-8 md:w-10 md:h-10 border-2'} rounded-full flex items-center justify-center shrink-0 ${step.status === 'complete' ? 'bg-green-500 border-green-500' : 'bg-transparent border-green-500/30'
                                     }`}>
-                                    {step.status === 'complete' && <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />}
-                                    {step.status === 'active' && <div className="w-2.5 h-2.5 md:w-3 md:h-3 bg-green-500 rounded-full animate-ping" />}
+                                    {step.status === 'complete' && <CheckCircle className={`${isMobile ? 'w-2.5 h-2.5 sm:w-3 sm:h-3' : 'w-4 h-4 md:w-5 md:h-5'} text-white`} />}
+                                    {step.status === 'active' && <div className={`${isMobile ? 'w-1.5 h-1.5 sm:w-2 sm:h-2' : 'w-2.5 h-2.5 md:w-3 md:h-3'} bg-green-500 rounded-full animate-ping`} />}
                                 </div>
-                                <span className={`text-sm md:text-base ${step.status === 'active' ? 'text-white font-medium' : 'text-white/50'}`}>
+                                <span className={`${isMobile ? 'text-[9px] sm:text-[10px]' : 'text-sm md:text-base'} ${step.status === 'active' ? 'text-white font-medium' : 'text-white/50'}`}>
                                     {step.text}
                                 </span>
                             </div>
@@ -204,8 +209,8 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                 </div>
             )}
 
-            <div className={`absolute -bottom-32 -right-32 w-60 h-60 md:w-80 md:h-80 ${colors.bg} rounded-full blur-[40px] md:blur-[60px] pointer-events-none`} />
-            <div className={`absolute -top-32 -left-32 w-60 h-60 md:w-80 md:h-80 ${colors.bgLight} rounded-full blur-[40px] md:blur-[60px] pointer-events-none`} />
+            <div className={`absolute -bottom-32 -right-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48 blur-[30px] sm:blur-[40px]' : 'w-60 h-60 md:w-80 md:h-80 blur-[40px] md:blur-[60px]'} ${colors.bg} rounded-full pointer-events-none`} />
+            <div className={`absolute -top-32 -left-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48 blur-[30px] sm:blur-[40px]' : 'w-60 h-60 md:w-80 md:h-80 blur-[40px] md:blur-[60px]'} ${colors.bgLight} rounded-full pointer-events-none`} />
         </div>
     );
 });
@@ -213,26 +218,26 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
 const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
         <div 
-            className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-4"
+            className="w-full h-full flex flex-col items-center justify-center p-1 sm:p-2 md:p-4"
             style={{
                 WebkitTransform: 'translate3d(0,0,0)',
                 transform: 'translate3d(0,0,0)',
             }}
         >
             <div 
-                className="h-full max-h-[420px] xs:max-h-[480px] sm:max-h-[520px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2rem] sm:rounded-[2.5rem] md:rounded-[3rem] border-[5px] sm:border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10"
+                className="h-full max-h-[380px] sm:max-h-[440px] md:max-h-[520px] lg:max-h-[580px] w-auto aspect-[9/19] bg-black rounded-[1.5rem] sm:rounded-[2rem] md:rounded-[2.5rem] lg:rounded-[3rem] border-[4px] sm:border-[5px] md:border-[6px] lg:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10"
                 style={{
                     WebkitBackfaceVisibility: 'hidden',
                     backfaceVisibility: 'hidden',
                     WebkitTransformStyle: 'preserve-3d',
                 }}
             >
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 md:w-28 h-6 md:h-7 bg-black rounded-b-2xl z-20 flex justify-center items-center">
-                    <div className="w-12 md:w-16 h-3 md:h-4 bg-zinc-900 rounded-full" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 sm:w-20 md:w-24 lg:w-28 h-4 sm:h-5 md:h-6 lg:h-7 bg-black rounded-b-xl sm:rounded-b-2xl z-20 flex justify-center items-center">
+                    <div className="w-8 sm:w-10 md:w-12 lg:w-16 h-2 sm:h-2.5 md:h-3 lg:h-4 bg-zinc-900 rounded-full" />
                 </div>
-                <div className="absolute top-2 md:top-3 left-6 md:left-8 text-[8px] md:text-[10px] font-bold text-white z-20">9:41</div>
-                <div className="absolute top-2 md:top-3 right-6 md:right-8 flex space-x-1 z-20">
-                    <div className="w-3 md:w-4 h-2 md:h-2.5 bg-white rounded-[1px]" />
+                <div className="absolute top-1 sm:top-1.5 md:top-2 lg:top-3 left-4 sm:left-5 md:left-6 lg:left-8 text-[6px] sm:text-[7px] md:text-[8px] lg:text-[10px] font-bold text-white z-20">9:41</div>
+                <div className="absolute top-1 sm:top-1.5 md:top-2 lg:top-3 right-4 sm:right-5 md:right-6 lg:right-8 flex space-x-1 z-20">
+                    <div className="w-2 sm:w-2.5 md:w-3 lg:w-4 h-1.5 sm:h-2 md:h-2 lg:h-2.5 bg-white rounded-[1px]" />
                 </div>
                 <ScreenContent feature={feature} isMobile={true} />
             </div>
