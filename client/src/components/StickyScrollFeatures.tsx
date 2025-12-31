@@ -289,17 +289,16 @@ const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionVa
     );
 });
 
-const Feature0MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature0MockupSlide = memo(({ scrollYProgress, isReady }: { scrollYProgress: MotionValue<number>, isReady: boolean }) => {
     const feature = features[0];
     const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
     const springY = useSpring(yValue, springConfig);
-    const y = useTransform(springY, (v) => `${v}vh`);
+    const animatedY = useTransform(springY, (v) => `${v}vh`);
     const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [1, 1, 1, 0.9]), springConfig);
 
     return (
         <motion.div 
-            initial={{ y: '0vh', scale: 1, opacity: 1 }}
-            style={{ y, scale }} 
+            style={isReady ? { y: animatedY, scale } : { y: '0vh', scale: 1 }} 
             className="absolute inset-0 flex items-center justify-center will-change-transform"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
@@ -366,22 +365,27 @@ const Feature2Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionVal
 
 export default function StickyScrollFeatures() {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isMounted, setIsMounted] = useState(false);
-    
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
+    const [isScrollReady, setIsScrollReady] = useState(false);
     
     const { scrollYProgress } = useScroll({
         target: containerRef,
         offset: ["start start", "end end"]
     });
+    
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsScrollReady(true);
+        }, 100);
+        return () => clearTimeout(timer);
+    }, []);
 
     const [activeFeature, setActiveFeature] = useState(0);
     const [isInSection, setIsInSection] = useState(false);
 
     useMotionValueEvent(scrollYProgress, "change", (latest: number) => {
-        if (!isMounted) return;
+        if (!isScrollReady && typeof latest === 'number' && !isNaN(latest)) {
+            setIsScrollReady(true);
+        }
         setIsInSection(latest > 0.05 && latest < 0.95);
         if (latest < 0.34) setActiveFeature(0);
         else if (latest < 0.68) setActiveFeature(1);
@@ -433,7 +437,7 @@ export default function StickyScrollFeatures() {
                         </div>
 
                         <div className="relative w-full h-[90%] md:h-[80%] max-w-[700px]">
-                            <Feature0MockupSlide scrollYProgress={scrollYProgress} />
+                            <Feature0MockupSlide scrollYProgress={scrollYProgress} isReady={isScrollReady} />
                             <Feature1MockupSlide scrollYProgress={scrollYProgress} />
                             <Feature2MockupSlide scrollYProgress={scrollYProgress} />
                         </div>
