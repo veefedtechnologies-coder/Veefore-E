@@ -394,6 +394,12 @@ const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKe
 export default function StickyScrollFeaturesV2() {
     const containerRef = useRef<HTMLElement | null>(null);
     const { progress, isReady } = useScrollProgress(containerRef);
+    const [hasMounted, setHasMounted] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setHasMounted(true), 300);
+        return () => clearTimeout(timer);
+    }, []);
 
     const activeFeature = useMemo(() => {
         if (progress < 0.34) return 0;
@@ -436,7 +442,7 @@ export default function StickyScrollFeaturesV2() {
             let isStatic = false;
 
             if (i === 0) {
-                if (!isReady) {
+                if (!hasMounted) {
                     y = 0;
                     scale = 1;
                     isStatic = true;
@@ -444,7 +450,7 @@ export default function StickyScrollFeaturesV2() {
                     y = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 0, -100) * window.innerHeight / 100 : 0;
                     scale = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 1, 0.9) : 1;
                 }
-                isVisible = progress < 0.4 || !isReady;
+                isVisible = progress < 0.4 || !hasMounted;
             } else if (i === 1) {
                 const enterY = mapRange(progress, 0.32, 0.38, 100, 0);
                 const exitY = mapRange(progress, 0.62, 0.68, 0, -100);
@@ -460,7 +466,7 @@ export default function StickyScrollFeaturesV2() {
 
             return { feature, y, scale: Math.max(0.9, Math.min(1, scale)), isVisible, isStatic };
         });
-    }, [progress, isReady]);
+    }, [progress, hasMounted]);
 
     const ambientOpacities = useMemo(() => {
         return features.map((_, i) => {
