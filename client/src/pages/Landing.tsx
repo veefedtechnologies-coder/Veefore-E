@@ -854,44 +854,60 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
         </motion.nav>
         
-        {/* Mobile Menu Dropdown */}
+        {/* Mobile Menu Full-Page Overlay */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="lg:hidden fixed inset-x-0 top-[60px] sm:top-[70px] md:top-[80px] z-40 mx-2 sm:mx-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xl"
+              onClick={() => setMobileMenuOpen(false)}
             >
-              <div className="bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 shadow-2xl">
-                <div className="flex flex-col space-y-3 sm:space-y-4">
-                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
-                    <a 
+              <motion.div 
+                initial={{ opacity: 0, y: -30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -30 }}
+                transition={{ duration: 0.3, delay: 0.05 }}
+                className="flex flex-col items-center justify-center min-h-screen px-6 py-20"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex flex-col items-center space-y-6 w-full max-w-sm">
+                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item, index) => (
+                    <motion.a 
                       key={item} 
                       href={`#${item.toLowerCase().replace(' ', '-')}`} 
-                      className="text-base sm:text-lg font-medium text-white/70 hover:text-white transition-colors py-2 border-b border-white/5 last:border-0"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.1 + index * 0.05 }}
+                      className="text-2xl sm:text-3xl font-semibold text-white/80 hover:text-white transition-colors py-3"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item}
-                    </a>
+                    </motion.a>
                   ))}
-                  <div className="pt-2 sm:pt-4 flex flex-col space-y-3">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.35 }}
+                    className="pt-6 flex flex-col items-center space-y-4 w-full"
+                  >
                     <button 
-                      className="text-base sm:text-lg font-medium text-white/70 hover:text-white transition-colors py-2 text-left"
+                      className="text-xl font-medium text-white/60 hover:text-white transition-colors py-2"
                       onClick={() => { onNavigate('signin'); setMobileMenuOpen(false); }}
                     >
                       Login
                     </button>
                     <button 
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 py-3 text-sm sm:text-base font-semibold w-full"
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-8 py-3.5 text-base font-semibold w-full max-w-xs"
                       onClick={() => { onNavigate('signup'); setMobileMenuOpen(false); }}
                     >
                       Start Free Trial
                     </button>
-                  </div>
+                  </motion.div>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
