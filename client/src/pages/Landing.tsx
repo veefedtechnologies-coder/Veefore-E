@@ -868,14 +868,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
                 <div className="flex items-center cursor-pointer" onClick={() => { setMobileMenuOpen(false); onNavigate('/'); }}>
                   <img
-                    src="/veefore-logo-simple.svg"
+                    src="/veefore-logo.png"
                     alt="VeeFore"
                     className="h-7 w-auto"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
                   />
-                  <span className="text-white text-lg font-bold tracking-tight ml-1">eefore</span>
+                  <span className="text-white text-lg font-bold tracking-tight ml-[-2px]">eefore</span>
                 </div>
                 <button 
                   onClick={() => setMobileMenuOpen(false)}
