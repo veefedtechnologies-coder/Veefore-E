@@ -383,7 +383,8 @@ export default function StickyScrollFeatures() {
     const [isInSection, setIsInSection] = useState(false);
 
     useMotionValueEvent(scrollYProgress, "change", (latest: number) => {
-        if (!isScrollReady && typeof latest === 'number' && !isNaN(latest)) {
+        if (!isFinite(latest)) return;
+        if (!isScrollReady) {
             setIsScrollReady(true);
         }
         setIsInSection(latest > 0.05 && latest < 0.95);
@@ -395,7 +396,7 @@ export default function StickyScrollFeatures() {
     const activeColors = useMemo(() => colorMap[features[activeFeature].color], [activeFeature]);
 
     return (
-        <section ref={containerRef} className="relative h-[300vh] bg-black">
+        <section ref={containerRef} className="relative h-[300vh] bg-black contain-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
             <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full" style={{ WebkitOverflowScrolling: 'touch' }}>

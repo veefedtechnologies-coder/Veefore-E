@@ -19,10 +19,16 @@
 }
 
 /* Ensure sticky sections have proper containment on mobile */
+/* Note: Sections with contain-none class are excluded - needed for Framer Motion scroll hooks */
 @media (max-width: 768px) {
-  section {
+  section:not(.contain-none) {
     contain: layout style;
   }
+}
+
+/* Override containment for sections that use Framer Motion scroll hooks */
+.contain-none {
+  contain: none !important;
 }
 
 
