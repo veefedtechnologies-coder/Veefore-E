@@ -137,8 +137,9 @@ export const CinematicFeatures = ({ features }: CinematicFeaturesProps) => {
   });
 
   useMotionValueEvent(smoothProgress, "change", (latest) => {
-    if (latest > 0.05) setShowHint(false);
-    else setShowHint(true);
+    // Show hint while section is locked on screen (between 5% and 90% progress)
+    if (latest > 0.05 && latest < 0.90) setShowHint(true);
+    else setShowHint(false);
   });
 
   const activeIndex = useTransform(smoothProgress, (value) => {
