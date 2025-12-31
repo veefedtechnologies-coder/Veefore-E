@@ -1,6 +1,7 @@
 import { useRef, useState, memo, useMemo, useEffect } from 'react';
 import { motion, useScroll, useSpring, useMotionValueEvent } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
+import { ScrollHint } from './ui/ScrollHint';
 
 const springConfig = { stiffness: 100, damping: 20, mass: 0.5 };
 
@@ -535,6 +536,17 @@ export default function StickyScrollFeaturesV2() {
                     </div>
 
                 </div>
+                
+                {progress < 0.08 && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+                    >
+                        <ScrollHint />
+                    </motion.div>
+                )}
             </div>
         </section>
     );

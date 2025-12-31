@@ -1,6 +1,7 @@
-import { useRef, memo } from 'react';
-import { motion, useScroll, useSpring, useTransform, MotionValue } from 'framer-motion';
+import { useRef, memo, useState } from 'react';
+import { motion, useScroll, useSpring, useTransform, MotionValue, useMotionValueEvent } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
+import { ScrollHint } from './ui/ScrollHint';
 
 interface Feature {
   id: string;
@@ -122,23 +123,32 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
 
 export const CinematicFeatures = ({ features }: CinematicFeaturesProps) => {
   const targetRef = useRef<HTMLDivElement>(null);
+  const [showHint, setShowHint] = useState(true);
+  
   const { scrollYProgress } = useScroll({
     target: targetRef,
     offset: ["start start", "end end"]
   });
 
-  const activeIndex = useTransform(scrollYProgress, (value) => {
-    // Smoother quantization
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 30,
+    damping: 25,
+    mass: 1.2
+  });
+
+  useMotionValueEvent(smoothProgress, "change", (latest) => {
+    if (latest > 0.05) setShowHint(false);
+    else setShowHint(true);
+  });
+
+  const activeIndex = useTransform(smoothProgress, (value) => {
     const total = features.length;
-    // Map 0-1 to 0-(total-1)
     const raw = value * total;
-    // Use a small buffer to prevent rapid switching at edges
     return Math.min(Math.floor(raw), total - 1);
   });
 
   return (
-    // Increase height to allow for more scroll distance per card (180vh per card)
-    <section ref={targetRef} className="relative" style={{ height: `${features.length * 180}vh` }}>
+    <section ref={targetRef} className="relative" style={{ height: `${features.length * 220}vh` }}>
       <div className="sticky top-0 h-screen overflow-hidden bg-black">
         {features.map((feature, index) => (
           <Card 
@@ -148,6 +158,17 @@ export const CinematicFeatures = ({ features }: CinematicFeaturesProps) => {
             activeIndex={activeIndex}
           />
         ))}
+        
+        {showHint && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+          >
+            <ScrollHint />
+          </motion.div>
+        )}
       </div>
     </section>
   );
