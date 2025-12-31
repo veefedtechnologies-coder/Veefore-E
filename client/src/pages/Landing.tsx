@@ -858,19 +858,21 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
-              initial={{ opacity: 0 }}
+              initial={{ opacity: 1 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.15 }}
               className="lg:hidden fixed inset-0 z-50 bg-[#0a0a0f]"
             >
-              {/* Header with logo and close */}
+              {/* Header with logo and close - no animation for instant display */}
               <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
                 <div className="flex items-center cursor-pointer" onClick={() => { setMobileMenuOpen(false); onNavigate('/'); }}>
                   <img
                     src="/veefore-logo.png"
                     alt="VeeFore"
                     className="h-7 w-auto"
+                    loading="eager"
+                    decoding="sync"
                   />
                   <span className="text-white text-lg font-bold tracking-tight ml-[-2px]">eefore</span>
                 </div>
