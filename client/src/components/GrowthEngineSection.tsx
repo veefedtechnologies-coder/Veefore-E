@@ -175,8 +175,8 @@ const GrowthEngineSection = () => {
                     </div>
 
                     {/* Center Core (The Reactor) */}
-                    <div className="relative w-full lg:w-1/3 flex justify-center order-1 lg:order-2 py-12 lg:py-0">
-                        <div className="relative w-72 h-72 md:w-96 md:h-96">
+                    <div className="relative w-full lg:w-1/3 flex justify-center order-1 lg:order-2 py-8 sm:py-12 lg:py-0">
+                        <div className="relative w-56 h-56 sm:w-72 sm:h-72 md:w-96 md:h-96">
 
                             {/* Complex Rotating Rings */}
                             <motion.div
@@ -207,7 +207,7 @@ const GrowthEngineSection = () => {
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <motion.div 
                                     whileHover={{ scale: 1.05 }}
-                                    className="relative w-48 h-48 md:w-56 md:h-56 rounded-full bg-black/80 backdrop-blur-xl border border-indigo-500/30 shadow-[0_0_60px_rgba(79,70,229,0.15)] flex items-center justify-center group cursor-pointer z-20 overflow-hidden"
+                                    className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-56 md:h-56 rounded-full bg-black/80 backdrop-blur-xl border border-indigo-500/30 shadow-[0_0_60px_rgba(79,70,229,0.15)] flex items-center justify-center group cursor-pointer z-20 overflow-hidden"
                                 >
 
                                     {/* Holographic Inner Gradient */}
@@ -223,24 +223,24 @@ const GrowthEngineSection = () => {
                                     {/* Rotating Data Ring */}
                                      <div className="absolute inset-2 border border-dashed border-indigo-500/10 rounded-full animate-[spin_10s_linear_infinite]" />
 
-                                    <div className="text-center relative z-10 p-6">
-                                        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
-                                            <Cpu className="w-7 h-7 text-white" />
+                                    <div className="text-center relative z-10 p-3 sm:p-4 md:p-6">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 mx-auto mb-2 sm:mb-3 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
+                                            <Cpu className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-white" />
                                         </div>
-                                        <div className="text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] mb-1">Central Intelligence</div>
-                                        <div className="text-xl md:text-2xl font-bold text-white leading-tight">Adaptive<br />Growth Loop</div>
+                                        <div className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-indigo-300 uppercase tracking-[0.15em] sm:tracking-[0.2em] mb-0.5 sm:mb-1">Central Intelligence</div>
+                                        <div className="text-base sm:text-lg md:text-2xl font-bold text-white leading-tight">Adaptive<br />Growth Loop</div>
                                     </div>
                                 </motion.div>
                             </div>
 
-                            {/* Orbiting Data Nodes */}
+                            {/* Orbiting Data Nodes - Hidden on very small screens */}
                             {[0, 1, 2, 3].map((i) => (
                                 <motion.div
                                     key={i}
-                                    className="absolute w-2 h-2 bg-white rounded-full shadow-[0_0_15px_rgba(255,255,255,0.8)] z-10"
+                                    className="absolute w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full shadow-[0_0_15px_rgba(255,255,255,0.8)] z-10 hidden sm:block"
                                     animate={{
-                                        x: [Math.cos(i * 1.5) * 160, Math.cos(i * 1.5 + Math.PI) * 160],
-                                        y: [Math.sin(i * 1.5) * 160, Math.sin(i * 1.5 + Math.PI) * 160],
+                                        x: [Math.cos(i * 1.5) * 100, Math.cos(i * 1.5 + Math.PI) * 100],
+                                        y: [Math.sin(i * 1.5) * 100, Math.sin(i * 1.5 + Math.PI) * 100],
                                         scale: [1, 0.5, 1],
                                         opacity: [1, 0.3, 1]
                                     }}
@@ -277,29 +277,29 @@ const GrowthEngineSection = () => {
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/5 to-transparent animate-pulse group-hover:via-indigo-500/10 transition-colors" />
 
                         <div className="relative rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8">
-                            <div className="flex items-center gap-5 w-full md:w-auto">
-                                <div className="relative w-12 h-12 rounded-full bg-green-900/20 border border-green-500/30 flex items-center justify-center shrink-0">
+                            <div className="flex items-center gap-3 sm:gap-5 w-full md:w-auto">
+                                <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-green-900/20 border border-green-500/30 flex items-center justify-center shrink-0">
                                     <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping" />
-                                    <Activity className="w-6 h-6 text-green-400 relative z-10" />
+                                    <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-green-400 relative z-10" />
                                 </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                        <div className="text-xs font-bold text-green-400 uppercase tracking-widest">System Online</div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
+                                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-500 animate-pulse" />
+                                        <div className="text-[10px] sm:text-xs font-bold text-green-400 uppercase tracking-wider sm:tracking-widest">System Online</div>
                                     </div>
-                                    <div className="text-white font-bold text-lg">Continuous Optimization Active</div>
+                                    <div className="text-white font-bold text-sm sm:text-base md:text-lg truncate">Continuous Optimization Active</div>
                                 </div>
                             </div>
 
-                            <div className="flex-1 w-full relative h-12 flex items-center bg-white/5 rounded-lg border border-white/5 px-4 overflow-hidden">
+                            <div className="flex-1 w-full relative h-10 sm:h-12 flex items-center bg-white/5 rounded-lg border border-white/5 px-2 sm:px-4 overflow-hidden">
                                 {/* Progress Bar Background */}
                                 <div className="absolute left-0 top-0 bottom-0 w-full bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.05)_50%,transparent_100%)] animate-[shimmer_2s_infinite]" />
 
-                                <div className="flex items-center justify-between w-full text-[10px] md:text-xs font-mono font-bold text-gray-400 relative z-10">
+                                <div className="flex items-center justify-between w-full text-[8px] sm:text-[10px] md:text-xs font-mono font-bold text-gray-400 relative z-10">
                                     {['POST', 'DATA', 'ANALYZE', 'REFINE', 'IMPROVE'].map((step, i) => (
-                                        <div key={step} className={`flex items-center gap-2 ${i === 4 ? 'text-indigo-400' : ''}`}>
+                                        <div key={step} className={`flex items-center gap-1 sm:gap-2 ${i === 4 ? 'text-indigo-400' : ''}`}>
                                             <span>{step}</span>
-                                            {i < 4 && <div className="w-1 h-1 rounded-full bg-white/20" />}
+                                            {i < 4 && <div className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-white/20" />}
                                         </div>
                                     ))}
                                 </div>
