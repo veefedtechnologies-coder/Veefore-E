@@ -591,40 +591,35 @@ const ScrollZoomIntro = () => {
 // ============================================
 const CreditTokensVisual = () => {
     return (
-        <div className="relative w-full h-24 md:h-32 flex items-center justify-center">
-            {[...Array(5)].map((_, i) => (
-                <motion.div
-                    key={i}
-                    className="absolute"
-                    style={{
-                        left: `${20 + i * 15}%`,
-                        zIndex: 5 - i
-                    }}
-                    animate={{
-                        y: [0, -8, 0],
-                        rotateY: [0, 180, 360],
-                    }}
-                    transition={{
-                        duration: 3,
-                        delay: i * 0.2,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                    }}
-                >
-                    <div 
-                        className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-cyan-400 via-cyan-500 to-cyan-600 border-2 border-cyan-300/50 flex items-center justify-center shadow-lg shadow-cyan-500/30"
-                        style={{ transform: `translateX(${i * -8}px)` }}
+        <div className="relative w-full min-h-[100px] md:min-h-[120px] flex items-center justify-between px-2">
+            <div className="flex items-center -space-x-3">
+                {[...Array(4)].map((_, i) => (
+                    <motion.div
+                        key={i}
+                        animate={{
+                            y: [0, -6, 0],
+                        }}
+                        transition={{
+                            duration: 2,
+                            delay: i * 0.15,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                        }}
+                        style={{ zIndex: 4 - i }}
                     >
-                        <span className="text-white font-bold text-sm md:text-lg">V</span>
-                    </div>
-                </motion.div>
-            ))}
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-cyan-400 via-cyan-500 to-cyan-600 border-2 border-cyan-300/40 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                            <span className="text-white font-bold text-sm md:text-base">V</span>
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
             <motion.div
-                className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2"
-                animate={{ scale: [1, 1.1, 1] }}
+                className="text-right"
+                animate={{ scale: [1, 1.05, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
             >
-                <span className="text-2xl md:text-4xl font-black text-cyan-400">+500</span>
+                <span className="text-3xl md:text-5xl font-black text-cyan-400 block leading-none">+500</span>
+                <span className="text-[9px] md:text-xs text-cyan-300 uppercase tracking-wider">credits</span>
             </motion.div>
         </div>
     );
@@ -636,45 +631,53 @@ const CreditTokensVisual = () => {
 const TerminalVisual = () => {
     const [lineIndex, setLineIndex] = useState(0);
     const lines = [
-        { text: '$ veefore --beta-features', color: 'text-green-400' },
-        { text: 'Loading new features...', color: 'text-white/60' },
-        { text: '+ AI Hook Generator v2.0', color: 'text-emerald-400' },
-        { text: '+ Smart DM Templates', color: 'text-emerald-400' },
-        { text: '+ Advanced Analytics', color: 'text-emerald-400' },
-        { text: 'Beta access granted!', color: 'text-cyan-400' },
+        { text: '$ veefore --beta', color: 'text-green-400' },
+        { text: '+ Hook Generator v2', color: 'text-emerald-400' },
+        { text: '+ Smart DM Funnels', color: 'text-emerald-400' },
+        { text: '+ AI Analytics', color: 'text-emerald-400' },
+        { text: 'Access granted!', color: 'text-cyan-400' },
     ];
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setLineIndex(prev => (prev + 1) % (lines.length + 2));
-        }, 800);
-        return () => clearInterval(interval);
-    }, []);
+        if (lineIndex < lines.length) {
+            const timeout = setTimeout(() => {
+                setLineIndex(prev => prev + 1);
+            }, 600);
+            return () => clearTimeout(timeout);
+        }
+    }, [lineIndex, lines.length]);
 
     return (
-        <div className="w-full h-28 md:h-36 rounded-xl bg-[#0d1117] border border-white/10 p-3 md:p-4 font-mono text-[10px] md:text-xs overflow-hidden">
-            <div className="flex items-center gap-1.5 mb-2 md:mb-3">
-                <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-red-500/80" />
-                <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500/80" />
-                <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-green-500/80" />
-                <span className="ml-2 text-white/30 text-[8px] md:text-[10px]">terminal</span>
+        <div className="w-full min-h-[100px] md:min-h-[120px] rounded-xl bg-[#0d1117] border border-white/10 p-2.5 md:p-3 font-mono text-[9px] md:text-[11px] overflow-hidden">
+            <div className="flex items-center gap-1.5 mb-2">
+                <div className="w-2 h-2 rounded-full bg-red-500/80" />
+                <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
+                <div className="w-2 h-2 rounded-full bg-green-500/80" />
+                <span className="ml-2 text-white/30 text-[8px]">terminal</span>
             </div>
-            <div className="space-y-0.5 md:space-y-1">
-                {lines.slice(0, Math.min(lineIndex, lines.length)).map((line, i) => (
+            <div className="space-y-1">
+                {lines.slice(0, lineIndex).map((line, i) => (
                     <motion.div
                         key={i}
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className={line.color}
+                        className={`${line.color} leading-tight`}
                     >
                         {line.text}
                     </motion.div>
                 ))}
                 {lineIndex < lines.length && (
                     <motion.span
-                        className="inline-block w-2 h-3 md:h-4 bg-white/60"
+                        className="inline-block w-1.5 h-3 bg-white/60"
                         animate={{ opacity: [1, 0] }}
                         transition={{ duration: 0.5, repeat: Infinity }}
+                    />
+                )}
+                {lineIndex >= lines.length && (
+                    <motion.span
+                        className="inline-block w-1.5 h-3 bg-emerald-400"
+                        animate={{ opacity: [1, 0.5] }}
+                        transition={{ duration: 1, repeat: Infinity }}
                     />
                 )}
             </div>
@@ -687,32 +690,33 @@ const TerminalVisual = () => {
 // ============================================
 const CalendarVisual = () => {
     return (
-        <div className="w-full h-28 md:h-36 rounded-xl bg-gradient-to-br from-blue-900/30 to-blue-950/50 border border-blue-500/20 p-3 md:p-4 overflow-hidden relative">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs text-blue-300 font-medium">Your Premium Trial</span>
-                <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[8px] md:text-[10px] font-bold">ACTIVE</span>
+        <div className="w-full min-h-[100px] md:min-h-[120px] rounded-xl bg-gradient-to-br from-blue-900/40 to-blue-950/60 border border-blue-500/20 p-3 overflow-hidden relative">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] md:text-[11px] text-blue-300 font-medium">Premium Trial</span>
+                <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[8px] font-bold">ACTIVE</span>
             </div>
-            <div className="grid grid-cols-7 gap-0.5 md:gap-1">
-                {[...Array(28)].map((_, i) => {
-                    const isActive = i < 30;
-                    const isToday = i === 0;
-                    return (
-                        <motion.div
-                            key={i}
-                            className={`aspect-square rounded-sm md:rounded flex items-center justify-center text-[6px] md:text-[8px] font-medium
-                                ${isToday ? 'bg-blue-500 text-white' : isActive ? 'bg-blue-500/20 text-blue-300' : 'bg-white/5 text-white/20'}`}
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: i * 0.02 }}
-                        >
-                            {i + 1}
-                        </motion.div>
-                    );
-                })}
-            </div>
-            <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3">
-                <span className="text-xl md:text-3xl font-black text-blue-400">30</span>
-                <span className="text-[8px] md:text-xs text-blue-300 ml-1">days</span>
+            <div className="flex items-center justify-between">
+                <div className="grid grid-cols-7 gap-1 flex-1 mr-3">
+                    {[...Array(21)].map((_, i) => {
+                        const isToday = i === 0;
+                        return (
+                            <motion.div
+                                key={i}
+                                className={`w-4 h-4 md:w-5 md:h-5 rounded flex items-center justify-center text-[7px] md:text-[8px] font-medium
+                                    ${isToday ? 'bg-blue-500 text-white' : 'bg-blue-500/20 text-blue-300'}`}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: i * 0.03 }}
+                            >
+                                {i + 1}
+                            </motion.div>
+                        );
+                    })}
+                </div>
+                <div className="text-right">
+                    <span className="text-2xl md:text-4xl font-black text-blue-400 block leading-none">30</span>
+                    <span className="text-[8px] md:text-[10px] text-blue-300 uppercase tracking-wider">days free</span>
+                </div>
             </div>
         </div>
     );
@@ -723,51 +727,42 @@ const CalendarVisual = () => {
 // ============================================
 const ChatVisual = () => {
     return (
-        <div className="w-full h-28 md:h-36 rounded-xl bg-gradient-to-br from-purple-900/30 to-purple-950/50 border border-purple-500/20 p-3 md:p-4 overflow-hidden">
-            <div className="space-y-2 md:space-y-3">
+        <div className="w-full min-h-[100px] md:min-h-[120px] rounded-xl bg-gradient-to-br from-purple-900/40 to-purple-950/60 border border-purple-500/20 p-2.5 md:p-3 overflow-hidden">
+            <div className="space-y-2">
                 <motion.div
                     className="flex items-start gap-2"
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
+                    transition={{ delay: 0.2 }}
                 >
-                    <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-purple-500/30 flex items-center justify-center shrink-0">
-                        <span className="text-[8px] md:text-[10px] text-purple-300">You</span>
+                    <div className="w-5 h-5 rounded-full bg-purple-500/30 flex items-center justify-center shrink-0">
+                        <span className="text-[7px] text-purple-300">You</span>
                     </div>
-                    <div className="bg-white/10 rounded-xl rounded-tl-none px-2 py-1.5 md:px-3 md:py-2 max-w-[80%]">
-                        <p className="text-[9px] md:text-xs text-white/80">Need help with AI credits</p>
+                    <div className="bg-white/10 rounded-lg rounded-tl-none px-2 py-1.5">
+                        <p className="text-[9px] md:text-[10px] text-white/80">Need help with credits</p>
                     </div>
                 </motion.div>
                 <motion.div
                     className="flex items-start gap-2 justify-end"
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 1 }}
+                    transition={{ delay: 0.8 }}
                 >
-                    <div className="bg-purple-500/30 rounded-xl rounded-tr-none px-2 py-1.5 md:px-3 md:py-2 max-w-[80%]">
-                        <p className="text-[9px] md:text-xs text-white/90">Hi! I'm here to help. As a beta member, you get priority support!</p>
+                    <div className="bg-purple-500/30 rounded-lg rounded-tr-none px-2 py-1.5 max-w-[85%]">
+                        <p className="text-[9px] md:text-[10px] text-white/90">I'm here to help! Beta members get priority support</p>
                     </div>
-                    <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
-                        <span className="text-[8px] md:text-[10px] text-white font-bold">V</span>
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+                        <span className="text-[7px] text-white font-bold">V</span>
                     </div>
                 </motion.div>
                 <motion.div
-                    className="flex items-center gap-2 pl-7"
+                    className="flex items-center gap-1.5 justify-end pr-7"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 1.5 }}
+                    transition={{ delay: 1.2 }}
                 >
-                    <div className="flex gap-1">
-                        {[0, 1, 2].map(i => (
-                            <motion.div
-                                key={i}
-                                className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-purple-400"
-                                animate={{ opacity: [0.3, 1, 0.3] }}
-                                transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
-                            />
-                        ))}
-                    </div>
-                    <span className="text-[8px] md:text-[10px] text-purple-300">Typically replies instantly</span>
+                    <span className="text-[8px] text-green-400">●</span>
+                    <span className="text-[8px] text-purple-300">Replies instantly</span>
                 </motion.div>
             </div>
         </div>
