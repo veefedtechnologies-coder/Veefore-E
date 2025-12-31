@@ -170,7 +170,7 @@ const RotatingHeroText = memo(() => {
   }, [currentIndex, isReady])
 
   return (
-    <div className="relative overflow-hidden" style={{ height: 'clamp(8rem, 20vw, 16rem)', paddingBottom: '0.15em' }}>
+    <div className="relative overflow-visible" style={{ height: 'clamp(10rem, 25vw, 16rem)', paddingBottom: '0.5em' }}>
       {taglines.map((tagline, index) => {
         const isActive = currentIndex === index
         const isExiting = prevIndex === index
@@ -192,7 +192,7 @@ const RotatingHeroText = memo(() => {
             className="absolute inset-0 flex flex-col items-center justify-center will-change-transform"
             style={{ pointerEvents: isActive ? 'auto' : 'none' }}
           >
-            <span className="block text-white" style={{ lineHeight: '1.15' }}>
+            <span className="block text-white whitespace-nowrap" style={{ lineHeight: '1.15' }}>
               {tagline.top}
             </span>
             <span
@@ -792,26 +792,18 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
           <div 
-            className={`transition-all duration-300 ease-out ${isScrolled 
+            className={`transition-[margin] duration-150 ease-linear ${isScrolled 
               ? 'mx-2 sm:mx-4 mt-2 sm:mt-3' 
               : 'mx-0 mt-4 sm:mt-4 md:mt-5'
             }`}
-            style={{ 
-              willChange: 'margin, padding',
-              transform: 'translateZ(0)'
-            }}
           >
             <GlassCard
-              className={`mx-auto transition-all duration-300 ease-out ${isScrolled
+              className={`mx-auto transition-[max-width,border-radius,background-color,backdrop-filter,box-shadow,padding] duration-150 ease-linear ${isScrolled
                 ? 'max-w-[1200px] !rounded-full bg-black/60 backdrop-blur-xl border-white/10 shadow-lg shadow-black/20 px-3 sm:px-5 py-2 sm:py-2'
                 : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-4 sm:px-5 md:px-6 lg:px-10 py-3 sm:py-3 md:py-3'
                 }`}
               hover={false}
               showGradient={isScrolled}
-              style={{ 
-                willChange: 'max-width, border-radius, background-color, padding',
-                transform: 'translateZ(0)'
-              }}
             >
               <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
                 <div className="flex items-center space-x-4 sm:space-x-6 md:space-x-8">
