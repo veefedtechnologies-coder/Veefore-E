@@ -128,7 +128,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
     const colors = colorMap[feature.color];
     
     return (
-        <div className="h-full w-full p-4 md:p-8 pt-8 md:pt-10 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden">
+        <div className="h-full w-full p-4 md:p-6 lg:p-8 pt-10 md:pt-12 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden">
             {feature.screen.type === 'analysis' && (
                 <div className="space-y-4 md:space-y-6 h-full flex flex-col justify-center">
                     <div className="bg-white/5 rounded-2xl p-4 md:p-6 border border-white/10 backdrop-blur-sm">
@@ -213,14 +213,14 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
 const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
         <div 
-            className="w-full h-full flex flex-col items-center justify-center p-4"
+            className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-4"
             style={{
                 WebkitTransform: 'translate3d(0,0,0)',
                 transform: 'translate3d(0,0,0)',
             }}
         >
             <div 
-                className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10"
+                className="h-full max-h-[420px] xs:max-h-[480px] sm:max-h-[520px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2rem] sm:rounded-[2.5rem] md:rounded-[3rem] border-[5px] sm:border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10"
                 style={{
                     WebkitBackfaceVisibility: 'hidden',
                     backfaceVisibility: 'hidden',
@@ -278,8 +278,8 @@ const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
             </div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
-            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 md:mb-6 leading-tight">{feature.title}</h2>
+            <p className="text-xs sm:text-sm md:text-lg md:text-xl text-white/50 leading-relaxed max-w-sm md:max-w-none">{feature.description}</p>
         </motion.div>
     );
 });
@@ -488,13 +488,13 @@ export default function StickyScrollFeaturesV2() {
                         ))}
                     </div>
 
-                    <div className="w-full md:w-[45%] relative h-[40vh] md:h-full flex items-end md:items-center justify-start z-20 pb-8 md:pb-0">
+                    <div className="w-full md:w-[45%] relative h-[35vh] sm:h-[40vh] md:h-full flex items-center md:items-center justify-start z-20 pb-4 md:pb-0">
                         {textSlides.map(({ feature, opacity, y }, i) => (
                             <TextSlide key={i} feature={feature} opacity={opacity} y={y} />
                         ))}
                     </div>
 
-                    <div className="flex w-full md:w-[55%] h-[60vh] md:h-full items-center justify-center relative z-20">
+                    <div className="flex w-full md:w-[55%] h-[55vh] sm:h-[60vh] md:h-full items-center justify-center relative z-20">
                         <div className={`absolute -inset-2 md:-inset-8 overflow-visible pointer-events-none transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>
                             <div className="absolute inset-0 rounded-3xl transition-all duration-500" style={{ background: activeColors.panelGradient }} />
                             <div className="absolute inset-4 rounded-2xl border-2 transition-all duration-500" style={{ borderColor: activeColors.borderColor, boxShadow: activeColors.boxShadow }} />
@@ -542,7 +542,7 @@ export default function StickyScrollFeaturesV2() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+                        className="absolute bottom-4 sm:bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 pointer-events-none scale-75 sm:scale-100"
                     >
                         <ScrollHint />
                     </motion.div>
