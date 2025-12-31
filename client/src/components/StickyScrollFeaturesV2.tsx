@@ -316,9 +316,10 @@ interface MockupSlideProps {
     y: number;
     scale: number;
     isVisible: boolean;
+    isStatic?: boolean;
 }
 
-const MockupSlide = memo(({ feature, y, scale, isVisible }: MockupSlideProps) => {
+const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: MockupSlideProps) => {
     const springY = useSpring(useMotionValue(y), springConfig);
     const springScale = useSpring(useMotionValue(scale), springConfig);
 
@@ -328,6 +329,20 @@ const MockupSlide = memo(({ feature, y, scale, isVisible }: MockupSlideProps) =>
     }, [y, scale, springY, springScale]);
 
     if (!isVisible && y > 50) return null;
+
+    if (isStatic) {
+        return (
+            <div 
+                style={{ 
+                    transform: `translateY(${y}px) scale(${scale})`,
+                }} 
+                className="absolute inset-0 flex items-center justify-center"
+            >
+                <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
+                <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+            </div>
+        );
+    }
 
     return (
         <motion.div 
@@ -400,16 +415,18 @@ export default function StickyScrollFeaturesV2() {
             let y = 0;
             let scale = 1;
             let isVisible = true;
+            let isStatic = false;
 
             if (i === 0) {
                 if (!isReady) {
                     y = 0;
                     scale = 1;
+                    isStatic = true;
                 } else {
                     y = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 0, -100) * window.innerHeight / 100 : 0;
                     scale = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 1, 0.9) : 1;
                 }
-                isVisible = progress < 0.4;
+                isVisible = progress < 0.4 || !isReady;
             } else if (i === 1) {
                 const enterY = mapRange(progress, 0.32, 0.38, 100, 0);
                 const exitY = mapRange(progress, 0.62, 0.68, 0, -100);
@@ -423,7 +440,7 @@ export default function StickyScrollFeaturesV2() {
                 isVisible = progress > 0.62;
             }
 
-            return { feature, y, scale: Math.max(0.9, Math.min(1, scale)), isVisible };
+            return { feature, y, scale: Math.max(0.9, Math.min(1, scale)), isVisible, isStatic };
         });
     }, [progress, isReady]);
 
@@ -496,8 +513,8 @@ export default function StickyScrollFeaturesV2() {
                         </div>
 
                         <div className="relative w-full h-[90%] md:h-[80%] max-w-[700px]">
-                            {mockupSlides.map(({ feature, y, scale, isVisible }, i) => (
-                                <MockupSlide key={i} feature={feature} y={y} scale={scale} isVisible={isVisible} />
+                            {mockupSlides.map(({ feature, y, scale, isVisible, isStatic }, i) => (
+                                <MockupSlide key={i} feature={feature} y={y} scale={scale} isVisible={isVisible} isStatic={isStatic} />
                             ))}
                         </div>
                     </div>
