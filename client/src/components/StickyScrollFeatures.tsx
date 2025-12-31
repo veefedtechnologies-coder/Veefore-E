@@ -1,8 +1,6 @@
 import { useRef, useState, memo, useMemo, useEffect } from 'react';
-import { motion, useScroll, useTransform, useSpring, useMotionValueEvent, MotionValue } from 'framer-motion';
+import { motion, useMotionValue, MotionValue } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
-
-const springConfig = { stiffness: 100, damping: 20, mass: 0.5 };
 
 const colorMap = {
     blue: {
@@ -132,11 +130,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                             </div>
                         </div>
                         <div className="h-2 md:h-3 bg-white/10 rounded-full overflow-hidden">
-                            <motion.div
-                                initial={{ width: "98%" }}
-                                animate={{ width: "98%" }}
-                                className={`h-full bg-gradient-to-r ${colors.gradient}`}
-                            />
+                            <div className={`h-full w-[98%] bg-gradient-to-r ${colors.gradient}`} />
                         </div>
                     </div>
 
@@ -154,10 +148,8 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
             {feature.screen.type === 'chat' && (
                 <div className="space-y-4 md:space-y-6 h-full justify-center flex flex-col px-4 md:px-12">
                     {feature.screen.messages?.map((msg, i: number) => (
-                        <motion.div
+                        <div
                             key={i}
-                            initial={{ opacity: 1, scale: 1, y: 0 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
                             className={`max-w-[85%] md:max-w-[70%] p-4 md:p-5 rounded-2xl ${msg.user === 'me'
                                 ? 'bg-purple-500 text-white self-end rounded-br-none ml-auto'
                                 : 'bg-white/10 text-white self-start rounded-bl-none backdrop-blur-sm'
@@ -165,7 +157,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                         >
                             <p className="text-sm md:text-base font-medium">{msg.text}</p>
                             <p className={`text-[10px] md:text-xs mt-2 opacity-60 ${msg.user === 'me' ? 'text-white' : 'text-white/60'}`}>{msg.time}</p>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             )}
@@ -235,171 +227,345 @@ const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
     );
 });
 
-const Feature0TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+function useManualScrollProgress(containerRef: React.RefObject<HTMLElement>) {
+    const scrollProgress = useMotionValue(0);
+    
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        
+        let rafId: number;
+        let lastProgress = 0;
+        
+        const updateProgress = () => {
+            const rect = container.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+            const containerHeight = rect.height;
+            const scrollableHeight = containerHeight - windowHeight;
+            
+            if (scrollableHeight <= 0) {
+                scrollProgress.set(0);
+                return;
+            }
+            
+            const scrolled = -rect.top;
+            const progress = Math.max(0, Math.min(1, scrolled / scrollableHeight));
+            
+            if (Math.abs(progress - lastProgress) > 0.001) {
+                lastProgress = progress;
+                scrollProgress.set(progress);
+            }
+        };
+        
+        const handleScroll = () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(updateProgress);
+        };
+        
+        updateProgress();
+        
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('resize', handleScroll, { passive: true });
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleScroll);
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [containerRef, scrollProgress]);
+    
+    return scrollProgress;
+}
+
+const Feature0TextSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const feature = features[0];
     const colors = colorMap[feature.color];
-    const opacity = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [1, 1, 0]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -30]), springConfig);
+    const [styles, setStyles] = useState({ opacity: 1, y: 0 });
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let opacity = 1, y = 0;
+            if (latest <= 0.28) { opacity = 1; y = 0; }
+            else if (latest <= 0.34) {
+                const t = (latest - 0.28) / 0.06;
+                opacity = 1 - t;
+                y = -30 * t;
+            }
+            else { opacity = 0; y = -30; }
+            setStyles({ opacity, y });
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
 
     return (
-        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
+        <div style={{ opacity: styles.opacity, transform: `translateY(${styles.y}px)`, transition: 'opacity 0.15s, transform 0.15s' }} className="absolute w-full max-w-lg">
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
             </div>
             <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
             <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </motion.div>
+        </div>
     );
 });
 
-const Feature1TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature1TextSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const feature = features[1];
     const colors = colorMap[feature.color];
-    const opacity = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [0, 1, 1, 0]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [30, 0, 0, -30]), springConfig);
+    const [styles, setStyles] = useState({ opacity: 0, y: 30 });
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let opacity = 0, y = 30;
+            if (latest < 0.32) { opacity = 0; y = 30; }
+            else if (latest <= 0.38) {
+                const t = (latest - 0.32) / 0.06;
+                opacity = t;
+                y = 30 * (1 - t);
+            }
+            else if (latest <= 0.62) { opacity = 1; y = 0; }
+            else if (latest <= 0.68) {
+                const t = (latest - 0.62) / 0.06;
+                opacity = 1 - t;
+                y = -30 * t;
+            }
+            else { opacity = 0; y = -30; }
+            setStyles({ opacity, y });
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
 
     return (
-        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
+        <div style={{ opacity: styles.opacity, transform: `translateY(${styles.y}px)`, transition: 'opacity 0.15s, transform 0.15s' }} className="absolute w-full max-w-lg">
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
             </div>
             <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
             <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </motion.div>
+        </div>
     );
 });
 
-const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature2TextSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const feature = features[2];
     const colors = colorMap[feature.color];
-    const opacity = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [0, 1, 1]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [30, 0, 0]), springConfig);
+    const [styles, setStyles] = useState({ opacity: 0, y: 30 });
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let opacity = 0, y = 30;
+            if (latest < 0.66) { opacity = 0; y = 30; }
+            else if (latest <= 0.72) {
+                const t = (latest - 0.66) / 0.06;
+                opacity = t;
+                y = 30 * (1 - t);
+            }
+            else { opacity = 1; y = 0; }
+            setStyles({ opacity, y });
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
 
     return (
-        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
+        <div style={{ opacity: styles.opacity, transform: `translateY(${styles.y}px)`, transition: 'opacity 0.15s, transform 0.15s' }} className="absolute w-full max-w-lg">
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
             </div>
             <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
             <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </motion.div>
+        </div>
     );
 });
 
-const Feature0MockupSlide = memo(({ scrollYProgress, isReady }: { scrollYProgress: MotionValue<number>, isReady: boolean }) => {
+const Feature0MockupSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const feature = features[0];
-    const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
-    const springY = useSpring(yValue, springConfig);
-    const animatedY = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [1, 1, 1, 0.9]), springConfig);
+    const [styles, setStyles] = useState({ y: 0, scale: 1 });
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let y = 0, scale = 1;
+            if (latest <= 0.28) { y = 0; scale = 1; }
+            else if (latest <= 0.34) {
+                const t = (latest - 0.28) / 0.06;
+                y = -100 * t;
+                scale = 1 - 0.1 * t;
+            }
+            else { y = -100; scale = 0.9; }
+            setStyles({ y, scale });
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
 
     return (
-        <motion.div 
-            style={isReady ? { y: animatedY, scale } : { y: '0vh', scale: 1 }} 
+        <div 
+            style={{ transform: `translateY(${styles.y}vh) scale(${styles.scale})`, transition: 'transform 0.2s ease-out' }} 
             className="absolute inset-0 flex items-center justify-center will-change-transform"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
+        </div>
     );
 });
 
-const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature1MockupSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const feature = features[1];
-    const yValue = useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [100, 0, 0, -100]);
-    const springY = useSpring(yValue, springConfig);
-    const y = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.9, 1, 1, 0.9]), springConfig);
+    const [styles, setStyles] = useState({ y: 100, scale: 0.9 });
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let y = 100, scale = 0.9;
+            if (latest < 0.32) { y = 100; scale = 0.9; }
+            else if (latest <= 0.38) {
+                const t = (latest - 0.32) / 0.06;
+                y = 100 * (1 - t);
+                scale = 0.9 + 0.1 * t;
+            }
+            else if (latest <= 0.62) { y = 0; scale = 1; }
+            else if (latest <= 0.68) {
+                const t = (latest - 0.62) / 0.06;
+                y = -100 * t;
+                scale = 1 - 0.1 * t;
+            }
+            else { y = -100; scale = 0.9; }
+            setStyles({ y, scale });
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
 
     return (
-        <motion.div 
-            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
-            style={{ y, scale }} 
+        <div 
+            style={{ transform: `translateY(${styles.y}vh) scale(${styles.scale})`, transition: 'transform 0.2s ease-out' }} 
             className="absolute inset-0 flex items-center justify-center will-change-transform"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
+        </div>
     );
 });
 
-const Feature2MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature2MockupSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const feature = features[2];
-    const yValue = useTransform(scrollYProgress, [0.66, 0.72, 1.0], [100, 0, 0]);
-    const springY = useSpring(yValue, springConfig);
-    const y = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.9, 1, 1, 1]), springConfig);
+    const [styles, setStyles] = useState({ y: 100, scale: 0.9 });
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let y = 100, scale = 0.9;
+            if (latest < 0.66) { y = 100; scale = 0.9; }
+            else if (latest <= 0.72) {
+                const t = (latest - 0.66) / 0.06;
+                y = 100 * (1 - t);
+                scale = 0.9 + 0.1 * t;
+            }
+            else { y = 0; scale = 1; }
+            setStyles({ y, scale });
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
 
     return (
-        <motion.div 
-            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
-            style={{ y, scale }} 
+        <div 
+            style={{ transform: `translateY(${styles.y}vh) scale(${styles.scale})`, transition: 'transform 0.2s ease-out' }} 
             className="absolute inset-0 flex items-center justify-center will-change-transform"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
+        </div>
     );
 });
 
-const Feature0Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature0Ambience = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const colors = colorMap[features[0].color];
-    const opacity = useTransform(scrollYProgress, [0, 0.1, 0.24, 0.34], [0, 0.2, 0.2, 0]);
-    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
+    const [opacity, setOpacity] = useState(0);
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let o = 0;
+            if (latest < 0.1) o = latest / 0.1 * 0.2;
+            else if (latest <= 0.24) o = 0.2;
+            else if (latest <= 0.34) o = 0.2 * (1 - (latest - 0.24) / 0.1);
+            else o = 0;
+            setOpacity(o);
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
+    
+    return <div style={{ opacity, transition: 'opacity 0.3s' }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`} />;
 });
 
-const Feature1Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature1Ambience = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const colors = colorMap[features[1].color];
-    const opacity = useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0, 0.2, 0.2, 0]);
-    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
+    const [opacity, setOpacity] = useState(0);
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let o = 0;
+            if (latest < 0.32) o = 0;
+            else if (latest <= 0.42) o = (latest - 0.32) / 0.1 * 0.2;
+            else if (latest <= 0.58) o = 0.2;
+            else if (latest <= 0.68) o = 0.2 * (1 - (latest - 0.58) / 0.1);
+            else o = 0;
+            setOpacity(o);
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
+    
+    return <div style={{ opacity, transition: 'opacity 0.3s' }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`} />;
 });
 
-const Feature2Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+const Feature2Ambience = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
     const colors = colorMap[features[2].color];
-    const opacity = useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0, 0.2, 0.2, 0]);
-    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
+    const [opacity, setOpacity] = useState(0);
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            let o = 0;
+            if (latest < 0.66) o = 0;
+            else if (latest <= 0.76) o = (latest - 0.66) / 0.1 * 0.2;
+            else o = 0.2;
+            setOpacity(o);
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
+    
+    return <div style={{ opacity, transition: 'opacity 0.3s' }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`} />;
 });
 
 export default function StickyScrollFeatures() {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isScrollReady, setIsScrollReady] = useState(false);
+    const scrollProgress = useManualScrollProgress(containerRef as React.RefObject<HTMLElement>);
     
-    const { scrollYProgress } = useScroll({
-        target: containerRef,
-        offset: ["start start", "end end"]
-    });
-    
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsScrollReady(true);
-        }, 100);
-        return () => clearTimeout(timer);
-    }, []);
-
     const [activeFeature, setActiveFeature] = useState(0);
     const [isInSection, setIsInSection] = useState(false);
-
-    useMotionValueEvent(scrollYProgress, "change", (latest: number) => {
-        if (!isFinite(latest)) return;
-        if (!isScrollReady) {
-            setIsScrollReady(true);
-        }
-        setIsInSection(latest > 0.05 && latest < 0.95);
-        if (latest < 0.34) setActiveFeature(0);
-        else if (latest < 0.68) setActiveFeature(1);
-        else setActiveFeature(2);
-    });
+    
+    useEffect(() => {
+        const unsubscribe = scrollProgress.on("change", (latest) => {
+            if (!isFinite(latest)) return;
+            setIsInSection(latest > 0.05 && latest < 0.95);
+            if (latest < 0.34) setActiveFeature(0);
+            else if (latest < 0.68) setActiveFeature(1);
+            else setActiveFeature(2);
+        });
+        return unsubscribe;
+    }, [scrollProgress]);
 
     const activeColors = useMemo(() => colorMap[features[activeFeature].color], [activeFeature]);
 
     return (
-        <section ref={containerRef} className="relative h-[300vh] bg-black contain-none">
+        <section ref={containerRef} className="relative h-[300vh] bg-black" style={{ position: 'relative', contain: 'none' }}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
-            <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full" style={{ position: 'sticky', WebkitOverflowScrolling: 'touch' }}>
                 <div className="w-full px-4 md:px-16 lg:px-24 relative h-full flex flex-col md:flex-row items-center">
 
                     <div className={`absolute top-8 md:top-28 left-6 md:left-16 lg:left-24 flex space-x-2 z-50 transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>
@@ -412,9 +578,9 @@ export default function StickyScrollFeatures() {
                     </div>
 
                     <div className="w-full md:w-[45%] relative h-[40vh] md:h-full flex items-end md:items-center justify-start z-20 pb-8 md:pb-0">
-                        <Feature0TextSlide scrollYProgress={scrollYProgress} />
-                        <Feature1TextSlide scrollYProgress={scrollYProgress} />
-                        <Feature2TextSlide scrollYProgress={scrollYProgress} />
+                        <Feature0TextSlide scrollProgress={scrollProgress} />
+                        <Feature1TextSlide scrollProgress={scrollProgress} />
+                        <Feature2TextSlide scrollProgress={scrollProgress} />
                     </div>
 
                     <div className="flex w-full md:w-[55%] h-[60vh] md:h-full items-center justify-center relative z-20">
@@ -433,23 +599,20 @@ export default function StickyScrollFeatures() {
                                 className="absolute bottom-0 left-0 w-[150px] h-[150px] md:w-[400px] md:h-[400px] rounded-full transition-all duration-500"
                                 style={{ background: `radial-gradient(circle, ${activeColors.orbSecondary} 0%, transparent 60%)`, filter: 'blur(50px)' }}
                                 animate={{ scale: [1, 1.2, 1] }}
-                                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
                             />
                         </div>
 
-                        <div className="relative w-full h-[90%] md:h-[80%] max-w-[700px]">
-                            <Feature0MockupSlide scrollYProgress={scrollYProgress} isReady={isScrollReady} />
-                            <Feature1MockupSlide scrollYProgress={scrollYProgress} />
-                            <Feature2MockupSlide scrollYProgress={scrollYProgress} />
+                        <div className="w-full h-full max-w-[340px] md:max-w-[700px] relative overflow-hidden">
+                            <Feature0MockupSlide scrollProgress={scrollProgress} />
+                            <Feature1MockupSlide scrollProgress={scrollProgress} />
+                            <Feature2MockupSlide scrollProgress={scrollProgress} />
                         </div>
                     </div>
 
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        <Feature0Ambience scrollYProgress={scrollYProgress} />
-                        <Feature1Ambience scrollYProgress={scrollYProgress} />
-                        <Feature2Ambience scrollYProgress={scrollYProgress} />
-                    </div>
-
+                    <Feature0Ambience scrollProgress={scrollProgress} />
+                    <Feature1Ambience scrollProgress={scrollProgress} />
+                    <Feature2Ambience scrollProgress={scrollProgress} />
                 </div>
             </div>
         </section>
