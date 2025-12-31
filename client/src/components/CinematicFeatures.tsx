@@ -149,7 +149,7 @@ export const CinematicFeatures = ({ features }: CinematicFeaturesProps) => {
   });
 
   return (
-    <section ref={targetRef} className="relative" style={{ height: `${features.length * 220}vh` }}>
+    <section ref={targetRef} className="relative" style={{ height: `${features.length * 180}vh` }}>
       <div className="sticky top-0 h-screen overflow-hidden bg-black">
         {features.map((feature, index) => (
           <Card 
