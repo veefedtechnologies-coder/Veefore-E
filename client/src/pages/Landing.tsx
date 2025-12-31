@@ -192,7 +192,7 @@ const RotatingHeroText = memo(() => {
             className="absolute inset-0 flex flex-col items-center justify-center will-change-transform"
             style={{ pointerEvents: isActive ? 'auto' : 'none' }}
           >
-            <span className="block text-white whitespace-nowrap" style={{ lineHeight: '1.15' }}>
+            <span className="block text-white" style={{ lineHeight: '1.15' }}>
               {tagline.top}
             </span>
             <span
@@ -920,10 +920,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         )}
 
         {isMobile ? (
-          <div className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center">
+          <div className="container max-w-[1100px] mx-auto px-3 sm:px-6 relative z-10 text-center">
 
 
-            <h1 className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8">
+            <h1 className="text-[clamp(2rem,8vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8">
               <RotatingHeroText />
             </h1>
 
@@ -970,7 +970,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         ) : (
           <motion.div
             style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
-            className="container max-w-[1100px] mx-auto px-6 relative z-10 text-center"
+            className="container max-w-[1100px] mx-auto px-3 sm:px-6 relative z-10 text-center"
           >
 
 
@@ -978,7 +978,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
-              className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8"
+              className="text-[clamp(2rem,8vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8"
             >
               <RotatingHeroText />
             </motion.h1>
