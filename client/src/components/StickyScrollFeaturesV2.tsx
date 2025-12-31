@@ -341,14 +341,12 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
         springScale.set(scale);
     }, [y, scale, springY, springScale]);
 
-    if (!isVisible && y > 50) return null;
-
     if (isStatic) {
         return (
             <div 
                 style={{ 
-                    transform: `translate3d(0, ${y}px, 0) scale(${scale})`,
-                    WebkitTransform: `translate3d(0, ${y}px, 0) scale(${scale})`,
+                    transform: `translate3d(0, 0, 0) scale(1)`,
+                    WebkitTransform: `translate3d(0, 0, 0) scale(1)`,
                     visibility: 'visible',
                     opacity: 1,
                     WebkitBackfaceVisibility: 'hidden',
@@ -361,6 +359,8 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
             </div>
         );
     }
+
+    if (!isVisible && y > 50) return null;
 
     return (
         <motion.div 
