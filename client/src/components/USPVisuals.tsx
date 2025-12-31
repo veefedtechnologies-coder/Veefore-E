@@ -3,7 +3,7 @@ import { MessageSquare, Bot, User, ArrowRight, Sparkles, TrendingUp, Zap, CheckC
 
 export const EngagementVisual = () => {
   return (
-    <div className="relative w-full h-auto min-h-[160px] md:min-h-[200px] bg-neutral-950 rounded-xl border border-white/10 p-2 md:p-4 overflow-hidden flex flex-col justify-end shadow-2xl">
+    <div className="relative w-full h-auto min-h-[220px] md:min-h-[320px] bg-neutral-950 rounded-xl border border-white/10 p-2 md:p-4 overflow-hidden flex flex-col justify-end shadow-2xl">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent" />
       
       <div className="space-y-3 md:space-y-4 relative z-10 pb-1 md:pb-2">
