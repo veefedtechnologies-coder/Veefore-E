@@ -367,7 +367,8 @@ export default function StickyScrollFeaturesV2() {
     });
 
     useMotionValueEvent(smoothProgress, "change", (latest) => {
-        setProgress(latest);
+        // Clamp progress to valid range to handle edge cases on tall screens
+        setProgress(Math.max(0, Math.min(1, latest)));
     });
 
     useEffect(() => {
@@ -416,15 +417,17 @@ export default function StickyScrollFeaturesV2() {
             let isStatic = false;
 
             if (i === 0) {
-                if (!hasMounted) {
+                // Always show first mockup at start - critical for iPhone 16 Pro Max
+                if (!hasMounted || progress < 0.05) {
                     y = 0;
                     scale = 1;
                     isStatic = true;
+                    isVisible = true;
                 } else {
                     y = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 0, -100) * window.innerHeight / 100 : 0;
                     scale = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 1, 0.9) : 1;
+                    isVisible = progress < 0.40;
                 }
-                isVisible = progress < 0.40 || !hasMounted;
             } else if (i === 1) {
                 const enterY = mapRange(progress, 0.30, 0.36, 100, 0);
                 const exitY = mapRange(progress, 0.60, 0.66, 0, -100);
