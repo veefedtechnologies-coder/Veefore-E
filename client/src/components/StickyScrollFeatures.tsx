@@ -1,6 +1,8 @@
-import { useRef, useState, memo, useMemo, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useRef, useState, memo, useMemo, useEffect } from 'react';
+import { motion, useScroll, useTransform, useSpring, useMotionValueEvent, MotionValue } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
+
+const springConfig = { stiffness: 100, damping: 20, mass: 0.5 };
 
 const colorMap = {
     blue: {
@@ -130,7 +132,11 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                             </div>
                         </div>
                         <div className="h-2 md:h-3 bg-white/10 rounded-full overflow-hidden">
-                            <div className={`h-full w-[98%] bg-gradient-to-r ${colors.gradient}`} />
+                            <motion.div
+                                initial={{ width: "98%" }}
+                                animate={{ width: "98%" }}
+                                className={`h-full bg-gradient-to-r ${colors.gradient}`}
+                            />
                         </div>
                     </div>
 
@@ -148,8 +154,10 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
             {feature.screen.type === 'chat' && (
                 <div className="space-y-4 md:space-y-6 h-full justify-center flex flex-col px-4 md:px-12">
                     {feature.screen.messages?.map((msg, i: number) => (
-                        <div
+                        <motion.div
                             key={i}
+                            initial={{ opacity: 1, scale: 1, y: 0 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
                             className={`max-w-[85%] md:max-w-[70%] p-4 md:p-5 rounded-2xl ${msg.user === 'me'
                                 ? 'bg-purple-500 text-white self-end rounded-br-none ml-auto'
                                 : 'bg-white/10 text-white self-start rounded-bl-none backdrop-blur-sm'
@@ -157,7 +165,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                         >
                             <p className="text-sm md:text-base font-medium">{msg.text}</p>
                             <p className={`text-[10px] md:text-xs mt-2 opacity-60 ${msg.user === 'me' ? 'text-white' : 'text-white/60'}`}>{msg.time}</p>
-                        </div>
+                        </motion.div>
                     ))}
                 </div>
             )}
@@ -197,164 +205,200 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
     );
 });
 
-const IPhoneMockup = memo(({ feature }: { feature: Feature }) => (
-    <div className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 md:w-28 h-6 md:h-7 bg-black rounded-b-2xl z-20 flex justify-center items-center">
-            <div className="w-12 md:w-16 h-3 md:h-4 bg-zinc-900 rounded-full" />
-        </div>
-        <div className="absolute top-2 md:top-3 left-6 md:left-8 text-[8px] md:text-[10px] font-bold text-white z-20">9:41</div>
-        <div className="absolute top-2 md:top-3 right-6 md:right-8 flex space-x-1 z-20">
-            <div className="w-3 md:w-4 h-2 md:h-2.5 bg-white rounded-[1px]" />
-        </div>
-        <ScreenContent feature={feature} isMobile={true} />
-    </div>
-));
-
-const MacBookMockup = memo(({ feature }: { feature: Feature }) => (
-    <div className="w-full flex flex-col items-center justify-center">
-        <div className="w-full aspect-[16/10] bg-black rounded-t-2xl border-[6px] border-zinc-800 overflow-hidden relative shadow-2xl">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20" />
-            <ScreenContent feature={feature} />
-        </div>
-        <div className="w-[110%] h-3 bg-gradient-to-b from-zinc-700 to-zinc-800 rounded-b-xl shadow-lg" />
-        <div className="w-[95%] h-1 bg-zinc-900/50 rounded-b-sm" />
-    </div>
-));
-
-const TextContent = memo(({ feature, isActive }: { feature: Feature; isActive: boolean }) => {
-    const colors = colorMap[feature.color];
-    
+const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
-        <div 
-            className="absolute w-full max-w-lg transition-all duration-500 ease-out"
-            style={{
-                opacity: isActive ? 1 : 0,
-                transform: isActive ? 'translateY(0)' : 'translateY(30px)',
-                pointerEvents: isActive ? 'auto' : 'none'
-            }}
-        >
+        <div className="w-full h-full flex flex-col items-center justify-center p-4">
+            <div className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 md:w-28 h-6 md:h-7 bg-black rounded-b-2xl z-20 flex justify-center items-center">
+                    <div className="w-12 md:w-16 h-3 md:h-4 bg-zinc-900 rounded-full" />
+                </div>
+                <div className="absolute top-2 md:top-3 left-6 md:left-8 text-[8px] md:text-[10px] font-bold text-white z-20">9:41</div>
+                <div className="absolute top-2 md:top-3 right-6 md:right-8 flex space-x-1 z-20">
+                    <div className="w-3 md:w-4 h-2 md:h-2.5 bg-white rounded-[1px]" />
+                </div>
+                <ScreenContent feature={feature} isMobile={true} />
+            </div>
+        </div>
+    );
+});
+
+const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
+    return (
+        <div className="w-full h-full flex flex-col items-center justify-center">
+            <div className="w-full aspect-[16/10] bg-black rounded-t-2xl border-[6px] border-zinc-800 overflow-hidden relative shadow-2xl">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20" />
+                <ScreenContent feature={feature} />
+            </div>
+            <div className="w-[110%] h-3 bg-gradient-to-b from-zinc-700 to-zinc-800 rounded-b-xl shadow-lg" />
+            <div className="w-[95%] h-1 bg-zinc-900/50 rounded-b-sm" />
+        </div>
+    );
+});
+
+const Feature0TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const feature = features[0];
+    const colors = colorMap[feature.color];
+    const opacity = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [1, 1, 0]), springConfig);
+    const y = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -30]), springConfig);
+
+    return (
+        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
             </div>
             <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
             <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </div>
+        </motion.div>
     );
 });
 
-const MockupSlide = memo(({ feature, state }: { feature: Feature; state: 'before' | 'active' | 'after' }) => {
-    const getTransform = () => {
-        switch (state) {
-            case 'before': return 'translateY(100vh) scale(0.9)';
-            case 'active': return 'translateY(0) scale(1)';
-            case 'after': return 'translateY(-100vh) scale(0.9)';
-        }
-    };
-    
+const Feature1TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const feature = features[1];
+    const colors = colorMap[feature.color];
+    const opacity = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [0, 1, 1, 0]), springConfig);
+    const y = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [30, 0, 0, -30]), springConfig);
+
     return (
-        <div 
-            className="absolute inset-0 flex items-center justify-center transition-transform duration-700 ease-out will-change-transform"
-            style={{ transform: getTransform() }}
+        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
+            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
+                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
+                <span>{feature.highlight}</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
+            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
+        </motion.div>
+    );
+});
+
+const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const feature = features[2];
+    const colors = colorMap[feature.color];
+    const opacity = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [0, 1, 1]), springConfig);
+    const y = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [30, 0, 0]), springConfig);
+
+    return (
+        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
+            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
+                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
+                <span>{feature.highlight}</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
+            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
+        </motion.div>
+    );
+});
+
+const Feature0MockupSlide = memo(({ scrollYProgress, isReady }: { scrollYProgress: MotionValue<number>, isReady: boolean }) => {
+    const feature = features[0];
+    const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
+    const springY = useSpring(yValue, springConfig);
+    const animatedY = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [1, 1, 1, 0.9]), springConfig);
+
+    return (
+        <motion.div 
+            style={isReady ? { y: animatedY, scale } : { y: '0vh', scale: 1 }} 
+            className="absolute inset-0 flex items-center justify-center will-change-transform"
         >
-            <div className="hidden md:flex w-full h-full items-center justify-center p-8">
-                <MacBookMockup feature={feature} />
-            </div>
-            <div className="flex md:hidden w-full h-full items-center justify-center p-4">
-                <IPhoneMockup feature={feature} />
-            </div>
-        </div>
+            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+        </motion.div>
     );
 });
 
-const AmbienceGlow = memo(({ color, isActive }: { color: ColorKey; isActive: boolean }) => {
-    const colors = colorMap[color];
+const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const feature = features[1];
+    const yValue = useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [100, 0, 0, -100]);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.9, 1, 1, 0.9]), springConfig);
+
     return (
-        <div 
-            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full pointer-events-none transition-opacity duration-700`}
-            style={{ opacity: isActive ? 0.2 : 0 }}
-        />
+        <motion.div 
+            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
+            style={{ y, scale }} 
+            className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
+            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+        </motion.div>
     );
+});
+
+const Feature2MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const feature = features[2];
+    const yValue = useTransform(scrollYProgress, [0.66, 0.72, 1.0], [100, 0, 0]);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.9, 1, 1, 1]), springConfig);
+
+    return (
+        <motion.div 
+            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
+            style={{ y, scale }} 
+            className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
+            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+        </motion.div>
+    );
+});
+
+const Feature0Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const colors = colorMap[features[0].color];
+    const opacity = useTransform(scrollYProgress, [0, 0.1, 0.24, 0.34], [0, 0.2, 0.2, 0]);
+    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
+});
+
+const Feature1Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const colors = colorMap[features[1].color];
+    const opacity = useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0, 0.2, 0.2, 0]);
+    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
+});
+
+const Feature2Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
+    const colors = colorMap[features[2].color];
+    const opacity = useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0, 0.2, 0.2, 0]);
+    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
 });
 
 export default function StickyScrollFeatures() {
     const containerRef = useRef<HTMLDivElement>(null);
-    const sentinel0Ref = useRef<HTMLDivElement>(null);
-    const sentinel1Ref = useRef<HTMLDivElement>(null);
-    const sentinel2Ref = useRef<HTMLDivElement>(null);
+    const [isScrollReady, setIsScrollReady] = useState(false);
     
+    const { scrollYProgress } = useScroll({
+        target: containerRef,
+        offset: ["start start", "end end"]
+    });
+    
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsScrollReady(true);
+        }, 100);
+        return () => clearTimeout(timer);
+    }, []);
+
     const [activeFeature, setActiveFeature] = useState(0);
     const [isInSection, setIsInSection] = useState(false);
-    
-    useEffect(() => {
-        const sentinels = [sentinel0Ref.current, sentinel1Ref.current, sentinel2Ref.current];
-        if (sentinels.some(s => !s)) return;
-        
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    const index = sentinels.indexOf(entry.target as HTMLDivElement);
-                    if (index === -1) return;
-                    
-                    if (entry.isIntersecting) {
-                        setActiveFeature(index);
-                        setIsInSection(true);
-                    }
-                });
-            },
-            {
-                root: null,
-                rootMargin: '-40% 0px -40% 0px',
-                threshold: 0
-            }
-        );
-        
-        sentinels.forEach(sentinel => {
-            if (sentinel) observer.observe(sentinel);
-        });
-        
-        return () => observer.disconnect();
-    }, []);
-    
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                setIsInSection(entry.isIntersecting && entry.intersectionRatio > 0.1);
-            },
-            { threshold: [0.1, 0.9] }
-        );
-        
-        observer.observe(container);
-        return () => observer.disconnect();
-    }, []);
+
+    useMotionValueEvent(scrollYProgress, "change", (latest: number) => {
+        if (!isScrollReady && typeof latest === 'number' && !isNaN(latest)) {
+            setIsScrollReady(true);
+        }
+        setIsInSection(latest > 0.05 && latest < 0.95);
+        if (latest < 0.34) setActiveFeature(0);
+        else if (latest < 0.68) setActiveFeature(1);
+        else setActiveFeature(2);
+    });
 
     const activeColors = useMemo(() => colorMap[features[activeFeature].color], [activeFeature]);
-    
-    const getMockupState = useCallback((index: number): 'before' | 'active' | 'after' => {
-        if (index < activeFeature) return 'after';
-        if (index > activeFeature) return 'before';
-        return 'active';
-    }, [activeFeature]);
 
     return (
-        <section 
-            ref={containerRef} 
-            className="relative h-[300vh] bg-black"
-            style={{ position: 'relative', contain: 'none', transform: 'none' }}
-        >
+        <section ref={containerRef} className="relative h-[300vh] bg-black">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
-            <div className="absolute top-0 left-0 right-0 h-[100vh]" ref={sentinel0Ref} />
-            <div className="absolute top-[100vh] left-0 right-0 h-[100vh]" ref={sentinel1Ref} />
-            <div className="absolute top-[200vh] left-0 right-0 h-[100vh]" ref={sentinel2Ref} />
-
-            <div 
-                className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full overflow-hidden"
-                style={{ position: 'sticky', WebkitOverflowScrolling: 'touch' }}
-            >
+            <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="w-full px-4 md:px-16 lg:px-24 relative h-full flex flex-col md:flex-row items-center">
 
                     <div className={`absolute top-8 md:top-28 left-6 md:left-16 lg:left-24 flex space-x-2 z-50 transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>
@@ -367,9 +411,9 @@ export default function StickyScrollFeatures() {
                     </div>
 
                     <div className="w-full md:w-[45%] relative h-[40vh] md:h-full flex items-end md:items-center justify-start z-20 pb-8 md:pb-0">
-                        {features.map((feature, i) => (
-                            <TextContent key={i} feature={feature} isActive={activeFeature === i} />
-                        ))}
+                        <Feature0TextSlide scrollYProgress={scrollYProgress} />
+                        <Feature1TextSlide scrollYProgress={scrollYProgress} />
+                        <Feature2TextSlide scrollYProgress={scrollYProgress} />
                     </div>
 
                     <div className="flex w-full md:w-[55%] h-[60vh] md:h-full items-center justify-center relative z-20">
@@ -388,20 +432,23 @@ export default function StickyScrollFeatures() {
                                 className="absolute bottom-0 left-0 w-[150px] h-[150px] md:w-[400px] md:h-[400px] rounded-full transition-all duration-500"
                                 style={{ background: `radial-gradient(circle, ${activeColors.orbSecondary} 0%, transparent 60%)`, filter: 'blur(50px)' }}
                                 animate={{ scale: [1, 1.2, 1] }}
-                                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                             />
                         </div>
 
-                        <div className="w-full h-full max-w-[340px] md:max-w-[700px] relative overflow-hidden">
-                            {features.map((feature, i) => (
-                                <MockupSlide key={i} feature={feature} state={getMockupState(i)} />
-                            ))}
+                        <div className="relative w-full h-[90%] md:h-[80%] max-w-[700px]">
+                            <Feature0MockupSlide scrollYProgress={scrollYProgress} isReady={isScrollReady} />
+                            <Feature1MockupSlide scrollYProgress={scrollYProgress} />
+                            <Feature2MockupSlide scrollYProgress={scrollYProgress} />
                         </div>
                     </div>
 
-                    {features.map((feature, i) => (
-                        <AmbienceGlow key={i} color={feature.color} isActive={activeFeature === i} />
-                    ))}
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                        <Feature0Ambience scrollYProgress={scrollYProgress} />
+                        <Feature1Ambience scrollYProgress={scrollYProgress} />
+                        <Feature2Ambience scrollYProgress={scrollYProgress} />
+                    </div>
+
                 </div>
             </div>
         </section>
