@@ -4,7 +4,7 @@ import {
   ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp,
   Users, Sparkles, Brain, Rocket, Plus,
   Clock, Shield, BarChart3, Send, Layers,
-  Crown, RefreshCw, Lock,
+  Crown, RefreshCw, Lock, Menu,
   X, Instagram, Twitter, Linkedin, Mail,
   MessageCircle, Check, DollarSign, Search
 } from 'lucide-react'
@@ -665,6 +665,7 @@ const AnimatedDashboard = memo(() => {
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // HUD State for Algorithm Science section
   const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
@@ -782,27 +783,30 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           animate={{ y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className={`transition-all duration-500 ease-in-out ${isScrolled ? 'mx-4 mt-4' : 'mx-4 mt-4'}`}>
+          <div className={`transition-all duration-500 ease-in-out ${isScrolled 
+            ? 'mx-2 sm:mx-4 mt-2 sm:mt-4' 
+            : 'mx-0 mt-4 sm:mt-6 md:mt-8'
+          }`}>
             <GlassCard
               className={`mx-auto transition-all duration-500 ease-in-out ${isScrolled
-                ? 'max-w-[1200px] !rounded-full bg-black/50 backdrop-blur-md border-white/10 shadow-lg px-5 py-2.5'
-                : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-8 py-4'
+                ? 'max-w-[1200px] !rounded-full bg-black/50 backdrop-blur-md border-white/10 shadow-lg px-3 sm:px-5 py-2 sm:py-2.5'
+                : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-4 sm:px-6 md:px-8 lg:px-12 py-3 sm:py-4 md:py-5'
                 }`}
               hover={false}
               showGradient={isScrolled}
             >
               <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
-                <div className="flex items-center space-x-8">
+                <div className="flex items-center space-x-4 sm:space-x-6 md:space-x-8">
                   <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
                     <img
                       src="/veefore-logo.png"
                       alt="VeeFore"
-                      className="h-8 w-auto"
+                      className="h-6 sm:h-7 md:h-8 w-auto"
                     />
-                    <span className="text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
+                    <span className="text-lg sm:text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
                   </div>
 
-                  <div className="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs md:text-sm font-medium text-white/50">
+                  <div className="hidden lg:flex items-center space-x-4 xl:space-x-6 text-sm font-medium text-white/50">
                     {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
                       <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
                         {item}
@@ -813,19 +817,74 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
 
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <button className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
+                  <button className="hidden md:block text-sm font-medium text-white/60 hover:text-white transition-colors px-3 lg:px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
                   <MagneticButton
-                    className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
+                    className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
                     onClick={() => onNavigate('signup')}
                   >
                     <span className="hidden sm:inline">Start Free Trial</span>
                     <span className="sm:hidden">Start Free</span>
                   </MagneticButton>
+                  
+                  {/* Mobile Menu Toggle */}
+                  <button 
+                    className="lg:hidden flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    aria-label="Toggle menu"
+                  >
+                    {mobileMenuOpen ? (
+                      <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                    ) : (
+                      <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                    )}
+                  </button>
                 </div>
               </div>
             </GlassCard>
           </div>
         </motion.nav>
+        
+        {/* Mobile Menu Dropdown */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="lg:hidden fixed inset-x-0 top-[60px] sm:top-[70px] md:top-[80px] z-40 mx-2 sm:mx-4"
+            >
+              <div className="bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 shadow-2xl">
+                <div className="flex flex-col space-y-3 sm:space-y-4">
+                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
+                    <a 
+                      key={item} 
+                      href={`#${item.toLowerCase().replace(' ', '-')}`} 
+                      className="text-base sm:text-lg font-medium text-white/70 hover:text-white transition-colors py-2 border-b border-white/5 last:border-0"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {item}
+                    </a>
+                  ))}
+                  <div className="pt-2 sm:pt-4 flex flex-col space-y-3">
+                    <button 
+                      className="text-base sm:text-lg font-medium text-white/70 hover:text-white transition-colors py-2 text-left"
+                      onClick={() => { onNavigate('signin'); setMobileMenuOpen(false); }}
+                    >
+                      Login
+                    </button>
+                    <button 
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 py-3 text-sm sm:text-base font-semibold w-full"
+                      onClick={() => { onNavigate('signup'); setMobileMenuOpen(false); }}
+                    >
+                      Start Free Trial
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Hero Section */}
