@@ -1,21 +1,24 @@
 import React, { useState, useEffect, useRef, Suspense, useCallback, memo } from 'react'
+
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp,
-  Users, Sparkles, Brain, Rocket, Plus,
+  Users, Sparkles, Brain, Plus,
   Clock, Shield, BarChart3, Send, Layers,
-  Crown, RefreshCw, Lock, Menu, ChevronDown,
-  X, Instagram, Twitter, Linkedin, Mail,
+  Crown, RefreshCw, Lock,
+  X,
   MessageCircle, Check, DollarSign, Search
 } from 'lucide-react'
 import { SEO, seoConfig } from '../lib/seo-optimization'
 import { useIsMobile } from '../hooks/use-is-mobile';
+import { MainNavigation } from '../components/MainNavigation';
 import GlassCard from '../components/GlassCard';
 import { PricingScrollAnimation } from '../components/PricingScrollAnimation';
 import { CinematicFeatures } from '../components/CinematicFeatures';
 import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals';
 import TargetAudienceSection from '../components/TargetAudienceSection';
 import GrowthEngineSection from '../components/GrowthEngineSection';
+import MainFooter from '../components/MainFooter'
 import CreditSystemSection from '../components/CreditSystemSection';
 import BetaLaunchSection from '../components/BetaLaunchSection';
 
@@ -665,30 +668,13 @@ const AnimatedDashboard = memo(() => {
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
   // HUD State for Algorithm Science section
   const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
-  const [expandedFeature, setExpandedFeature] = useState<string | null>(null)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-  // Initialize to true (scrolled/solid state) to prevent flash of transparent on reload
-  const [isScrolled, setIsScrolled] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { scrollY, scrollYProgress } = useScroll()
-
-  // Check initial scroll position immediately on mount
-  useEffect(() => {
-    // Set correct initial state based on current scroll position
-    const initialScroll = window.scrollY || window.pageYOffset || 0;
-    setIsScrolled(initialScroll > 50);
-  }, []);
-
-  useEffect(() => {
-    return scrollY.on('change', (latest) => {
-      setIsScrolled(latest > 50)
-    })
-  }, [scrollY])
+  const { scrollYProgress } = useScroll()
 
   const heroOpacity = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0])
   const heroScale = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0.95])
@@ -775,10 +761,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   return (
     <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
       <SEO {...seoConfig.landing} />
-      
+
       {/* Preload logo image for instant display in mobile menu */}
-      <link rel="preload" href="/veefore-logo.png" as="image" />
-      <img src="/veefore-logo.png" alt="" className="hidden" aria-hidden="true" />
+      <link rel="preload" href="/veefore.svg" as="image" />
+      <img src="/veefore.svg" alt="" className="hidden" aria-hidden="true" />
 
       {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
       <div className={`${isMobile ? 'absolute h-[500vh]' : 'fixed'} inset-0 pointer-events-none overflow-hidden -z-10`}>
@@ -788,150 +774,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
       </div>
 
-      {/* Navigation - use wrapper for sticky/fixed to avoid iOS Safari transform issues */}
-      <div className="landing-nav-wrapper w-full z-50">
-        <motion.nav
-          initial={{ y: -100 }}
-          animate={{ y: 0 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div 
-            className={`transition-[margin] duration-150 ease-linear ${isScrolled 
-              ? 'mx-2 sm:mx-4 mt-2 sm:mt-3' 
-              : 'mx-0 mt-4 sm:mt-4 md:mt-5'
-            }`}
-          >
-            <GlassCard
-              className={`mx-auto transition-[max-width,border-radius,background-color,backdrop-filter,box-shadow,padding] duration-150 ease-linear ${isScrolled
-                ? 'max-w-[1200px] !rounded-full bg-black/60 backdrop-blur-xl border-white/10 shadow-lg shadow-black/20 px-3 sm:px-5 py-2 sm:py-2'
-                : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-4 sm:px-5 md:px-6 lg:px-10 py-3 sm:py-3 md:py-3'
-                }`}
-              hover={false}
-              showGradient={isScrolled}
-            >
-              <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
-                <div className="flex items-center space-x-4 sm:space-x-6 md:space-x-8">
-                  <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
-                    <img
-                      src="/veefore-logo.png"
-                      alt="VeeFore"
-                      className="h-6 sm:h-7 md:h-8 w-auto"
-                    />
-                    <span className="text-lg sm:text-xl font-bold tracking-tight ml-[-2px]">eefore</span>
-                  </div>
 
-                  <div className="hidden lg:flex items-center space-x-4 xl:space-x-6 text-sm font-medium text-white/50">
-                    {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item) => (
-                      <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="hover:text-white transition-colors duration-300 relative group">
-                        {item}
-                        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300" />
-                      </a>
-                    ))}
-                  </div>
-                </div>
+      <MainNavigation onNavigate={onNavigate} />
 
-                <div className="flex items-center space-x-2 sm:space-x-3">
-                  <button className="hidden md:block text-sm font-medium text-white/60 hover:text-white transition-colors px-3 lg:px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
-                  <MagneticButton
-                    className="bg-white text-black hover:bg-white/90 rounded-full px-2.5 sm:px-3 md:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold transition-all duration-300"
-                    onClick={() => onNavigate('signup')}
-                  >
-                    <span className="hidden sm:inline">Start Free Trial</span>
-                    <span className="sm:hidden">Start Free</span>
-                  </MagneticButton>
-                  
-                  {/* Mobile Menu Toggle */}
-                  <button 
-                    className="lg:hidden flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    aria-label="Toggle menu"
-                  >
-                    {mobileMenuOpen ? (
-                      <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    ) : (
-                      <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </GlassCard>
-          </div>
-        </motion.nav>
-        
-        {/* Mobile Menu Full Page - Clean Design */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="lg:hidden fixed inset-0 z-50 bg-[#0a0a0f]"
-            >
-              {/* Header with logo and close - no animation for instant display */}
-              <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
-                <div className="flex items-center cursor-pointer" onClick={() => { setMobileMenuOpen(false); onNavigate('/'); }}>
-                  <img
-                    src="/veefore-logo.png"
-                    alt="VeeFore"
-                    className="h-7 w-auto"
-                  />
-                  <span className="text-white text-lg font-bold tracking-tight ml-[-2px]">eefore</span>
-                </div>
-                <button 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-6 h-6 text-white" />
-                </button>
-              </div>
-
-              {/* Menu Content */}
-              <div className="px-4 py-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 70px)' }}>
-                {/* CTA Button */}
-                <motion.button 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.05 }}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full py-3.5 text-base font-semibold mb-4"
-                  onClick={() => { onNavigate('signup'); setMobileMenuOpen(false); }}
-                >
-                  GET STARTED
-                </motion.button>
-
-                {/* Sign In */}
-                <motion.button 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.1 }}
-                  className="w-full text-center text-white/70 hover:text-white text-sm font-medium tracking-wide py-3 mb-6"
-                  onClick={() => { onNavigate('signin'); setMobileMenuOpen(false); }}
-                >
-                  SIGN IN
-                </motion.button>
-
-                {/* Menu Items */}
-                <div className="space-y-2">
-                  {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item, index) => (
-                    <motion.a 
-                      key={item} 
-                      href={`#${item.toLowerCase().replace(' ', '-')}`} 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, delay: 0.15 + index * 0.05 }}
-                      className="flex items-center justify-between w-full px-4 py-4 border border-white/10 rounded-xl text-white/80 hover:text-white hover:border-white/20 transition-all"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <span className="text-sm font-medium tracking-wide uppercase">{item.toUpperCase()}</span>
-                      <ChevronDown className="w-5 h-5 text-white/40" />
-                    </motion.a>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center pt-24 pb-20 overflow-hidden" style={{ marginTop: '-80px', paddingTop: 'calc(80px + 6rem)' }}>
@@ -2370,91 +2215,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section >
 
       {/* Footer */}
-      < footer className="py-20 border-t border-white/[0.05] relative overflow-hidden" >
-        <div className="absolute inset-0 bg-gradient-to-t from-blue-500/[0.02] to-transparent" />
-
-        <div className="max-w-[1200px] mx-auto px-6 relative">
-          <div className="grid md:grid-cols-5 gap-12 mb-16">
-            <div className="md:col-span-2">
-              <div className="flex items-center space-x-2.5 mb-6">
-                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Rocket className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold">VeeFore</span>
-              </div>
-              <p className="text-white/30 text-sm leading-relaxed max-w-xs mb-6">
-                AI-powered Growth Engine that actively increases engagement, reach, and visibility for creators — automatically.
-              </p>
-
-              <div className="flex items-center space-x-3">
-                {[
-                  { icon: Twitter, href: '#', gradient: 'from-blue-400 to-cyan-400' },
-                  { icon: Instagram, href: '#', gradient: 'from-pink-500 to-purple-500' },
-                  { icon: Linkedin, href: '#', gradient: 'from-blue-600 to-blue-400' }
-                ].map((social, i) => (
-                  <a
-                    key={i}
-                    href={social.href}
-                    className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-gradient-to-br hover:${social.gradient} transition-all duration-300 group`}
-                  >
-                    <social.icon className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" />
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            {[
-              { title: 'Product', links: ['Features', 'Pricing', 'Free Trial', 'Changelog'] },
-              { title: 'Company', links: ['About', 'Blog', 'Careers', 'Contact'] },
-              { title: 'Legal', links: ['Privacy', 'Terms', 'Security', 'GDPR'] }
-            ].map((col) => (
-              <div key={col.title}>
-                <h5 className="font-bold mb-4 text-xs uppercase tracking-widest text-white/30">{col.title}</h5>
-                <ul className="space-y-3 text-sm text-white/40">
-                  {col.links.map((link) => (
-                    <li key={link} className="hover:text-white cursor-pointer transition-colors">{link}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          <div className="mb-12">
-            <GlassCard className="p-6 md:p-8 !bg-gradient-to-r !from-blue-500/[0.05] !to-purple-500/[0.05]">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="text-center md:text-left">
-                  <h4 className="font-bold text-lg mb-1">Stay in the loop</h4>
-                  <p className="text-sm text-white/40">Get growth tips and VeeFore updates in your inbox</p>
-                </div>
-                <div className="flex w-full md:w-auto">
-                  <div className="relative flex-1 md:w-72">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input
-                      type="email"
-                      placeholder="Enter your email"
-                      className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-l-xl text-sm placeholder:text-white/30 focus:outline-none focus:border-blue-500/50 transition-colors"
-                    />
-                  </div>
-                  <button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-r-xl text-sm font-bold hover:opacity-90 transition-opacity whitespace-nowrap">
-                    Subscribe
-                  </button>
-                </div>
-              </div>
-            </GlassCard>
-          </div>
-
-          <div className="pt-8 border-t border-white/[0.05] flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-white/20 text-sm">
-              © 2025 VeeFore. Built for serious creators.
-            </p>
-            <div className="flex items-center space-x-6 text-sm text-white/30">
-              <span className="hover:text-white cursor-pointer transition-colors">Privacy Policy</span>
-              <span className="hover:text-white cursor-pointer transition-colors">Terms of Service</span>
-              <span className="hover:text-white cursor-pointer transition-colors">Cookie Policy</span>
-            </div>
-          </div>
-        </div>
-      </footer >
+      <MainFooter />
     </div >
   )
 }

@@ -2,20 +2,20 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '@/lib/queryClient'
 import { Button } from '@/components/ui/button'
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
-import { 
-  Building2, 
-  ChevronDown, 
-  Plus, 
-  Settings, 
+import {
+  Building2,
+  ChevronDown,
+  Plus,
+  Settings,
   Crown,
   Check,
   Users,
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 
 // Workspace switching without loading screen - instant transition
-const AdvancedWorkspaceTransition = ({ workspace }: { workspace: Workspace }) => {
+const AdvancedWorkspaceTransition = ({ workspace: _workspace }: { workspace: Workspace }) => {
   // No loading screen - return null for instant workspace switching
   return null
 }
@@ -104,7 +104,7 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
     queryFn: () => apiRequest('/api/workspaces'),
     staleTime: 5 * 60 * 1000 // 5 minutes
   })
-  
+
   // Extract workspaces from nested API response { success: true, data: [...] }
   // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
   const rawWorkspaces = workspacesResponse?.data || workspacesResponse || []
@@ -114,7 +114,7 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
   const safeWorkspaces = workspaces
 
   // Get current workspace
-  const currentWorkspace = safeWorkspaces.find((ws: Workspace) => 
+  const currentWorkspace = safeWorkspaces.find((ws: Workspace) =>
     currentWorkspaceId ? ws.id === currentWorkspaceId : ws.isDefault
   ) || safeWorkspaces.find((ws: Workspace) => ws.isDefault) || safeWorkspaces[0]
 
@@ -125,21 +125,21 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
       console.warn('[WorkspaceSwitcher] ❌ Attempted to switch to invalid workspace ID:', workspaceId);
       return;
     }
-    
+
     const workspace = safeWorkspaces.find((ws: Workspace) => ws.id === workspaceId)
     if (!workspace) return
-    
+
     // Start beautiful transition
     setTargetWorkspace(workspace)
     setIsTransitioning(true)
-    
+
     // Update workspace immediately
     setCurrentWorkspaceId(workspaceId)
     localStorage.setItem('currentWorkspaceId', workspaceId)
-    
+
     // Dispatch custom event to notify useCurrentWorkspace hook
     window.dispatchEvent(new Event('workspace-changed'))
-    
+
     // Invalidate queries that depend on workspace with animation timing
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['/api/content'] }),
@@ -147,14 +147,14 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
       queryClient.invalidateQueries({ queryKey: ['/api/analytics'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] })
     ])
-    
+
     // Show beautiful animation for at least 2 seconds
     await new Promise(resolve => setTimeout(resolve, 2000))
-    
+
     // End transition
     setIsTransitioning(false)
     setTargetWorkspace(null)
-    
+
     toast({
       title: "🚀 Workspace Ready!",
       description: `Welcome to ${workspace.name} workspace`
@@ -190,108 +190,108 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
       {isTransitioning && targetWorkspace && (
         <AdvancedWorkspaceTransition workspace={targetWorkspace} />
       )}
-      
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="flex items-center space-x-3 h-auto p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl">
-          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getThemeGradient(currentWorkspace.theme)} flex items-center justify-center text-white shadow-sm`}>
-            <Building2 className="w-4 h-4" />
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="text-left">
-              <div className="flex items-center space-x-1">
-                <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{currentWorkspace.name}</span>
-                {currentWorkspace.isDefault && (
-                  <Crown className="w-3 h-3 text-yellow-500" />
-                )}
+          <Button variant="ghost" className="flex items-center space-x-3 h-auto p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl">
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getThemeGradient(currentWorkspace.theme)} flex items-center justify-center text-white shadow-sm`}>
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="text-left">
+                <div className="flex items-center space-x-1">
+                  <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{currentWorkspace.name}</span>
+                  {currentWorkspace.isDefault && (
+                    <Crown className="w-3 h-3 text-yellow-500" />
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
+                  <span>{getPersonalityIcon(currentWorkspace.aiPersonality)}</span>
+                  <span>{currentWorkspace.credits} credits</span>
+                </div>
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
-                <span>{getPersonalityIcon(currentWorkspace.aiPersonality)}</span>
-                <span>{currentWorkspace.credits} credits</span>
+              <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+            </div>
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent className="w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl" align="end" forceMount>
+          <DropdownMenuLabel className="font-normal p-4">
+            <div className="flex flex-col space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Switch Workspace</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onNavigateToWorkspaces}
+                  className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {safeWorkspaces.length} workspace{safeWorkspaces.length !== 1 ? 's' : ''} available
               </div>
             </div>
-            <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-          </div>
-        </Button>
-      </DropdownMenuTrigger>
-      
-      <DropdownMenuContent className="w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal p-4">
-          <div className="flex flex-col space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Switch Workspace</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onNavigateToWorkspaces}
-                className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+
+          <div className="space-y-1">
+            {safeWorkspaces.map((workspace: Workspace) => (
+              <DropdownMenuItem
+                key={workspace.id}
+                onClick={() => handleWorkspaceSwitch(workspace.id)}
+                className="flex items-center space-x-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg"
               >
-                <Settings className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {safeWorkspaces.length} workspace{safeWorkspaces.length !== 1 ? 's' : ''} available
-            </div>
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getThemeGradient(workspace.theme)} flex items-center justify-center text-white shadow-sm flex-shrink-0`}>
+                  <Building2 className="w-5 h-5" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{workspace.name}</span>
+                    {workspace.isDefault && (
+                      <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />
+                    )}
+                    {workspace.id === currentWorkspace.id && (
+                      <Check className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center space-x-1">
+                      <span>{getPersonalityIcon(workspace.aiPersonality)}</span>
+                      <span className="capitalize">{workspace.aiPersonality}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Sparkles className="w-3 h-3" />
+                      <span>{workspace.credits}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Users className="w-3 h-3" />
+                      <span>{workspace.maxTeamMembers}</span>
+                    </div>
+                  </div>
+
+                  {workspace.description && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{workspace.description}</p>
+                  )}
+                </div>
+              </DropdownMenuItem>
+            ))}
           </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        
-        <div className="space-y-1">
-          {safeWorkspaces.map((workspace: Workspace) => (
-            <DropdownMenuItem
-              key={workspace.id}
-              onClick={() => handleWorkspaceSwitch(workspace.id)}
-              className="flex items-center space-x-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg"
-            >
-              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getThemeGradient(workspace.theme)} flex items-center justify-center text-white shadow-sm flex-shrink-0`}>
-                <Building2 className="w-5 h-5" />
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{workspace.name}</span>
-                  {workspace.isDefault && (
-                    <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />
-                  )}
-                  {workspace.id === currentWorkspace.id && (
-                    <Check className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                  )}
-                </div>
-                
-                <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  <div className="flex items-center space-x-1">
-                    <span>{getPersonalityIcon(workspace.aiPersonality)}</span>
-                    <span className="capitalize">{workspace.aiPersonality}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Sparkles className="w-3 h-3" />
-                    <span>{workspace.credits}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Users className="w-3 h-3" />
-                    <span>{workspace.maxTeamMembers}</span>
-                  </div>
-                </div>
-                
-                {workspace.description && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{workspace.description}</p>
-                )}
-              </div>
-            </DropdownMenuItem>
-          ))}
-        </div>
-        
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
-          onClick={onNavigateToWorkspaces}
-          className="flex items-center space-x-2 p-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="font-medium">Create New Workspace</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            onClick={onNavigateToWorkspaces}
+            className="flex items-center space-x-2 p-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="font-medium">Create New Workspace</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   )
 }
@@ -299,16 +299,16 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
 // ✅ PURE FUNCTION: Get valid workspace ID synchronously (no side effects in render)
 const getValidWorkspaceId = (workspaces: Workspace[], storedId: string | null): string | null => {
   if (workspaces.length === 0) return null;
-  
+
   // Check if stored ID is valid and exists in workspaces
-  const isValidId = storedId && 
-    storedId !== 'undefined' && 
-    storedId !== 'null' && 
+  const isValidId = storedId &&
+    storedId !== 'undefined' &&
+    storedId !== 'null' &&
     storedId !== '' &&
     workspaces.some(ws => ws.id === storedId);
-  
+
   if (isValidId) return storedId;
-  
+
   // Return default or first workspace ID
   const fallback = workspaces.find(ws => ws.isDefault) || workspaces[0];
   return fallback?.id || null;
@@ -324,14 +324,14 @@ export function useCurrentWorkspace() {
   const [isValidating, setIsValidating] = useState(false)
   const [hasValidated, setHasValidated] = useState(false)
   const queryClient = useQueryClient()
-  
+
   // Fetch user's workspaces
   const { data: workspacesResponse, isLoading: workspacesLoading } = useQuery({
     queryKey: ['/api/workspaces'],
     queryFn: () => apiRequest('/api/workspaces'),
     staleTime: 5 * 60 * 1000 // 5 minutes
   })
-  
+
   // Extract workspaces from nested API response { success: true, data: [...] }
   // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
   const rawWorkspaces = workspacesResponse?.data || workspacesResponse || []
@@ -355,26 +355,26 @@ export function useCurrentWorkspace() {
 
     const syncLocalStorage = async () => {
       setIsValidating(true);
-      
+
       const currentStored = localStorage.getItem('currentWorkspaceId');
-      
+
       // ✅ GUARD: Check for invalid string values first
       if (currentStored === 'undefined' || currentStored === 'null' || currentStored === '') {
         console.warn('[useCurrentWorkspace] 🧹 Removing invalid localStorage value:', currentStored);
         localStorage.removeItem('currentWorkspaceId');
       }
-      
+
       // Check if localStorage needs correction
       const needsCorrection = validWorkspaceId && validWorkspaceId !== currentStored;
-      
+
       if (needsCorrection) {
         console.warn('[useCurrentWorkspace] ❌ Invalid workspace ID in localStorage:', currentStored);
         console.log('[useCurrentWorkspace] 🔧 Correcting to:', validWorkspaceId);
-        
+
         // Update localStorage
         localStorage.setItem('currentWorkspaceId', validWorkspaceId);
         setStoredWorkspaceId(validWorkspaceId);
-        
+
         // ✅ CRITICAL: Invalidate all React Query caches that depend on workspace ID
         console.log('[useCurrentWorkspace] 🔄 Invalidating workspace-dependent queries...');
         await Promise.all([
@@ -383,13 +383,13 @@ export function useCurrentWorkspace() {
           queryClient.invalidateQueries({ queryKey: ['/api/analytics/historical'] }),
           queryClient.invalidateQueries({ queryKey: ['/api/content'] }),
         ]);
-        
+
         // Dispatch events to notify other components
         window.dispatchEvent(new Event('workspace-changed'));
       } else if (validWorkspaceId) {
         console.log('[useCurrentWorkspace] ✅ Workspace ID is valid:', validWorkspaceId);
       }
-      
+
       setIsValidating(false);
       setHasValidated(true);
     };
@@ -421,11 +421,11 @@ export function useCurrentWorkspace() {
             queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] }),
             queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] })
           ]);
-        } catch {}
+        } catch { }
       })();
     }
   }, [workspaces, workspacesLoading, queryClient]);
-  
+
   // Listen for localStorage changes to keep hook reactive
   useEffect(() => {
     const handleStorageChange = () => {
@@ -433,13 +433,13 @@ export function useCurrentWorkspace() {
       setStoredWorkspaceId(getSanitizedWorkspaceId())
       setHasValidated(false) // Re-validate after external change
     }
-    
+
     // Listen for storage events (when localStorage changes in other tabs)
     window.addEventListener('storage', handleStorageChange)
-    
+
     // Custom event for same-tab localStorage changes
     window.addEventListener('workspace-changed', handleStorageChange)
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('workspace-changed', handleStorageChange)
