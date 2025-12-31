@@ -59,6 +59,8 @@ import { RealtimeProvider } from './contexts/RealtimeContext'
 import { initializeAccessibilityCompliance, useAccessibilityRouteAnnouncements } from './lib/accessibility-compliance'
 // P11: Mobile & Cross-Platform Excellence
 import { initializeMobileExcellence } from './lib/mobile-excellence'
+// Mobile Performance Optimizer - Adaptive animations based on device capabilities
+import { AdaptiveAnimationProvider } from '@/lib/mobile-performance-optimizer'
 // P7: SEO, Core Web Vitals & Accessibility Excellence
 import { initializeSEO } from './lib/seo-optimization';
 import { initializeCoreWebVitals } from './lib/core-web-vitals';
@@ -398,6 +400,11 @@ function App() {
   }
 
   return (
+    <AdaptiveAnimationProvider
+      autoMonitor={true}
+      autoDowngradeThreshold={25}
+      autoUpgradeThreshold={50}
+    >
     <P6Provider>
     <RealtimeProvider>
     <>
@@ -1341,6 +1348,7 @@ function App() {
     </>
     </RealtimeProvider>
     </P6Provider>
+    </AdaptiveAnimationProvider>
   )
 }
 

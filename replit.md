@@ -50,6 +50,43 @@ The backend follows a Repository Pattern with distinct layers for routes, servic
 - **Real-time Updates**: Socket.IO-based `RealtimeContext` with Firebase authentication, providing real-time data updates and cache invalidation for TanStack Query.
 - **Skeleton Loading System**: Comprehensive skeleton components and page-specific loaders with GPU-accelerated shimmer animation across 15+ pages.
 
+### Mobile Performance Optimization System
+The app includes a comprehensive mobile performance optimization system for lightning-fast performance on all devices:
+
+- **Adaptive Animation System** (`client/src/lib/mobile-performance-optimizer.ts`):
+  - Device capability detection (memory, CPU cores, GPU, connection type)
+  - Quality tiers: ultra, high, medium, low with auto-selection
+  - FPS monitoring with auto-downgrade/upgrade
+  - `prefers-reduced-motion` support
+  - Animation presets for each quality tier
+  - `AdaptiveAnimationProvider` wraps the app in `App.tsx`
+
+- **Optimized Image Component** (`client/src/components/ui/optimized-image.tsx`):
+  - IntersectionObserver-based lazy loading
+  - Blur-up placeholder effect
+  - WebP/AVIF format detection
+  - Responsive srcSet generation
+  - SSR-compatible with proper guards
+
+- **Virtual List Component** (`client/src/components/ui/virtual-list.tsx`):
+  - Windowed rendering for long lists
+  - Dynamic and fixed item height support
+  - Mobile touch optimization with momentum scrolling
+  - Keyboard navigation for accessibility
+
+- **Build Optimizations** (`vite.config.ts`):
+  - Code splitting: react-vendor, three-vendor, ui-vendor, firebase-vendor, query-vendor
+  - Terser minification with console removal
+  - PWA with service worker caching (StaleWhileRevalidate for JS/CSS, CacheFirst for fonts/images)
+  - Offline fallback page
+
+- **CSS Performance** (`client/src/index.css`):
+  - GPU acceleration classes (`.gpu-accelerated`, `.will-animate-*`)
+  - CSS containment utilities (`.contain-layout`, `.contain-paint`)
+  - Quality tier-based styling via `[data-quality-tier]`
+  - Touch-friendly 44px tap targets on mobile
+  - Content visibility for off-screen content
+
 ## External Dependencies
 
 | Service | Purpose |
