@@ -207,14 +207,14 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
 
 const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
-        <div className="w-full h-full flex items-center justify-center p-2">
-            <div className="w-[200px] h-[420px] sm:w-[220px] sm:h-[480px] bg-black rounded-[2rem] border-[5px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-b-xl z-20 flex justify-center items-center">
-                    <div className="w-10 h-3 bg-zinc-900 rounded-full" />
+        <div className="w-full h-full flex flex-col items-center justify-center p-4">
+            <div className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 md:w-28 h-6 md:h-7 bg-black rounded-b-2xl z-20 flex justify-center items-center">
+                    <div className="w-12 md:w-16 h-3 md:h-4 bg-zinc-900 rounded-full" />
                 </div>
-                <div className="absolute top-1.5 left-4 text-[8px] font-bold text-white z-20">9:41</div>
-                <div className="absolute top-1.5 right-4 flex space-x-1 z-20">
-                    <div className="w-3 h-2 bg-white rounded-[1px]" />
+                <div className="absolute top-2 md:top-3 left-6 md:left-8 text-[8px] md:text-[10px] font-bold text-white z-20">9:41</div>
+                <div className="absolute top-2 md:top-3 right-6 md:right-8 flex space-x-1 z-20">
+                    <div className="w-3 md:w-4 h-2 md:h-2.5 bg-white rounded-[1px]" />
                 </div>
                 <ScreenContent feature={feature} isMobile={true} />
             </div>
@@ -291,42 +291,45 @@ const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionVa
 
 const Feature0MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[0];
-    const opacity = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [1, 1, 0]), springConfig);
-    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [1, 1, 1, 0.95]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -50]), springConfig);
+    const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [0.95, 1, 1, 0.9]), springConfig);
 
     return (
-        <motion.div style={{ opacity, scale, y }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
         </motion.div>
     );
 });
 
 const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[1];
-    const opacity = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [0, 1, 1, 0]), springConfig);
-    const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.95, 1, 1, 0.95]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [50, 0, 0, -50]), springConfig);
+    const yValue = useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [100, 0, 0, -100]);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.9, 1, 1, 0.9]), springConfig);
 
     return (
-        <motion.div style={{ opacity, scale, y }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
         </motion.div>
     );
 });
 
 const Feature2MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[2];
-    const opacity = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [0, 1, 1]), springConfig);
-    const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.95, 1, 1, 1]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [50, 0, 0]), springConfig);
+    const yValue = useTransform(scrollYProgress, [0.66, 0.72, 1.0], [100, 0, 0]);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.9, 1, 1, 1]), springConfig);
 
     return (
-        <motion.div style={{ opacity, scale, y }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
         </motion.div>
     );
 });
