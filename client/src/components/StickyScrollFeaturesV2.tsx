@@ -537,7 +537,7 @@ export default function StickyScrollFeaturesV2() {
 
                 </div>
                 
-                {progress < 0.08 && (
+                {progress > 0.02 && progress < 0.92 && (
                     <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
