@@ -256,3 +256,206 @@ html.dark .glass {
     color: black !important;
   }
 }
+
+/* =================================
+   MOBILE PERFORMANCE OPTIMIZATIONS
+   ================================= */
+
+/* GPU Acceleration for animated elements */
+.gpu-accelerated,
+[data-animate],
+.animate-fade-in,
+.animate-slide-in,
+.animate-scale {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Will-change hints for frequently animated properties */
+.will-animate-transform {
+  will-change: transform;
+}
+
+.will-animate-opacity {
+  will-change: opacity;
+}
+
+.will-animate-all {
+  will-change: transform, opacity;
+}
+
+/* Reduce motion for accessibility - respects user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.1s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Low-end device optimizations via class - less aggressive than prefers-reduced-motion */
+/* Reduces animation duration but keeps essential UI feedback (hovers, focus states) working */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.1s !important;
+  animation-iteration-count: 1 !important;
+}
+
+.low-end-device .glass {
+  backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+html.dark .low-end-device .glass {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Disable expensive effects on low-end devices */
+.low-end-device .blur-effect,
+.low-end-device [class*="blur-"] {
+  filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Quality tier specific optimizations */
+[data-quality-tier="low"] .complex-shadow {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-quality-tier="low"] .gradient-complex {
+  background: var(--fallback-color, #3b82f6) !important;
+}
+
+[data-quality-tier="medium"] .complex-shadow {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Adaptive animation duration via CSS custom properties */
+:root {
+  --animation-duration: 0.3s;
+  --animation-stagger: 0.1s;
+  --animation-delay: 0s;
+}
+
+.adaptive-animation {
+  animation-duration: var(--animation-duration);
+}
+
+.adaptive-transition {
+  transition-duration: var(--animation-duration);
+}
+
+/* Touch-friendly tap targets on mobile */
+@media (max-width: 768px) {
+  button,
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="checkbox"],
+  input[type="radio"],
+  .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent text size adjustment on orientation change */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  /* Smooth momentum scrolling on iOS */
+  .scroll-container {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+  }
+  
+  /* Prevent zoom on input focus */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Optimize paint performance */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+.contain-content {
+  contain: content;
+}
+
+/* Image rendering optimization */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Large images should be optimized for quality */
+img.hero-image,
+img.feature-image {
+  image-rendering: auto;
+}
+
+/* Lazy loaded content placeholder */
+.lazy-placeholder {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+html.dark .lazy-placeholder {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.05) 25%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.05) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* Content visibility for off-screen content */
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Font display optimization */
+@font-face {
+  font-display: swap;
+}
+
+/* Optimize layer creation */
+.layer-optimize {
+  isolation: isolate;
+}
+
+/* Scrollbar hiding for fullscreen experiences */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
