@@ -1,4 +1,4 @@
-import { useRef, useState, memo, useMemo } from 'react';
+import { useRef, useState, memo, useMemo, useEffect } from 'react';
 import { motion, useScroll, useTransform, useSpring, useMotionValueEvent, MotionValue } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 
@@ -294,12 +294,16 @@ const Feature0MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: Motion
     const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
     const springY = useSpring(yValue, springConfig);
     const y = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [0.95, 1, 1, 0.9]), springConfig);
+    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [1, 1, 1, 0.9]), springConfig);
 
     return (
-        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div 
+            initial={{ y: '0vh', scale: 1, opacity: 1 }}
+            style={{ y, scale }} 
+            className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
         </motion.div>
     );
 });
@@ -312,9 +316,13 @@ const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: Motion
     const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.9, 1, 1, 0.9]), springConfig);
 
     return (
-        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div 
+            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
+            style={{ y, scale }} 
+            className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
         </motion.div>
     );
 });
@@ -327,9 +335,13 @@ const Feature2MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: Motion
     const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.9, 1, 1, 1]), springConfig);
 
     return (
-        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div 
+            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
+            style={{ y, scale }} 
+            className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
         </motion.div>
     );
 });
@@ -354,6 +366,12 @@ const Feature2Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionVal
 
 export default function StickyScrollFeatures() {
     const containerRef = useRef<HTMLDivElement>(null);
+    const [isMounted, setIsMounted] = useState(false);
+    
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+    
     const { scrollYProgress } = useScroll({
         target: containerRef,
         offset: ["start start", "end end"]
@@ -363,6 +381,7 @@ export default function StickyScrollFeatures() {
     const [isInSection, setIsInSection] = useState(false);
 
     useMotionValueEvent(scrollYProgress, "change", (latest: number) => {
+        if (!isMounted) return;
         setIsInSection(latest > 0.05 && latest < 0.95);
         if (latest < 0.34) setActiveFeature(0);
         else if (latest < 0.68) setActiveFeature(1);
@@ -372,10 +391,10 @@ export default function StickyScrollFeatures() {
     const activeColors = useMemo(() => colorMap[features[activeFeature].color], [activeFeature]);
 
     return (
-        <section ref={containerRef} style={{ position: 'relative' }} className="h-[300vh] bg-black">
+        <section ref={containerRef} className="relative h-[300vh] bg-black">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
-            <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center overflow-hidden w-full">
+            <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="w-full px-4 md:px-16 lg:px-24 relative h-full flex flex-col md:flex-row items-center">
 
                     <div className={`absolute top-8 md:top-28 left-6 md:left-16 lg:left-24 flex space-x-2 z-50 transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>

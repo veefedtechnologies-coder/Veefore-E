@@ -10,6 +10,21 @@
   top: 0 !important;
 }
 
+/* Mobile sticky scroll fix for iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  .sticky {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+  }
+}
+
+/* Ensure sticky sections have proper containment on mobile */
+@media (max-width: 768px) {
+  section {
+    contain: layout style;
+  }
+}
+
 
 /* Global dark mode support */
 @layer base {
