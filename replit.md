@@ -90,6 +90,14 @@ The app includes a comprehensive mobile performance optimization system for ligh
 ## Recent Changes
 
 ### December 31, 2025
+- **Cinematic Smooth Scroll Animations**: Enhanced both sticky scroll sections with smoother animations and scroll hints:
+  - Created reusable `ScrollHint` component (`client/src/components/ui/ScrollHint.tsx`) with animated mouse indicator
+  - Added scroll hints to CinematicFeatures (bottom middle, fades on scroll > 5%)
+  - Added scroll hints to StickyScrollFeaturesV2 (bottom middle, fades on scroll > 8%)
+  - Reduced scroll sensitivity by increasing section heights (CinematicFeatures: 220vh/feature, StickyScrollFeaturesV2: 550vh)
+  - Smoother physics-based animations with lower stiffness (30), higher damping (25), and more mass (1.2)
+  - Responsive positioning: bottom-6 on mobile, bottom-10 on desktop with z-50
+
 - **Sticky Scroll Features Section Rebuild**: Replaced `StickyScrollFeatures.tsx` with `StickyScrollFeaturesV2.tsx` to fix mobile Safari rendering issues:
   - Custom `useScrollProgress` hook using `getBoundingClientRect` + `requestAnimationFrame` instead of framer-motion's `useScroll`
   - Safari-safe sticky CSS positioning with `WebkitOverflowScrolling: touch`
