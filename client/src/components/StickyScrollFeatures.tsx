@@ -1,5 +1,5 @@
-import { useRef, useState, memo, useMemo, useEffect } from 'react';
-import { motion, useMotionValue, MotionValue } from 'framer-motion';
+import { useRef, useState, memo, useMemo, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 
 const colorMap = {
@@ -197,109 +197,42 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
     );
 });
 
-const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
-    return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-4">
-            <div className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 md:w-28 h-6 md:h-7 bg-black rounded-b-2xl z-20 flex justify-center items-center">
-                    <div className="w-12 md:w-16 h-3 md:h-4 bg-zinc-900 rounded-full" />
-                </div>
-                <div className="absolute top-2 md:top-3 left-6 md:left-8 text-[8px] md:text-[10px] font-bold text-white z-20">9:41</div>
-                <div className="absolute top-2 md:top-3 right-6 md:right-8 flex space-x-1 z-20">
-                    <div className="w-3 md:w-4 h-2 md:h-2.5 bg-white rounded-[1px]" />
-                </div>
-                <ScreenContent feature={feature} isMobile={true} />
-            </div>
+const IPhoneMockup = memo(({ feature }: { feature: Feature }) => (
+    <div className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 md:w-28 h-6 md:h-7 bg-black rounded-b-2xl z-20 flex justify-center items-center">
+            <div className="w-12 md:w-16 h-3 md:h-4 bg-zinc-900 rounded-full" />
         </div>
-    );
-});
-
-const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
-    return (
-        <div className="w-full h-full flex flex-col items-center justify-center">
-            <div className="w-full aspect-[16/10] bg-black rounded-t-2xl border-[6px] border-zinc-800 overflow-hidden relative shadow-2xl">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20" />
-                <ScreenContent feature={feature} />
-            </div>
-            <div className="w-[110%] h-3 bg-gradient-to-b from-zinc-700 to-zinc-800 rounded-b-xl shadow-lg" />
-            <div className="w-[95%] h-1 bg-zinc-900/50 rounded-b-sm" />
+        <div className="absolute top-2 md:top-3 left-6 md:left-8 text-[8px] md:text-[10px] font-bold text-white z-20">9:41</div>
+        <div className="absolute top-2 md:top-3 right-6 md:right-8 flex space-x-1 z-20">
+            <div className="w-3 md:w-4 h-2 md:h-2.5 bg-white rounded-[1px]" />
         </div>
-    );
-});
+        <ScreenContent feature={feature} isMobile={true} />
+    </div>
+));
 
-function useManualScrollProgress(containerRef: React.RefObject<HTMLElement>) {
-    const scrollProgress = useMotionValue(0);
-    
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        
-        let rafId: number;
-        let lastProgress = 0;
-        
-        const updateProgress = () => {
-            const rect = container.getBoundingClientRect();
-            const windowHeight = window.innerHeight;
-            const containerHeight = rect.height;
-            const scrollableHeight = containerHeight - windowHeight;
-            
-            if (scrollableHeight <= 0) {
-                scrollProgress.set(0);
-                return;
-            }
-            
-            const scrolled = -rect.top;
-            const progress = Math.max(0, Math.min(1, scrolled / scrollableHeight));
-            
-            if (Math.abs(progress - lastProgress) > 0.001) {
-                lastProgress = progress;
-                scrollProgress.set(progress);
-            }
-        };
-        
-        const handleScroll = () => {
-            if (rafId) cancelAnimationFrame(rafId);
-            rafId = requestAnimationFrame(updateProgress);
-        };
-        
-        updateProgress();
-        
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        window.addEventListener('resize', handleScroll, { passive: true });
-        
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-            window.removeEventListener('resize', handleScroll);
-            if (rafId) cancelAnimationFrame(rafId);
-        };
-    }, [containerRef, scrollProgress]);
-    
-    return scrollProgress;
-}
+const MacBookMockup = memo(({ feature }: { feature: Feature }) => (
+    <div className="w-full flex flex-col items-center justify-center">
+        <div className="w-full aspect-[16/10] bg-black rounded-t-2xl border-[6px] border-zinc-800 overflow-hidden relative shadow-2xl">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20" />
+            <ScreenContent feature={feature} />
+        </div>
+        <div className="w-[110%] h-3 bg-gradient-to-b from-zinc-700 to-zinc-800 rounded-b-xl shadow-lg" />
+        <div className="w-[95%] h-1 bg-zinc-900/50 rounded-b-sm" />
+    </div>
+));
 
-const Feature0TextSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const feature = features[0];
+const TextContent = memo(({ feature, isActive }: { feature: Feature; isActive: boolean }) => {
     const colors = colorMap[feature.color];
-    const [styles, setStyles] = useState({ opacity: 1, y: 0 });
     
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let opacity = 1, y = 0;
-            if (latest <= 0.28) { opacity = 1; y = 0; }
-            else if (latest <= 0.34) {
-                const t = (latest - 0.28) / 0.06;
-                opacity = 1 - t;
-                y = -30 * t;
-            }
-            else { opacity = 0; y = -30; }
-            setStyles({ opacity, y });
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-
     return (
-        <div style={{ opacity: styles.opacity, transform: `translateY(${styles.y}px)`, transition: 'opacity 0.15s, transform 0.15s' }} className="absolute w-full max-w-lg">
+        <div 
+            className="absolute w-full max-w-lg transition-all duration-500 ease-out"
+            style={{
+                opacity: isActive ? 1 : 0,
+                transform: isActive ? 'translateY(0)' : 'translateY(30px)',
+                pointerEvents: isActive ? 'auto' : 'none'
+            }}
+        >
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
@@ -310,262 +243,118 @@ const Feature0TextSlide = memo(({ scrollProgress }: { scrollProgress: MotionValu
     );
 });
 
-const Feature1TextSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const feature = features[1];
-    const colors = colorMap[feature.color];
-    const [styles, setStyles] = useState({ opacity: 0, y: 30 });
+const MockupSlide = memo(({ feature, state }: { feature: Feature; state: 'before' | 'active' | 'after' }) => {
+    const getTransform = () => {
+        switch (state) {
+            case 'before': return 'translateY(100vh) scale(0.9)';
+            case 'active': return 'translateY(0) scale(1)';
+            case 'after': return 'translateY(-100vh) scale(0.9)';
+        }
+    };
     
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let opacity = 0, y = 30;
-            if (latest < 0.32) { opacity = 0; y = 30; }
-            else if (latest <= 0.38) {
-                const t = (latest - 0.32) / 0.06;
-                opacity = t;
-                y = 30 * (1 - t);
-            }
-            else if (latest <= 0.62) { opacity = 1; y = 0; }
-            else if (latest <= 0.68) {
-                const t = (latest - 0.62) / 0.06;
-                opacity = 1 - t;
-                y = -30 * t;
-            }
-            else { opacity = 0; y = -30; }
-            setStyles({ opacity, y });
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-
     return (
-        <div style={{ opacity: styles.opacity, transform: `translateY(${styles.y}px)`, transition: 'opacity 0.15s, transform 0.15s' }} className="absolute w-full max-w-lg">
-            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
-                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
-                <span>{feature.highlight}</span>
+        <div 
+            className="absolute inset-0 flex items-center justify-center transition-transform duration-700 ease-out will-change-transform"
+            style={{ transform: getTransform() }}
+        >
+            <div className="hidden md:flex w-full h-full items-center justify-center p-8">
+                <MacBookMockup feature={feature} />
             </div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
-            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </div>
-    );
-});
-
-const Feature2TextSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const feature = features[2];
-    const colors = colorMap[feature.color];
-    const [styles, setStyles] = useState({ opacity: 0, y: 30 });
-    
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let opacity = 0, y = 30;
-            if (latest < 0.66) { opacity = 0; y = 30; }
-            else if (latest <= 0.72) {
-                const t = (latest - 0.66) / 0.06;
-                opacity = t;
-                y = 30 * (1 - t);
-            }
-            else { opacity = 1; y = 0; }
-            setStyles({ opacity, y });
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-
-    return (
-        <div style={{ opacity: styles.opacity, transform: `translateY(${styles.y}px)`, transition: 'opacity 0.15s, transform 0.15s' }} className="absolute w-full max-w-lg">
-            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
-                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
-                <span>{feature.highlight}</span>
+            <div className="flex md:hidden w-full h-full items-center justify-center p-4">
+                <IPhoneMockup feature={feature} />
             </div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
-            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
         </div>
     );
 });
 
-const Feature0MockupSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const feature = features[0];
-    const [styles, setStyles] = useState({ y: 0, scale: 1 });
-    
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let y = 0, scale = 1;
-            if (latest <= 0.28) { y = 0; scale = 1; }
-            else if (latest <= 0.34) {
-                const t = (latest - 0.28) / 0.06;
-                y = -100 * t;
-                scale = 1 - 0.1 * t;
-            }
-            else { y = -100; scale = 0.9; }
-            setStyles({ y, scale });
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-
+const AmbienceGlow = memo(({ color, isActive }: { color: ColorKey; isActive: boolean }) => {
+    const colors = colorMap[color];
     return (
         <div 
-            style={{ transform: `translateY(${styles.y}vh) scale(${styles.scale})`, transition: 'transform 0.2s ease-out' }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </div>
+            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full pointer-events-none transition-opacity duration-700`}
+            style={{ opacity: isActive ? 0.2 : 0 }}
+        />
     );
-});
-
-const Feature1MockupSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const feature = features[1];
-    const [styles, setStyles] = useState({ y: 100, scale: 0.9 });
-    
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let y = 100, scale = 0.9;
-            if (latest < 0.32) { y = 100; scale = 0.9; }
-            else if (latest <= 0.38) {
-                const t = (latest - 0.32) / 0.06;
-                y = 100 * (1 - t);
-                scale = 0.9 + 0.1 * t;
-            }
-            else if (latest <= 0.62) { y = 0; scale = 1; }
-            else if (latest <= 0.68) {
-                const t = (latest - 0.62) / 0.06;
-                y = -100 * t;
-                scale = 1 - 0.1 * t;
-            }
-            else { y = -100; scale = 0.9; }
-            setStyles({ y, scale });
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-
-    return (
-        <div 
-            style={{ transform: `translateY(${styles.y}vh) scale(${styles.scale})`, transition: 'transform 0.2s ease-out' }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </div>
-    );
-});
-
-const Feature2MockupSlide = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const feature = features[2];
-    const [styles, setStyles] = useState({ y: 100, scale: 0.9 });
-    
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let y = 100, scale = 0.9;
-            if (latest < 0.66) { y = 100; scale = 0.9; }
-            else if (latest <= 0.72) {
-                const t = (latest - 0.66) / 0.06;
-                y = 100 * (1 - t);
-                scale = 0.9 + 0.1 * t;
-            }
-            else { y = 0; scale = 1; }
-            setStyles({ y, scale });
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-
-    return (
-        <div 
-            style={{ transform: `translateY(${styles.y}vh) scale(${styles.scale})`, transition: 'transform 0.2s ease-out' }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </div>
-    );
-});
-
-const Feature0Ambience = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const colors = colorMap[features[0].color];
-    const [opacity, setOpacity] = useState(0);
-    
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let o = 0;
-            if (latest < 0.1) o = latest / 0.1 * 0.2;
-            else if (latest <= 0.24) o = 0.2;
-            else if (latest <= 0.34) o = 0.2 * (1 - (latest - 0.24) / 0.1);
-            else o = 0;
-            setOpacity(o);
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-    
-    return <div style={{ opacity, transition: 'opacity 0.3s' }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`} />;
-});
-
-const Feature1Ambience = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const colors = colorMap[features[1].color];
-    const [opacity, setOpacity] = useState(0);
-    
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let o = 0;
-            if (latest < 0.32) o = 0;
-            else if (latest <= 0.42) o = (latest - 0.32) / 0.1 * 0.2;
-            else if (latest <= 0.58) o = 0.2;
-            else if (latest <= 0.68) o = 0.2 * (1 - (latest - 0.58) / 0.1);
-            else o = 0;
-            setOpacity(o);
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-    
-    return <div style={{ opacity, transition: 'opacity 0.3s' }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`} />;
-});
-
-const Feature2Ambience = memo(({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-    const colors = colorMap[features[2].color];
-    const [opacity, setOpacity] = useState(0);
-    
-    useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            let o = 0;
-            if (latest < 0.66) o = 0;
-            else if (latest <= 0.76) o = (latest - 0.66) / 0.1 * 0.2;
-            else o = 0.2;
-            setOpacity(o);
-        });
-        return unsubscribe;
-    }, [scrollProgress]);
-    
-    return <div style={{ opacity, transition: 'opacity 0.3s' }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`} />;
 });
 
 export default function StickyScrollFeatures() {
     const containerRef = useRef<HTMLDivElement>(null);
-    const scrollProgress = useManualScrollProgress(containerRef as React.RefObject<HTMLElement>);
+    const sentinel0Ref = useRef<HTMLDivElement>(null);
+    const sentinel1Ref = useRef<HTMLDivElement>(null);
+    const sentinel2Ref = useRef<HTMLDivElement>(null);
     
     const [activeFeature, setActiveFeature] = useState(0);
     const [isInSection, setIsInSection] = useState(false);
     
     useEffect(() => {
-        const unsubscribe = scrollProgress.on("change", (latest) => {
-            if (!isFinite(latest)) return;
-            setIsInSection(latest > 0.05 && latest < 0.95);
-            if (latest < 0.34) setActiveFeature(0);
-            else if (latest < 0.68) setActiveFeature(1);
-            else setActiveFeature(2);
+        const sentinels = [sentinel0Ref.current, sentinel1Ref.current, sentinel2Ref.current];
+        if (sentinels.some(s => !s)) return;
+        
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    const index = sentinels.indexOf(entry.target as HTMLDivElement);
+                    if (index === -1) return;
+                    
+                    if (entry.isIntersecting) {
+                        setActiveFeature(index);
+                        setIsInSection(true);
+                    }
+                });
+            },
+            {
+                root: null,
+                rootMargin: '-40% 0px -40% 0px',
+                threshold: 0
+            }
+        );
+        
+        sentinels.forEach(sentinel => {
+            if (sentinel) observer.observe(sentinel);
         });
-        return unsubscribe;
-    }, [scrollProgress]);
+        
+        return () => observer.disconnect();
+    }, []);
+    
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                setIsInSection(entry.isIntersecting && entry.intersectionRatio > 0.1);
+            },
+            { threshold: [0.1, 0.9] }
+        );
+        
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, []);
 
     const activeColors = useMemo(() => colorMap[features[activeFeature].color], [activeFeature]);
+    
+    const getMockupState = useCallback((index: number): 'before' | 'active' | 'after' => {
+        if (index < activeFeature) return 'after';
+        if (index > activeFeature) return 'before';
+        return 'active';
+    }, [activeFeature]);
 
     return (
-        <section ref={containerRef} className="relative h-[300vh] bg-black" style={{ position: 'relative', contain: 'none' }}>
+        <section 
+            ref={containerRef} 
+            className="relative h-[300vh] bg-black"
+            style={{ position: 'relative', contain: 'none', transform: 'none' }}
+        >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
-            <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full" style={{ position: 'sticky', WebkitOverflowScrolling: 'touch' }}>
+            <div className="absolute top-0 left-0 right-0 h-[100vh]" ref={sentinel0Ref} />
+            <div className="absolute top-[100vh] left-0 right-0 h-[100vh]" ref={sentinel1Ref} />
+            <div className="absolute top-[200vh] left-0 right-0 h-[100vh]" ref={sentinel2Ref} />
+
+            <div 
+                className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full overflow-hidden"
+                style={{ position: 'sticky', WebkitOverflowScrolling: 'touch' }}
+            >
                 <div className="w-full px-4 md:px-16 lg:px-24 relative h-full flex flex-col md:flex-row items-center">
 
                     <div className={`absolute top-8 md:top-28 left-6 md:left-16 lg:left-24 flex space-x-2 z-50 transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>
@@ -578,9 +367,9 @@ export default function StickyScrollFeatures() {
                     </div>
 
                     <div className="w-full md:w-[45%] relative h-[40vh] md:h-full flex items-end md:items-center justify-start z-20 pb-8 md:pb-0">
-                        <Feature0TextSlide scrollProgress={scrollProgress} />
-                        <Feature1TextSlide scrollProgress={scrollProgress} />
-                        <Feature2TextSlide scrollProgress={scrollProgress} />
+                        {features.map((feature, i) => (
+                            <TextContent key={i} feature={feature} isActive={activeFeature === i} />
+                        ))}
                     </div>
 
                     <div className="flex w-full md:w-[55%] h-[60vh] md:h-full items-center justify-center relative z-20">
@@ -604,15 +393,15 @@ export default function StickyScrollFeatures() {
                         </div>
 
                         <div className="w-full h-full max-w-[340px] md:max-w-[700px] relative overflow-hidden">
-                            <Feature0MockupSlide scrollProgress={scrollProgress} />
-                            <Feature1MockupSlide scrollProgress={scrollProgress} />
-                            <Feature2MockupSlide scrollProgress={scrollProgress} />
+                            {features.map((feature, i) => (
+                                <MockupSlide key={i} feature={feature} state={getMockupState(i)} />
+                            ))}
                         </div>
                     </div>
 
-                    <Feature0Ambience scrollProgress={scrollProgress} />
-                    <Feature1Ambience scrollProgress={scrollProgress} />
-                    <Feature2Ambience scrollProgress={scrollProgress} />
+                    {features.map((feature, i) => (
+                        <AmbienceGlow key={i} color={feature.color} isActive={activeFeature === i} />
+                    ))}
                 </div>
             </div>
         </section>
