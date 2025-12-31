@@ -87,6 +87,16 @@ The app includes a comprehensive mobile performance optimization system for ligh
   - Touch-friendly 44px tap targets on mobile
   - Content visibility for off-screen content
 
+## Recent Changes
+
+### December 31, 2025
+- **Sticky Scroll Features Section Rebuild**: Replaced `StickyScrollFeatures.tsx` with `StickyScrollFeaturesV2.tsx` to fix mobile Safari rendering issues:
+  - Custom `useScrollProgress` hook using `getBoundingClientRect` + `requestAnimationFrame` instead of framer-motion's `useScroll`
+  - Safari-safe sticky CSS positioning with `WebkitOverflowScrolling: touch`
+  - Static rendering first with animation overlay for reliable first-paint
+  - Spring animations applied only after mount via `isReady` flag
+  - Preserved all design elements: 3 features, device mockups, progress dots, ambient glows
+
 ## External Dependencies
 
 | Service | Purpose |
