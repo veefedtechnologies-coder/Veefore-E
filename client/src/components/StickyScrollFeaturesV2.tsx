@@ -1,5 +1,5 @@
-import { useRef, useState, memo, useMemo, useEffect, useCallback } from 'react';
-import { motion, useSpring, useMotionValue } from 'framer-motion';
+import { useRef, useState, memo, useMemo, useEffect } from 'react';
+import { motion, useScroll, useSpring, useMotionValueEvent } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 
 const springConfig = { stiffness: 100, damping: 20, mass: 0.5 };
@@ -113,47 +113,6 @@ const features: Feature[] = [
     }
 ];
 
-function useScrollProgress(containerRef: React.RefObject<HTMLElement | null>) {
-    const [progress, setProgress] = useState(0);
-    const [isReady, setIsReady] = useState(false);
-    const rafRef = useRef<number | null>(null);
-
-    const calculateProgress = useCallback(() => {
-        if (!containerRef.current) return;
-
-        const rect = containerRef.current.getBoundingClientRect();
-        const windowHeight = window.innerHeight;
-        const sectionHeight = rect.height - windowHeight;
-        
-        if (sectionHeight <= 0) return;
-
-        const scrolled = -rect.top;
-        const rawProgress = Math.max(0, Math.min(1, scrolled / sectionHeight));
-        
-        setProgress(rawProgress);
-        if (!isReady) setIsReady(true);
-    }, [containerRef, isReady]);
-
-    useEffect(() => {
-        const handleScroll = () => {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            rafRef.current = requestAnimationFrame(calculateProgress);
-        };
-
-        calculateProgress();
-        
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        window.addEventListener('resize', handleScroll, { passive: true });
-
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-            window.removeEventListener('resize', handleScroll);
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        };
-    }, [calculateProgress]);
-
-    return { progress, isReady };
-}
 
 function lerp(start: number, end: number, t: number): number {
     return start + (end - start) * Math.max(0, Math.min(1, t));
@@ -301,17 +260,17 @@ interface TextSlideProps {
 
 const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     const colors = colorMap[feature.color];
-    const springOpacity = useSpring(useMotionValue(opacity), springConfig);
-    const springY = useSpring(useMotionValue(y), springConfig);
+    const opacityValue = useSpring(opacity, springConfig);
+    const yValue = useSpring(y, springConfig);
 
     useEffect(() => {
-        springOpacity.set(opacity);
-        springY.set(y);
-    }, [opacity, y, springOpacity, springY]);
+        opacityValue.set(opacity);
+        yValue.set(y);
+    }, [opacity, y]);
 
     return (
         <motion.div 
-            style={{ opacity: springOpacity, y: springY }} 
+            style={{ opacity: opacityValue, y: yValue }} 
             className="absolute w-full max-w-lg"
         >
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
@@ -333,13 +292,13 @@ interface MockupSlideProps {
 }
 
 const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: MockupSlideProps) => {
-    const springY = useSpring(useMotionValue(y), springConfig);
-    const springScale = useSpring(useMotionValue(scale), springConfig);
+    const springY = useSpring(y, springConfig);
+    const springScale = useSpring(scale, springConfig);
 
     useEffect(() => {
         springY.set(y);
         springScale.set(scale);
-    }, [y, scale, springY, springScale]);
+    }, [y, scale]);
 
     if (isStatic) {
         return (
@@ -377,11 +336,11 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
 });
 
 const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKey], opacity: number }) => {
-    const springOpacity = useSpring(useMotionValue(opacity), springConfig);
+    const springOpacity = useSpring(opacity, springConfig);
 
     useEffect(() => {
         springOpacity.set(opacity);
-    }, [opacity, springOpacity]);
+    }, [opacity]);
 
     return (
         <motion.div 
@@ -392,9 +351,24 @@ const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKe
 });
 
 export default function StickyScrollFeaturesV2() {
-    const containerRef = useRef<HTMLElement | null>(null);
-    const { progress, isReady } = useScrollProgress(containerRef);
+    const containerRef = useRef<HTMLElement>(null);
     const [hasMounted, setHasMounted] = useState(false);
+    const [progress, setProgress] = useState(0);
+
+    const { scrollYProgress } = useScroll({
+        target: containerRef,
+        offset: ["start start", "end end"]
+    });
+
+    const smoothProgress = useSpring(scrollYProgress, {
+        stiffness: 50,
+        damping: 20,
+        mass: 0.5
+    });
+
+    useMotionValueEvent(smoothProgress, "change", (latest) => {
+        setProgress(latest);
+    });
 
     useEffect(() => {
         const timer = setTimeout(() => setHasMounted(true), 300);
@@ -402,8 +376,8 @@ export default function StickyScrollFeaturesV2() {
     }, []);
 
     const activeFeature = useMemo(() => {
-        if (progress < 0.34) return 0;
-        if (progress < 0.68) return 1;
+        if (progress < 0.33) return 0;
+        if (progress < 0.66) return 1;
         return 2;
     }, [progress]);
 
@@ -416,18 +390,18 @@ export default function StickyScrollFeaturesV2() {
             let y = 30;
 
             if (i === 0) {
-                opacity = mapRange(progress, 0, 0.28, 1, 1);
-                if (progress > 0.28) opacity = mapRange(progress, 0.28, 0.34, 1, 0);
-                y = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 0, -30) : 0;
+                opacity = mapRange(progress, 0, 0.27, 1, 1);
+                if (progress > 0.27) opacity = mapRange(progress, 0.27, 0.33, 1, 0);
+                y = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 0, -30) : 0;
                 if (progress < 0.05) { opacity = 1; y = 0; }
             } else if (i === 1) {
-                opacity = mapRange(progress, 0.32, 0.38, 0, 1);
-                if (progress > 0.62) opacity = mapRange(progress, 0.62, 0.68, 1, 0);
-                y = progress < 0.38 ? mapRange(progress, 0.32, 0.38, 30, 0) : 
-                    progress > 0.62 ? mapRange(progress, 0.62, 0.68, 0, -30) : 0;
+                opacity = mapRange(progress, 0.30, 0.36, 0, 1);
+                if (progress > 0.60) opacity = mapRange(progress, 0.60, 0.66, 1, 0);
+                y = progress < 0.36 ? mapRange(progress, 0.30, 0.36, 30, 0) : 
+                    progress > 0.60 ? mapRange(progress, 0.60, 0.66, 0, -30) : 0;
             } else {
-                opacity = mapRange(progress, 0.66, 0.72, 0, 1);
-                y = progress < 0.72 ? mapRange(progress, 0.66, 0.72, 30, 0) : 0;
+                opacity = mapRange(progress, 0.63, 0.70, 0, 1);
+                y = progress < 0.70 ? mapRange(progress, 0.63, 0.70, 30, 0) : 0;
             }
 
             return { feature, opacity: Math.max(0, Math.min(1, opacity)), y };
@@ -447,21 +421,21 @@ export default function StickyScrollFeaturesV2() {
                     scale = 1;
                     isStatic = true;
                 } else {
-                    y = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 0, -100) * window.innerHeight / 100 : 0;
-                    scale = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 1, 0.9) : 1;
+                    y = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 0, -100) * window.innerHeight / 100 : 0;
+                    scale = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 1, 0.9) : 1;
                 }
-                isVisible = progress < 0.4 || !hasMounted;
+                isVisible = progress < 0.40 || !hasMounted;
             } else if (i === 1) {
-                const enterY = mapRange(progress, 0.32, 0.38, 100, 0);
-                const exitY = mapRange(progress, 0.62, 0.68, 0, -100);
-                y = (progress < 0.38 ? enterY : progress > 0.62 ? exitY : 0) * window.innerHeight / 100;
-                scale = progress < 0.42 ? mapRange(progress, 0.32, 0.42, 0.9, 1) : 
-                        progress > 0.58 ? mapRange(progress, 0.58, 0.68, 1, 0.9) : 1;
-                isVisible = progress > 0.28 && progress < 0.72;
+                const enterY = mapRange(progress, 0.30, 0.36, 100, 0);
+                const exitY = mapRange(progress, 0.60, 0.66, 0, -100);
+                y = (progress < 0.36 ? enterY : progress > 0.60 ? exitY : 0) * window.innerHeight / 100;
+                scale = progress < 0.40 ? mapRange(progress, 0.30, 0.40, 0.9, 1) : 
+                        progress > 0.56 ? mapRange(progress, 0.56, 0.66, 1, 0.9) : 1;
+                isVisible = progress > 0.27 && progress < 0.70;
             } else {
-                y = mapRange(progress, 0.66, 0.72, 100, 0) * window.innerHeight / 100;
-                scale = mapRange(progress, 0.66, 0.76, 0.9, 1);
-                isVisible = progress > 0.62;
+                y = mapRange(progress, 0.63, 0.70, 100, 0) * window.innerHeight / 100;
+                scale = mapRange(progress, 0.63, 0.73, 0.9, 1);
+                isVisible = progress > 0.60;
             }
 
             return { feature, y, scale: Math.max(0.9, Math.min(1, scale)), isVisible, isStatic };
@@ -472,14 +446,14 @@ export default function StickyScrollFeaturesV2() {
         return features.map((_, i) => {
             if (i === 0) {
                 let op = mapRange(progress, 0, 0.1, 0, 0.2);
-                if (progress > 0.24) op = mapRange(progress, 0.24, 0.34, 0.2, 0);
+                if (progress > 0.23) op = mapRange(progress, 0.23, 0.33, 0.2, 0);
                 return Math.max(0, Math.min(0.2, op));
             } else if (i === 1) {
-                let op = mapRange(progress, 0.32, 0.42, 0, 0.2);
-                if (progress > 0.58) op = mapRange(progress, 0.58, 0.68, 0.2, 0);
+                let op = mapRange(progress, 0.30, 0.40, 0, 0.2);
+                if (progress > 0.56) op = mapRange(progress, 0.56, 0.66, 0.2, 0);
                 return Math.max(0, Math.min(0.2, op));
             } else {
-                return Math.max(0, Math.min(0.2, mapRange(progress, 0.66, 0.76, 0, 0.2)));
+                return Math.max(0, Math.min(0.2, mapRange(progress, 0.63, 0.73, 0, 0.2)));
             }
         });
     }, [progress]);
@@ -487,7 +461,7 @@ export default function StickyScrollFeaturesV2() {
     return (
         <section 
             ref={containerRef} 
-            className="relative h-[300vh] bg-black"
+            className="h-[450vh] bg-black"
             style={{ position: 'relative' }}
         >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
