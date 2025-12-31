@@ -316,7 +316,7 @@ const MysteryDateDigits = () => {
 
 
 // ============================================
-// SCROLL REVEAL WITH 3D FLIP & PORTAL EFFECT
+// PREMIUM CINEMATIC SCROLL REVEAL
 // ============================================
 const ScrollZoomIntro = () => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -325,78 +325,76 @@ const ScrollZoomIntro = () => {
         offset: ["start end", "end end"]
     });
 
-    // ANIMATION TIMELINE (0 to 1)
-    // 0.0 - 0.2: Entry
-    // 0.2 - 0.6: Hero Flips + Portal Bursts
-    // 0.5 - 1.0: Benefits Staggered Reveal
+    // Smooth spring for all animations
+    const smoothProgress = useSpring(scrollYProgress, {
+        stiffness: 50,
+        damping: 30,
+        mass: 1
+    });
 
-    // 1. HERO BLAST (4-Quadrant Tear Effect)
-    // The image splits into 4 parts and flies outward
-    const tearMove = useTransform(scrollYProgress, [0.2, 0.5], ['0%', '150%']);
-    const tearRotate = useTransform(scrollYProgress, [0.2, 0.5], [0, 15]);
-    const tearOpacity = useTransform(scrollYProgress, [0.35, 0.6], [1, 0]);
+    // PHASE 1: Hero Image - Elegant 3D zoom and fade
+    const heroScale = useTransform(smoothProgress, [0, 0.25, 0.5], [1, 1.15, 1.4]);
+    const heroOpacity = useTransform(smoothProgress, [0.2, 0.45], [1, 0]);
+    const heroBlur = useTransform(smoothProgress, [0.15, 0.4], [0, 20]);
+    const heroY = useTransform(smoothProgress, [0, 0.4], [0, -60]);
 
-    // Text flies through camera
-    const textScale = useTransform(scrollYProgress, [0.2, 0.45], [1, 3]);
-    const textOpacity = useTransform(scrollYProgress, [0.25, 0.4], [1, 0]);
+    // Text elegant fade with slight parallax
+    const textOpacity = useTransform(smoothProgress, [0.15, 0.35], [1, 0]);
+    const textY = useTransform(smoothProgress, [0, 0.35], [0, -80]);
+    const textScale = useTransform(smoothProgress, [0.15, 0.35], [1, 1.05]);
 
-    // 2. PORTAL EXPLOSION (Shockwave Effect)
-    const portalScale = useTransform(scrollYProgress, [0.25, 0.65], [0, 4.5]);
-    const portalShockwave = useTransform(scrollYProgress, [0.3, 0.6], [0.5, 5]); // Faster, larger burst
-    const portalOpacity = useTransform(scrollYProgress, [0.25, 0.45, 0.7], [0, 1, 0]); // Fades out at end
-    const portalGlow = useTransform(scrollYProgress, [0.3, 0.5], [0.5, 1]);
+    // PHASE 2: Elegant Light Reveal - Soft expanding gradient
+    const revealScale = useTransform(smoothProgress, [0.25, 0.6], [0, 3]);
+    const revealOpacity = useTransform(smoothProgress, [0.25, 0.4, 0.65], [0, 0.8, 0]);
+    
+    // Floating light particles
+    const particleOpacity = useTransform(smoothProgress, [0.3, 0.45, 0.6], [0, 1, 0]);
 
-    // 3. BENEFITS STAGGERED REVEAL (Cascading Entrance)
-    // Header appears first
-    const headerOpacity = useTransform(scrollYProgress, [0.45, 0.6], [0, 1]);
-    const headerY = useTransform(scrollYProgress, [0.45, 0.6], [40, 0]);
+    // PHASE 3: Benefits reveal with stagger
+    const headerOpacity = useTransform(smoothProgress, [0.45, 0.6], [0, 1]);
+    const headerY = useTransform(smoothProgress, [0.45, 0.6], [50, 0]);
 
-    // Grid appears slightly later with separate zoom
-    const gridOpacity = useTransform(scrollYProgress, [0.5, 0.7], [0, 1]);
-    const gridScale = useTransform(scrollYProgress, [0.5, 0.7], [0.85, 1]);
-    const gridY = useTransform(scrollYProgress, [0.5, 0.7], [60, 0]);
+    const gridOpacity = useTransform(smoothProgress, [0.5, 0.7], [0, 1]);
+    const gridScale = useTransform(smoothProgress, [0.5, 0.7], [0.9, 1]);
+    const gridY = useTransform(smoothProgress, [0.5, 0.7], [40, 0]);
 
-    // 4. SCROLL INDICATOR
-    const scrollIndicatorOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
+    // Scroll indicator
+    const scrollIndicatorOpacity = useTransform(smoothProgress, [0, 0.12], [1, 0]);
 
     return (
         <section
             ref={containerRef}
-            className="h-[250vh] md:h-[400vh] relative z-10"
-            style={{ perspective: '2000px' }} // Deeper perspective for grander scale
+            className="h-[300vh] md:h-[400vh] relative z-10"
+            style={{ perspective: '1500px' }}
         >
-            <div className="sticky top-0 h-screen overflow-hidden bg-[#030303]">
+            <div className="sticky top-0 h-screen overflow-hidden bg-[#020408]">
 
-                {/* ------------------------------------------- */}
-                {/* BOTTOM LAYER: BENEFITS SECTION              */}
-                {/* z-10: Always there, revealed by portal      */}
-                {/* ------------------------------------------- */}
+                {/* ============================================ */}
+                {/* BOTTOM LAYER: Benefits Section               */}
+                {/* ============================================ */}
                 <motion.div
                     className="absolute inset-0 z-10 flex items-center justify-center"
                     style={{
-                        background: 'linear-gradient(135deg, #02040a 0%, #0d121f 50%, #02040a 100%)'
+                        background: 'radial-gradient(ellipse at center, #0a1628 0%, #020408 70%)'
                     }}
                 >
-                    {/* Decorative Orbs - Multi-colored mix */}
+                    {/* Premium ambient lighting */}
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        {/* Cyan/Blue Orb (Top Left) */}
-                        <div className="absolute left-[-10%] top-[10%] w-[45vw] h-[45vw] rounded-full bg-cyan-600/15 blur-[120px]" />
-                        {/* Orange/Yellow Orb (Bottom Right) */}
-                        <div className="absolute right-[-5%] bottom-[5%] w-[40vw] h-[40vw] rounded-full bg-orange-500/10 blur-[100px]" />
-                        {/* Deep Blue Orb (Bottom Left) */}
-                        <div className="absolute left-[10%] bottom-[10%] w-[35vw] h-[35vw] rounded-full bg-blue-700/10 blur-[90px]" />
+                        <div className="absolute left-[5%] top-[15%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-br from-blue-600/10 to-cyan-500/5 blur-[100px]" />
+                        <div className="absolute right-[5%] bottom-[10%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-tl from-purple-600/8 to-pink-500/5 blur-[100px]" />
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] rounded-full bg-gradient-to-r from-indigo-600/5 to-transparent blur-[120px]" />
                     </div>
 
-                    {/* Benefits Content - Mobile: Scaled to fit; Desktop: Standard */}
-                    <div className="w-full max-w-[1200px] px-6 pt-4 md:pt-24 select-none pointer-events-auto flex flex-col items-center">
+                    {/* Benefits Content */}
+                    <div className="w-full max-w-[1200px] px-6 pt-4 md:pt-20 select-none pointer-events-auto flex flex-col items-center">
                         <motion.div
-                            className="text-center mb-4 md:mb-10 scale-90 md:scale-100 origin-bottom"
+                            className="text-center mb-4 md:mb-10"
                             style={{ opacity: headerOpacity, y: headerY }}
                         >
                             <h3 className="text-3xl md:text-5xl font-bold text-white mb-4">
-                                Beta member <span className="text-white/90">benefits</span>
+                                Beta member <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">benefits</span>
                             </h3>
-                            <p className="text-lg md:text-xl text-white/60 max-w-lg mx-auto">
+                            <p className="text-lg md:text-xl text-white/50 max-w-lg mx-auto">
                                 Exclusive perks reserved for early adopters
                             </p>
                         </motion.div>
@@ -410,137 +408,169 @@ const ScrollZoomIntro = () => {
                     </div>
                 </motion.div>
 
-                {/* ------------------------------------------- */}
-                {/* MIDDLE LAYER: PORTAL (Expanding Circle)    */}
-                {/* z-20: Glowing circle that reveals benefits */}
-                {/* ------------------------------------------- */}
-                {/* ------------------------------------------- */}
-                {/* MIDDLE LAYER: PORTAL (Expanding Circle)    */}
-                {/* z-20: Glowing circle that reveals benefits */}
-                {/* ------------------------------------------- */}
+                {/* ============================================ */}
+                {/* MIDDLE LAYER: Elegant Light Reveal          */}
+                {/* ============================================ */}
                 <motion.div
                     className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                    style={{ opacity: portalOpacity }}
+                    style={{ opacity: revealOpacity }}
                 >
+                    {/* Central expanding glow */}
                     <motion.div
-                        className="w-[50vw] h-[50vw] md:w-[40vw] md:h-[40vw] rounded-full"
+                        className="absolute w-[60vw] h-[60vw] md:w-[50vw] md:h-[50vw]"
                         style={{
-                            scale: portalScale,
-                            // Cyan/Blue Outer with Transparent Center
-                            background: 'radial-gradient(circle, transparent 0%, rgba(3, 7, 18, 0.3) 40%, rgba(6, 182, 212, 0.15) 60%, transparent 70%)',
-                            boxShadow: '0 0 80px 40px rgba(6, 182, 212, 0.1), 0 0 150px 80px rgba(59, 130, 246, 0.05)',
-                            filter: 'blur(20px)'
+                            scale: revealScale,
+                            background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(99,102,241,0.1) 30%, rgba(139,92,246,0.05) 50%, transparent 70%)',
+                            filter: 'blur(40px)'
                         }}
                     />
-                    {/* Inner glow ring - Multi-colored Border */}
+                    
+                    {/* Soft inner ring */}
                     <motion.div
-                        className="absolute w-[48vw] h-[48vw] md:w-[38vw] md:h-[38vw] rounded-full"
+                        className="absolute w-[40vw] h-[40vw] md:w-[30vw] md:h-[30vw] rounded-full"
                         style={{
-                            scale: portalScale,
-                            opacity: portalGlow,
-                            // Gradient border effect via background + mask? Or just simple border color
-                            // Using a simple thin colored border for now, maybe Cyan mixed with Orange
-                            border: '2px solid rgba(255, 255, 255, 0.1)',
-                            background: 'conic-gradient(from 0deg, transparent 0%, rgba(6,182,212,0.3) 25%, rgba(249,115,22,0.3) 50%, rgba(59,130,246,0.3) 75%, transparent 100%)',
-                            mask: 'radial-gradient(transparent 68%, black 69%)' // Creating a ring shape manually if needed, but border is simpler.
-                            // Let's stick to a clean border with the colors:
+                            scale: revealScale,
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            boxShadow: '0 0 60px 20px rgba(59,130,246,0.1), inset 0 0 40px rgba(139,92,246,0.05)'
                         }}
-                    >
-                        <div className="absolute inset-0 rounded-full border-2 border-cyan-500/30" />
-                        <div className="absolute inset-0 rounded-full border-t-2 border-orange-500/40 rotate-180" />
-                    </motion.div>
+                    />
 
-                    {/* Shockwave Ring */}
+                    {/* Outer ring pulse */}
                     <motion.div
-                        className="absolute w-[48vw] h-[48vw] rounded-full border border-white/10"
+                        className="absolute w-[55vw] h-[55vw] md:w-[45vw] md:h-[45vw] rounded-full"
                         style={{
-                            scale: portalShockwave,
-                            opacity: useTransform(scrollYProgress, [0.3, 0.5], [0.4, 0])
+                            scale: useTransform(smoothProgress, [0.3, 0.55], [0.8, 2]),
+                            opacity: useTransform(smoothProgress, [0.3, 0.55], [0.3, 0]),
+                            border: '1px solid rgba(99,102,241,0.2)'
                         }}
                     />
                 </motion.div>
 
-                {/* ------------------------------------------- */}
-                {/* ------------------------------------------- */}
-                {/* TOP LAYER: HERO BLAST (Split Image)         */}
-                {/* ------------------------------------------- */}
-                <div className="absolute inset-0 z-30 pointer-events-none">
-                    {/* Top Left Quadrant */}
-                    <motion.div
-                        className="absolute top-0 left-0 w-1/2 h-1/2 overflow-hidden bg-[#030303]"
-                        style={{ x: useTransform(tearMove, v => `-${v}`), y: useTransform(tearMove, v => `-${v}`), rotate: useTransform(tearRotate, v => `-${v}deg`), opacity: tearOpacity, borderTopLeftRadius: '32px' }}
-                    >
-                        <img src="/beta-hero.png" alt="" className="absolute w-[200%] h-[200%] max-w-none object-cover top-0 left-0 brightness-[0.4]" />
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#030303]/80 to-transparent" />
-                    </motion.div>
+                {/* Floating light particles */}
+                <motion.div
+                    className="absolute inset-0 z-25 pointer-events-none"
+                    style={{ opacity: particleOpacity }}
+                >
+                    {[...Array(8)].map((_, i) => {
+                        const angle = (i / 8) * Math.PI * 2;
+                        const radius = 25 + (i % 3) * 10;
+                        return (
+                            <motion.div
+                                key={i}
+                                className="absolute w-2 h-2 rounded-full"
+                                style={{
+                                    left: `calc(50% + ${Math.cos(angle) * radius}vw)`,
+                                    top: `calc(50% + ${Math.sin(angle) * radius}vh)`,
+                                    background: i % 2 === 0 
+                                        ? 'radial-gradient(circle, rgba(59,130,246,0.8) 0%, transparent 70%)'
+                                        : 'radial-gradient(circle, rgba(139,92,246,0.8) 0%, transparent 70%)',
+                                    boxShadow: i % 2 === 0 
+                                        ? '0 0 20px 8px rgba(59,130,246,0.3)'
+                                        : '0 0 20px 8px rgba(139,92,246,0.3)'
+                                }}
+                                animate={{
+                                    y: [0, -20 - (i * 5), 0],
+                                    opacity: [0.4, 1, 0.4]
+                                }}
+                                transition={{
+                                    duration: 3 + (i * 0.3),
+                                    repeat: Infinity,
+                                    ease: "easeInOut",
+                                    delay: i * 0.2
+                                }}
+                            />
+                        );
+                    })}
+                </motion.div>
 
-                    {/* Top Right Quadrant */}
-                    <motion.div
-                        className="absolute top-0 right-0 w-1/2 h-1/2 overflow-hidden bg-[#030303]"
-                        style={{ x: tearMove, y: useTransform(tearMove, v => `-${v}`), rotate: tearRotate, opacity: tearOpacity, borderTopRightRadius: '32px' }}
-                    >
-                        <img src="/beta-hero.png" alt="" className="absolute w-[200%] h-[200%] max-w-none object-cover top-0 right-0 brightness-[0.4]" />
-                        <div className="absolute inset-0 bg-gradient-to-bl from-[#030303]/80 to-transparent" />
-                    </motion.div>
+                {/* ============================================ */}
+                {/* TOP LAYER: Hero Image with 3D Depth          */}
+                {/* ============================================ */}
+                <motion.div
+                    className="absolute inset-0 z-30 overflow-hidden"
+                    style={{
+                        opacity: heroOpacity,
+                        scale: heroScale,
+                        y: heroY,
+                        filter: useTransform(heroBlur, v => `blur(${v}px)`)
+                    }}
+                >
+                    {/* Hero image with professional treatment */}
+                    <div className="absolute inset-0">
+                        <img 
+                            src="/beta-hero.png" 
+                            alt="" 
+                            className="absolute w-full h-full object-cover object-center"
+                            style={{ 
+                                filter: 'brightness(0.5) saturate(1.1)',
+                            }}
+                        />
+                        {/* Premium vignette overlay */}
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,rgba(2,4,8,0.7)_70%,rgba(2,4,8,0.95)_100%)]" />
+                        {/* Top gradient fade */}
+                        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#020408] to-transparent" />
+                        {/* Bottom gradient fade */}
+                        <div className="absolute inset-x-0 bottom-0 h-60 bg-gradient-to-t from-[#020408] via-[#020408]/80 to-transparent" />
+                        {/* Subtle color overlay for cohesion */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-transparent to-purple-900/10 mix-blend-overlay" />
+                    </div>
+                </motion.div>
 
-                    {/* Bottom Left Quadrant */}
-                    <motion.div
-                        className="absolute bottom-0 left-0 w-1/2 h-1/2 overflow-hidden bg-[#030303]"
-                        style={{ x: useTransform(tearMove, v => `-${v}`), y: tearMove, rotate: tearRotate, opacity: tearOpacity, borderBottomLeftRadius: '32px' }}
-                    >
-                        <img src="/beta-hero.png" alt="" className="absolute w-[200%] h-[200%] max-w-none object-cover bottom-0 left-0 brightness-[0.4]" />
-                        <div className="absolute inset-0 bg-gradient-to-tr from-[#030303]/80 to-transparent" />
-                    </motion.div>
-
-                    {/* Bottom Right Quadrant */}
-                    <motion.div
-                        className="absolute bottom-0 right-0 w-1/2 h-1/2 overflow-hidden bg-[#030303]"
-                        style={{ x: tearMove, y: tearMove, rotate: useTransform(tearRotate, v => `-${v}deg`), opacity: tearOpacity, borderBottomRightRadius: '32px' }}
-                    >
-                        <img src="/beta-hero.png" alt="" className="absolute w-[200%] h-[200%] max-w-none object-cover bottom-0 right-0 brightness-[0.4]" />
-                        <div className="absolute inset-0 bg-gradient-to-tl from-[#030303]/80 to-transparent" />
-                    </motion.div>
-                </div>
-
-                {/* Hero Content (Text Layer) - Scaled Independently */}
+                {/* ============================================ */}
+                {/* TEXT LAYER: Hero Content                     */}
+                {/* ============================================ */}
                 <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-6 pointer-events-none">
                     <motion.div
                         className="text-center max-w-4xl"
-                        style={{ opacity: textOpacity, scale: textScale }}
+                        style={{ 
+                            opacity: textOpacity, 
+                            y: textY,
+                            scale: textScale
+                        }}
                     >
-                        <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-black text-white mb-6 leading-tight">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8, delay: 0.2 }}
+                            className="mb-6"
+                        >
+                            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
+                                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                <span className="text-xs font-medium text-white/60 uppercase tracking-wider">Beta Access Opening Soon</span>
+                            </span>
+                        </motion.div>
+                        
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-[1.1] tracking-tight">
                             The Future of
-                            <span className="block bg-gradient-to-r from-cyan-400 via-blue-500 to-orange-400 bg-clip-text text-transparent">
+                            <span className="block mt-2 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
                                 Content Creation
                             </span>
                         </h1>
-                        <p className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto mb-8">
+                        <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
                             Join the exclusive beta and transform your workflow with AI-powered tools designed for creators.
                         </p>
-
                     </motion.div>
-
-
                 </div>
 
-
-                {/* Scroll Indicator */}
+                {/* ============================================ */}
+                {/* SCROLL INDICATOR                             */}
+                {/* ============================================ */}
                 <motion.div
-                    className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-40 pointer-events-none"
+                    className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-40 pointer-events-none"
                     style={{ opacity: scrollIndicatorOpacity }}
                 >
-                    <span className="text-xs text-white/50 uppercase tracking-widest">Scroll to explore</span>
-                    <motion.div className="w-6 h-10 rounded-full border-2 border-white/30 flex justify-center pt-2">
+                    <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-medium">Scroll to explore</span>
+                    <motion.div className="w-6 h-10 rounded-full border border-white/20 flex justify-center pt-2">
                         <motion.div
-                            className="w-1.5 h-3 rounded-full bg-white/60"
-                            animate={{ y: [0, 12, 0] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
+                            className="w-1 h-2.5 rounded-full bg-white/50"
+                            animate={{ y: [0, 14, 0] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
                         />
                     </motion.div>
                 </motion.div>
 
             </div>
-        </section >
+        </section>
     );
 };
 
