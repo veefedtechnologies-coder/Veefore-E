@@ -3,7 +3,7 @@ import { motion, useScroll, useSpring, useMotionValueEvent } from 'framer-motion
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
 
-const springConfig = { stiffness: 100, damping: 20, mass: 0.5 };
+const springConfig = { stiffness: 50, damping: 25, mass: 0.8 };
 
 const colorMap = {
     blue: {
@@ -362,9 +362,9 @@ export default function StickyScrollFeaturesV2() {
     });
 
     const smoothProgress = useSpring(scrollYProgress, {
-        stiffness: 50,
-        damping: 20,
-        mass: 0.5
+        stiffness: 30,
+        damping: 25,
+        mass: 1.2
     });
 
     useMotionValueEvent(smoothProgress, "change", (latest) => {
@@ -465,7 +465,7 @@ export default function StickyScrollFeaturesV2() {
     return (
         <section 
             ref={containerRef} 
-            className="h-[450vh] bg-black"
+            className="h-[550vh] bg-black"
             style={{ position: 'relative' }}
         >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
