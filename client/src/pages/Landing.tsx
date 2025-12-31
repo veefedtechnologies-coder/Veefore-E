@@ -666,14 +666,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [logoLoaded, setLogoLoaded] = useState(false)
-  
-  // Preload logo for mobile menu
-  useEffect(() => {
-    const img = new Image()
-    img.src = '/veefore-logo.png'
-    img.onload = () => setLogoLoaded(true)
-  }, [])
 
   // HUD State for Algorithm Science section
   const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
@@ -783,6 +775,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   return (
     <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
       <SEO {...seoConfig.landing} />
+      
+      {/* Preload logo image for instant display in mobile menu */}
+      <link rel="preload" href="/veefore-logo.png" as="image" />
+      <img src="/veefore-logo.png" alt="" className="hidden" aria-hidden="true" />
 
       {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
       <div className={`${isMobile ? 'absolute h-[500vh]' : 'fixed'} inset-0 pointer-events-none overflow-hidden -z-10`}>
@@ -875,21 +871,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               {/* Header with logo and close - no animation for instant display */}
               <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
                 <div className="flex items-center cursor-pointer" onClick={() => { setMobileMenuOpen(false); onNavigate('/'); }}>
-                  {/* Inline SVG V logo for instant display */}
-                  <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-                    <path d="M20 20L50 80L80 20" stroke="url(#vGradient)" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                    <path d="M10 20L50 90L90 20" stroke="url(#vGradient2)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.5"/>
-                    <defs>
-                      <linearGradient id="vGradient" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#6366f1"/>
-                        <stop offset="1" stopColor="#8b5cf6"/>
-                      </linearGradient>
-                      <linearGradient id="vGradient2" x1="10" y1="20" x2="90" y2="90" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#6366f1"/>
-                        <stop offset="1" stopColor="#a855f7"/>
-                      </linearGradient>
-                    </defs>
-                  </svg>
+                  <img
+                    src="/veefore-logo.png"
+                    alt="VeeFore"
+                    className="h-7 w-auto"
+                  />
                   <span className="text-white text-lg font-bold tracking-tight ml-[-2px]">eefore</span>
                 </div>
                 <button 
