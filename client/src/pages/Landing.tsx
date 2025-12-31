@@ -671,10 +671,18 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-  const [isScrolled, setIsScrolled] = useState(false)
+  // Initialize to true (scrolled/solid state) to prevent flash of transparent on reload
+  const [isScrolled, setIsScrolled] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { scrollY, scrollYProgress } = useScroll()
+
+  // Check initial scroll position immediately on mount
+  useEffect(() => {
+    // Set correct initial state based on current scroll position
+    const initialScroll = window.scrollY || window.pageYOffset || 0;
+    setIsScrolled(initialScroll > 50);
+  }, []);
 
   useEffect(() => {
     return scrollY.on('change', (latest) => {
@@ -783,17 +791,27 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           animate={{ y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className={`transition-all duration-500 ease-in-out ${isScrolled 
-            ? 'mx-2 sm:mx-4 mt-2 sm:mt-4' 
-            : 'mx-0 mt-4 sm:mt-6 md:mt-8'
-          }`}>
+          <div 
+            className={`transition-all duration-300 ease-out ${isScrolled 
+              ? 'mx-2 sm:mx-4 mt-2 sm:mt-4' 
+              : 'mx-0 mt-4 sm:mt-6 md:mt-8'
+            }`}
+            style={{ 
+              willChange: 'margin, padding',
+              transform: 'translateZ(0)'
+            }}
+          >
             <GlassCard
-              className={`mx-auto transition-all duration-500 ease-in-out ${isScrolled
-                ? 'max-w-[1200px] !rounded-full bg-black/50 backdrop-blur-md border-white/10 shadow-lg px-3 sm:px-5 py-2 sm:py-2.5'
+              className={`mx-auto transition-all duration-300 ease-out ${isScrolled
+                ? 'max-w-[1200px] !rounded-full bg-black/60 backdrop-blur-xl border-white/10 shadow-lg shadow-black/20 px-3 sm:px-5 py-2 sm:py-2.5'
                 : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-4 sm:px-6 md:px-8 lg:px-12 py-3 sm:py-4 md:py-5'
                 }`}
               hover={false}
               showGradient={isScrolled}
+              style={{ 
+                willChange: 'max-width, border-radius, background-color, padding',
+                transform: 'translateZ(0)'
+              }}
             >
               <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
                 <div className="flex items-center space-x-4 sm:space-x-6 md:space-x-8">
