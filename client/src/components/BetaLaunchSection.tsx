@@ -367,13 +367,13 @@ const ScrollZoomIntro = () => {
             className="h-[300vh] md:h-[400vh] relative z-10"
             style={{ perspective: '1500px' }}
         >
-            <div className="sticky top-0 h-screen bg-[#020408] overflow-y-auto overflow-x-hidden">
+            <div className="sticky top-0 h-screen overflow-hidden bg-[#020408]">
 
                 {/* ============================================ */}
                 {/* BOTTOM LAYER: Benefits Section               */}
                 {/* ============================================ */}
                 <motion.div
-                    className="relative z-10 w-full py-12 sm:py-16 md:py-20"
+                    className="absolute inset-0 z-10 flex items-center justify-center"
                     style={{
                         background: 'radial-gradient(ellipse at center, #0a1628 0%, #020408 70%)'
                     }}
@@ -386,22 +386,22 @@ const ScrollZoomIntro = () => {
                     </div>
 
                     {/* Benefits Content */}
-                    <div className="relative w-full max-w-[1200px] mx-auto px-4 md:px-6 select-none pointer-events-auto flex flex-col items-center">
+                    <div className="w-full max-w-[1200px] px-6 pt-4 md:pt-20 select-none pointer-events-auto flex flex-col items-center">
                         <motion.div
-                            className="text-center mb-6 md:mb-10"
+                            className="text-center mb-4 md:mb-10"
                             style={{ opacity: headerOpacity, y: headerY }}
                         >
-                            <h3 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white mb-3 md:mb-4">
+                            <h3 className="text-3xl md:text-5xl font-bold text-white mb-4">
                                 Beta member <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">benefits</span>
                             </h3>
-                            <p className="text-base md:text-xl text-white/50 max-w-lg mx-auto px-4">
+                            <p className="text-lg md:text-xl text-white/50 max-w-lg mx-auto">
                                 Exclusive perks reserved for early adopters
                             </p>
                         </motion.div>
 
                         <motion.div
                             style={{ opacity: gridOpacity, scale: gridScale, y: gridY }}
-                            className="w-full origin-top"
+                            className="w-full origin-top transform scale-95 sm:scale-90 md:scale-100 mt-4 sm:mt-0"
                         >
                             <BentoBenefitsGrid />
                         </motion.div>
@@ -412,7 +412,7 @@ const ScrollZoomIntro = () => {
                 {/* MIDDLE LAYER: Elegant Light Reveal          */}
                 {/* ============================================ */}
                 <motion.div
-                    className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none"
+                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
                     style={{ opacity: revealOpacity }}
                 >
                     {/* Central expanding glow */}
@@ -448,7 +448,7 @@ const ScrollZoomIntro = () => {
 
                 {/* Floating light particles */}
                 <motion.div
-                    className="fixed inset-0 z-25 pointer-events-none"
+                    className="absolute inset-0 z-25 pointer-events-none"
                     style={{ opacity: particleOpacity }}
                 >
                     {[...Array(8)].map((_, i) => {
@@ -487,7 +487,7 @@ const ScrollZoomIntro = () => {
                 {/* TOP LAYER: Hero Image with 3D Depth          */}
                 {/* ============================================ */}
                 <motion.div
-                    className="fixed inset-0 z-30 overflow-hidden"
+                    className="absolute inset-0 z-30 overflow-hidden"
                     style={{
                         opacity: heroOpacity,
                         scale: heroScale,
@@ -519,7 +519,7 @@ const ScrollZoomIntro = () => {
                 {/* ============================================ */}
                 {/* TEXT LAYER: Hero Content                     */}
                 {/* ============================================ */}
-                <div className="fixed inset-0 z-40 flex flex-col items-center justify-center px-6 pointer-events-none">
+                <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-6 pointer-events-none">
                     <motion.div
                         className="text-center max-w-4xl"
                         style={{ 
@@ -587,289 +587,130 @@ const ScrollZoomIntro = () => {
 
 
 // ============================================
-// CREDIT TOKEN VISUAL
-// ============================================
-const CreditTokensVisual = () => {
-    return (
-        <div className="relative w-full min-h-[100px] md:min-h-[120px] flex items-center justify-between px-2">
-            <div className="flex items-center -space-x-3">
-                {[...Array(4)].map((_, i) => (
-                    <motion.div
-                        key={i}
-                        animate={{
-                            y: [0, -6, 0],
-                        }}
-                        transition={{
-                            duration: 2,
-                            delay: i * 0.15,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                        }}
-                        style={{ zIndex: 4 - i }}
-                    >
-                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-cyan-400 via-cyan-500 to-cyan-600 border-2 border-cyan-300/40 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                            <span className="text-white font-bold text-sm md:text-base">V</span>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-            <motion.div
-                className="text-right"
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-            >
-                <span className="text-3xl md:text-5xl font-black text-cyan-400 block leading-none">+500</span>
-                <span className="text-[9px] md:text-xs text-cyan-300 uppercase tracking-wider">credits</span>
-            </motion.div>
-        </div>
-    );
-};
-
-// ============================================
-// TERMINAL/CODE VISUAL FOR EARLY ACCESS
-// ============================================
-const TerminalVisual = () => {
-    const [lineIndex, setLineIndex] = useState(0);
-    const lines = [
-        { text: '$ veefore --beta', color: 'text-green-400' },
-        { text: '+ Hook Generator v2', color: 'text-emerald-400' },
-        { text: '+ Smart DM Funnels', color: 'text-emerald-400' },
-        { text: '+ AI Analytics', color: 'text-emerald-400' },
-        { text: 'Access granted!', color: 'text-cyan-400' },
-    ];
-
-    useEffect(() => {
-        if (lineIndex < lines.length) {
-            const timeout = setTimeout(() => {
-                setLineIndex(prev => prev + 1);
-            }, 600);
-            return () => clearTimeout(timeout);
-        }
-    }, [lineIndex, lines.length]);
-
-    return (
-        <div className="w-full min-h-[100px] md:min-h-[120px] rounded-xl bg-[#0d1117] border border-white/10 p-2.5 md:p-3 font-mono text-[9px] md:text-[11px] overflow-hidden">
-            <div className="flex items-center gap-1.5 mb-2">
-                <div className="w-2 h-2 rounded-full bg-red-500/80" />
-                <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
-                <div className="w-2 h-2 rounded-full bg-green-500/80" />
-                <span className="ml-2 text-white/30 text-[8px]">terminal</span>
-            </div>
-            <div className="space-y-1">
-                {lines.slice(0, lineIndex).map((line, i) => (
-                    <motion.div
-                        key={i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={`${line.color} leading-tight`}
-                    >
-                        {line.text}
-                    </motion.div>
-                ))}
-                {lineIndex < lines.length && (
-                    <motion.span
-                        className="inline-block w-1.5 h-3 bg-white/60"
-                        animate={{ opacity: [1, 0] }}
-                        transition={{ duration: 0.5, repeat: Infinity }}
-                    />
-                )}
-                {lineIndex >= lines.length && (
-                    <motion.span
-                        className="inline-block w-1.5 h-3 bg-emerald-400"
-                        animate={{ opacity: [1, 0.5] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                    />
-                )}
-            </div>
-        </div>
-    );
-};
-
-// ============================================
-// CALENDAR VISUAL FOR FREE TRIAL
-// ============================================
-const CalendarVisual = () => {
-    return (
-        <div className="w-full min-h-[100px] md:min-h-[120px] rounded-xl bg-gradient-to-br from-blue-900/40 to-blue-950/60 border border-blue-500/20 p-3 overflow-hidden relative">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-[9px] md:text-[11px] text-blue-300 font-medium">Premium Trial</span>
-                <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[8px] font-bold">ACTIVE</span>
-            </div>
-            <div className="flex items-center justify-between">
-                <div className="grid grid-cols-7 gap-1 flex-1 mr-3">
-                    {[...Array(21)].map((_, i) => {
-                        const isToday = i === 0;
-                        return (
-                            <motion.div
-                                key={i}
-                                className={`w-4 h-4 md:w-5 md:h-5 rounded flex items-center justify-center text-[7px] md:text-[8px] font-medium
-                                    ${isToday ? 'bg-blue-500 text-white' : 'bg-blue-500/20 text-blue-300'}`}
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ delay: i * 0.03 }}
-                            >
-                                {i + 1}
-                            </motion.div>
-                        );
-                    })}
-                </div>
-                <div className="text-right">
-                    <span className="text-2xl md:text-4xl font-black text-blue-400 block leading-none">30</span>
-                    <span className="text-[8px] md:text-[10px] text-blue-300 uppercase tracking-wider">days free</span>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ============================================
-// CHAT VISUAL FOR PRIORITY SUPPORT
-// ============================================
-const ChatVisual = () => {
-    return (
-        <div className="w-full min-h-[100px] md:min-h-[120px] rounded-xl bg-gradient-to-br from-purple-900/40 to-purple-950/60 border border-purple-500/20 p-2.5 md:p-3 overflow-hidden">
-            <div className="space-y-2">
-                <motion.div
-                    className="flex items-start gap-2"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
-                    <div className="w-5 h-5 rounded-full bg-purple-500/30 flex items-center justify-center shrink-0">
-                        <span className="text-[7px] text-purple-300">You</span>
-                    </div>
-                    <div className="bg-white/10 rounded-lg rounded-tl-none px-2 py-1.5">
-                        <p className="text-[9px] md:text-[10px] text-white/80">Need help with credits</p>
-                    </div>
-                </motion.div>
-                <motion.div
-                    className="flex items-start gap-2 justify-end"
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.8 }}
-                >
-                    <div className="bg-purple-500/30 rounded-lg rounded-tr-none px-2 py-1.5 max-w-[85%]">
-                        <p className="text-[9px] md:text-[10px] text-white/90">I'm here to help! Beta members get priority support</p>
-                    </div>
-                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
-                        <span className="text-[7px] text-white font-bold">V</span>
-                    </div>
-                </motion.div>
-                <motion.div
-                    className="flex items-center gap-1.5 justify-end pr-7"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.2 }}
-                >
-                    <span className="text-[8px] text-green-400">●</span>
-                    <span className="text-[8px] text-purple-300">Replies instantly</span>
-                </motion.div>
-            </div>
-        </div>
-    );
-};
-
-// ============================================
-// PREMIUM BENTO BENEFITS GRID
+// REFINED BENTO BENEFITS GRID
 // ============================================
 function BentoBenefitsGrid() {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full max-w-4xl mx-auto relative z-10 pb-8">
-            {/* CARD 1: 500 CREDITS */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/10"
-            >
-                <div className="absolute top-0 right-0 w-40 h-40 bg-cyan-500/10 blur-[60px] rounded-full" />
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-3 md:mb-4">
-                        <div className="p-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30">
-                            <Gift className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
-                        </div>
-                        <span className="text-[10px] md:text-xs font-bold text-cyan-400 uppercase tracking-wider">Bonus Credits</span>
-                    </div>
-                    <CreditTokensVisual />
-                    <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">500 Free Credits</h4>
-                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Start creating with a generous balance to explore all AI tools.</p>
-                    </div>
-                </div>
-            </motion.div>
+        <div className="grid grid-cols-2 md:grid-cols-12 gap-3 md:gap-5 w-full mx-auto relative z-10">
+            {/* CARD 1: 500 CREDITS (Cyan Accent) */}
+            <Perspective3D className="col-span-2 md:col-span-7">
+                <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/20">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[80px] rounded-full group-hover:bg-cyan-500/10 transition-colors" />
 
-            {/* CARD 2: EARLY ACCESS */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/10"
-            >
-                <div className="absolute bottom-0 left-0 w-40 h-40 bg-emerald-500/10 blur-[60px] rounded-full" />
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-3 md:mb-4">
-                        <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-                            <Lock className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
+                    <div className="relative z-10 flex flex-col h-full justify-between" style={{ transformStyle: 'preserve-3d' }}>
+                        <div className="flex justify-between items-start mb-4 md:mb-8">
+                            <motion.div
+                                className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-cyan-500/30 transition-colors"
+                                style={{ transform: 'translateZ(40px)' }}
+                                animate={{ y: [0, -6, 0] }}
+                                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                            >
+                                <Gift className="w-5 h-5 md:w-8 md:h-8 text-white group-hover:text-cyan-400 transition-colors" />
+                            </motion.div>
+                            <div className="text-right" style={{ transform: 'translateZ(20px)' }}>
+                                <span className="block text-3xl md:text-5xl font-black text-white drop-shadow-lg group-hover:text-cyan-100 transition-colors">
+                                    500
+                                </span>
+                                <span className="text-[10px] md:text-sm font-bold tracking-wider text-cyan-200 uppercase">credits</span>
+                            </div>
                         </div>
-                        <span className="text-[10px] md:text-xs font-bold text-emerald-400 uppercase tracking-wider">Early Access</span>
-                    </div>
-                    <TerminalVisual />
-                    <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">First to New Features</h4>
-                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Test unreleased tools before anyone else.</p>
-                    </div>
-                </div>
-            </motion.div>
 
-            {/* CARD 3: 30 DAYS FREE */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.3 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/10"
-            >
-                <div className="absolute top-0 left-0 w-40 h-40 bg-blue-500/10 blur-[60px] rounded-full" />
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-3 md:mb-4">
-                        <div className="p-2 rounded-xl bg-blue-500/20 border border-blue-500/30">
-                            <Calendar className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
+                        <div style={{ transform: 'translateZ(10px)' }}>
+                            <h4 className="text-lg md:text-2xl font-bold text-white mb-1 md:mb-2 group-hover:text-cyan-50 transition-colors">500 Bonus Credits</h4>
+                            <p className="text-xs md:text-base text-blue-100/80 font-medium leading-relaxed">
+                                Get started with a generous credit balance to explore all AI features.
+                            </p>
                         </div>
-                        <span className="text-[10px] md:text-xs font-bold text-blue-400 uppercase tracking-wider">Free Trial</span>
-                    </div>
-                    <CalendarVisual />
-                    <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">30 Days Premium</h4>
-                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Full access to all premium features, no limits.</p>
                     </div>
                 </div>
-            </motion.div>
+            </Perspective3D>
 
-            {/* CARD 4: PRIORITY SUPPORT */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.4 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10"
-            >
-                <div className="absolute bottom-0 right-0 w-40 h-40 bg-purple-500/10 blur-[60px] rounded-full" />
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-3 md:mb-4">
-                        <div className="p-2 rounded-xl bg-purple-500/20 border border-purple-500/30">
-                            <Mail className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+            {/* CARD 2: EARLY ACCESS (Orange Accent) */}
+            <Perspective3D className="col-span-1 md:col-span-5">
+                <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/20">
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/5 blur-[80px] rounded-full group-hover:bg-orange-500/10 transition-colors" />
+
+                    <div className="relative z-10 h-full flex flex-col justify-between" style={{ transformStyle: 'preserve-3d' }}>
+                        <motion.div
+                            className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-orange-500/30 transition-colors"
+                            style={{ transform: 'translateZ(40px)' }}
+                            animate={{ y: [0, -6, 0] }}
+                            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+                        >
+                            <Lock className="w-5 h-5 md:w-8 md:h-8 text-white group-hover:text-orange-400 transition-colors" />
+                        </motion.div>
+
+                        <div style={{ transform: 'translateZ(20px)' }}>
+                            <h4 className="text-sm md:text-2xl font-bold text-white mb-1 md:mb-2 group-hover:text-orange-50 transition-colors">Early Access</h4>
+                            <p className="text-[10px] md:text-base text-blue-100/80 font-medium leading-relaxed hidden sm:block">
+                                Be the first to try new features before release.
+                            </p>
                         </div>
-                        <span className="text-[10px] md:text-xs font-bold text-purple-400 uppercase tracking-wider">Priority Support</span>
-                    </div>
-                    <ChatVisual />
-                    <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">Direct Team Access</h4>
-                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Get instant help from our dedicated support team.</p>
                     </div>
                 </div>
-            </motion.div>
+            </Perspective3D>
+
+            {/* CARD 3: 30 DAYS (Blue Accent) */}
+            <Perspective3D className="col-span-1 md:col-span-5">
+                <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/20">
+                    <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 blur-[80px] rounded-full group-hover:bg-blue-500/10 transition-colors" />
+
+                    <div className="relative z-10 flex flex-col h-full justify-between" style={{ transformStyle: 'preserve-3d' }}>
+                        <div className="flex justify-between items-start mb-4 md:mb-6">
+                            <motion.div
+                                className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-blue-500/30 transition-colors"
+                                style={{ transform: 'translateZ(40px)' }}
+                                animate={{ y: [0, -6, 0] }}
+                                transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
+                            >
+                                <Calendar className="w-5 h-5 md:w-8 md:h-8 text-white group-hover:text-blue-400 transition-colors" />
+                            </motion.div>
+                            <div className="text-right" style={{ transform: 'translateZ(20px)' }}>
+                                <span className="block text-3xl md:text-5xl font-black text-white drop-shadow-lg group-hover:text-blue-100 transition-colors">
+                                    30
+                                </span>
+                                <span className="text-[10px] md:text-sm font-bold tracking-wider text-blue-200 uppercase">days</span>
+                            </div>
+                        </div>
+
+                        <div style={{ transform: 'translateZ(10px)' }}>
+                            <h4 className="text-sm md:text-2xl font-bold text-white mb-1 md:mb-2 group-hover:text-blue-50 transition-colors">Free Trial</h4>
+                            <p className="text-[10px] md:text-base text-blue-100/80 font-medium leading-relaxed hidden sm:block">
+                                Full premium access.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </Perspective3D>
+
+            {/* CARD 4: PRIORITY SUPPORT (Yellow Accent) */}
+            <Perspective3D className="col-span-2 md:col-span-7">
+                <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-yellow-500/30 hover:shadow-2xl hover:shadow-yellow-500/20">
+                    <div className="absolute bottom-0 right-0 w-64 h-64 bg-yellow-500/5 blur-[80px] rounded-full group-hover:bg-yellow-500/10 transition-colors" />
+
+                    <div className="relative z-10 h-full flex flex-col justify-between" style={{ transformStyle: 'preserve-3d' }}>
+                        <div className="flex justify-between items-start mb-4 md:mb-8">
+                            <motion.div
+                                className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-yellow-500/30 transition-colors"
+                                style={{ transform: 'translateZ(40px)' }}
+                                animate={{ y: [0, -6, 0] }}
+                                transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
+                            >
+                                <Mail className="w-5 h-5 md:w-8 md:h-8 text-white group-hover:text-yellow-400 transition-colors" />
+                            </motion.div>
+
+                            {/* Empty div to balance layout if needed, or text on right */}
+                        </div>
+
+                        <div style={{ transform: 'translateZ(20px)' }}>
+                            <h4 className="text-lg md:text-2xl font-bold text-white mb-1 md:mb-2 group-hover:text-yellow-50 transition-colors">Priority Support</h4>
+                            <p className="text-xs md:text-base text-blue-100/80 font-medium leading-relaxed">
+                                Direct access to our team.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </Perspective3D>
         </div>
     );
 }
