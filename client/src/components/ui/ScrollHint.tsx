@@ -13,7 +13,7 @@ export const ScrollHint = memo(({ className = '' }: ScrollHintProps) => {
       transition={{ delay: 1, duration: 0.6 }}
       className={`flex flex-col items-center gap-2 ${className}`}
     >
-      <div className="relative w-6 h-10 rounded-full border-2 border-white/20 flex justify-center">
+      <div className="relative w-5 h-8 sm:w-6 sm:h-10 rounded-full border-2 border-white/20 flex justify-center">
         <motion.div
           animate={{
             y: [0, 12, 0],
