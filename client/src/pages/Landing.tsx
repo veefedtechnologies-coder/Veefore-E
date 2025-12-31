@@ -4,7 +4,7 @@ import {
   ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp,
   Users, Sparkles, Brain, Rocket, Plus,
   Clock, Shield, BarChart3, Send, Layers,
-  Crown, RefreshCw, Lock, Menu,
+  Crown, RefreshCw, Lock, Menu, ChevronDown,
   X, Instagram, Twitter, Linkedin, Mail,
   MessageCircle, Check, DollarSign, Search
 } from 'lucide-react'
@@ -854,7 +854,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
         </motion.nav>
         
-        {/* Mobile Menu Overlay - Below Navbar */}
+        {/* Mobile Menu Full Page - Clean Design */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
@@ -862,52 +862,71 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="lg:hidden fixed inset-x-0 top-[60px] sm:top-[70px] bottom-0 z-40 bg-black/60 backdrop-blur-xl"
-              onClick={() => setMobileMenuOpen(false)}
+              className="lg:hidden fixed inset-0 z-50 bg-[#0a0a0f]"
             >
-              <motion.div 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.25 }}
-                className="flex flex-col items-center pt-12 sm:pt-16 px-6"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex flex-col items-center space-y-5 w-full max-w-sm">
+              {/* Header with logo and close */}
+              <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
+                <div className="flex items-center cursor-pointer" onClick={() => { setMobileMenuOpen(false); onNavigate('/'); }}>
+                  <img
+                    src="/veefore-logo-simple.svg"
+                    alt="VeeFore"
+                    className="h-7 w-auto"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <span className="text-white text-lg font-bold tracking-tight ml-1">eefore</span>
+                </div>
+                <button 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-6 h-6 text-white" />
+                </button>
+              </div>
+
+              {/* Menu Content */}
+              <div className="px-4 py-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 70px)' }}>
+                {/* CTA Button */}
+                <motion.button 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: 0.05 }}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full py-3.5 text-base font-semibold mb-4"
+                  onClick={() => { onNavigate('signup'); setMobileMenuOpen(false); }}
+                >
+                  GET STARTED
+                </motion.button>
+
+                {/* Sign In */}
+                <motion.button 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: 0.1 }}
+                  className="w-full text-center text-white/70 hover:text-white text-sm font-medium tracking-wide py-3 mb-6"
+                  onClick={() => { onNavigate('signin'); setMobileMenuOpen(false); }}
+                >
+                  SIGN IN
+                </motion.button>
+
+                {/* Menu Items */}
+                <div className="space-y-2">
                   {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item, index) => (
                     <motion.a 
                       key={item} 
                       href={`#${item.toLowerCase().replace(' ', '-')}`} 
-                      initial={{ opacity: 0, y: 15 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: 0.05 + index * 0.04 }}
-                      className="text-xl sm:text-2xl font-semibold text-white/80 hover:text-white transition-colors py-2"
+                      transition={{ duration: 0.2, delay: 0.15 + index * 0.05 }}
+                      className="flex items-center justify-between w-full px-4 py-4 border border-white/10 rounded-xl text-white/80 hover:text-white hover:border-white/20 transition-all"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {item}
+                      <span className="text-sm font-medium tracking-wide uppercase">{item.toUpperCase()}</span>
+                      <ChevronDown className="w-5 h-5 text-white/40" />
                     </motion.a>
                   ))}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: 0.25 }}
-                    className="pt-4 flex flex-col items-center space-y-4 w-full"
-                  >
-                    <button 
-                      className="text-lg font-medium text-white/60 hover:text-white transition-colors py-2"
-                      onClick={() => { onNavigate('signin'); setMobileMenuOpen(false); }}
-                    >
-                      Login
-                    </button>
-                    <button 
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-8 py-3 text-base font-semibold w-full max-w-xs"
-                      onClick={() => { onNavigate('signup'); setMobileMenuOpen(false); }}
-                    >
-                      Start Free Trial
-                    </button>
-                  </motion.div>
                 </div>
-              </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
