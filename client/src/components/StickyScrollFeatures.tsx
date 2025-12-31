@@ -1,6 +1,8 @@
 import { useRef, useState, memo, useMemo } from 'react';
-import { motion, useScroll, useTransform, useMotionValueEvent, MotionValue } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring, useMotionValueEvent, MotionValue } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
+
+const springConfig = { stiffness: 100, damping: 20, mass: 0.5 };
 
 const colorMap = {
     blue: {
@@ -131,9 +133,8 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                         </div>
                         <div className="h-2 md:h-3 bg-white/10 rounded-full overflow-hidden">
                             <motion.div
-                                initial={{ width: 0 }}
-                                whileInView={{ width: "98%" }}
-                                transition={{ duration: 1, delay: 0.3 }}
+                                initial={{ width: "98%" }}
+                                animate={{ width: "98%" }}
                                 className={`h-full bg-gradient-to-r ${colors.gradient}`}
                             />
                         </div>
@@ -155,9 +156,8 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                     {feature.screen.messages?.map((msg, i: number) => (
                         <motion.div
                             key={i}
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            whileInView={{ opacity: 1, scale: 1, y: 0 }}
-                            transition={{ delay: i * 0.3 }}
+                            initial={{ opacity: 1, scale: 1, y: 0 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
                             className={`max-w-[85%] md:max-w-[70%] p-4 md:p-5 rounded-2xl ${msg.user === 'me'
                                 ? 'bg-purple-500 text-white self-end rounded-br-none ml-auto'
                                 : 'bg-white/10 text-white self-start rounded-bl-none backdrop-blur-sm'
@@ -181,12 +181,8 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
 
                     <div className="space-y-3 md:space-y-5">
                         {feature.screen.steps?.map((step, i: number) => (
-                            <motion.div
+                            <div
                                 key={i}
-                                initial={{ opacity: 0, x: -20 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: i * 0.2 }}
                                 className="flex items-center space-x-3 md:space-x-5 bg-white/5 p-3 md:p-4 rounded-xl backdrop-blur-sm"
                             >
                                 <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 shrink-0 ${step.status === 'complete' ? 'bg-green-500 border-green-500' : 'bg-transparent border-green-500/30'
@@ -197,14 +193,14 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                                 <span className={`text-sm md:text-base ${step.status === 'active' ? 'text-white font-medium' : 'text-white/50'}`}>
                                     {step.text}
                                 </span>
-                            </motion.div>
+                            </div>
                         ))}
                     </div>
                 </div>
             )}
 
-            <div className={`absolute -bottom-32 -right-32 w-60 h-60 md:w-80 md:h-80 ${colors.bg} rounded-full blur-[60px] md:blur-[80px] pointer-events-none`} />
-            <div className={`absolute -top-32 -left-32 w-60 h-60 md:w-80 md:h-80 ${colors.bgLight} rounded-full blur-[60px] md:blur-[80px] pointer-events-none`} />
+            <div className={`absolute -bottom-32 -right-32 w-60 h-60 md:w-80 md:h-80 ${colors.bg} rounded-full blur-[40px] md:blur-[60px] pointer-events-none`} />
+            <div className={`absolute -top-32 -left-32 w-60 h-60 md:w-80 md:h-80 ${colors.bgLight} rounded-full blur-[40px] md:blur-[60px] pointer-events-none`} />
         </div>
     );
 });
@@ -242,10 +238,11 @@ const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
 const Feature0TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[0];
     const colors = colorMap[feature.color];
-    const opacity = useTransform(scrollYProgress, [0, 0.28, 0.34], [1, 1, 0]);
+    const opacity = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [1, 1, 0]), springConfig);
+    const y = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -30]), springConfig);
 
     return (
-        <motion.div style={{ opacity }} className="absolute w-full max-w-lg">
+        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
@@ -259,10 +256,11 @@ const Feature0TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionVa
 const Feature1TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[1];
     const colors = colorMap[feature.color];
-    const opacity = useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [0, 1, 1, 0]);
+    const opacity = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [0, 1, 1, 0]), springConfig);
+    const y = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [30, 0, 0, -30]), springConfig);
 
     return (
-        <motion.div style={{ opacity }} className="absolute w-full max-w-lg">
+        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
@@ -276,10 +274,11 @@ const Feature1TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionVa
 const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[2];
     const colors = colorMap[feature.color];
-    const opacity = useTransform(scrollYProgress, [0.66, 0.72, 1.0], [0, 1, 1]);
+    const opacity = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [0, 1, 1]), springConfig);
+    const y = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [30, 0, 0]), springConfig);
 
     return (
-        <motion.div style={{ opacity }} className="absolute w-full max-w-lg">
+        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
@@ -293,10 +292,12 @@ const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionVa
 const Feature0MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[0];
     const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
-    const y = useTransform(yValue, (v) => `${v}vh`);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [0.95, 1, 1, 0.9]), springConfig);
 
     return (
-        <motion.div style={{ y }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
         </motion.div>
@@ -306,10 +307,12 @@ const Feature0MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: Motion
 const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[1];
     const yValue = useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [100, 0, 0, -100]);
-    const y = useTransform(yValue, (v) => `${v}vh`);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.9, 1, 1, 0.9]), springConfig);
 
     return (
-        <motion.div style={{ y }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
         </motion.div>
@@ -319,10 +322,12 @@ const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: Motion
 const Feature2MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
     const feature = features[2];
     const yValue = useTransform(scrollYProgress, [0.66, 0.72, 1.0], [100, 0, 0]);
-    const y = useTransform(yValue, (v) => `${v}vh`);
+    const springY = useSpring(yValue, springConfig);
+    const y = useTransform(springY, (v) => `${v}vh`);
+    const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.9, 1, 1, 1]), springConfig);
 
     return (
-        <motion.div style={{ y }} className="absolute inset-0 flex items-center justify-center will-change-transform">
+        <motion.div style={{ y, scale }} className="absolute inset-0 flex items-center justify-center will-change-transform">
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full transform scale-90"><IPhoneScreen feature={feature} /></div>
         </motion.div>
