@@ -1,4 +1,4 @@
-import { useRef, useState, memo, useMemo, useEffect } from 'react';
+import { useRef, useState, memo, useMemo } from 'react';
 import { motion, useScroll, useTransform, useSpring, useMotionValueEvent, MotionValue } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 
@@ -289,55 +289,26 @@ const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionVa
     );
 });
 
-const Feature0MockupSlide = memo(({ scrollYProgress, isReady }: { scrollYProgress: MotionValue<number>, isReady: boolean }) => {
-    const feature = features[0];
-    const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
-    const springY = useSpring(yValue, springConfig);
-    const animatedY = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [1, 1, 1, 0.9]), springConfig);
-
+const MockupSlide = memo(({ feature, isActive, index }: { feature: Feature, isActive: boolean, index: number }) => {
     return (
         <motion.div 
-            style={isReady ? { y: animatedY, scale } : { y: '0vh', scale: 1 }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
-    );
-});
-
-const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const feature = features[1];
-    const yValue = useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [100, 0, 0, -100]);
-    const springY = useSpring(yValue, springConfig);
-    const y = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.9, 1, 1, 0.9]), springConfig);
-
-    return (
-        <motion.div 
-            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
-            style={{ y, scale }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
-    );
-});
-
-const Feature2MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const feature = features[2];
-    const yValue = useTransform(scrollYProgress, [0.66, 0.72, 1.0], [100, 0, 0]);
-    const springY = useSpring(yValue, springConfig);
-    const y = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.9, 1, 1, 1]), springConfig);
-
-    return (
-        <motion.div 
-            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
-            style={{ y, scale }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
+            initial={false}
+            animate={{ 
+                opacity: isActive ? 1 : 0,
+                scale: isActive ? 1 : 0.9,
+                y: isActive ? 0 : (index === 0 ? -50 : 50)
+            }}
+            transition={{ 
+                type: "spring",
+                stiffness: 100,
+                damping: 20,
+                mass: 0.5
+            }}
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ 
+                pointerEvents: isActive ? 'auto' : 'none',
+                zIndex: isActive ? 10 : 0
+            }}
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
@@ -365,28 +336,17 @@ const Feature2Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionVal
 
 export default function StickyScrollFeatures() {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isScrollReady, setIsScrollReady] = useState(false);
     
     const { scrollYProgress } = useScroll({
         target: containerRef,
         offset: ["start start", "end end"]
     });
-    
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsScrollReady(true);
-        }, 100);
-        return () => clearTimeout(timer);
-    }, []);
 
     const [activeFeature, setActiveFeature] = useState(0);
     const [isInSection, setIsInSection] = useState(false);
 
     useMotionValueEvent(scrollYProgress, "change", (latest: number) => {
         if (!isFinite(latest)) return;
-        if (!isScrollReady) {
-            setIsScrollReady(true);
-        }
         setIsInSection(latest > 0.05 && latest < 0.95);
         if (latest < 0.34) setActiveFeature(0);
         else if (latest < 0.68) setActiveFeature(1);
@@ -438,9 +398,14 @@ export default function StickyScrollFeatures() {
                         </div>
 
                         <div className="relative w-full h-[90%] md:h-[80%] max-w-[700px]">
-                            <Feature0MockupSlide scrollYProgress={scrollYProgress} isReady={isScrollReady} />
-                            <Feature1MockupSlide scrollYProgress={scrollYProgress} />
-                            <Feature2MockupSlide scrollYProgress={scrollYProgress} />
+                            {features.map((feature, index) => (
+                                <MockupSlide 
+                                    key={index}
+                                    feature={feature} 
+                                    isActive={activeFeature === index}
+                                    index={index}
+                                />
+                            ))}
                         </div>
                     </div>
 
