@@ -829,7 +829,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <button className="hidden md:block text-sm font-medium text-white/60 hover:text-white transition-colors px-3 lg:px-4 py-2" onClick={() => onNavigate('signin')}>Login</button>
                   <MagneticButton
-                    className="bg-white text-black hover:bg-white/90 rounded-full px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-all duration-300"
+                    className="bg-white text-black hover:bg-white/90 rounded-full px-2.5 sm:px-3 md:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold transition-all duration-300"
                     onClick={() => onNavigate('signup')}
                   >
                     <span className="hidden sm:inline">Start Free Trial</span>
