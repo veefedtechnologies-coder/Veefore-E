@@ -359,7 +359,7 @@ const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKe
 });
 
 export default function StickyScrollFeaturesV2() {
-    const containerRef = useRef<HTMLElement>(null);
+    const containerRef = useRef<HTMLElement | null>(null);
     const { progress, isReady } = useScrollProgress(containerRef);
 
     const activeFeature = useMemo(() => {
