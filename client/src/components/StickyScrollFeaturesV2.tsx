@@ -252,8 +252,21 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
 
 const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-4">
-            <div className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10">
+        <div 
+            className="w-full h-full flex flex-col items-center justify-center p-4"
+            style={{
+                WebkitTransform: 'translate3d(0,0,0)',
+                transform: 'translate3d(0,0,0)',
+            }}
+        >
+            <div 
+                className="h-full max-h-[500px] md:max-h-[580px] w-auto aspect-[9/19.5] bg-black rounded-[2.5rem] md:rounded-[3rem] border-[6px] md:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10"
+                style={{
+                    WebkitBackfaceVisibility: 'hidden',
+                    backfaceVisibility: 'hidden',
+                    WebkitTransformStyle: 'preserve-3d',
+                }}
+            >
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 md:w-28 h-6 md:h-7 bg-black rounded-b-2xl z-20 flex justify-center items-center">
                     <div className="w-12 md:w-16 h-3 md:h-4 bg-zinc-900 rounded-full" />
                 </div>
@@ -334,9 +347,14 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
         return (
             <div 
                 style={{ 
-                    transform: `translateY(${y}px) scale(${scale})`,
+                    transform: `translate3d(0, ${y}px, 0) scale(${scale})`,
+                    WebkitTransform: `translate3d(0, ${y}px, 0) scale(${scale})`,
+                    visibility: 'visible',
+                    opacity: 1,
+                    WebkitBackfaceVisibility: 'hidden',
+                    backfaceVisibility: 'hidden',
                 }} 
-                className="absolute inset-0 flex items-center justify-center"
+                className="absolute inset-0 flex items-center justify-center z-10"
             >
                 <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
                 <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
@@ -512,7 +530,15 @@ export default function StickyScrollFeaturesV2() {
                             />
                         </div>
 
-                        <div className="relative w-full h-[90%] md:h-[80%] max-w-[700px]">
+                        <div 
+                            className="relative w-full h-[90%] md:h-[80%] max-w-[700px]"
+                            style={{
+                                WebkitTransform: 'translate3d(0,0,0)',
+                                transform: 'translate3d(0,0,0)',
+                                WebkitBackfaceVisibility: 'hidden',
+                                backfaceVisibility: 'hidden',
+                            }}
+                        >
                             {mockupSlides.map(({ feature, y, scale, isVisible, isStatic }, i) => (
                                 <MockupSlide key={i} feature={feature} y={y} scale={scale} isVisible={isVisible} isStatic={isStatic} />
                             ))}
