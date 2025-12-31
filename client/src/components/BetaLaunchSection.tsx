@@ -358,8 +358,8 @@ const ScrollZoomIntro = () => {
     const gridScale = useTransform(smoothProgress, [0.5, 0.7], [0.9, 1]);
     const gridY = useTransform(smoothProgress, [0.5, 0.7], [40, 0]);
 
-    // Scroll indicator
-    const scrollIndicatorOpacity = useTransform(smoothProgress, [0, 0.12], [1, 0]);
+    // Scroll indicator - visible while hero is showing
+    const scrollIndicatorOpacity = useTransform(smoothProgress, [0, 0.05, 0.25], [1, 1, 0]);
 
     return (
         <section
@@ -556,26 +556,27 @@ const ScrollZoomIntro = () => {
                 {/* SCROLL INDICATOR                             */}
                 {/* ============================================ */}
                 <motion.div
-                    className="absolute bottom-8 md:bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-50 pointer-events-none"
+                    className="absolute bottom-6 md:bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-[60] pointer-events-none"
                     style={{ opacity: scrollIndicatorOpacity }}
+                    initial={{ opacity: 1 }}
                 >
-                    <span className="text-[10px] text-white/50 uppercase tracking-[0.15em] font-medium">Scroll for more</span>
+                    <span className="text-[11px] text-white/60 uppercase tracking-[0.15em] font-medium drop-shadow-lg">Scroll for more</span>
                     <motion.div 
-                        className="w-6 h-10 rounded-full border border-white/20 flex justify-center pt-2 backdrop-blur-sm bg-white/5"
-                        animate={{ y: [0, 4, 0] }}
+                        className="w-7 h-11 rounded-full border-2 border-white/30 flex justify-center pt-2.5 backdrop-blur-md bg-black/20 shadow-lg"
+                        animate={{ y: [0, 5, 0] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                     >
                         <motion.div
-                            className="w-1 h-2.5 rounded-full bg-white/60"
+                            className="w-1.5 h-3 rounded-full bg-white/70"
                             animate={{ y: [0, 12, 0] }}
                             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                         />
                     </motion.div>
                     <motion.div
-                        animate={{ y: [0, 6, 0], opacity: [0.4, 0.8, 0.4] }}
+                        animate={{ y: [0, 8, 0], opacity: [0.5, 1, 0.5] }}
                         transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                     >
-                        <ArrowRight className="w-4 h-4 text-white/40 rotate-90" />
+                        <ArrowRight className="w-5 h-5 text-white/50 rotate-90 drop-shadow-md" />
                     </motion.div>
                 </motion.div>
 
