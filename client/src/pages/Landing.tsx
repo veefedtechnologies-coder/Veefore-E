@@ -793,8 +793,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         >
           <div 
             className={`transition-all duration-300 ease-out ${isScrolled 
-              ? 'mx-2 sm:mx-4 mt-2 sm:mt-4' 
-              : 'mx-0 mt-4 sm:mt-6 md:mt-8'
+              ? 'mx-2 sm:mx-4 mt-2 sm:mt-3' 
+              : 'mx-0 mt-4 sm:mt-4 md:mt-5'
             }`}
             style={{ 
               willChange: 'margin, padding',
@@ -803,8 +803,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           >
             <GlassCard
               className={`mx-auto transition-all duration-300 ease-out ${isScrolled
-                ? 'max-w-[1200px] !rounded-full bg-black/60 backdrop-blur-xl border-white/10 shadow-lg shadow-black/20 px-3 sm:px-5 py-2 sm:py-2.5'
-                : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-4 sm:px-6 md:px-8 lg:px-12 py-3 sm:py-4 md:py-5'
+                ? 'max-w-[1200px] !rounded-full bg-black/60 backdrop-blur-xl border-white/10 shadow-lg shadow-black/20 px-3 sm:px-5 py-2 sm:py-2'
+                : 'max-w-full !rounded-none !bg-transparent !border-transparent !backdrop-blur-none !shadow-none px-4 sm:px-5 md:px-6 lg:px-10 py-3 sm:py-3 md:py-3'
                 }`}
               hover={false}
               showGradient={isScrolled}
