@@ -774,14 +774,14 @@ const ChatVisual = () => {
 // ============================================
 function BentoBenefitsGrid() {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full max-w-4xl mx-auto relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full max-w-4xl mx-auto relative z-10 pb-8">
             {/* CARD 1: 500 CREDITS */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/10"
+                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/10"
             >
                 <div className="absolute top-0 right-0 w-40 h-40 bg-cyan-500/10 blur-[60px] rounded-full" />
                 <div className="relative z-10">
@@ -793,8 +793,8 @@ function BentoBenefitsGrid() {
                     </div>
                     <CreditTokensVisual />
                     <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1">500 Free Credits</h4>
-                        <p className="text-xs md:text-sm text-white/50">Start creating with a generous balance to explore all AI tools.</p>
+                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">500 Free Credits</h4>
+                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Start creating with a generous balance to explore all AI tools.</p>
                     </div>
                 </div>
             </motion.div>
@@ -805,7 +805,7 @@ function BentoBenefitsGrid() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.2 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/10"
+                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/10"
             >
                 <div className="absolute bottom-0 left-0 w-40 h-40 bg-emerald-500/10 blur-[60px] rounded-full" />
                 <div className="relative z-10">
@@ -817,8 +817,8 @@ function BentoBenefitsGrid() {
                     </div>
                     <TerminalVisual />
                     <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1">First to New Features</h4>
-                        <p className="text-xs md:text-sm text-white/50">Test unreleased tools before anyone else.</p>
+                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">First to New Features</h4>
+                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Test unreleased tools before anyone else.</p>
                     </div>
                 </div>
             </motion.div>
@@ -829,7 +829,7 @@ function BentoBenefitsGrid() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.3 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/10"
+                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/10"
             >
                 <div className="absolute top-0 left-0 w-40 h-40 bg-blue-500/10 blur-[60px] rounded-full" />
                 <div className="relative z-10">
@@ -841,8 +841,8 @@ function BentoBenefitsGrid() {
                     </div>
                     <CalendarVisual />
                     <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1">30 Days Premium</h4>
-                        <p className="text-xs md:text-sm text-white/50">Full access to all premium features, no limits.</p>
+                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">30 Days Premium</h4>
+                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Full access to all premium features, no limits.</p>
                     </div>
                 </div>
             </motion.div>
@@ -853,7 +853,7 @@ function BentoBenefitsGrid() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.4 }}
-                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10"
+                className="group relative overflow-hidden rounded-2xl md:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a1520]/90 to-[#0a0f18]/90 backdrop-blur-xl p-4 md:p-6 pb-6 md:pb-8 transition-all duration-500 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10"
             >
                 <div className="absolute bottom-0 right-0 w-40 h-40 bg-purple-500/10 blur-[60px] rounded-full" />
                 <div className="relative z-10">
@@ -865,8 +865,8 @@ function BentoBenefitsGrid() {
                     </div>
                     <ChatVisual />
                     <div className="mt-3 md:mt-4">
-                        <h4 className="text-base md:text-xl font-bold text-white mb-1">Direct Team Access</h4>
-                        <p className="text-xs md:text-sm text-white/50">Get instant help from our dedicated support team.</p>
+                        <h4 className="text-base md:text-xl font-bold text-white mb-1.5">Direct Team Access</h4>
+                        <p className="text-xs md:text-sm text-white/50 leading-relaxed">Get instant help from our dedicated support team.</p>
                     </div>
                 </div>
             </motion.div>
