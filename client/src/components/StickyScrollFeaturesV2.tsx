@@ -1,5 +1,5 @@
-import { useRef, useState, memo, useMemo, useEffect } from 'react';
-import { motion, useScroll, useTransform, useSpring, useMotionValueEvent, MotionValue } from 'framer-motion';
+import { useRef, useState, memo, useMemo, useEffect, useCallback } from 'react';
+import { motion, useSpring, useMotionValue } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 
 const springConfig = { stiffness: 100, damping: 20, mass: 0.5 };
@@ -113,6 +113,57 @@ const features: Feature[] = [
     }
 ];
 
+function useScrollProgress(containerRef: React.RefObject<HTMLElement | null>) {
+    const [progress, setProgress] = useState(0);
+    const [isReady, setIsReady] = useState(false);
+    const rafRef = useRef<number | null>(null);
+
+    const calculateProgress = useCallback(() => {
+        if (!containerRef.current) return;
+
+        const rect = containerRef.current.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        const sectionHeight = rect.height - windowHeight;
+        
+        if (sectionHeight <= 0) return;
+
+        const scrolled = -rect.top;
+        const rawProgress = Math.max(0, Math.min(1, scrolled / sectionHeight));
+        
+        setProgress(rawProgress);
+        if (!isReady) setIsReady(true);
+    }, [containerRef, isReady]);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            rafRef.current = requestAnimationFrame(calculateProgress);
+        };
+
+        calculateProgress();
+        
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('resize', handleScroll, { passive: true });
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleScroll);
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, [calculateProgress]);
+
+    return { progress, isReady };
+}
+
+function lerp(start: number, end: number, t: number): number {
+    return start + (end - start) * Math.max(0, Math.min(1, t));
+}
+
+function mapRange(value: number, inMin: number, inMax: number, outMin: number, outMax: number): number {
+    const t = (value - inMin) / (inMax - inMin);
+    return lerp(outMin, outMax, t);
+}
+
 const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, isMobile?: boolean }) => {
     const colors = colorMap[feature.color];
     
@@ -132,11 +183,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                             </div>
                         </div>
                         <div className="h-2 md:h-3 bg-white/10 rounded-full overflow-hidden">
-                            <motion.div
-                                initial={{ width: "98%" }}
-                                animate={{ width: "98%" }}
-                                className={`h-full bg-gradient-to-r ${colors.gradient}`}
-                            />
+                            <div className={`h-full w-[98%] bg-gradient-to-r ${colors.gradient}`} />
                         </div>
                     </div>
 
@@ -154,10 +201,8 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
             {feature.screen.type === 'chat' && (
                 <div className="space-y-4 md:space-y-6 h-full justify-center flex flex-col px-4 md:px-12">
                     {feature.screen.messages?.map((msg, i: number) => (
-                        <motion.div
+                        <div
                             key={i}
-                            initial={{ opacity: 1, scale: 1, y: 0 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
                             className={`max-w-[85%] md:max-w-[70%] p-4 md:p-5 rounded-2xl ${msg.user === 'me'
                                 ? 'bg-purple-500 text-white self-end rounded-br-none ml-auto'
                                 : 'bg-white/10 text-white self-start rounded-bl-none backdrop-blur-sm'
@@ -165,7 +210,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                         >
                             <p className="text-sm md:text-base font-medium">{msg.text}</p>
                             <p className={`text-[10px] md:text-xs mt-2 opacity-60 ${msg.user === 'me' ? 'text-white' : 'text-white/60'}`}>{msg.time}</p>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             )}
@@ -235,170 +280,184 @@ const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
     );
 });
 
-const Feature0TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const feature = features[0];
+interface TextSlideProps {
+    feature: Feature;
+    opacity: number;
+    y: number;
+}
+
+const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     const colors = colorMap[feature.color];
-    const opacity = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [1, 1, 0]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -30]), springConfig);
+    const springOpacity = useSpring(useMotionValue(opacity), springConfig);
+    const springY = useSpring(useMotionValue(y), springConfig);
 
-    return (
-        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
-            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
-                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
-                <span>{feature.highlight}</span>
-            </div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
-            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </motion.div>
-    );
-});
-
-const Feature1TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const feature = features[1];
-    const colors = colorMap[feature.color];
-    const opacity = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [0, 1, 1, 0]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [30, 0, 0, -30]), springConfig);
-
-    return (
-        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
-            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
-                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
-                <span>{feature.highlight}</span>
-            </div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
-            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </motion.div>
-    );
-});
-
-const Feature2TextSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const feature = features[2];
-    const colors = colorMap[feature.color];
-    const opacity = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [0, 1, 1]), springConfig);
-    const y = useSpring(useTransform(scrollYProgress, [0.66, 0.72, 1.0], [30, 0, 0]), springConfig);
-
-    return (
-        <motion.div style={{ opacity, y }} className="absolute w-full max-w-lg">
-            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
-                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
-                <span>{feature.highlight}</span>
-            </div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
-            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
-        </motion.div>
-    );
-});
-
-const Feature0MockupSlide = memo(({ scrollYProgress, isReady }: { scrollYProgress: MotionValue<number>, isReady: boolean }) => {
-    const feature = features[0];
-    const yValue = useTransform(scrollYProgress, [0, 0.28, 0.34], [0, 0, -100]);
-    const springY = useSpring(yValue, springConfig);
-    const animatedY = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0, 0.1, 0.28, 0.34], [1, 1, 1, 0.9]), springConfig);
-
-    return (
-        <motion.div 
-            style={isReady ? { y: animatedY, scale } : { y: '0vh', scale: 1 }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
-    );
-});
-
-const Feature1MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const feature = features[1];
-    const yValue = useTransform(scrollYProgress, [0.32, 0.38, 0.62, 0.68], [100, 0, 0, -100]);
-    const springY = useSpring(yValue, springConfig);
-    const y = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0.9, 1, 1, 0.9]), springConfig);
-
-    return (
-        <motion.div 
-            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
-            style={{ y, scale }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
-    );
-});
-
-const Feature2MockupSlide = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const feature = features[2];
-    const yValue = useTransform(scrollYProgress, [0.66, 0.72, 1.0], [100, 0, 0]);
-    const springY = useSpring(yValue, springConfig);
-    const y = useTransform(springY, (v) => `${v}vh`);
-    const scale = useSpring(useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0.9, 1, 1, 1]), springConfig);
-
-    return (
-        <motion.div 
-            initial={{ y: '100vh', scale: 0.9, opacity: 1 }}
-            style={{ y, scale }} 
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-        >
-            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
-            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
-        </motion.div>
-    );
-});
-
-const Feature0Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const colors = colorMap[features[0].color];
-    const opacity = useTransform(scrollYProgress, [0, 0.1, 0.24, 0.34], [0, 0.2, 0.2, 0]);
-    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
-});
-
-const Feature1Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const colors = colorMap[features[1].color];
-    const opacity = useTransform(scrollYProgress, [0.32, 0.42, 0.58, 0.68], [0, 0.2, 0.2, 0]);
-    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
-});
-
-const Feature2Ambience = memo(({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) => {
-    const colors = colorMap[features[2].color];
-    const opacity = useTransform(scrollYProgress, [0.66, 0.76, 0.9, 1.0], [0, 0.2, 0.2, 0]);
-    return <motion.div style={{ opacity }} className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} />;
-});
-
-export default function StickyScrollFeatures() {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [isScrollReady, setIsScrollReady] = useState(false);
-    
-    const { scrollYProgress } = useScroll({
-        target: containerRef,
-        offset: ["start start", "end end"]
-    });
-    
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsScrollReady(true);
-        }, 100);
-        return () => clearTimeout(timer);
-    }, []);
-
-    const [activeFeature, setActiveFeature] = useState(0);
-    const [isInSection, setIsInSection] = useState(false);
-
-    useMotionValueEvent(scrollYProgress, "change", (latest: number) => {
-        if (!isScrollReady && typeof latest === 'number' && !isNaN(latest)) {
-            setIsScrollReady(true);
-        }
-        setIsInSection(latest > 0.05 && latest < 0.95);
-        if (latest < 0.34) setActiveFeature(0);
-        else if (latest < 0.68) setActiveFeature(1);
-        else setActiveFeature(2);
-    });
-
-    const activeColors = useMemo(() => colorMap[features[activeFeature].color], [activeFeature]);
+        springOpacity.set(opacity);
+        springY.set(y);
+    }, [opacity, y, springOpacity, springY]);
 
     return (
-        <section ref={containerRef} className="relative h-[300vh] bg-black">
+        <motion.div 
+            style={{ opacity: springOpacity, y: springY }} 
+            className="absolute w-full max-w-lg"
+        >
+            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
+                <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
+                <span>{feature.highlight}</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">{feature.title}</h2>
+            <p className="text-sm md:text-lg md:text-xl text-white/50 leading-relaxed">{feature.description}</p>
+        </motion.div>
+    );
+});
+
+interface MockupSlideProps {
+    feature: Feature;
+    y: number;
+    scale: number;
+    isVisible: boolean;
+}
+
+const MockupSlide = memo(({ feature, y, scale, isVisible }: MockupSlideProps) => {
+    const springY = useSpring(useMotionValue(y), springConfig);
+    const springScale = useSpring(useMotionValue(scale), springConfig);
+
+    useEffect(() => {
+        springY.set(y);
+        springScale.set(scale);
+    }, [y, scale, springY, springScale]);
+
+    if (!isVisible && y > 50) return null;
+
+    return (
+        <motion.div 
+            style={{ 
+                y: springY,
+                scale: springScale,
+            }} 
+            className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
+            <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
+            <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+        </motion.div>
+    );
+});
+
+const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKey], opacity: number }) => {
+    const springOpacity = useSpring(useMotionValue(opacity), springConfig);
+
+    useEffect(() => {
+        springOpacity.set(opacity);
+    }, [opacity, springOpacity]);
+
+    return (
+        <motion.div 
+            style={{ opacity: springOpacity }} 
+            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} 
+        />
+    );
+});
+
+export default function StickyScrollFeaturesV2() {
+    const containerRef = useRef<HTMLElement>(null);
+    const { progress, isReady } = useScrollProgress(containerRef);
+
+    const activeFeature = useMemo(() => {
+        if (progress < 0.34) return 0;
+        if (progress < 0.68) return 1;
+        return 2;
+    }, [progress]);
+
+    const isInSection = progress > 0.05 && progress < 0.95;
+    const activeColors = colorMap[features[activeFeature].color];
+
+    const textSlides = useMemo(() => {
+        return features.map((feature, i) => {
+            let opacity = 0;
+            let y = 30;
+
+            if (i === 0) {
+                opacity = mapRange(progress, 0, 0.28, 1, 1);
+                if (progress > 0.28) opacity = mapRange(progress, 0.28, 0.34, 1, 0);
+                y = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 0, -30) : 0;
+                if (progress < 0.05) { opacity = 1; y = 0; }
+            } else if (i === 1) {
+                opacity = mapRange(progress, 0.32, 0.38, 0, 1);
+                if (progress > 0.62) opacity = mapRange(progress, 0.62, 0.68, 1, 0);
+                y = progress < 0.38 ? mapRange(progress, 0.32, 0.38, 30, 0) : 
+                    progress > 0.62 ? mapRange(progress, 0.62, 0.68, 0, -30) : 0;
+            } else {
+                opacity = mapRange(progress, 0.66, 0.72, 0, 1);
+                y = progress < 0.72 ? mapRange(progress, 0.66, 0.72, 30, 0) : 0;
+            }
+
+            return { feature, opacity: Math.max(0, Math.min(1, opacity)), y };
+        });
+    }, [progress]);
+
+    const mockupSlides = useMemo(() => {
+        return features.map((feature, i) => {
+            let y = 0;
+            let scale = 1;
+            let isVisible = true;
+
+            if (i === 0) {
+                if (!isReady) {
+                    y = 0;
+                    scale = 1;
+                } else {
+                    y = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 0, -100) * window.innerHeight / 100 : 0;
+                    scale = progress > 0.28 ? mapRange(progress, 0.28, 0.34, 1, 0.9) : 1;
+                }
+                isVisible = progress < 0.4;
+            } else if (i === 1) {
+                const enterY = mapRange(progress, 0.32, 0.38, 100, 0);
+                const exitY = mapRange(progress, 0.62, 0.68, 0, -100);
+                y = (progress < 0.38 ? enterY : progress > 0.62 ? exitY : 0) * window.innerHeight / 100;
+                scale = progress < 0.42 ? mapRange(progress, 0.32, 0.42, 0.9, 1) : 
+                        progress > 0.58 ? mapRange(progress, 0.58, 0.68, 1, 0.9) : 1;
+                isVisible = progress > 0.28 && progress < 0.72;
+            } else {
+                y = mapRange(progress, 0.66, 0.72, 100, 0) * window.innerHeight / 100;
+                scale = mapRange(progress, 0.66, 0.76, 0.9, 1);
+                isVisible = progress > 0.62;
+            }
+
+            return { feature, y, scale: Math.max(0.9, Math.min(1, scale)), isVisible };
+        });
+    }, [progress, isReady]);
+
+    const ambientOpacities = useMemo(() => {
+        return features.map((_, i) => {
+            if (i === 0) {
+                let op = mapRange(progress, 0, 0.1, 0, 0.2);
+                if (progress > 0.24) op = mapRange(progress, 0.24, 0.34, 0.2, 0);
+                return Math.max(0, Math.min(0.2, op));
+            } else if (i === 1) {
+                let op = mapRange(progress, 0.32, 0.42, 0, 0.2);
+                if (progress > 0.58) op = mapRange(progress, 0.58, 0.68, 0.2, 0);
+                return Math.max(0, Math.min(0.2, op));
+            } else {
+                return Math.max(0, Math.min(0.2, mapRange(progress, 0.66, 0.76, 0, 0.2)));
+            }
+        });
+    }, [progress]);
+
+    return (
+        <section 
+            ref={containerRef} 
+            className="relative h-[300vh] bg-black"
+            style={{ position: 'relative' }}
+        >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
-            <div className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div 
+                className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full"
+                style={{ 
+                    position: 'sticky',
+                    WebkitOverflowScrolling: 'touch'
+                }}
+            >
                 <div className="w-full px-4 md:px-16 lg:px-24 relative h-full flex flex-col md:flex-row items-center">
 
                     <div className={`absolute top-8 md:top-28 left-6 md:left-16 lg:left-24 flex space-x-2 z-50 transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>
@@ -411,9 +470,9 @@ export default function StickyScrollFeatures() {
                     </div>
 
                     <div className="w-full md:w-[45%] relative h-[40vh] md:h-full flex items-end md:items-center justify-start z-20 pb-8 md:pb-0">
-                        <Feature0TextSlide scrollYProgress={scrollYProgress} />
-                        <Feature1TextSlide scrollYProgress={scrollYProgress} />
-                        <Feature2TextSlide scrollYProgress={scrollYProgress} />
+                        {textSlides.map(({ feature, opacity, y }, i) => (
+                            <TextSlide key={i} feature={feature} opacity={opacity} y={y} />
+                        ))}
                     </div>
 
                     <div className="flex w-full md:w-[55%] h-[60vh] md:h-full items-center justify-center relative z-20">
@@ -437,16 +496,16 @@ export default function StickyScrollFeatures() {
                         </div>
 
                         <div className="relative w-full h-[90%] md:h-[80%] max-w-[700px]">
-                            <Feature0MockupSlide scrollYProgress={scrollYProgress} isReady={isScrollReady} />
-                            <Feature1MockupSlide scrollYProgress={scrollYProgress} />
-                            <Feature2MockupSlide scrollYProgress={scrollYProgress} />
+                            {mockupSlides.map(({ feature, y, scale, isVisible }, i) => (
+                                <MockupSlide key={i} feature={feature} y={y} scale={scale} isVisible={isVisible} />
+                            ))}
                         </div>
                     </div>
 
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        <Feature0Ambience scrollYProgress={scrollYProgress} />
-                        <Feature1Ambience scrollYProgress={scrollYProgress} />
-                        <Feature2Ambience scrollYProgress={scrollYProgress} />
+                        {features.map((feature, i) => (
+                            <AmbientGlow key={i} colors={colorMap[feature.color]} opacity={ambientOpacities[i]} />
+                        ))}
                     </div>
 
                 </div>

@@ -41,7 +41,7 @@ const Landing3DFallback = memo(() => (
   </div>
 ))
 
-import StickyScrollFeatures from '../components/StickyScrollFeatures';
+import StickyScrollFeaturesV2 from '../components/StickyScrollFeaturesV2';
 // Mobile-optimized gradient orbs - use opacity gradient instead of expensive blur
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
   const isMobile = useIsMobile()
@@ -1831,7 +1831,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Sticky Scroll "Story" Features */}
-      <StickyScrollFeatures />
+      <StickyScrollFeaturesV2 />
 
 
       {/* Problem / Philosophy Section */}
