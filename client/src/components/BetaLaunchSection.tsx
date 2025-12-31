@@ -367,13 +367,13 @@ const ScrollZoomIntro = () => {
             className="h-[300vh] md:h-[400vh] relative z-10"
             style={{ perspective: '1500px' }}
         >
-            <div className="sticky top-0 h-screen overflow-hidden bg-[#020408]">
+            <div className="sticky top-0 h-screen bg-[#020408] overflow-y-auto overflow-x-hidden">
 
                 {/* ============================================ */}
                 {/* BOTTOM LAYER: Benefits Section               */}
                 {/* ============================================ */}
                 <motion.div
-                    className="absolute inset-0 z-10 flex items-center justify-center"
+                    className="relative z-10 w-full py-12 sm:py-16 md:py-20"
                     style={{
                         background: 'radial-gradient(ellipse at center, #0a1628 0%, #020408 70%)'
                     }}
@@ -386,22 +386,22 @@ const ScrollZoomIntro = () => {
                     </div>
 
                     {/* Benefits Content */}
-                    <div className="w-full max-w-[1200px] px-6 pt-4 md:pt-20 select-none pointer-events-auto flex flex-col items-center">
+                    <div className="relative w-full max-w-[1200px] mx-auto px-4 md:px-6 select-none pointer-events-auto flex flex-col items-center">
                         <motion.div
-                            className="text-center mb-4 md:mb-10"
+                            className="text-center mb-6 md:mb-10"
                             style={{ opacity: headerOpacity, y: headerY }}
                         >
-                            <h3 className="text-3xl md:text-5xl font-bold text-white mb-4">
+                            <h3 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white mb-3 md:mb-4">
                                 Beta member <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">benefits</span>
                             </h3>
-                            <p className="text-lg md:text-xl text-white/50 max-w-lg mx-auto">
+                            <p className="text-base md:text-xl text-white/50 max-w-lg mx-auto px-4">
                                 Exclusive perks reserved for early adopters
                             </p>
                         </motion.div>
 
                         <motion.div
                             style={{ opacity: gridOpacity, scale: gridScale, y: gridY }}
-                            className="w-full origin-top transform scale-95 sm:scale-90 md:scale-100 mt-4 sm:mt-0"
+                            className="w-full origin-top"
                         >
                             <BentoBenefitsGrid />
                         </motion.div>
@@ -412,7 +412,7 @@ const ScrollZoomIntro = () => {
                 {/* MIDDLE LAYER: Elegant Light Reveal          */}
                 {/* ============================================ */}
                 <motion.div
-                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                    className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none"
                     style={{ opacity: revealOpacity }}
                 >
                     {/* Central expanding glow */}
@@ -448,7 +448,7 @@ const ScrollZoomIntro = () => {
 
                 {/* Floating light particles */}
                 <motion.div
-                    className="absolute inset-0 z-25 pointer-events-none"
+                    className="fixed inset-0 z-25 pointer-events-none"
                     style={{ opacity: particleOpacity }}
                 >
                     {[...Array(8)].map((_, i) => {
@@ -487,7 +487,7 @@ const ScrollZoomIntro = () => {
                 {/* TOP LAYER: Hero Image with 3D Depth          */}
                 {/* ============================================ */}
                 <motion.div
-                    className="absolute inset-0 z-30 overflow-hidden"
+                    className="fixed inset-0 z-30 overflow-hidden"
                     style={{
                         opacity: heroOpacity,
                         scale: heroScale,
@@ -519,7 +519,7 @@ const ScrollZoomIntro = () => {
                 {/* ============================================ */}
                 {/* TEXT LAYER: Hero Content                     */}
                 {/* ============================================ */}
-                <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-6 pointer-events-none">
+                <div className="fixed inset-0 z-40 flex flex-col items-center justify-center px-6 pointer-events-none">
                     <motion.div
                         className="text-center max-w-4xl"
                         style={{ 
