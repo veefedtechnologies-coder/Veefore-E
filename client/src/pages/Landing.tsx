@@ -854,7 +854,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
         </motion.nav>
         
-        {/* Mobile Menu Full-Page Overlay */}
+        {/* Mobile Menu Overlay - Below Navbar */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
@@ -862,45 +862,45 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xl"
+              className="lg:hidden fixed inset-x-0 top-[60px] sm:top-[70px] bottom-0 z-40 bg-black/60 backdrop-blur-xl"
               onClick={() => setMobileMenuOpen(false)}
             >
               <motion.div 
-                initial={{ opacity: 0, y: -30 }}
+                initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -30 }}
-                transition={{ duration: 0.3, delay: 0.05 }}
-                className="flex flex-col items-center justify-center min-h-screen px-6 py-20"
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col items-center pt-12 sm:pt-16 px-6"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex flex-col items-center space-y-6 w-full max-w-sm">
+                <div className="flex flex-col items-center space-y-5 w-full max-w-sm">
                   {['Features', 'How it Works', 'Pricing', 'FAQ'].map((item, index) => (
                     <motion.a 
                       key={item} 
                       href={`#${item.toLowerCase().replace(' ', '-')}`} 
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: 0.1 + index * 0.05 }}
-                      className="text-2xl sm:text-3xl font-semibold text-white/80 hover:text-white transition-colors py-3"
+                      transition={{ duration: 0.25, delay: 0.05 + index * 0.04 }}
+                      className="text-xl sm:text-2xl font-semibold text-white/80 hover:text-white transition-colors py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item}
                     </motion.a>
                   ))}
                   <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.35 }}
-                    className="pt-6 flex flex-col items-center space-y-4 w-full"
+                    transition={{ duration: 0.25, delay: 0.25 }}
+                    className="pt-4 flex flex-col items-center space-y-4 w-full"
                   >
                     <button 
-                      className="text-xl font-medium text-white/60 hover:text-white transition-colors py-2"
+                      className="text-lg font-medium text-white/60 hover:text-white transition-colors py-2"
                       onClick={() => { onNavigate('signin'); setMobileMenuOpen(false); }}
                     >
                       Login
                     </button>
                     <button 
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-8 py-3.5 text-base font-semibold w-full max-w-xs"
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-8 py-3 text-base font-semibold w-full max-w-xs"
                       onClick={() => { onNavigate('signup'); setMobileMenuOpen(false); }}
                     >
                       Start Free Trial
