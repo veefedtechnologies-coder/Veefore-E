@@ -777,8 +777,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       <SEO {...seoConfig.landing} />
       
       {/* Preload logo image for instant display in mobile menu */}
-      <link rel="preload" href="/veefore-logo.png" as="image" />
-      <img src="/veefore-logo.png" alt="" className="hidden" aria-hidden="true" />
+      <link rel="preload" href="/veefore-v-logo.svg" as="image" />
+      <img src="/veefore-v-logo.svg" alt="" className="hidden" aria-hidden="true" />
 
       {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
       <div className={`${isMobile ? 'absolute h-[500vh]' : 'fixed'} inset-0 pointer-events-none overflow-hidden -z-10`}>
@@ -813,7 +813,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 <div className="flex items-center space-x-4 sm:space-x-6 md:space-x-8">
                   <div className="flex items-center cursor-pointer" onClick={() => onNavigate('/')}>
                     <img
-                      src="/veefore-logo.png"
+                      src="/veefore-v-logo.svg"
                       alt="VeeFore"
                       className="h-6 sm:h-7 md:h-8 w-auto"
                     />
@@ -872,7 +872,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
                 <div className="flex items-center cursor-pointer" onClick={() => { setMobileMenuOpen(false); onNavigate('/'); }}>
                   <img
-                    src="/veefore-logo.png"
+                    src="/veefore-v-logo.svg"
                     alt="VeeFore"
                     className="h-7 w-auto"
                   />
