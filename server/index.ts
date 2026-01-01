@@ -174,6 +174,24 @@ app.use(correlationIdMiddleware);
 // P1-7 SECURITY: Security monitoring and logging
 app.use(securityLoggingMiddleware);
 
+// CRITICAL: Serve static assets BEFORE security middleware to prevent 403 blocks
+// This must run before CORS checks since static files don't need origin validation
+const distPublicPath = path.join(process.cwd(), 'dist/public');
+if (fs.existsSync(distPublicPath)) {
+  app.use('/assets', express.static(path.join(distPublicPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      } else if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      }
+    }
+  }));
+  console.log('[STATIC] Serving /assets from dist/public/assets (pre-CORS)');
+}
+
 // P1-5 SECURITY: Emergency CORS lockdown check (highest priority)
 app.use(emergencyCorsLockdown);
 
@@ -1121,27 +1139,8 @@ app.use((req, res, next) => {
   
   app.use('/browserconfig.xml', express.static(path.join(process.cwd(), 'client/public/browserconfig.xml')));
   
-  // Serve images and other assets with proper MIME types from built directory in production
-  if (isProduction) {
-    const distPublic = path.join(process.cwd(), 'dist/public');
-    app.use('/assets', express.static(path.join(distPublic, 'assets'), {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.png')) {
-          res.setHeader('Content-Type', 'image/png');
-        } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
-          res.setHeader('Content-Type', 'image/jpeg');
-        } else if (filePath.endsWith('.svg')) {
-          res.setHeader('Content-Type', 'image/svg+xml');
-        } else if (filePath.endsWith('.ico')) {
-          res.setHeader('Content-Type', 'image/x-icon');
-        } else if (filePath.endsWith('.css')) {
-          res.setHeader('Content-Type', 'text/css');
-        } else if (filePath.endsWith('.js')) {
-          res.setHeader('Content-Type', 'application/javascript');
-        }
-      }
-    }));
-  }
+  // NOTE: /assets static serving is now handled BEFORE CORS middleware (see line ~180)
+  // This prevents 403 blocks from CORS checks on static files
 
   // Setup Vite in development and static serving in production
   // Split-dev option: when SPLIT_DEV=1, do NOT embed Vite; run client dev on 5173
