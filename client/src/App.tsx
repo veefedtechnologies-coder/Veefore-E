@@ -17,7 +17,8 @@ import { CalendarView } from './components/calendar/calendar-view'
 import { AnalyticsDashboard } from './components/analytics/analytics-dashboard'
 import { CreatePost } from './components/create/create-post'
 const VeeGPT = React.lazy(() => import('./pages/VeeGPT'))
-const Landing = React.lazy(() => import('./pages/Landing'))
+// Landing is eagerly loaded to prevent double loading spinner on initial load
+import Landing from './pages/Landing'
 const Landing3D = React.lazy(() => import('./pages/Landing3D'))
 const Landing3DAdvanced = React.lazy(() => import('./pages/Landing3DAdvanced'))
 const SplineKeyboardLanding = React.lazy(() => import('./pages/SplineKeyboardLanding'))
@@ -25,18 +26,19 @@ const RobotHeroLanding = React.lazy(() => import('./pages/RobotHeroLanding'))
 const SignUpIntegrated = React.lazy(() => import('./pages/SignUpIntegrated'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
 const Workspaces = React.lazy(() => import('./pages/Workspaces'))
-const Waitlist = React.lazy(() => import('./pages/Waitlist'))
-const WaitlistStatus = React.lazy(() => import('./pages/WaitlistStatus'))
-const Features = React.lazy(() => import('./pages/Features'))
-const Pricing = React.lazy(() => import('./pages/Pricing'))
-const FreeTrial = React.lazy(() => import('./pages/FreeTrial'))
-const Changelog = React.lazy(() => import('./pages/Changelog'))
-const About = React.lazy(() => import('./pages/About'))
-const Blog = React.lazy(() => import('./pages/Blog'))
-const Careers = React.lazy(() => import('./pages/Careers'))
-const Contact = React.lazy(() => import('./pages/Contact'))
-const Security = React.lazy(() => import('./pages/Security'))
-const GDPR = React.lazy(() => import('./pages/GDPR'))
+// Public pages - eagerly loaded for instant navigation (no loading spinner)
+import Features from './pages/Features'
+import Pricing from './pages/Pricing'
+import FreeTrial from './pages/FreeTrial'
+import Changelog from './pages/Changelog'
+import About from './pages/About'
+import Blog from './pages/Blog'
+import Careers from './pages/Careers'
+import Contact from './pages/Contact'
+import Security from './pages/Security'
+import GDPR from './pages/GDPR'
+import PrivacyPolicyPage from './pages/PrivacyPolicy'
+import TermsOfServicePage from './pages/TermsOfService'
 import OnboardingFlow from './components/onboarding/OnboardingFlow'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
@@ -54,8 +56,8 @@ const AutomationStepByStep = React.lazy(() => import('./pages/AutomationStepBySt
 const VideoGeneratorAdvanced = React.lazy(() => import('./pages/VideoGeneratorAdvanced'))
 const AdminPanel = React.lazy(() => import('./pages/AdminPanel'))
 const AdminLogin = React.lazy(() => import('./pages/AdminLogin'))
-const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'))
-const TermsOfService = React.lazy(() => import('./pages/TermsOfService'))
+const PrivacyPolicy = PrivacyPolicyPage
+const TermsOfService = TermsOfServicePage
 const Settings = React.lazy(() => import('./pages/Settings'))
 const SecurityDashboard = React.lazy(() => import('./pages/SecurityDashboard'))
 const TestFixtures = React.lazy(() => import('./pages/TestFixtures'))
@@ -75,6 +77,8 @@ import { initializeSEO } from './lib/seo-optimization';
 import { initializeCoreWebVitals } from './lib/core-web-vitals';
 import { initializeComponentModernization } from './lib/component-modernization';
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { WaitlistProvider } from './context/WaitlistContext'
+import { WaitlistModal } from './components/waitlist/WaitlistModal'
 
 const EncryptionHealth = React.lazy(() => import('./pages/EncryptionHealth'))
 
@@ -120,6 +124,11 @@ function App() {
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
+
+  // Scroll to top when route changes (SPA navigation)
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location])
 
   // P7: Route announcements for accessibility
   useAccessibilityRouteAnnouncements(location)
@@ -394,14 +403,18 @@ function App() {
     }
   }, [user, loading, userData, userDataLoading, location, setLocation, isOnboardingModalOpen, workspaces, workspacesLoading])
 
-  // Show loading spinner only during initial auth - not for user data loading (better UX)
-  if (loading) {
-    return <LoadingSpinner type="minimal" />
+  // Only show loading spinner for protected routes when user is not authenticated
+  // Public pages (landing, features, pricing, etc.) can render without waiting for auth
+  const protectedRoutes = ['/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator', '/workspaces', '/profile', '/automation', '/veegpt', '/admin', '/settings', '/security-dashboard']
+  const isProtectedRoute = protectedRoutes.some(route => location.startsWith(route))
+
+  // Only block rendering for protected routes while auth is loading
+  if (loading && isProtectedRoute) {
+    return <LoadingSpinner type="dashboard" />
   }
 
-  // Show loading spinner for protected routes when auth is still loading
-  const protectedRoutes = ['/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator', '/workspaces', '/profile', '/automation', '/veegpt']
-  if (!user && protectedRoutes.some(route => location.startsWith(route))) {
+  // Redirect unauthenticated users away from protected routes (after auth finishes loading)
+  if (!loading && !user && isProtectedRoute) {
     return <LoadingSpinner type="dashboard" />
   }
 
@@ -416,1047 +429,1068 @@ function App() {
       autoUpgradeThreshold={50}
     >
       <P6Provider>
-        <RealtimeProvider>
-          <>
-
-            <Switch>
-              {/* Features Page - Public access */}
-              <Route path="/features">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Features />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Waitlist pages - full screen without sidebar */}
-              <Route path="/waitlist">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Waitlist />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              <Route path="/waitlist-status">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <WaitlistStatus />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Authentication pages - full screen without sidebar */}
-              <Route path="/signup">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <SignUpIntegrated />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              <Route path="/signin">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <SignIn onNavigate={(page: string) => setLocation(`/${page}`)} />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Removed old onboarding route - now handled by modal */}
-
-
-              {/* Admin Login - Accessible to everyone */}
-              <Route path="/admin-login">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <AdminLogin />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Admin Panel - Protected */}
-              <Route path="/admin">
-                <ProtectedRoute>
-                  <React.Suspense fallback={<LoadingSpinner type="admin" />}>
-                    <div className="min-h-screen bg-gray-50">
-                      <AdminPanel />
-                    </div>
-                  </React.Suspense>
-                </ProtectedRoute>
-              </Route>
-
-              {/* 3D Landing Page - Public access */}
-              <Route path="/3d">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <Landing3D />
-                </React.Suspense>
-              </Route>
-
-              {/* Advanced 3D Landing Page with Spline Robot - Public access */}
-              <Route path="/3d-advanced">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <Landing3DAdvanced />
-                </React.Suspense>
-              </Route>
-
-              {/* Spline Keyboard Landing Page - Public access */}
-              <Route path="/keyboard">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <SplineKeyboardLanding />
-                </React.Suspense>
-              </Route>
-
-              {/* Robot Hero Landing Page - Public access */}
-              <Route path="/robot-hero">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <RobotHeroLanding />
-                </React.Suspense>
-              </Route>
-
-
-
-              {/* Original Landing Page - Public access */}
-
-
-              {/* Original Landing Page - Public access */}
-              <Route path="/landing">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-
-
-              {/* Pricing Page - Public access */}
-              <Route path="/pricing">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Pricing />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Free Trial Page - Public access */}
-              <Route path="/free-trial">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <FreeTrial />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Changelog Page - Public access */}
-              <Route path="/changelog">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Changelog />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* About Page - Public access */}
-              <Route path="/about">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <About />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Blog Page - Public access */}
-              <Route path="/blog">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Blog />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Careers Page - Public access */}
-              <Route path="/careers">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Careers />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Contact Page - Public access */}
-              <Route path="/contact">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Contact />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Privacy Policy Page - Public access */}
-              <Route path="/privacy-policy">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <PrivacyPolicy />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Terms of Service Page - Public access */}
-              <Route path="/terms-of-service">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <TermsOfService />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Security Page - Public access */}
-              <Route path="/security">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <Security />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* GDPR Page - Public access */}
-              <Route path="/gdpr">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <div className="min-h-screen">
-                    <GDPR />
-                  </div>
-                </React.Suspense>
-              </Route>
-
-              {/* Protected routes with sidebar layout - uses ProtectedRoute for auth */}
-              <Route path="/plan">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <div className="space-y-6">
-                          <Tabs defaultValue="calendar" className="w-full">
-                            <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                              <TabsTrigger value="drafts">Drafts</TabsTrigger>
-                              <TabsTrigger value="content">Content</TabsTrigger>
-                              <TabsTrigger value="dm-automation">DM automation</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="calendar" className="mt-6">
-                              <CalendarView />
-                            </TabsContent>
-                            <TabsContent value="drafts" className="mt-6">
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <ScheduledPosts />
-                                <Drafts />
-                              </div>
-                            </TabsContent>
-                            <TabsContent value="content" className="mt-6">
-                              <div className="text-center py-12">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Content Library</h3>
-                                <p className="text-gray-600 dark:text-gray-400">Manage your content library and templates here.</p>
-                              </div>
-                            </TabsContent>
-                            <TabsContent value="dm-automation" className="mt-6">
-                              <div className="text-center py-12">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">DM Automation</h3>
-                                <p className="text-gray-600 dark:text-gray-400">Set up automated direct message responses.</p>
-                              </div>
-                            </TabsContent>
-                          </Tabs>
-                        </div>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/create">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        {/* Instagram Webhook Listener for Real-time Updates */}
-                        <InstagramWebhookListener />
-                        <CreatePost />
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/analytics">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        {/* Instagram Webhook Listener for Real-time Updates */}
-                        <InstagramWebhookListener />
-                        <AnalyticsDashboard />
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/inbox">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <div className="text-center py-12">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Inbox 2.0</h3>
-                          <p className="text-gray-600 dark:text-gray-400">Manage your social media conversations here.</p>
-                        </div>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-
-
-              <Route path="/video-generator">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Cosmos Studio interface without VeeFore header */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Cosmos Studio Interface - Full height with scrolling */}
-                      <main className="flex-1 overflow-y-auto">
-                        <React.Suspense fallback={<SkeletonPageLoader type="video" />}>
-                          <VideoGeneratorAdvanced />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/workspaces">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <React.Suspense fallback={<SkeletonPageLoader type="workspaces" />}>
-                          <Workspaces />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-
-
-              <Route path="/profile">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <React.Suspense fallback={<SkeletonPageLoader type="profile" />}>
-                          <Profile />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/integration">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        {/* Instagram Webhook Listener for Real-time Updates */}
-                        <InstagramWebhookListener />
-                        <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
-                          <Integration />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/automation">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <React.Suspense fallback={<SkeletonPageLoader type="automation" />}>
-                          <AutomationStepByStep />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              {/* VeeGPT Route - with main sidebar */}
-              <Route path="/veegpt">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - VeeGPT takes full remaining space */}
-                    <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                      <React.Suspense fallback={<SkeletonPageLoader type="veegpt" />}>
-                        <VeeGPT />
-                      </React.Suspense>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/integrations">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        {/* Instagram Webhook Listener for Real-time Updates */}
-                        <InstagramWebhookListener />
-                        <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
-                          <Integration />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/settings">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={(option) => {
-                            setIsCreateDropdownOpen(false)
-                            // Handle navigation based on option
-                            if (option === 'post') setLocation('/create')
-                            if (option === 'automation') setLocation('/automation')
-                            if (option === 'video') setLocation('/video-generator')
-                          }}
-                        />
-                      )}
-
-                      {/* Page Content */}
-                      <div className="flex-1 overflow-y-auto">
-                        <React.Suspense fallback={<SkeletonPageLoader type="settings" />}>
-                          <Settings />
-                        </React.Suspense>
-                      </div>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              {/* P8: Security Operations Center Route */}
-              <Route path="/security">
-                <ProtectedRoute>
-                  <React.Suspense fallback={<LoadingSpinner type="security" />}>
-                    <SecurityDashboard />
-                  </React.Suspense>
-                </ProtectedRoute>
-              </Route>
-
-              {/* Privacy Policy Route - Public access */}
-              <Route path="/privacy-policy">
+        <WaitlistProvider>
+          <RealtimeProvider>
+            <>
+              <WaitlistModal />
+
+              {/* Public Pages - Eagerly loaded for instant navigation (no loading spinner) */}
+              {location === '/features' && (
+                <div className="min-h-screen"><Features /></div>
+              )}
+              {location === '/pricing' && (
+                <div className="min-h-screen"><Pricing /></div>
+              )}
+              {location === '/changelog' && (
+                <div className="min-h-screen"><Changelog /></div>
+              )}
+              {location === '/about' && (
+                <div className="min-h-screen"><About /></div>
+              )}
+              {location === '/blog' && (
+                <div className="min-h-screen"><Blog /></div>
+              )}
+              {location === '/careers' && (
+                <div className="min-h-screen"><Careers /></div>
+              )}
+              {location === '/contact' && (
+                <div className="min-h-screen"><Contact /></div>
+              )}
+              {location === '/security' && (
+                <div className="min-h-screen"><Security /></div>
+              )}
+              {location === '/gdpr' && (
+                <div className="min-h-screen"><GDPR /></div>
+              )}
+              {location === '/privacy-policy' && (
                 <PrivacyPolicy />
-              </Route>
-
-              <Route path="/test-fixtures">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <React.Suspense fallback={<LoadingSpinner type="default" />}>
-                          <TestFixtures />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              <Route path="/encryption-health">
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    <div className="h-screen overflow-y-auto">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <React.Suspense fallback={<LoadingSpinner type="security" />}>
-                          <EncryptionHealth />
-                        </React.Suspense>
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              </Route>
-
-              {/* Terms of Service Route - Public access */}
-              <Route path="/terms-of-service">
+              )}
+              {location === '/terms-of-service' && (
                 <TermsOfService />
-              </Route>
+              )}
 
-              {/* Public routes for legal pages - accessible without authentication */}
-              <Route path="/privacy-policy">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <PrivacyPolicy />
-                </React.Suspense>
-              </Route>
+              {location === '/free-trial' && (
+                <div className="min-h-screen"><FreeTrial /></div>
+              )}
 
-              <Route path="/terms-of-service">
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <TermsOfService />
-                </React.Suspense>
-              </Route>
+              {/* Root "/" - Landing page for unauthenticated users (renders immediately, no auth wait) */}
+              {location === '/' && !user && (
+                <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+              )}
 
-              {/* Root route - Spline Keyboard Landing for unauthenticated, Dashboard for authenticated users (modal handles onboarding) */}
-              <Route path="/">
-                {!user && !loading ? (
-                  <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                    <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
-                  </React.Suspense>
-                ) : user && userData ? (
-                  // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                    {(needEnforce && enforcing && !enforceHang) && <WorkspaceCreationOverlay onRetry={() => { }} />}
-                    {(needEnforce && ((enforceHang && enforcing) || (!enforcing && enforceError))) && (
-                      <WorkspaceCreationOverlay
-                        error={String(enforceError || 'Taking longer than usual')}
-                        onRetry={() => enforceRefetch()}
-                        onSignOut={() => { const auth = getAuth(); auth.signOut(); setLocation('/signin'); }}
-                      />
-                    )}
-                    {/* Sidebar - Fixed height with independent scrolling */}
-                    <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
-                      <Sidebar
-                        className="w-24 bg-white dark:bg-gray-800 h-full transition-colors duration-300"
-                        isCreateDropdownOpen={isCreateDropdownOpen}
-                        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                      />
-                    </div>
+              {/* Switch for remaining routes (authenticated "/" and all other routes) */}
+              {!['/features', '/pricing', '/changelog', '/about', '/blog', '/careers', '/contact', '/security', '/gdpr', '/privacy-policy', '/terms-of-service', '/waitlist', '/free-trial'].includes(location) && (location !== '/' || user) && (
+                <Switch location={location}>
+                  {/* Features Page - now handled above */}
 
-                    {/* Main Content Area - Independent scrolling */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                      {/* Header */}
-                      <Header
-                        onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                      />
 
-                      {/* Create Dropdown */}
-                      {isCreateDropdownOpen && (
-                        <CreateDropdown
-                          isOpen={isCreateDropdownOpen}
-                          onClose={() => setIsCreateDropdownOpen(false)}
-                          onOptionSelect={handleCreateOptionSelect}
-                        />
-                      )}
 
-                      {/* Main Content - Scrollable */}
-                      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                        <>
-                          {/* Instagram Webhook Listener for Real-time Updates */}
-                          <InstagramWebhookListener />
+                  {/* Authentication pages - full screen without sidebar */}
+                  <Route path="/signup">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <SignUpIntegrated />
+                      </div>
+                    </React.Suspense>
+                  </Route>
 
-                          {/* Quick Actions - Top Section */}
-                          <div className="mb-8">
-                            <QuickActions />
-                          </div>
+                  <Route path="/signin">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <SignIn onNavigate={(page: string) => setLocation(`/${page}`)} />
+                      </div>
+                    </React.Suspense>
+                  </Route>
 
-                          {/* Main Dashboard Layout - Hootsuite Style */}
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-                            {/* Left Column - Performance Score + Get Started + Scheduled Posts + Drafts */}
-                            <div className="space-y-6">
-                              <SectionErrorBoundary sectionName="Performance Score">
-                                <PerformanceScore />
-                              </SectionErrorBoundary>
-                              <SectionErrorBoundary sectionName="Get Started">
-                                <GetStarted />
-                              </SectionErrorBoundary>
-                              <SectionErrorBoundary sectionName="Scheduled Posts">
-                                <ScheduledPostsSection />
-                              </SectionErrorBoundary>
-                              <SectionErrorBoundary sectionName="Drafts">
-                                <DraftsSection />
-                              </SectionErrorBoundary>
-                            </div>
+                  {/* Removed old onboarding route - now handled by modal */}
 
-                            {/* Right Column - Recommendations + Social Accounts + Listening */}
-                            <div className="space-y-6">
-                              <SectionErrorBoundary sectionName="Recommendations">
-                                <Recommendations />
-                              </SectionErrorBoundary>
-                              <SectionErrorBoundary sectionName="Social Accounts">
-                                <SocialAccounts />
-                              </SectionErrorBoundary>
-                              <SectionErrorBoundary sectionName="Listening">
-                                <Listening />
-                              </SectionErrorBoundary>
-                            </div>
-                          </div>
-                        </>
-                      </main>
-                    </div>
 
-                    {/* Onboarding Flow for new users - triple safety check:
-                1. Backend says not onboarded
-                2. localStorage doesn't say onboarded
-                3. User doesn't have workspaces (which indicates completed onboarding) */}
-                    {userData && !userData.isOnboarded &&
-                      localStorage.getItem('isOnboarded') !== 'true' &&
-                      !(Array.isArray(workspaces) && workspaces.length > 0) && (
-                        <OnboardingFlow
-                          open={isOnboardingModalOpen}
-                          userData={userData}
-                          onComplete={async (onboardingData) => {
-                            console.log('🎯 COMPLETING ONBOARDING with data:', onboardingData)
-                            try {
-                              const response = await fetch('/api/user/complete-onboarding', {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${await user?.getIdToken()}`
-                                },
-                                body: JSON.stringify({ preferences: onboardingData })
-                              })
-                              if (response.ok) {
-                                console.log('✅ Onboarding completed successfully!')
+                  {/* Admin Login - Accessible to everyone */}
+                  <Route path="/admin-login">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <AdminLogin />
+                      </div>
+                    </React.Suspense>
+                  </Route>
 
-                                // First, close the onboarding modal immediately
-                                setIsOnboardingModalOpen(false)
-                                localStorage.setItem('isOnboarded', 'true')
-
-                                // Invalidate and refetch user data in background
-                                queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                                queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
-
-                                // Wait a bit for the modal to close, then start the guided tour
-                                setTimeout(() => {
-                                  setIsWalkthroughOpen(true)
-                                }, 500) // Small delay to ensure modal closes first
-                              } else {
-                                const errorText = await response.text().catch(() => 'Unknown error')
-                                console.error('❌ Failed to complete onboarding:', errorText)
-                                throw new Error(`Failed to complete onboarding: ${response.status}`)
-                              }
-                            } catch (error) {
-                              console.error('❌ Onboarding completion error:', error)
-                              throw error // Re-throw to let OnboardingFlow handle it
-                            }
-                          }}
-                        />
-                      )}
-                  </div>
-                ) : userDataLoading ? (
-                  <LoadingSpinner type="dashboard" />
-                ) : user && !userData && !userDataLoading && userDataError ? (
-                  String(userDataError).includes('404') ? (
-                    <AccountNotFoundBanner
-                      onSignup={() => setLocation('/signup')}
-                      onSignOut={() => { getAuth().signOut(); setLocation('/signin') }}
-                      onAssociate={async () => {
-                        try {
-                          await apiRequest('/api/auth/associate-uid', { method: 'POST' })
-                          queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                          window.location.reload()
-                        } catch { }
-                      }}
-                    />
-                  ) : (
-                    // If user exists but userData failed to load after retries, show error
-                    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
-                      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
+                  {/* Admin Panel - Protected */}
+                  <Route path="/admin">
+                    <ProtectedRoute>
+                      <React.Suspense fallback={<LoadingSpinner type="admin" />}>
+                        <div className="min-h-screen bg-gray-50">
+                          <AdminPanel />
                         </div>
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                          Unable to Load Account
-                        </h2>
-                        <p className="text-gray-600 dark:text-gray-400 mb-6">
-                          We're having trouble loading your account. This might be a temporary issue.
-                        </p>
-                        <div className="space-y-3">
-                          <button
-                            onClick={() => {
-                              queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                              window.location.reload()
-                            }}
-                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          >
-                            Try Again
-                          </button>
-                          <button
-                            onClick={() => {
-                              getAuth().signOut()
-                              setLocation('/signin')
-                            }}
-                            className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                          >
-                            Sign Out and Try Again
-                          </button>
+                      </React.Suspense>
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* 3D Landing Page - Public access */}
+                  <Route path="/3d">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <Landing3D />
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Advanced 3D Landing Page with Spline Robot - Public access */}
+                  <Route path="/3d-advanced">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <Landing3DAdvanced />
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Spline Keyboard Landing Page - Public access */}
+                  <Route path="/keyboard">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <SplineKeyboardLanding />
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Robot Hero Landing Page - Public access */}
+                  <Route path="/robot-hero">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <RobotHeroLanding />
+                    </React.Suspense>
+                  </Route>
+
+
+
+                  {/* Original Landing Page - Public access */}
+
+
+                  {/* Original Landing Page - Public access */}
+                  <Route path="/landing">
+                    <div className="min-h-screen">
+                      <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+                    </div>
+                  </Route>
+
+
+
+                  {/* Pricing Page - Public access */}
+                  <Route path="/pricing">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <Pricing />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Free Trial Page - Public access */}
+                  <Route path="/free-trial">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <FreeTrial />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Changelog Page - Public access */}
+                  <Route path="/changelog">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <Changelog />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* About Page - Public access */}
+                  <Route path="/about">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <About />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Blog Page - Public access */}
+                  <Route path="/blog">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <Blog />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Careers Page - Public access */}
+                  <Route path="/careers">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <Careers />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Contact Page - Public access */}
+                  <Route path="/contact">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <Contact />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Privacy Policy Page - Public access */}
+                  <Route path="/privacy-policy">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <PrivacyPolicy />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Terms of Service Page - Public access */}
+                  <Route path="/terms-of-service">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <TermsOfService />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Security Page - Public access */}
+                  <Route path="/security">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <Security />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* GDPR Page - Public access */}
+                  <Route path="/gdpr">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <div className="min-h-screen">
+                        <GDPR />
+                      </div>
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Protected routes with sidebar layout - uses ProtectedRoute for auth */}
+                  <Route path="/plan">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <div className="space-y-6">
+                              <Tabs defaultValue="calendar" className="w-full">
+                                <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                  <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                                  <TabsTrigger value="drafts">Drafts</TabsTrigger>
+                                  <TabsTrigger value="content">Content</TabsTrigger>
+                                  <TabsTrigger value="dm-automation">DM automation</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="calendar" className="mt-6">
+                                  <CalendarView />
+                                </TabsContent>
+                                <TabsContent value="drafts" className="mt-6">
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <ScheduledPosts />
+                                    <Drafts />
+                                  </div>
+                                </TabsContent>
+                                <TabsContent value="content" className="mt-6">
+                                  <div className="text-center py-12">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Content Library</h3>
+                                    <p className="text-gray-600 dark:text-gray-400">Manage your content library and templates here.</p>
+                                  </div>
+                                </TabsContent>
+                                <TabsContent value="dm-automation" className="mt-6">
+                                  <div className="text-center py-12">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">DM Automation</h3>
+                                    <p className="text-gray-600 dark:text-gray-400">Set up automated direct message responses.</p>
+                                  </div>
+                                </TabsContent>
+                              </Tabs>
+                            </div>
+                          </main>
                         </div>
                       </div>
-                    </div>
-                  )
-                ) : (
-                  <LoadingSpinner type="dashboard" />
-                )}
-              </Route>
+                    </ProtectedRoute>
+                  </Route>
 
-              {/* Catch-all route - handles unmatched routes and redirects appropriately */}
-              <Route>
-                {() => {
-                  if (!user && !loading) {
-                    return (
+                  <Route path="/create">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            {/* Instagram Webhook Listener for Real-time Updates */}
+                            <InstagramWebhookListener />
+                            <CreatePost />
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/analytics">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            {/* Instagram Webhook Listener for Real-time Updates */}
+                            <InstagramWebhookListener />
+                            <AnalyticsDashboard />
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/inbox">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <div className="text-center py-12">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Inbox 2.0</h3>
+                              <p className="text-gray-600 dark:text-gray-400">Manage your social media conversations here.</p>
+                            </div>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+
+
+                  <Route path="/video-generator">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Cosmos Studio interface without VeeFore header */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Cosmos Studio Interface - Full height with scrolling */}
+                          <main className="flex-1 overflow-y-auto">
+                            <React.Suspense fallback={<SkeletonPageLoader type="video" />}>
+                              <VideoGeneratorAdvanced />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/workspaces">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <React.Suspense fallback={<SkeletonPageLoader type="workspaces" />}>
+                              <Workspaces />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+
+
+                  <Route path="/profile">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <React.Suspense fallback={<SkeletonPageLoader type="profile" />}>
+                              <Profile />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/integration">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            {/* Instagram Webhook Listener for Real-time Updates */}
+                            <InstagramWebhookListener />
+                            <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
+                              <Integration />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/automation">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <React.Suspense fallback={<SkeletonPageLoader type="automation" />}>
+                              <AutomationStepByStep />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* VeeGPT Route - with main sidebar */}
+                  <Route path="/veegpt">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - VeeGPT takes full remaining space */}
+                        <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                          <React.Suspense fallback={<SkeletonPageLoader type="veegpt" />}>
+                            <VeeGPT />
+                          </React.Suspense>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/integrations">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            {/* Instagram Webhook Listener for Real-time Updates */}
+                            <InstagramWebhookListener />
+                            <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
+                              <Integration />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/settings">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={(option) => {
+                                setIsCreateDropdownOpen(false)
+                                // Handle navigation based on option
+                                if (option === 'post') setLocation('/create')
+                                if (option === 'automation') setLocation('/automation')
+                                if (option === 'video') setLocation('/video-generator')
+                              }}
+                            />
+                          )}
+
+                          {/* Page Content */}
+                          <div className="flex-1 overflow-y-auto">
+                            <React.Suspense fallback={<SkeletonPageLoader type="settings" />}>
+                              <Settings />
+                            </React.Suspense>
+                          </div>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* P8: Security Operations Center Route */}
+                  <Route path="/security">
+                    <ProtectedRoute>
+                      <React.Suspense fallback={<LoadingSpinner type="security" />}>
+                        <SecurityDashboard />
+                      </React.Suspense>
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* Privacy Policy Route - Public access */}
+                  <Route path="/privacy-policy">
+                    <PrivacyPolicy />
+                  </Route>
+
+                  <Route path="/test-fixtures">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <React.Suspense fallback={<LoadingSpinner type="default" />}>
+                              <TestFixtures />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  <Route path="/encryption-health">
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        <div className="h-screen overflow-y-auto">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
+                        </div>
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <React.Suspense fallback={<LoadingSpinner type="security" />}>
+                              <EncryptionHealth />
+                            </React.Suspense>
+                          </main>
+                        </div>
+                      </div>
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* Terms of Service Route - Public access */}
+                  <Route path="/terms-of-service">
+                    <TermsOfService />
+                  </Route>
+
+                  {/* Public routes for legal pages - accessible without authentication */}
+                  <Route path="/privacy-policy">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <PrivacyPolicy />
+                    </React.Suspense>
+                  </Route>
+
+                  <Route path="/terms-of-service">
+                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                      <TermsOfService />
+                    </React.Suspense>
+                  </Route>
+
+                  {/* Root route - Landing for unauthenticated, Dashboard for authenticated users */}
+                  <Route path="/"  >
+                    {!user && !loading ? (
                       <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
                         <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
                       </React.Suspense>
-                    )
-                  }
-                  if (user && !userData && userDataLoading) {
-                    return <LoadingSpinner type="dashboard" />
-                  }
-                  if (user && userData && !userData.isOnboarded) {
-                    setLocation('/')
-                    return <LoadingSpinner type="dashboard" />
-                  }
-                  return (
-                    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
-                      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-                        <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                    ) : user && userData ? (
+                      // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+                        {(needEnforce && enforcing && !enforceHang) && <WorkspaceCreationOverlay onRetry={() => { }} />}
+                        {(needEnforce && ((enforceHang && enforcing) || (!enforcing && enforceError))) && (
+                          <WorkspaceCreationOverlay
+                            error={String(enforceError || 'Taking longer than usual')}
+                            onRetry={() => enforceRefetch()}
+                            onSignOut={() => { const auth = getAuth(); auth.signOut(); setLocation('/signin'); }}
+                          />
+                        )}
+                        {/* Sidebar - Fixed height with independent scrolling */}
+                        <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
+                          <Sidebar
+                            className="w-24 bg-white dark:bg-gray-800 h-full transition-colors duration-300"
+                            isCreateDropdownOpen={isCreateDropdownOpen}
+                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                          />
                         </div>
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                          Page Not Found
-                        </h2>
-                        <p className="text-gray-600 dark:text-gray-400 mb-6">
-                          The page you're looking for doesn't exist or has been moved.
-                        </p>
-                        <button
-                          onClick={() => setLocation('/')}
-                          className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                        >
-                          Go to Dashboard
-                        </button>
+
+                        {/* Main Content Area - Independent scrolling */}
+                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                          {/* Header */}
+                          <Header
+                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
+                          />
+
+                          {/* Create Dropdown */}
+                          {isCreateDropdownOpen && (
+                            <CreateDropdown
+                              isOpen={isCreateDropdownOpen}
+                              onClose={() => setIsCreateDropdownOpen(false)}
+                              onOptionSelect={handleCreateOptionSelect}
+                            />
+                          )}
+
+                          {/* Main Content - Scrollable */}
+                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                            <>
+                              {/* Instagram Webhook Listener for Real-time Updates */}
+                              <InstagramWebhookListener />
+
+                              {/* Quick Actions - Top Section */}
+                              <div className="mb-8">
+                                <QuickActions />
+                              </div>
+
+                              {/* Main Dashboard Layout - Hootsuite Style */}
+                              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+                                {/* Left Column - Performance Score + Get Started + Scheduled Posts + Drafts */}
+                                <div className="space-y-6">
+                                  <SectionErrorBoundary sectionName="Performance Score">
+                                    <PerformanceScore />
+                                  </SectionErrorBoundary>
+                                  <SectionErrorBoundary sectionName="Get Started">
+                                    <GetStarted />
+                                  </SectionErrorBoundary>
+                                  <SectionErrorBoundary sectionName="Scheduled Posts">
+                                    <ScheduledPostsSection />
+                                  </SectionErrorBoundary>
+                                  <SectionErrorBoundary sectionName="Drafts">
+                                    <DraftsSection />
+                                  </SectionErrorBoundary>
+                                </div>
+
+                                {/* Right Column - Recommendations + Social Accounts + Listening */}
+                                <div className="space-y-6">
+                                  <SectionErrorBoundary sectionName="Recommendations">
+                                    <Recommendations />
+                                  </SectionErrorBoundary>
+                                  <SectionErrorBoundary sectionName="Social Accounts">
+                                    <SocialAccounts />
+                                  </SectionErrorBoundary>
+                                  <SectionErrorBoundary sectionName="Listening">
+                                    <Listening />
+                                  </SectionErrorBoundary>
+                                </div>
+                              </div>
+                            </>
+                          </main>
+                        </div>
+
+                        {/* Onboarding Flow for new users - triple safety check:
+                1. Backend says not onboarded
+                2. localStorage doesn't say onboarded
+                3. User doesn't have workspaces (which indicates completed onboarding) */}
+                        {userData && !userData.isOnboarded &&
+                          localStorage.getItem('isOnboarded') !== 'true' &&
+                          !(Array.isArray(workspaces) && workspaces.length > 0) && (
+                            <OnboardingFlow
+                              open={isOnboardingModalOpen}
+                              userData={userData}
+                              onComplete={async (onboardingData) => {
+                                console.log('🎯 COMPLETING ONBOARDING with data:', onboardingData)
+                                try {
+                                  const response = await fetch('/api/user/complete-onboarding', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'Authorization': `Bearer ${await user?.getIdToken()}`
+                                    },
+                                    body: JSON.stringify({ preferences: onboardingData })
+                                  })
+                                  if (response.ok) {
+                                    console.log('✅ Onboarding completed successfully!')
+
+                                    // First, close the onboarding modal immediately
+                                    setIsOnboardingModalOpen(false)
+                                    localStorage.setItem('isOnboarded', 'true')
+
+                                    // Invalidate and refetch user data in background
+                                    queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                                    queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
+
+                                    // Wait a bit for the modal to close, then start the guided tour
+                                    setTimeout(() => {
+                                      setIsWalkthroughOpen(true)
+                                    }, 500) // Small delay to ensure modal closes first
+                                  } else {
+                                    const errorText = await response.text().catch(() => 'Unknown error')
+                                    console.error('❌ Failed to complete onboarding:', errorText)
+                                    throw new Error(`Failed to complete onboarding: ${response.status}`)
+                                  }
+                                } catch (error) {
+                                  console.error('❌ Onboarding completion error:', error)
+                                  throw error // Re-throw to let OnboardingFlow handle it
+                                }
+                              }}
+                            />
+                          )}
                       </div>
-                    </div>
-                  )
-                }}
-              </Route>
+                    ) : userDataLoading ? (
+                      <LoadingSpinner type="dashboard" />
+                    ) : user && !userData && !userDataLoading && userDataError ? (
+                      String(userDataError).includes('404') ? (
+                        <AccountNotFoundBanner
+                          onSignup={() => setLocation('/signup')}
+                          onSignOut={() => { getAuth().signOut(); setLocation('/signin') }}
+                          onAssociate={async () => {
+                            try {
+                              await apiRequest('/api/auth/associate-uid', { method: 'POST' })
+                              queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                              window.location.reload()
+                            } catch { }
+                          }}
+                        />
+                      ) : (
+                        // If user exists but userData failed to load after retries, show error
+                        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
+                          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+                            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                            </div>
+                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                              Unable to Load Account
+                            </h2>
+                            <p className="text-gray-600 dark:text-gray-400 mb-6">
+                              We're having trouble loading your account. This might be a temporary issue.
+                            </p>
+                            <div className="space-y-3">
+                              <button
+                                onClick={() => {
+                                  queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+                                  window.location.reload()
+                                }}
+                                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                Try Again
+                              </button>
+                              <button
+                                onClick={() => {
+                                  getAuth().signOut()
+                                  setLocation('/signin')
+                                }}
+                                className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                              >
+                                Sign Out and Try Again
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <LoadingSpinner type="dashboard" />
+                    )}
+                  </Route>
 
-            </Switch>
+                  {/* Catch-all route - 404 for unmatched routes */}
+                  <Route>
+                    {() => {
+                      // For authenticated users loading
+                      if (user && !userData && userDataLoading) {
+                        return <LoadingSpinner type="dashboard" />
+                      }
+                      if (user && userData && !userData.isOnboarded) {
+                        setLocation('/')
+                        return <LoadingSpinner type="dashboard" />
+                      }
+                      // For all users (including unauthenticated), show 404 for unmatched routes
+                      return (
+                        <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">
+                          <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+                            <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <h2 className="text-xl font-semibold text-white mb-2">
+                              Page Not Found
+                            </h2>
+                            <p className="text-white/60 mb-6">
+                              The page you're looking for doesn't exist or has been moved.
+                            </p>
+                            <button
+                              onClick={() => setLocation('/')}
+                              className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                            >
+                              Go to Home
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    }}
+                  </Route>
 
-            {/* Guided Tour */}
-            <GuidedTour
-              isActive={isWalkthroughOpen}
-              onClose={() => setIsWalkthroughOpen(false)}
-            />
+                </Switch>
+              )}
 
-            {/* P6: Toast notifications container */}
-            <ToastContainer position="top-right" />
-          </>
-        </RealtimeProvider>
+              {/* Guided Tour */}
+              <GuidedTour
+                isActive={isWalkthroughOpen}
+                onClose={() => setIsWalkthroughOpen(false)}
+              />
+
+              {/* P6: Toast notifications container */}
+              <ToastContainer position="top-right" />
+            </>
+          </RealtimeProvider>
+        </WaitlistProvider>
       </P6Provider>
     </AdaptiveAnimationProvider>
   )

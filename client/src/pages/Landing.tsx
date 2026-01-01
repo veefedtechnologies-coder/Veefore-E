@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense, useCallback, memo } from 'react'
+import { useWaitlist } from '../context/WaitlistContext'
 
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import {
@@ -667,6 +668,7 @@ const AnimatedDashboard = memo(() => {
 
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
+  const { openWaitlist } = useWaitlist()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
@@ -819,10 +821,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
               <MagneticButton
                 className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
-                onClick={() => onNavigate('signup')}
+                onClick={openWaitlist}
               >
                 <span className="relative z-10 flex items-center">
-                  Start 7-Day Free Trial
+                  Join Waitlist
                   <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5" />
                 </span>
               </MagneticButton>
@@ -890,10 +892,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             >
               <MagneticButton
                 className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
-                onClick={() => onNavigate('signup')}
+                onClick={openWaitlist}
               >
                 <span className="relative z-10 flex items-center">
-                  Start 7-Day Free Trial
+                  Join Waitlist
                   <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -2032,7 +2034,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <div className="mt-16 text-center">
             <MagneticButton
               className="bg-white text-black hover:bg-white/90 rounded-full px-8 py-3 text-sm font-bold transition-all duration-300 shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.5)]"
-              onClick={() => onNavigate('signup')}
+              onClick={openWaitlist}
             >
               Switch to VeeFore Now
             </MagneticButton>
@@ -2121,7 +2123,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         ? 'bg-white text-black hover:bg-white/90'
                         : 'bg-white/5 border border-white/10 hover:bg-white/10'
                         }`}
-                      onClick={() => onNavigate('signup')}
+                      onClick={openWaitlist}
                     >
                       Get Started
                     </MagneticButton>

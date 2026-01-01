@@ -95,7 +95,7 @@ const Careers = () => {
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -111,7 +111,7 @@ const Careers = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
                     >
                         <span className="text-white">Build the Future of </span>
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -123,7 +123,7 @@ const Careers = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-base md:text-lg text-white/50 max-w-2xl mx-auto mb-8"
+                        className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-8"
                     >
                         We're on a mission to empower every creator with AI-powered growth tools. Join our early-stage team and make a real impact.
                     </motion.p>
@@ -148,7 +148,7 @@ const Careers = () => {
 
             {/* No Openings Notice */}
             <section className="py-12 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-5xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -173,7 +173,7 @@ const Careers = () => {
 
             {/* Why Join Us */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -198,7 +198,7 @@ const Careers = () => {
 
             {/* Our Values */}
             <section className="py-16 md:py-24 px-4 sm:px-6 bg-white/[0.01]">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -223,7 +223,7 @@ const Careers = () => {
 
             {/* Who We're Looking For */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -264,7 +264,7 @@ const Careers = () => {
 
             {/* CTA Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto text-center">
+                <div className="max-w-5xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}

@@ -114,7 +114,7 @@ const Contact = () => {
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -130,7 +130,7 @@ const Contact = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
                     >
                         <span className="text-white">We'd Love to </span>
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -142,7 +142,7 @@ const Contact = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-base md:text-lg text-white/50 max-w-2xl mx-auto"
+                        className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto"
                     >
                         Have questions, feedback, or just want to say hello? Our team is here to help.
                     </motion.p>
@@ -151,7 +151,7 @@ const Contact = () => {
 
             {/* Contact Options */}
             <section className="py-12 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
+                <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-6">
                     {contactOptions.map((option, i) => (
                         <ContactCard key={i} {...option} />
                     ))}
@@ -160,7 +160,7 @@ const Contact = () => {
 
             {/* Contact Form & Info */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12">
+                <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12">
                     {/* Contact Form */}
                     <motion.div
                         initial={{ opacity: 0, x: -30 }}

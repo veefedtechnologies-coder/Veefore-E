@@ -262,8 +262,8 @@ function setupGlobalEventListeners(): void {
     }
   };
 
-  // Check for route changes (for SPAs)
-  setInterval(checkRouteChange, 100);
+  // Check for route changes (for SPAs) - reduced frequency for performance
+  setInterval(checkRouteChange, 500);
 
   // Performance monitoring
   window.addEventListener('load', () => {
@@ -271,7 +271,7 @@ function setupGlobalEventListeners(): void {
     setTimeout(() => {
       const performanceOptimizer = FrontendPerformanceOptimizer.getInstance();
       const metrics = performanceOptimizer.getPerformanceMetrics();
-      
+
       console.log('📊 P6: Page performance metrics:', {
         loadTime: `${metrics.pageLoadTime.toFixed(0)}ms`,
         domContentLoaded: `${metrics.domContentLoaded.toFixed(0)}ms`,
@@ -293,7 +293,7 @@ function setupGlobalEventListeners(): void {
         const memory = (performance as any).memory;
         const usedMB = Math.round(memory.usedJSHeapSize / 1048576);
         const limitMB = Math.round(memory.jsHeapSizeLimit / 1048576);
-        
+
         if (usedMB > limitMB * 0.8) {
           console.warn(`⚠️ P6: High memory usage: ${usedMB}MB / ${limitMB}MB`);
         }
@@ -318,7 +318,7 @@ function getPageName(path: string): string {
     '/pricing': 'Pricing'
   };
 
-  return pathMap[path] || path.replace('/', '').replace('-', ' ').replace(/\w\S*/g, (txt) => 
+  return pathMap[path] || path.replace('/', '').replace('-', ' ').replace(/\w\S*/g, (txt) =>
     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
   );
 }
@@ -363,7 +363,7 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ position = 'top-right' }) => {
   const toasts: any[] = []; // Temporary fallback
-  const removeToast = (id: string) => {}; // Temporary fallback
+  const removeToast = (id: string) => { }; // Temporary fallback
 
   const positionClasses = {
     'top-right': 'top-4 right-4',
@@ -393,11 +393,10 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({ position = 'top-
                     <button
                       key={index}
                       onClick={action.action}
-                      className={`text-sm font-medium ${
-                        action.style === 'primary' 
-                          ? 'text-blue-600 hover:text-blue-500' 
+                      className={`text-sm font-medium ${action.style === 'primary'
+                          ? 'text-blue-600 hover:text-blue-500'
                           : 'text-gray-600 hover:text-gray-500'
-                      }`}
+                        }`}
                     >
                       {action.label}
                     </button>
@@ -457,7 +456,7 @@ export {
   useSEO,
   SEO,
   SEOManager,
-  
+
   // Accessibility
   AccessibilityManager
 };

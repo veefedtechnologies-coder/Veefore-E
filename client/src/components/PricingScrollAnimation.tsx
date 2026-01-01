@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'framer-motion';
 import { CheckCircle, Lock } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
+import { useWaitlist } from '../context/WaitlistContext';
 
 // Interfaces
 interface PricingPlan {
@@ -111,13 +112,13 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
 
     // Transforms for Desktop Stacking Effect
     // Using nearly full range [0.1, 0.9] to make animation slower and smoother over the scroll distance
-    
+
     // Middle Card (Growth) - The Hero
     const middleScale = useTransform(smoothProgress, [0.1, 0.8], [1, 1.05]);
     const middleY = useTransform(smoothProgress, [0.1, 0.8], [0, 15]);
-    
+
     // Left Card (Starter) - Tucks behind left
-    const leftX = useTransform(smoothProgress, [0.1, 0.8], ["-380px", "-50px"]); 
+    const leftX = useTransform(smoothProgress, [0.1, 0.8], ["-380px", "-50px"]);
     const leftScale = useTransform(smoothProgress, [0.1, 0.8], [0.95, 0.9]);
     const leftOpacity = useTransform(smoothProgress, [0.1, 0.8], [1, 0.6]);
     const leftRotate = useTransform(smoothProgress, [0.1, 0.8], [0, -6]);
@@ -134,9 +135,9 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
         <div ref={containerRef} className="hidden md:block relative h-[200vh] -mt-20 mb-0 z-50">
             <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden perspective-1000">
                 <div className="relative w-full max-w-[1200px] flex justify-center items-center h-[600px]">
-                    
+
                     {/* Left Card - Starter */}
-                    <motion.div 
+                    <motion.div
                         style={{ x: leftX, scale: leftScale, opacity: leftOpacity, rotate: leftRotate, zIndex: leftZ }}
                         className="absolute w-[350px] h-full origin-bottom-right"
                     >
@@ -144,7 +145,7 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
                     </motion.div>
 
                     {/* Right Card - Pro */}
-                    <motion.div 
+                    <motion.div
                         style={{ x: rightX, scale: rightScale, opacity: rightOpacity, rotate: rightRotate, zIndex: rightZ }}
                         className="absolute w-[350px] h-full origin-bottom-left"
                     >
@@ -152,7 +153,7 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
                     </motion.div>
 
                     {/* Middle Card - Growth - Stays on top */}
-                    <motion.div 
+                    <motion.div
                         style={{ scale: middleScale, y: middleY, zIndex: 10 }}
                         className="absolute w-[380px] h-full shadow-2xl shadow-blue-500/20 rounded-3xl"
                     >
@@ -160,15 +161,15 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
                     </motion.div>
 
                 </div>
-                
+
                 {/* Scroll Indicator */}
-                <motion.div 
+                <motion.div
                     style={{ opacity: useTransform(scrollYProgress, [0, 0.1, 0.8, 1], [1, 0, 0, 0]) }}
                     className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
                 >
                     <span className="text-white/30 text-sm uppercase tracking-widest font-medium">Compare Plans</span>
                     <div className="w-1 h-12 rounded-full bg-white/10 overflow-hidden">
-                        <motion.div 
+                        <motion.div
                             animate={{ y: [0, 48, 0] }}
                             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                             className="w-full h-1/2 bg-blue-500 rounded-full"
@@ -182,6 +183,7 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
 
 // Reusable Pricing Card Component (Internal)
 const PricingCard = ({ plan, billingCycle, onNavigate, isHero = false }: { plan: PricingPlan, billingCycle: string, onNavigate: (p: string) => void, isHero?: boolean }) => {
+    const { openWaitlist } = useWaitlist();
     return (
         <TiltCard className="h-full group">
             {plan.popular && (
@@ -222,12 +224,11 @@ const PricingCard = ({ plan, billingCycle, onNavigate, isHero = false }: { plan:
                 </div>
 
                 <MagneticButton
-                    className={`w-full rounded-full py-4 font-bold transition-all duration-300 ${
-                        isHero
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25'
-                        : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
-                    }`}
-                    onClick={() => onNavigate('signup')}
+                    className={`w-full rounded-full py-4 font-bold transition-all duration-300 ${isHero
+                            ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25'
+                            : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
+                        }`}
+                    onClick={openWaitlist}
                 >
                     Get Started
                 </MagneticButton>

@@ -3,13 +3,13 @@ import {
     motion, AnimatePresence,
     useScroll,
     useTransform,
-    useSpring,
-    MotionValue
+    useSpring
 } from 'framer-motion';
 import {
     Rocket, Gift, Calendar, Mail, ArrowRight, Lock, Check
 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-is-mobile';
+import { useWaitlist } from '../context/WaitlistContext';
 
 // ============================================
 // 3D FLOATING ORB COMPONENT
@@ -34,7 +34,8 @@ const FloatingOrb = ({
                 width: size,
                 height: size,
                 background: `radial-gradient(circle at 30% 30%, ${color}, transparent 70%)`,
-                filter: 'blur(1px)'
+                filter: 'blur(1px)',
+                willChange: 'transform'
             }}
             animate={{
                 y: [0, -30, 0],
@@ -101,6 +102,7 @@ const Perspective3D = ({ children, className }: { children: React.ReactNode; cla
 const Hero3D = () => {
     const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
     const isMobile = useIsMobile();
+    const { openWaitlist } = useWaitlist();
 
     useEffect(() => {
         if (isMobile) return;
@@ -249,7 +251,7 @@ const Hero3D = () => {
                         whileHover={{ scale: 1.05, boxShadow: '0 0 40px rgba(139,92,246,0.4)' }}
                         whileTap={{ scale: 0.98 }}
                         className="group relative px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold text-lg overflow-hidden"
-                        onClick={() => document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' })}
+                        onClick={openWaitlist}
                     >
                         <span className="relative z-10 flex items-center gap-2">
                             Join Beta Waitlist
@@ -276,7 +278,7 @@ const MysteryDateDigits = () => {
     const [tick, setTick] = useState(0);
 
     useEffect(() => {
-        const interval = setInterval(() => setTick(prev => prev + 1), 100);
+        const interval = setInterval(() => setTick(prev => prev + 1), 500);
         return () => clearInterval(interval);
     }, []);
 
@@ -288,6 +290,7 @@ const MysteryDateDigits = () => {
                 <motion.span
                     key={`d${i} `}
                     className="w-8 h-10 flex items-center justify-center rounded-lg bg-purple-500/20 text-purple-400"
+                    style={{ willChange: 'transform' }}
                     animate={{ rotateX: [0, 360] }}
                     transition={{ duration: 0.5, delay: i * 0.1, repeat: Infinity, repeatDelay: 2 }}
                 >
@@ -299,6 +302,7 @@ const MysteryDateDigits = () => {
                 <motion.span
                     key={`m${i} `}
                     className="w-8 h-10 flex items-center justify-center rounded-lg bg-blue-500/20 text-blue-400"
+                    style={{ willChange: 'transform' }}
                     animate={{ rotateX: [0, 360] }}
                     transition={{ duration: 0.5, delay: 0.2 + i * 0.1, repeat: Infinity, repeatDelay: 2 }}
                 >
@@ -346,7 +350,7 @@ const ScrollZoomIntro = () => {
     // PHASE 2: Elegant Light Reveal - Soft expanding gradient
     const revealScale = useTransform(smoothProgress, [0.25, 0.6], [0, 3]);
     const revealOpacity = useTransform(smoothProgress, [0.25, 0.4, 0.65], [0, 0.8, 0]);
-    
+
     // Floating light particles
     const particleOpacity = useTransform(smoothProgress, [0.3, 0.45, 0.6], [0, 1, 0]);
 
@@ -424,7 +428,7 @@ const ScrollZoomIntro = () => {
                             filter: 'blur(40px)'
                         }}
                     />
-                    
+
                     {/* Soft inner ring */}
                     <motion.div
                         className="absolute w-[40vw] h-[40vw] md:w-[30vw] md:h-[30vw] rounded-full"
@@ -461,10 +465,10 @@ const ScrollZoomIntro = () => {
                                 style={{
                                     left: `calc(50% + ${Math.cos(angle) * radius}vw)`,
                                     top: `calc(50% + ${Math.sin(angle) * radius}vh)`,
-                                    background: i % 2 === 0 
+                                    background: i % 2 === 0
                                         ? 'radial-gradient(circle, rgba(59,130,246,0.8) 0%, transparent 70%)'
                                         : 'radial-gradient(circle, rgba(139,92,246,0.8) 0%, transparent 70%)',
-                                    boxShadow: i % 2 === 0 
+                                    boxShadow: i % 2 === 0
                                         ? '0 0 20px 8px rgba(59,130,246,0.3)'
                                         : '0 0 20px 8px rgba(139,92,246,0.3)'
                                 }}
@@ -497,11 +501,11 @@ const ScrollZoomIntro = () => {
                 >
                     {/* Hero image with professional treatment */}
                     <div className="absolute inset-0">
-                        <img 
-                            src="/beta-hero.png" 
-                            alt="" 
+                        <img
+                            src="/beta-hero.png"
+                            alt=""
                             className="absolute w-full h-full object-cover object-center"
-                            style={{ 
+                            style={{
                                 filter: 'brightness(0.5) saturate(1.1)',
                             }}
                         />
@@ -522,8 +526,8 @@ const ScrollZoomIntro = () => {
                 <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-6 pointer-events-none">
                     <motion.div
                         className="text-center max-w-4xl"
-                        style={{ 
-                            opacity: textOpacity, 
+                        style={{
+                            opacity: textOpacity,
                             y: textY,
                             scale: textScale
                         }}
@@ -539,7 +543,7 @@ const ScrollZoomIntro = () => {
                                 <span className="text-xs font-medium text-white/60 uppercase tracking-wider">Beta Access Opening Soon</span>
                             </span>
                         </motion.div>
-                        
+
                         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-[1.1] tracking-tight">
                             The Future of
                             <span className="block mt-2 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
@@ -561,7 +565,7 @@ const ScrollZoomIntro = () => {
                     initial={{ opacity: 1 }}
                 >
                     <span className="text-[11px] text-white/60 uppercase tracking-[0.15em] font-medium drop-shadow-lg">Scroll for more</span>
-                    <motion.div 
+                    <motion.div
                         className="w-7 h-11 rounded-full border-2 border-white/30 flex justify-center pt-2.5 backdrop-blur-md bg-black/20 shadow-lg"
                         animate={{ y: [0, 5, 0] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -601,7 +605,7 @@ function BentoBenefitsGrid() {
                         <div className="flex justify-between items-start mb-4 md:mb-8">
                             <motion.div
                                 className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-cyan-500/30 transition-colors"
-                                style={{ transform: 'translateZ(40px)' }}
+                                style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
                                 animate={{ y: [0, -6, 0] }}
                                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                             >
@@ -633,7 +637,7 @@ function BentoBenefitsGrid() {
                     <div className="relative z-10 h-full flex flex-col justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <motion.div
                             className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-orange-500/30 transition-colors"
-                            style={{ transform: 'translateZ(40px)' }}
+                            style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
                             animate={{ y: [0, -6, 0] }}
                             transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
                         >
@@ -659,7 +663,7 @@ function BentoBenefitsGrid() {
                         <div className="flex justify-between items-start mb-4 md:mb-6">
                             <motion.div
                                 className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-blue-500/30 transition-colors"
-                                style={{ transform: 'translateZ(40px)' }}
+                                style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
                                 animate={{ y: [0, -6, 0] }}
                                 transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
                             >
@@ -692,7 +696,7 @@ function BentoBenefitsGrid() {
                         <div className="flex justify-between items-start mb-4 md:mb-8">
                             <motion.div
                                 className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-yellow-500/30 transition-colors"
-                                style={{ transform: 'translateZ(40px)' }}
+                                style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
                                 animate={{ y: [0, -6, 0] }}
                                 transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
                             >
@@ -719,6 +723,7 @@ function BentoBenefitsGrid() {
 // SIMPLE URGENCY SECTION
 // ============================================
 function UrgencySection() {
+    const { openWaitlist } = useWaitlist();
     const [spotsLeft] = useState(147);
     const totalSpots = 500;
     const claimedSpots = totalSpots - spotsLeft;
@@ -766,7 +771,7 @@ function UrgencySection() {
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' })}
+                        onClick={openWaitlist}
                         className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm transition-colors"
                     >
                         Reserve your spot
