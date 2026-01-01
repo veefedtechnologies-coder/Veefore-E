@@ -31,7 +31,7 @@ export default defineConfig({
     port: 5173,
     host: "0.0.0.0",
     hmr: { protocol: "wss", clientPort: 443 },
-    allowedHosts: ["veefore-webhook.veefore.com"],
+    allowedHosts: true,
     strictPort: true,
   },
   optimizeDeps: {
