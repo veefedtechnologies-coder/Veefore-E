@@ -167,7 +167,7 @@ const Changelog = () => {
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -183,7 +183,7 @@ const Changelog = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
                     >
                         <span className="text-white">What's New in </span>
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -204,7 +204,7 @@ const Changelog = () => {
 
             {/* Changelog Timeline */}
             <section className="py-12 md:py-16 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-5xl mx-auto">
                     {/* Timeline line */}
                     <div className="relative border-l-2 border-white/10 ml-2">
                         {changelogEntries.map((entry, i) => (
@@ -216,7 +216,7 @@ const Changelog = () => {
 
             {/* Roadmap Preview */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -259,7 +259,7 @@ const Changelog = () => {
 
             {/* CTA Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto text-center">
+                <div className="max-w-5xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}

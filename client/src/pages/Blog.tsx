@@ -178,7 +178,7 @@ const Blog = () => {
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -194,7 +194,7 @@ const Blog = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
                     >
                         <span className="text-white">The Veefore </span>
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -206,7 +206,7 @@ const Blog = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-base md:text-lg text-white/50 max-w-2xl mx-auto"
+                        className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto"
                     >
                         Insights, tips, and stories to help you grow your audience with AI-powered engagement automation.
                     </motion.p>
@@ -215,7 +215,7 @@ const Blog = () => {
 
             {/* Categories & Search */}
             <section className="py-8 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <div className="flex flex-wrap items-center gap-3 mb-8">
                         {categories.map((cat) => (
                             <CategoryTag
@@ -232,7 +232,7 @@ const Blog = () => {
 
             {/* Coming Soon Notice */}
             <section className="py-8 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -250,7 +250,7 @@ const Blog = () => {
 
             {/* Blog Posts Grid */}
             <section className="py-12 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <div className="grid md:grid-cols-2 gap-6">
                         {filteredPosts.map((post, i) => (
                             <BlogPostCard key={i} {...post} />
@@ -261,7 +261,7 @@ const Blog = () => {
 
             {/* Newsletter CTA */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto text-center">
+                <div className="max-w-5xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}

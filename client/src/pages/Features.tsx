@@ -11,8 +11,10 @@ import {
 import { useIsMobile } from '../hooks/use-is-mobile';
 import { SEO } from '../lib/seo-optimization'
 import { Link } from 'wouter'
+import { useWaitlist } from '../context/WaitlistContext'
 import { MainNavigation } from '../components/MainNavigation'
 import MainFooter from '../components/MainFooter'
+import { IphoneMockup } from '../components/ui/iphone-mockup'
 
 // Lazy load wrapper to fix "stuck loading" issues
 const LazySection = ({ children, threshold = 0.1 }: { children: React.ReactNode, threshold?: number }) => {
@@ -67,121 +69,144 @@ const VeeGPTChatMockup = React.memo(() => {
     // Use slightly less blur for mobile but keep opacity high to maintain glow
     const blurClass = isMobile ? 'blur-2xl' : 'blur-3xl';
 
+    // Header Content
+    const Header = () => (
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-gradient-to-r from-cyan-600/20 to-blue-600/20 sticky top-0 z-10 backdrop-blur-md">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                    <div className="font-semibold text-white flex items-center gap-2">
+                        VeeGPT
+                        <span className="px-2 py-0.5 text-[10px] rounded-full bg-green-500/20 text-green-400 font-medium">AI Agent</span>
+                    </div>
+                    <div className="text-xs text-white/50">Your growth assistant</div>
+                </div>
+            </div>
+            {!isMobile && (
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-xs text-green-400">Active</span>
+                </div>
+            )}
+        </div>
+    );
+
+    // Messages Content
+    const Messages = () => (
+        <div className={`p-5 space-y-4 ${!isMobile ? 'max-h-80 overflow-y-auto' : ''}`}>
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="flex justify-end"
+            >
+                <div className="max-w-[85%] p-4 rounded-2xl rounded-tr-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
+                    <p className="text-sm">Analyze my last 10 posts and tell me what's working</p>
+                </div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                className="flex justify-start"
+            >
+                <div className="max-w-[100%] p-4 rounded-2xl rounded-tl-sm bg-white/5 border border-white/10">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-4 h-4 text-cyan-400" />
+                        <span className="text-xs text-cyan-400 font-medium">Analyzing with GPT-4o</span>
+                    </div>
+                    <p className="text-sm text-white mb-3">I've analyzed your recent posts. Here's what I found:</p>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs">
+                            <CheckCircle className="w-3 h-3 text-green-400" />
+                            <span className="text-white/70">Reels get 3.2x more engagement</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                            <CheckCircle className="w-3 h-3 text-green-400" />
+                            <span className="text-white/70">Best time: 6-8 PM gets 40% more views</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                            <CheckCircle className="w-3 h-3 text-green-400" />
+                            <span className="text-white/70">Carousel posts drive 2x saves</span>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.4 }}
+                className="flex justify-end"
+            >
+                <div className="max-w-[85%] p-4 rounded-2xl rounded-tr-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
+                    <p className="text-sm">Create a content strategy for next week</p>
+                </div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.6 }}
+                className="flex justify-start"
+            >
+                <div className="max-w-[100%] p-4 rounded-2xl rounded-tl-sm bg-white/5 border border-cyan-500/30">
+                    <div className="flex items-center gap-2 mb-3">
+                        <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
+                        <span className="text-xs text-cyan-400 font-medium">Agent working...</span>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                            </div>
+                            <span className="text-xs text-white/70">Analyzing audience trends</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                            </div>
+                            <span className="text-xs text-white/70">Creating 7-day content plan</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center animate-pulse flex-shrink-0">
+                                <Clock className="w-3 h-3 text-cyan-400" />
+                            </div>
+                            <span className="text-xs text-white/70">Scheduling posts...</span>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+
+    if (isMobile) {
+        return (
+            <div className="relative flex justify-center py-4">
+                <div className={`absolute inset-0 bg-gradient-to-br from-cyan-500/40 via-blue-500/30 to-teal-500/40 ${blurClass}`} style={{ transform: 'scale(1.2)' }} />
+                <IphoneMockup isAutoScroll={true} className="relative z-10 w-[90%] max-w-[320px] h-[600px] border-gray-900 bg-gray-900 shadow-2xl">
+                    <div className="bg-[#0a0a0a] min-h-full">
+                        <Header />
+                        <Messages />
+                    </div>
+                </IphoneMockup>
+            </div>
+        );
+    }
+
     return (
         <div className="relative" style={{ willChange: 'transform' }}>
             <div className={`absolute inset-0 bg-gradient-to-br from-cyan-500/40 via-blue-500/30 to-teal-500/40 ${blurClass}`} />
 
             <div className="relative rounded-2xl overflow-hidden border border-cyan-500/30 bg-[#0a0a0a] shadow-2xl">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-gradient-to-r from-cyan-600/20 to-blue-600/20">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-                            <Bot className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <div className="font-semibold text-white flex items-center gap-2">
-                                VeeGPT
-                                <span className="px-2 py-0.5 text-[10px] rounded-full bg-green-500/20 text-green-400 font-medium">AI Agent</span>
-                            </div>
-                            <div className="text-xs text-white/50">Your growth assistant</div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                        <span className="text-xs text-green-400">Active</span>
-                    </div>
-                </div>
-
-                {/* Chat Messages */}
-                <div className="p-5 space-y-4 max-h-80 overflow-y-auto">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        className="flex justify-end"
-                    >
-                        <div className="max-w-[85%] p-4 rounded-2xl rounded-tr-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
-                            <p className="text-sm">Analyze my last 10 posts and tell me what's working</p>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.2 }}
-                        className="flex justify-start"
-                    >
-                        <div className="max-w-[85%] p-4 rounded-2xl rounded-tl-sm bg-white/5 border border-white/10">
-                            <div className="flex items-center gap-2 mb-3">
-                                <Sparkles className="w-4 h-4 text-cyan-400" />
-                                <span className="text-xs text-cyan-400 font-medium">Analyzing with GPT-4o</span>
-                            </div>
-                            <p className="text-sm text-white mb-3">I've analyzed your recent posts. Here's what I found:</p>
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs">
-                                    <CheckCircle className="w-3 h-3 text-green-400" />
-                                    <span className="text-white/70">Reels get 3.2x more engagement</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs">
-                                    <CheckCircle className="w-3 h-3 text-green-400" />
-                                    <span className="text-white/70">Best time: 6-8 PM gets 40% more views</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs">
-                                    <CheckCircle className="w-3 h-3 text-green-400" />
-                                    <span className="text-white/70">Carousel posts drive 2x saves</span>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.4 }}
-                        className="flex justify-end"
-                    >
-                        <div className="max-w-[85%] p-4 rounded-2xl rounded-tr-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
-                            <p className="text-sm">Create a content strategy for next week</p>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.6 }}
-                        className="flex justify-start"
-                    >
-                        <div className="max-w-[85%] p-4 rounded-2xl rounded-tl-sm bg-white/5 border border-cyan-500/30">
-                            <div className="flex items-center gap-2 mb-3">
-                                <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
-                                <span className="text-xs text-cyan-400 font-medium">Agent working...</span>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded bg-green-500/20 flex items-center justify-center">
-                                        <CheckCircle className="w-3 h-3 text-green-400" />
-                                    </div>
-                                    <span className="text-xs text-white/70">Analyzing audience trends</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded bg-green-500/20 flex items-center justify-center">
-                                        <CheckCircle className="w-3 h-3 text-green-400" />
-                                    </div>
-                                    <span className="text-xs text-white/70">Creating 7-day content plan</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center animate-pulse">
-                                        <Clock className="w-3 h-3 text-cyan-400" />
-                                    </div>
-                                    <span className="text-xs text-white/70">Scheduling posts...</span>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
+                <Header />
+                <Messages />
             </div>
         </div>
     )
@@ -192,59 +217,78 @@ const HybridAIMockup = React.memo(() => {
     const isMobile = useIsMobile();
     const blurClass = isMobile ? 'blur-2xl' : 'blur-3xl';
 
+    const Content = () => (
+        <>
+            <div className="text-center mb-6">
+                <h3 className="text-lg font-bold text-white mb-2">Hybrid AI Engine</h3>
+                <p className="text-xs text-white/50">Automatically selects the best model for your query</p>
+            </div>
+
+            {/* Query Analysis */}
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4"
+            >
+                <div className="text-xs text-white/50 mb-2">Your Query</div>
+                <p className="text-sm text-white">"Create a viral marketing campaign for my new product launch"</p>
+            </motion.div>
+
+            {/* AI Models */}
+            <div className="space-y-3">
+                {[
+                    { name: 'GPT-4o', color: 'from-green-500 to-emerald-500', match: 92, desc: 'Best for creative strategy', selected: true },
+                    { name: 'Claude 3.5', color: 'from-orange-500 to-amber-500', match: 78, desc: 'Great for detailed analysis' },
+                    { name: 'Gemini Pro', color: 'from-blue-500 to-cyan-500', match: 71, desc: 'Good for research' },
+                ].map((model, i) => (
+                    <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: i * 0.1 }}
+                        className={`p-3 rounded-xl flex items-center gap-3 ${model.selected ? 'bg-gradient-to-r ' + model.color + ' bg-opacity-20 border-2 border-green-500' : 'bg-white/5 border border-white/5'}`}
+                    >
+                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${model.color} flex items-center justify-center flex-shrink-0`}>
+                            <Brain className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-white">{model.name}</span>
+                                {model.selected && <span className="px-2 py-0.5 text-[10px] rounded-full bg-green-500 text-white">Selected</span>}
+                            </div>
+                            <p className="text-xs text-white/50">{model.desc}</p>
+                        </div>
+                        <div className="text-right">
+                            <div className={`text-lg font-bold ${model.selected ? 'text-green-400' : 'text-white/40'}`}>{model.match}%</div>
+                            <div className="text-[10px] text-white/40">Match</div>
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
+        </>
+    );
+
+    if (isMobile) {
+        return (
+            <div className="relative flex justify-center py-4">
+                <div className={`absolute inset-0 bg-gradient-to-br from-blue-500/30 via-purple-500/30 to-pink-500/30 ${blurClass}`} style={{ transform: 'scale(1.2)' }} />
+                <IphoneMockup isAutoScroll={true} className="relative z-10 w-[90%] max-w-[320px] h-[600px] border-gray-900 bg-gray-900 shadow-2xl">
+                    <div className="bg-[#0a0a0a] min-h-full p-4 overflow-y-auto">
+                        <Content />
+                    </div>
+                </IphoneMockup>
+            </div>
+        );
+    }
+
     return (
         <div className="relative" style={{ willChange: 'transform' }}>
             <div className={`absolute inset-0 bg-gradient-to-br from-blue-500/30 via-purple-500/30 to-pink-500/30 ${blurClass}`} />
 
             <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0a0a0a] shadow-2xl p-6">
-                <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-white mb-2">Hybrid AI Engine</h3>
-                    <p className="text-xs text-white/50">Automatically selects the best model for your query</p>
-                </div>
-
-                {/* Query Analysis */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4"
-                >
-                    <div className="text-xs text-white/50 mb-2">Your Query</div>
-                    <p className="text-sm text-white">"Create a viral marketing campaign for my new product launch"</p>
-                </motion.div>
-
-                {/* AI Models */}
-                <div className="space-y-3">
-                    {[
-                        { name: 'GPT-4o', color: 'from-green-500 to-emerald-500', match: 92, desc: 'Best for creative strategy', selected: true },
-                        { name: 'Claude 3.5', color: 'from-orange-500 to-amber-500', match: 78, desc: 'Great for detailed analysis' },
-                        { name: 'Gemini Pro', color: 'from-blue-500 to-cyan-500', match: 71, desc: 'Good for research' },
-                    ].map((model, i) => (
-                        <motion.div
-                            key={i}
-                            initial={{ opacity: 0, x: -20 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: i * 0.1 }}
-                            className={`p-3 rounded-xl flex items-center gap-3 ${model.selected ? 'bg-gradient-to-r ' + model.color + ' bg-opacity-20 border-2 border-green-500' : 'bg-white/5 border border-white/5'}`}
-                        >
-                            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${model.color} flex items-center justify-center`}>
-                                <Brain className="w-5 h-5 text-white" />
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-white">{model.name}</span>
-                                    {model.selected && <span className="px-2 py-0.5 text-[10px] rounded-full bg-green-500 text-white">Selected</span>}
-                                </div>
-                                <p className="text-xs text-white/50">{model.desc}</p>
-                            </div>
-                            <div className="text-right">
-                                <div className={`text-lg font-bold ${model.selected ? 'text-green-400' : 'text-white/40'}`}>{model.match}%</div>
-                                <div className="text-[10px] text-white/40">Match</div>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
+                <Content />
             </div>
         </div>
     )
@@ -255,71 +299,733 @@ const AgentTasksMockup = React.memo(() => {
     const isMobile = useIsMobile();
     const blurClass = isMobile ? 'blur-2xl' : 'blur-3xl';
 
+    const Content = () => (
+        <>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                        <Zap className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-white">Agent Tasks</h3>
+                        <p className="text-xs text-white/50">VeeGPT working for you</p>
+                    </div>
+                </div>
+                <div className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-medium">
+                    4 Active
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                {[
+                    { task: 'Responding to 12 new comments', status: 'running', progress: 75 },
+                    { task: 'Scheduling posts for next week', status: 'done', progress: 100 },
+                    { task: 'Analyzing competitor strategies', status: 'running', progress: 45 },
+                    { task: 'Generating content ideas', status: 'queued', progress: 0 },
+                ].map((item, i) => (
+                    <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: i * 0.1 }}
+                        className="p-3 rounded-xl bg-white/5 border border-white/5"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-white">{item.task}</span>
+                            {item.status === 'running' && (
+                                <div className="flex items-center gap-1.5 align-middle">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse bg-green-400" />
+                                    <span className="text-[10px] text-green-400 font-medium uppercase tracking-wider">Running</span>
+                                </div>
+                            )}
+                            {item.status === 'done' && (
+                                <div className="flex items-center gap-1.5">
+                                    <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                                    <span className="text-[10px] text-green-500 font-medium uppercase tracking-wider">Done</span>
+                                </div>
+                            )}
+                            {item.status === 'queued' && (
+                                <span className="text-[10px] text-white/30 font-medium uppercase tracking-wider">Queued</span>
+                            )}
+                        </div>
+                        <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                            <motion.div
+                                initial={{ width: 0 }}
+                                whileInView={{ width: `${item.progress}%` }}
+                                viewport={{ once: true }}
+                                transition={{ duration: 1, delay: i * 0.2 }}
+                                className={`h-full rounded-full ${item.status === 'running' ? 'bg-gradient-to-r from-cyan-500 to-blue-500' : item.status === 'done' ? 'bg-green-500' : 'bg-transparent'}`}
+                            />
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
+        </>
+    );
+
+    if (isMobile) {
+        return (
+            <div className="relative flex justify-center py-4">
+                <div className={`absolute inset-0 bg-gradient-to-br from-cyan-500/30 via-blue-500/30 to-teal-500/30 ${blurClass}`} style={{ transform: 'scale(1.2)' }} />
+                <IphoneMockup isAutoScroll={true} className="relative z-10 w-[90%] max-w-[320px] h-[600px] border-gray-900 bg-gray-900 shadow-2xl">
+                    <div className="bg-[#0a0a0a] min-h-full p-4 overflow-y-auto">
+                        <Content />
+                    </div>
+                </IphoneMockup>
+            </div>
+        );
+    }
+
     return (
         <div className="relative" style={{ willChange: 'transform' }}>
             <div className={`absolute inset-0 bg-gradient-to-br from-cyan-500/30 via-blue-500/30 to-teal-500/30 ${blurClass}`} />
 
             <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0a0a0a] shadow-2xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-                            <Zap className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-white">Agent Tasks</h3>
-                            <p className="text-xs text-white/50">VeeGPT working for you</p>
-                        </div>
+                <Content />
+            </div>
+        </div>
+    )
+})
+
+// Workflow Builder Mockup
+const WorkflowBuilderMockup = React.memo(() => {
+    const isMobile = useIsMobile();
+    const blurClass = isMobile ? 'blur-2xl' : 'blur-3xl';
+
+    const Content = () => (
+        <>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                        <Zap className="w-5 h-5 text-white" />
                     </div>
-                    <div className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-medium">
-                        4 Active
+                    <div>
+                        <h3 className="font-semibold text-white">Workflow Builder</h3>
+                        <p className="text-xs text-white/50">Create automations visually</p>
                     </div>
                 </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-xs text-green-400">3 Active Workflows</span>
+                </div>
+            </div>
 
-                <div className="space-y-3">
+            {/* Workflow Timeline */}
+            <div className="relative">
+                {/* Vertical Line */}
+                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-500 via-pink-500 to-rose-500" />
+
+                {/* Workflow Steps */}
+                <div className="space-y-6">
                     {[
-                        { task: 'Responding to 12 new comments', status: 'running', progress: 75 },
-                        { task: 'Scheduling posts for next week', status: 'done', progress: 100 },
-                        { task: 'Analyzing competitor strategies', status: 'running', progress: 45 },
-                        { task: 'Generating content ideas', status: 'queued', progress: 0 },
-                    ].map((item, i) => (
+                        { type: 'trigger', label: 'TRIGGER', title: 'New Comment Received', desc: 'When someone comments on any post', icon: Bell, color: 'from-purple-500 to-violet-500' },
+                        { type: 'condition', label: 'CONDITION', title: 'Check Sentiment', desc: 'Is the comment positive or question?', icon: Brain, color: 'from-blue-500 to-cyan-500' },
+                        { type: 'action', label: 'ACTION', title: 'AI Generates Reply', desc: 'Create personalized response', icon: Sparkles, color: 'from-pink-500 to-rose-500' },
+                        { type: 'action', label: 'ACTION', title: 'Post Reply', desc: 'Send reply after 2-5 min delay', icon: Send, color: 'from-green-500 to-emerald-500' },
+                    ].map((step, i) => (
                         <motion.div
                             key={i}
                             initial={{ opacity: 0, x: -20 }}
                             whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }}
-                            transition={{ delay: i * 0.1 }}
-                            className="p-3 rounded-xl bg-white/5 border border-white/5"
+                            transition={{ delay: i * 0.15 }}
+                            className="relative pl-16"
                         >
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm text-white">{item.task}</span>
-                                {item.status === 'running' && (
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                        <span className="text-[10px] text-green-400 font-medium uppercase tracking-wider">Running</span>
-                                    </div>
-                                )}
-                                {item.status === 'done' && (
-                                    <div className="flex items-center gap-1.5">
-                                        <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                                        <span className="text-[10px] text-green-500 font-medium uppercase tracking-wider">Done</span>
-                                    </div>
-                                )}
-                                {item.status === 'queued' && (
-                                    <span className="text-[10px] text-white/30 font-medium uppercase tracking-wider">Queued</span>
-                                )}
+                            {/* Step Icon */}
+                            <div className={`absolute left-0 w-12 h-12 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center shadow-lg`}>
+                                <step.icon className="w-6 h-6 text-white" />
                             </div>
-                            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    whileInView={{ width: `${item.progress}%` }}
-                                    viewport={{ once: true }}
-                                    transition={{ duration: 1, delay: i * 0.2 }}
-                                    className={`h-full rounded-full ${item.status === 'running' ? 'bg-gradient-to-r from-cyan-500 to-blue-500' : item.status === 'done' ? 'bg-green-500' : 'bg-transparent'}`}
-                                />
+
+                            {/* Step Content */}
+                            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/30 transition-all">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${step.type === 'trigger' ? 'bg-purple-500/20 text-purple-400' :
+                                        step.type === 'condition' ? 'bg-blue-500/20 text-blue-400' :
+                                            'bg-green-500/20 text-green-400'
+                                        } `}>
+                                        {step.label}
+                                    </span>
+                                </div>
+                                <h4 className="font-semibold text-white mb-1">{step.title}</h4>
+                                <p className="text-sm text-white/50">{step.desc}</p>
                             </div>
                         </motion.div>
                     ))}
                 </div>
+            </div>
+
+            {/* Stats Footer */}
+            <div className="mt-8 pt-6 border-t border-white/10 grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <div className="text-2xl font-bold text-purple-400">1,247</div>
+                    <div className="text-xs text-white/50">Runs today</div>
+                </div>
+                <div>
+                    <div className="text-2xl font-bold text-pink-400">98.5%</div>
+                    <div className="text-xs text-white/50">Success rate</div>
+                </div>
+                <div>
+                    <div className="text-2xl font-bold text-green-400">4.2h</div>
+                    <div className="text-xs text-white/50">Time saved</div>
+                </div>
+            </div>
+        </>
+    );
+
+    if (isMobile) {
+        return (
+            <div className="relative flex justify-center py-4">
+                <div className={`absolute inset-0 bg-gradient-to-br from-purple-500/30 via-pink-500/20 to-rose-500/30 ${blurClass}`} style={{ transform: 'scale(1.2)' }} />
+                <IphoneMockup isAutoScroll={true} className="relative z-10 w-[90%] max-w-[320px] h-[600px] border-gray-900 bg-gray-900 shadow-2xl">
+                    <div className="bg-[#0a0a0a] min-h-full p-4 overflow-y-auto">
+                        <Content />
+                    </div>
+                </IphoneMockup>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <div className={`absolute inset-0 bg-gradient-to-br from-purple-500/30 via-pink-500/20 to-rose-500/30 ${blurClass}`} />
+            <div className="relative rounded-2xl overflow-hidden border border-purple-500/20 bg-[#0a0a0a] shadow-2xl p-6 md:p-8">
+                <Content />
+            </div>
+        </div>
+    )
+})
+
+// Scheduling Calendar Mockup
+const SchedulingCalendarMockup = React.memo(() => {
+    const isMobile = useIsMobile();
+    const blurClass = isMobile ? 'blur-2xl' : 'blur-3xl';
+
+    const Content = () => (
+        <>
+            {/* Calendar View */}
+            <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className={isMobile ? "w-full mb-8" : "lg:col-span-2"}
+            >
+                <div>
+                    {!isMobile && (
+                        <div className="absolute inset-0 bg-gradient-to-br from-rose-500/30 via-pink-500/20 to-red-500/30 blur-3xl" />
+                    )}
+                    <div className={`relative rounded-2xl overflow-hidden border border-rose-500/20 bg-[#0a0a0a] shadow-2xl ${isMobile ? '' : ''}`}>
+                        {/* Calendar Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                            <div className="flex items-center gap-3">
+                                <button className="p-2 rounded-lg hover:bg-white/10 transition-colors">
+                                    <ChevronLeft className="w-4 h-4 text-white/50" />
+                                </button>
+                                <h3 className="font-semibold text-white">January 2026</h3>
+                                <button className="p-2 rounded-lg hover:bg-white/10 transition-colors">
+                                    <ChevronRight className="w-4 h-4 text-white/50" />
+                                </button>
+                            </div>
+                            <div className="flex gap-2">
+                                <span className="text-xs px-2 py-1 rounded bg-rose-500/20 text-rose-400">Week View</span>
+                                {!isMobile && <span className="text-xs px-2 py-1 rounded bg-white/5 text-white/50">Month View</span>}
+                            </div>
+                        </div>
+
+                        {/* Calendar Grid */}
+                        <div className="p-4">
+                            {/* Days Header */}
+                            <div className="grid grid-cols-7 gap-2 mb-2">
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
+                                    <div key={i} className="text-center text-xs text-white/40 py-2">{isMobile ? day.charAt(0) : day}</div>
+                                ))}
+                            </div>
+
+                            {/* Calendar Days */}
+                            <div className="grid grid-cols-7 gap-2">
+                                {Array.from({ length: 35 }, (_, i) => {
+                                    const day = i - 3 // Start from Wednesday (offset)
+                                    const hasPost = [3, 5, 8, 12, 15, 19, 22, 26].includes(i)
+                                    const isOptimal = [5, 12, 19, 26].includes(i) // Tuesdays
+                                    const isToday = i === 15
+
+                                    return (
+                                        <motion.div
+                                            key={i}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            whileInView={{ opacity: 1, scale: 1 }}
+                                            viewport={{ once: true }}
+                                            transition={{ delay: i * 0.01 }}
+                                            className={`aspect-square rounded-lg flex flex-col items-center justify-center relative cursor-pointer transition-all ${day < 1 || day > 31 ? 'opacity-30' :
+                                                isToday ? 'bg-rose-500 text-white' :
+                                                    isOptimal ? 'bg-rose-500/20 border border-rose-500/30' :
+                                                        'bg-white/[0.02] hover:bg-white/[0.05]'
+                                                } `}
+                                        >
+                                            <span className={`text-sm ${isToday ? 'font-bold' : 'text-white/70'} `}>
+                                                {day > 0 && day <= 31 ? day : ''}
+                                            </span>
+                                            {hasPost && day > 0 && day <= 31 && (
+                                                <div className={`w-1.5 h-1.5 rounded-full mt-1 ${isOptimal ? 'bg-green-400' : 'bg-rose-400'} `} />
+                                            )}
+                                        </motion.div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Scheduled Posts Preview */}
+                        <div className="px-4 pb-4 space-y-2">
+                            <div className="text-xs text-white/40 mb-2">Scheduled for Today</div>
+                            {[
+                                { time: '6:00 PM', title: 'Behind the scenes reel', type: 'Reel', optimal: true },
+                                { time: '8:30 PM', title: 'Product showcase carousel', type: 'Carousel', optimal: false },
+                            ].map((post, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    whileInView={{ opacity: 1, x: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: i * 0.1 }}
+                                    className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.03] border border-white/5"
+                                >
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                                        <Instagram className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="text-sm text-white truncate max-w-[120px]">{post.title}</div>
+                                        <div className="text-xs text-white/50">{post.time} • {post.type}</div>
+                                    </div>
+                                    {post.optimal && (
+                                        <span className="text-[10px] px-2 py-1 rounded bg-green-500/20 text-green-400">Optimal</span>
+                                    )}
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+
+            {/* Content Queue */}
+            <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                className={isMobile ? "w-full" : ""}
+            >
+                <div className="relative h-full">
+                    {!isMobile && (
+                        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/30 via-rose-500/20 to-red-500/30 blur-3xl" />
+                    )}
+                    <div className="relative rounded-2xl overflow-hidden border border-pink-500/20 bg-[#0a0a0a] shadow-2xl h-full">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                            <h3 className="font-semibold text-white">Content Queue</h3>
+                            <span className="text-xs px-2 py-1 rounded-full bg-rose-500/20 text-rose-400">12 drafts</span>
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                            {[
+                                { title: 'Morning motivation post', status: 'ready', time: 'Tomorrow 7:00 AM' },
+                                { title: 'Tutorial: Quick tips', status: 'ready', time: 'Wed 6:00 PM' },
+                                { title: 'Weekly Q&A story', status: 'draft', time: 'Thu 12:00 PM' },
+                                { title: 'Product launch teaser', status: 'review', time: 'Fri 5:00 PM' },
+                                { title: 'Weekend vibes reel', status: 'ready', time: 'Sat 10:00 AM' },
+                            ].map((item, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: i * 0.1 }}
+                                    className="p-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-rose-500/30 transition-all cursor-grab"
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-sm text-white truncate">{item.title}</span>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.status === 'ready' ? 'bg-green-500/20 text-green-400' :
+                                            item.status === 'review' ? 'bg-amber-500/20 text-amber-400' :
+                                                'bg-white/10 text-white/50'
+                                            } `}>
+                                            {item.status}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-white/40">{item.time}</div>
+                                </motion.div>
+                            ))}
+                        </div>
+
+                        <div className="px-4 pb-4">
+                            <button className="w-full py-2 rounded-xl border border-dashed border-rose-500/30 text-rose-400 text-sm hover:bg-rose-500/10 transition-colors">
+                                + Add to Queue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        </>
+    );
+
+    if (isMobile) {
+        return (
+            <div className="relative flex justify-center py-4">
+                <div className={`absolute inset-0 bg-gradient-to-br from-rose-500/30 via-pink-500/20 to-red-500/30 ${blurClass}`} style={{ transform: 'scale(1.2)' }} />
+                <IphoneMockup isAutoScroll={true} className="relative z-10 w-[90%] max-w-[320px] h-[600px] border-gray-900 bg-gray-900 shadow-2xl">
+                    <div className="bg-[#0a0a0a] min-h-full p-4 overflow-y-auto">
+                        <Content />
+                    </div>
+                </IphoneMockup>
+            </div>
+        );
+    }
+
+    return (
+        <div className="grid lg:grid-cols-3 gap-8 mb-16 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/30 via-pink-500/20 to-red-500/30 blur-3xl -z-10" />
+            <Content />
+        </div>
+    )
+})
+
+// Main Dashboard Mockup
+const MainDashboardMockup = React.memo(() => {
+    const isMobile = useIsMobile();
+    const blurClass = isMobile ? 'blur-2xl' : 'blur-3xl';
+
+    // Extracted content for reusability
+    const Content = () => (
+        <div className="flex h-full">
+            {/* Sidebar - Hidden on mobile, visible on desktop */}
+            {!isMobile && (
+                <div className="hidden md:flex w-16 flex-col items-center py-6 border-r border-white/10 bg-white/[0.02]">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center mb-8">
+                        <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    {[BarChart3, MessageSquare, Users, Bell, Clock, Target].map((Icon, i) => (
+                        <div key={i} className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 cursor-pointer transition-all ${i === 0 ? 'bg-blue-500/20 text-blue-400' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>
+                            <Icon className="w-5 h-5" />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Main Content */}
+            <div className="flex-1 p-6 overflow-y-auto">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-lg font-semibold text-white">Dashboard Overview</h3>
+                        <p className="text-xs text-white/50">Welcome back! Here's your growth summary.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-medium">
+                            All Systems Operational
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                            V
+                        </div>
+                    </div>
+                </div>
+
+                {/* Metric Cards */}
+                <div className={`grid grid-cols-2 ${isMobile ? 'gap-3' : 'md:grid-cols-4 gap-4'} mb-6`}>
+                    {[
+                        { label: 'Total Followers', value: '24.5K', change: '+12.3%', icon: Users, color: 'blue' },
+                        { label: 'Engagement', value: '8.7%', change: '+2.1%', icon: Heart, color: 'pink' },
+                        { label: 'Comments', value: '847', change: '+34%', icon: MessageSquare, color: 'purple' },
+                        { label: 'Reach', value: '156K', change: '+18%', icon: Eye, color: 'green' },
+                    ].map((metric, i) => (
+                        <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 10 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: i * 0.1 }}
+                            className="p-4 rounded-xl bg-white/[0.03] border border-white/5"
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <metric.icon className={`w-4 h-4 ${metric.color === 'blue' ? 'text-blue-400' : metric.color === 'pink' ? 'text-pink-400' : metric.color === 'purple' ? 'text-purple-400' : 'text-green-400'}`} />
+                                <span className="text-xs text-green-400">{metric.change}</span>
+                            </div>
+                            <div className="text-xl font-bold text-white">{metric.value}</div>
+                            <div className="text-xs text-white/50">{metric.label}</div>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {/* Main Grid */}
+                <div className={`grid ${isMobile ? 'gap-4' : 'lg:grid-cols-3 gap-4'}`}>
+                    {/* Chart Area */}
+                    <div className={`${isMobile ? '' : 'lg:col-span-2'} p-4 rounded-xl bg-white/[0.02] border border-white/5`}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-sm font-medium text-white">Growth Overview</h4>
+                            <div className="flex gap-2">
+                                <span className="text-[10px] px-2 py-1 rounded bg-blue-500/20 text-blue-400">7D</span>
+                                {!isMobile && (
+                                    <>
+                                        <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-white/40">30D</span>
+                                        <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-white/40">90D</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        {/* Mini Chart */}
+                        <div className="flex items-end justify-between h-32 gap-1">
+                            {[40, 55, 45, 70, 65, 80, 75, 90, 85, 95, 88, 100].slice(0, isMobile ? 8 : 12).map((h, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ height: 0 }}
+                                    whileInView={{ height: `${h}% ` }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: i * 0.05, duration: 0.4 }}
+                                    className="flex-1 bg-gradient-to-t from-blue-500 to-purple-500 rounded-t opacity-70"
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Activity Feed */}
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                        <h4 className="text-sm font-medium text-white mb-3">Recent Activity</h4>
+                        <div className="space-y-3">
+                            {[
+                                { text: 'New follower milestone: 24K', time: '2m ago', icon: Users },
+                                { text: 'AI replied to 5 comments', time: '15m ago', icon: MessageSquare },
+                                { text: 'Automation triggered', time: '1h ago', icon: Zap },
+                                { text: 'Post scheduled', time: '2h ago', icon: Clock },
+                            ].map((activity, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                    <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                                        <activity.icon className="w-3 h-3 text-blue-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-white/70 truncate">{activity.text}</p>
+                                        <p className="text-[10px] text-white/30">{activity.time}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom Row */}
+                <div className={`grid ${isMobile ? 'gap-4 mt-4' : 'md:grid-cols-2 gap-4 mt-4'}`}>
+                    {/* Goals */}
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                        <h4 className="text-sm font-medium text-white mb-3">Monthly Goals</h4>
+                        <div className="space-y-3">
+                            {[
+                                { goal: 'Reach 25K followers', progress: 98, target: '24.5K / 25K' },
+                                { goal: '5% engagement rate', progress: 100, target: '8.7% ✓' },
+                                { goal: 'Post 30 times', progress: 73, target: '22 / 30' },
+                            ].map((item, i) => (
+                                <div key={i}>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-white/70">{item.goal}</span>
+                                        <span className="text-white/40">{item.target}</span>
+                                    </div>
+                                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            whileInView={{ width: `${item.progress}% ` }}
+                                            viewport={{ once: true }}
+                                            transition={{ delay: i * 0.1, duration: 0.5 }}
+                                            className={`h-full rounded-full ${item.progress >= 100 ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-purple-500'}`}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Automations Status */}
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                        <h4 className="text-sm font-medium text-white mb-3">Active Automations</h4>
+                        <div className="space-y-2">
+                            {[
+                                { name: 'Comment Auto-Reply', status: 'active', runs: '247 today' },
+                                { name: 'DM Responder', status: 'active', runs: '89 today' },
+                                { name: 'Welcome Messages', status: 'active', runs: '34 today' },
+                            ].map((auto, i) => (
+                                <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                        <span className="text-xs text-white">{auto.name}</span>
+                                    </div>
+                                    <span className="text-[10px] text-white/40">{auto.runs}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+
+    if (isMobile) {
+        return (
+            <div className="relative flex justify-center py-4">
+                <div className={`absolute inset-0 bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-violet-500/30 ${blurClass}`} style={{ transform: 'scale(1.2)' }} />
+                <IphoneMockup isAutoScroll={true} className="relative z-10 w-[90%] max-w-[320px] h-[600px] border-gray-900 bg-gray-900 shadow-2xl">
+                    <div className="bg-[#0a0a0a] min-h-full overflow-hidden flex flex-col">
+                        <Content />
+                    </div>
+                </IphoneMockup>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <div className={`absolute inset-0 bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-violet-500/30 ${blurClass}`} />
+            <div className="relative rounded-2xl overflow-hidden border border-blue-500/20 bg-[#0a0a0a] shadow-2xl">
+                <Content />
+            </div>
+        </div>
+    )
+})
+
+// Analytics Dashboard Mockup
+const AnalyticsDashboardMockup = React.memo(() => {
+    const isMobile = useIsMobile();
+    const blurClass = isMobile ? 'blur-2xl' : 'blur-3xl';
+
+    const Content = () => (
+        <>
+            {/* Dashboard Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-green-600/10 to-emerald-600/10">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0">
+                        <BarChart3 className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-white">Analytics Dashboard</h3>
+                        <p className="text-xs text-white/50">Last updated: Just now</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-medium flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                        Live
+                    </div>
+                    {!isMobile && <span className="text-xs text-white/40">Last 30 days</span>}
+                </div>
+            </div>
+
+            {/* Dashboard Content */}
+            <div className="p-6">
+                {/* Top Stats Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    {[
+                        { label: 'Total Followers', value: '24,847', change: '+12.3%', up: true },
+                        { label: 'Engagement Rate', value: '8.7%', change: '+2.1%', up: true },
+                        { label: 'Avg. Reach', value: '45.2K', change: '+18.5%', up: true },
+                        { label: 'Profile Visits', value: '3,521', change: '-3.2%', up: false },
+                    ].map((stat, i) => (
+                        <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 15 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: i * 0.1 }}
+                            className="p-4 rounded-xl bg-white/[0.03] border border-white/5"
+                        >
+                            <div className="text-xs text-white/50 mb-1">{stat.label}</div>
+                            <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
+                            <div className={`text-xs font-medium ${stat.up ? 'text-green-400' : 'text-red-400'} `}>
+                                {stat.up ? '↑' : '↓'} {stat.change}
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {/* Chart Area */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                    {/* Main Chart */}
+                    <div className="lg:col-span-2 p-5 rounded-xl bg-white/[0.02] border border-white/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-medium text-white">Engagement Over Time</h4>
+                            <div className="flex gap-2">
+                                <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">Likes</span>
+                                <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">Comments</span>
+                            </div>
+                        </div>
+                        {/* Animated Chart Bars */}
+                        <div className="flex items-end justify-between h-44 gap-2">
+                            {[35, 52, 45, 68, 55, 72, 48, 85, 62, 78, 55, 92, 68, 88].slice(0, isMobile ? 8 : 14).map((h, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ height: 0 }}
+                                    whileInView={{ height: `${h}% ` }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: i * 0.05, duration: 0.5 }}
+                                    className="flex-1 bg-gradient-to-t from-green-500 to-emerald-400 rounded-t relative group"
+                                >
+                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white bg-black/50 px-1 rounded">
+                                        {h * 12}
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                        {!isMobile && (
+                            <div className="flex justify-between mt-2 text-[10px] text-white/30">
+                                {['Jan 1', 'Jan 7', 'Jan 14', 'Jan 21', 'Jan 28'].map((d, i) => (
+                                    <span key={i}>{d}</span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Best Posting Times */}
+                    <div className="p-5 rounded-xl bg-white/[0.02] border border-white/5">
+                        <h4 className="font-medium text-white mb-4">Best Posting Times</h4>
+                        <div className="space-y-3">
+                            {[
+                                { day: 'Tuesday', time: '6:00 PM', engagement: '92%' },
+                                { day: 'Thursday', time: '12:00 PM', engagement: '87%' },
+                                { day: 'Saturday', time: '10:00 AM', engagement: '84%' },
+                                { day: 'Friday', time: '7:00 PM', engagement: '79%' },
+                            ].map((slot, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, x: 10 }}
+                                    whileInView={{ opacity: 1, x: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: i * 0.1 }}
+                                    className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]"
+                                >
+                                    <div>
+                                        <div className="text-sm text-white">{slot.day}</div>
+                                        <div className="text-xs text-white/50">{slot.time}</div>
+                                    </div>
+                                    <div className="text-sm font-semibold text-green-400">{slot.engagement}</div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+
+    if (isMobile) {
+        return (
+            <div className="relative flex justify-center py-4">
+                <div className={`absolute inset-0 bg-gradient-to-br from-green-500/30 via-emerald-500/20 to-teal-500/30 ${blurClass}`} style={{ transform: 'scale(1.2)' }} />
+                <IphoneMockup isAutoScroll={true} className="relative z-10 w-[90%] max-w-[320px] h-[600px] border-gray-900 bg-gray-900 shadow-2xl">
+                    <div className="bg-[#0a0a0a] min-h-full overflow-y-auto">
+                        <Content />
+                    </div>
+                </IphoneMockup>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <div className={`absolute inset-0 bg-gradient-to-br from-green-500/30 via-emerald-500/20 to-teal-500/30 ${blurClass}`} />
+            <div className="relative rounded-2xl overflow-hidden border border-green-500/20 bg-[#0a0a0a] shadow-2xl">
+                <Content />
             </div>
         </div>
     )
@@ -328,6 +1034,7 @@ const AgentTasksMockup = React.memo(() => {
 
 const Features = () => {
     const isMobile = useIsMobile()
+    const { openWaitlist } = useWaitlist()
 
 
     return (
@@ -349,7 +1056,7 @@ const Features = () => {
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-16 md:pt-40 md:pb-24 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -365,7 +1072,7 @@ const Features = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight mb-6"
                     >
                         <span className="text-white">The Complete </span>
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -377,7 +1084,7 @@ const Features = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-10"
+                        className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-8 md:mb-10"
                     >
                         AI-powered automation, intelligent engagement, and deep analytics working together to skyrocket your growth.
                     </motion.p>
@@ -388,10 +1095,10 @@ const Features = () => {
                         transition={{ duration: 0.6, delay: 0.3 }}
                         className="flex flex-col sm:flex-row gap-4 justify-center"
                     >
-                        <Link href="/waitlist" className="inline-flex items-center justify-center px-8 py-4 rounded-full bg-white text-black font-semibold hover:bg-white/90 transition-all group">
-                            Start Free Trial
+                        <button onClick={openWaitlist} className="inline-flex items-center justify-center px-8 py-4 rounded-full bg-white text-black font-semibold hover:bg-white/90 transition-all group cursor-pointer">
+                            Join Waitlist
                             <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </Link>
+                        </button>
                         <button className="inline-flex items-center justify-center px-8 py-4 rounded-full border border-white/20 text-white font-medium hover:bg-white/5 transition-all gap-2">
                             <Play className="w-5 h-5" />
                             Watch Demo
@@ -421,7 +1128,7 @@ const Features = () => {
                                 <Bot className="w-4 h-4 mr-2" />
                                 ⭐ Our Flagship Feature
                             </span>
-                            <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
+                            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6">
                                 <span className="text-white">Meet </span>
                                 <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-teal-400 bg-clip-text text-transparent">VeeGPT</span>
                             </h2>
@@ -443,7 +1150,7 @@ const Features = () => {
                         </motion.div>
 
                         {/* Key Differentiators */}
-                        <div className="grid md:grid-cols-3 gap-6 mb-20">
+                        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-16 md:mb-20">
                             {[
                                 { icon: Brain, title: "Hybrid AI Engine", desc: "Automatically analyzes your query complexity and routes to the best AI model (GPT-4o, Claude, Gemini) for optimal results" },
                                 { icon: Zap, title: "Agent Capabilities", desc: "Goes beyond answering questions — VeeGPT executes multi-step tasks like creating content plans, analyzing data, and scheduling posts" },
@@ -467,7 +1174,7 @@ const Features = () => {
                         </div>
 
                         {/* Two Column Layout - Hybrid AI + Agent Tasks */}
-                        <div className="grid lg:grid-cols-2 gap-8 mb-20">
+                        <div className="grid md:grid-cols-2 gap-6 lg:gap-8 mb-16 md:mb-20">
                             <motion.div
                                 initial={{ opacity: 0, x: -30 }}
                                 whileInView={{ opacity: 1, x: 0 }}
@@ -569,7 +1276,7 @@ const Features = () => {
                                 <Brain className="w-4 h-4 mr-2" />
                                 🔥 AI-Powered Engagement
                             </span>
-                            <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
+                            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6">
                                 <span className="text-white">Engage </span>
                                 <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">Smarter, Not Harder</span>
                             </h2>
@@ -608,7 +1315,7 @@ const Features = () => {
                         </motion.div>
 
                         {/* Main Visual - Chat + Response Demo */}
-                        <div className="grid lg:grid-cols-2 gap-10 mb-20">
+                        <div className="grid md:grid-cols-2 gap-6 lg:gap-10 mb-16 md:mb-20">
                             {/* Left - Comment Response Demo */}
                             <motion.div
                                 initial={{ opacity: 0, x: -30 }}
@@ -746,7 +1453,7 @@ const Features = () => {
                             viewport={{ once: true }}
                         >
                             <h3 className="text-2xl md:text-3xl font-bold text-white text-center mb-10">How Creators Use AI Engagement</h3>
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                                 {[
                                     { title: 'Reply to Comments', desc: 'Automatically respond to every comment with context-aware replies', icon: MessageSquare },
                                     { title: 'Answer FAQs', desc: 'Detect common questions and provide helpful answers instantly', icon: Brain },
@@ -796,7 +1503,7 @@ const Features = () => {
                                 <RefreshCw className="w-4 h-4 mr-2" />
                                 ⚡ Automation Workflows
                             </span>
-                            <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
+                            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6">
                                 <span className="text-white">Build Relationships </span>
                                 <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 bg-clip-text text-transparent">on Autopilot</span>
                             </h2>
@@ -811,89 +1518,9 @@ const Features = () => {
                             initial={{ opacity: 0, y: 30 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            className="max-w-4xl mx-auto mb-20"
+                            className="max-w-7xl mx-auto mb-20"
                         >
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/30 via-pink-500/20 to-rose-500/30 blur-3xl" />
-                                <div className="relative rounded-2xl overflow-hidden border border-purple-500/20 bg-[#0a0a0a] shadow-2xl p-6 md:p-8">
-                                    {/* Header */}
-                                    <div className="flex items-center justify-between mb-8">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                                                <Zap className="w-5 h-5 text-white" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-semibold text-white">Workflow Builder</h3>
-                                                <p className="text-xs text-white/50">Create automations visually</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                            <span className="text-xs text-green-400">3 Active Workflows</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Workflow Timeline */}
-                                    <div className="relative">
-                                        {/* Vertical Line */}
-                                        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-500 via-pink-500 to-rose-500" />
-
-                                        {/* Workflow Steps */}
-                                        <div className="space-y-6">
-                                            {[
-                                                { type: 'trigger', label: 'TRIGGER', title: 'New Comment Received', desc: 'When someone comments on any post', icon: Bell, color: 'from-purple-500 to-violet-500' },
-                                                { type: 'condition', label: 'CONDITION', title: 'Check Sentiment', desc: 'Is the comment positive or question?', icon: Brain, color: 'from-blue-500 to-cyan-500' },
-                                                { type: 'action', label: 'ACTION', title: 'AI Generates Reply', desc: 'Create personalized response', icon: Sparkles, color: 'from-pink-500 to-rose-500' },
-                                                { type: 'action', label: 'ACTION', title: 'Post Reply', desc: 'Send reply after 2-5 min delay', icon: Send, color: 'from-green-500 to-emerald-500' },
-                                            ].map((step, i) => (
-                                                <motion.div
-                                                    key={i}
-                                                    initial={{ opacity: 0, x: -20 }}
-                                                    whileInView={{ opacity: 1, x: 0 }}
-                                                    viewport={{ once: true }}
-                                                    transition={{ delay: i * 0.15 }}
-                                                    className="relative pl-16"
-                                                >
-                                                    {/* Step Icon */}
-                                                    <div className={`absolute left - 0 w - 12 h - 12 rounded - xl bg - gradient - to - br ${step.color} flex items - center justify - center shadow - lg`}>
-                                                        <step.icon className="w-6 h-6 text-white" />
-                                                    </div>
-
-                                                    {/* Step Content */}
-                                                    <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/30 transition-all">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className={`text - [10px] font - bold px - 2 py - 0.5 rounded ${step.type === 'trigger' ? 'bg-purple-500/20 text-purple-400' :
-                                                                step.type === 'condition' ? 'bg-blue-500/20 text-blue-400' :
-                                                                    'bg-green-500/20 text-green-400'
-                                                                } `}>
-                                                                {step.label}
-                                                            </span>
-                                                        </div>
-                                                        <h4 className="font-semibold text-white mb-1">{step.title}</h4>
-                                                        <p className="text-sm text-white/50">{step.desc}</p>
-                                                    </div>
-                                                </motion.div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Stats Footer */}
-                                    <div className="mt-8 pt-6 border-t border-white/10 grid grid-cols-3 gap-4 text-center">
-                                        <div>
-                                            <div className="text-2xl font-bold text-purple-400">1,247</div>
-                                            <div className="text-xs text-white/50">Runs today</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-2xl font-bold text-pink-400">98.5%</div>
-                                            <div className="text-xs text-white/50">Success rate</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-2xl font-bold text-green-400">4.2h</div>
-                                            <div className="text-xs text-white/50">Time saved</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <WorkflowBuilderMockup />
                         </motion.div>
 
                         {/* Automation Templates */}
@@ -904,7 +1531,7 @@ const Features = () => {
                             className="mb-16"
                         >
                             <h3 className="text-2xl md:text-3xl font-bold text-white text-center mb-10">Pre-Built Automation Templates</h3>
-                            <div className="grid md:grid-cols-3 gap-6">
+                            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                                 {[
                                     {
                                         title: 'Welcome New Followers',
@@ -975,7 +1602,7 @@ const Features = () => {
                                 <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">Powerful Trigger Options</h3>
                                 <p className="text-white/50">Start automations based on any event</p>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3">
                                 {[
                                     { label: 'New Comment', icon: MessageSquare },
                                     { label: 'New Follower', icon: Users },
@@ -1030,7 +1657,7 @@ const Features = () => {
                                 <BarChart3 className="w-4 h-4 mr-2" />
                                 📊 Real-Time Analytics
                             </span>
-                            <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
+                            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6">
                                 <span className="text-white">Understand What's </span>
                                 <span className="bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 bg-clip-text text-transparent">Actually Working</span>
                             </h2>
@@ -1047,122 +1674,7 @@ const Features = () => {
                             viewport={{ once: true }}
                             className="mb-16"
                         >
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-gradient-to-br from-green-500/30 via-emerald-500/20 to-teal-500/30 blur-3xl" />
-                                <div className="relative rounded-2xl overflow-hidden border border-green-500/20 bg-[#0a0a0a] shadow-2xl">
-                                    {/* Dashboard Header */}
-                                    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-green-600/10 to-emerald-600/10">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                                                <BarChart3 className="w-5 h-5 text-white" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-semibold text-white">Analytics Dashboard</h3>
-                                                <p className="text-xs text-white/50">Last updated: Just now</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-medium flex items-center gap-1">
-                                                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                                Live
-                                            </div>
-                                            <span className="text-xs text-white/40">Last 30 days</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Dashboard Content */}
-                                    <div className="p-6">
-                                        {/* Top Stats Row */}
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                                            {[
-                                                { label: 'Total Followers', value: '24,847', change: '+12.3%', up: true },
-                                                { label: 'Engagement Rate', value: '8.7%', change: '+2.1%', up: true },
-                                                { label: 'Avg. Reach', value: '45.2K', change: '+18.5%', up: true },
-                                                { label: 'Profile Visits', value: '3,521', change: '-3.2%', up: false },
-                                            ].map((stat, i) => (
-                                                <motion.div
-                                                    key={i}
-                                                    initial={{ opacity: 0, y: 15 }}
-                                                    whileInView={{ opacity: 1, y: 0 }}
-                                                    viewport={{ once: true }}
-                                                    transition={{ delay: i * 0.1 }}
-                                                    className="p-4 rounded-xl bg-white/[0.03] border border-white/5"
-                                                >
-                                                    <div className="text-xs text-white/50 mb-1">{stat.label}</div>
-                                                    <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
-                                                    <div className={`text - xs font - medium ${stat.up ? 'text-green-400' : 'text-red-400'} `}>
-                                                        {stat.up ? '↑' : '↓'} {stat.change}
-                                                    </div>
-                                                </motion.div>
-                                            ))}
-                                        </div>
-
-                                        {/* Chart Area */}
-                                        <div className="grid lg:grid-cols-3 gap-6">
-                                            {/* Main Chart */}
-                                            <div className="lg:col-span-2 p-5 rounded-xl bg-white/[0.02] border border-white/5">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h4 className="font-medium text-white">Engagement Over Time</h4>
-                                                    <div className="flex gap-2">
-                                                        <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">Likes</span>
-                                                        <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">Comments</span>
-                                                    </div>
-                                                </div>
-                                                {/* Animated Chart Bars */}
-                                                <div className="flex items-end justify-between h-44 gap-2">
-                                                    {[35, 52, 45, 68, 55, 72, 48, 85, 62, 78, 55, 92, 68, 88].map((h, i) => (
-                                                        <motion.div
-                                                            key={i}
-                                                            initial={{ height: 0 }}
-                                                            whileInView={{ height: `${h}% ` }}
-                                                            viewport={{ once: true }}
-                                                            transition={{ delay: i * 0.05, duration: 0.5 }}
-                                                            className="flex-1 bg-gradient-to-t from-green-500 to-emerald-400 rounded-t relative group"
-                                                        >
-                                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white bg-black/50 px-1 rounded">
-                                                                {h * 12}
-                                                            </div>
-                                                        </motion.div>
-                                                    ))}
-                                                </div>
-                                                <div className="flex justify-between mt-2 text-[10px] text-white/30">
-                                                    {['Jan 1', 'Jan 7', 'Jan 14', 'Jan 21', 'Jan 28'].map((d, i) => (
-                                                        <span key={i}>{d}</span>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {/* Best Posting Times */}
-                                            <div className="p-5 rounded-xl bg-white/[0.02] border border-white/5">
-                                                <h4 className="font-medium text-white mb-4">Best Posting Times</h4>
-                                                <div className="space-y-3">
-                                                    {[
-                                                        { day: 'Tuesday', time: '6:00 PM', engagement: '92%' },
-                                                        { day: 'Thursday', time: '12:00 PM', engagement: '87%' },
-                                                        { day: 'Saturday', time: '10:00 AM', engagement: '84%' },
-                                                        { day: 'Friday', time: '7:00 PM', engagement: '79%' },
-                                                    ].map((slot, i) => (
-                                                        <motion.div
-                                                            key={i}
-                                                            initial={{ opacity: 0, x: 10 }}
-                                                            whileInView={{ opacity: 1, x: 0 }}
-                                                            viewport={{ once: true }}
-                                                            transition={{ delay: i * 0.1 }}
-                                                            className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]"
-                                                        >
-                                                            <div>
-                                                                <div className="text-sm text-white">{slot.day}</div>
-                                                                <div className="text-xs text-white/50">{slot.time}</div>
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-green-400">{slot.engagement}</div>
-                                                        </motion.div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <AnalyticsDashboardMockup />
                         </motion.div>
 
                         {/* Key Metrics Grid */}
@@ -1173,7 +1685,7 @@ const Features = () => {
                             className="mb-16"
                         >
                             <h3 className="text-2xl md:text-3xl font-bold text-white text-center mb-10">Track Every Metric That Matters</h3>
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                                 {[
                                     { title: 'Follower Growth', desc: 'Track daily, weekly, monthly follower trends', icon: Users, value: '+1.2K/week' },
                                     { title: 'Engagement Rate', desc: 'Likes, comments, shares per post', icon: Heart, value: '8.7%' },
@@ -1289,162 +1801,7 @@ const Features = () => {
                         </motion.div>
 
                         {/* Main Calendar + Queue Layout */}
-                        <div className="grid lg:grid-cols-3 gap-8 mb-16">
-                            {/* Calendar View */}
-                            <motion.div
-                                initial={{ opacity: 0, x: -30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
-                                className="lg:col-span-2"
-                            >
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-rose-500/30 via-pink-500/20 to-red-500/30 blur-3xl" />
-                                    <div className="relative rounded-2xl overflow-hidden border border-rose-500/20 bg-[#0a0a0a] shadow-2xl">
-                                        {/* Calendar Header */}
-                                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-                                            <div className="flex items-center gap-3">
-                                                <button className="p-2 rounded-lg hover:bg-white/10 transition-colors">
-                                                    <ChevronLeft className="w-4 h-4 text-white/50" />
-                                                </button>
-                                                <h3 className="font-semibold text-white">January 2026</h3>
-                                                <button className="p-2 rounded-lg hover:bg-white/10 transition-colors">
-                                                    <ChevronRight className="w-4 h-4 text-white/50" />
-                                                </button>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <span className="text-xs px-2 py-1 rounded bg-rose-500/20 text-rose-400">Week View</span>
-                                                <span className="text-xs px-2 py-1 rounded bg-white/5 text-white/50">Month View</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Calendar Grid */}
-                                        <div className="p-4">
-                                            {/* Days Header */}
-                                            <div className="grid grid-cols-7 gap-2 mb-2">
-                                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
-                                                    <div key={i} className="text-center text-xs text-white/40 py-2">{day}</div>
-                                                ))}
-                                            </div>
-
-                                            {/* Calendar Days */}
-                                            <div className="grid grid-cols-7 gap-2">
-                                                {Array.from({ length: 35 }, (_, i) => {
-                                                    const day = i - 3 // Start from Wednesday (offset)
-                                                    const hasPost = [3, 5, 8, 12, 15, 19, 22, 26].includes(i)
-                                                    const isOptimal = [5, 12, 19, 26].includes(i) // Tuesdays
-                                                    const isToday = i === 15
-
-                                                    return (
-                                                        <motion.div
-                                                            key={i}
-                                                            initial={{ opacity: 0, scale: 0.9 }}
-                                                            whileInView={{ opacity: 1, scale: 1 }}
-                                                            viewport={{ once: true }}
-                                                            transition={{ delay: i * 0.01 }}
-                                                            className={`aspect - square rounded - lg flex flex - col items - center justify - center relative cursor - pointer transition - all ${day < 1 || day > 31 ? 'opacity-30' :
-                                                                isToday ? 'bg-rose-500 text-white' :
-                                                                    isOptimal ? 'bg-rose-500/20 border border-rose-500/30' :
-                                                                        'bg-white/[0.02] hover:bg-white/[0.05]'
-                                                                } `}
-                                                        >
-                                                            <span className={`text - sm ${isToday ? 'font-bold' : 'text-white/70'} `}>
-                                                                {day > 0 && day <= 31 ? day : ''}
-                                                            </span>
-                                                            {hasPost && day > 0 && day <= 31 && (
-                                                                <div className={`w - 1.5 h - 1.5 rounded - full mt - 1 ${isOptimal ? 'bg-green-400' : 'bg-rose-400'} `} />
-                                                            )}
-                                                        </motion.div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-
-                                        {/* Scheduled Posts Preview */}
-                                        <div className="px-4 pb-4 space-y-2">
-                                            <div className="text-xs text-white/40 mb-2">Scheduled for Today</div>
-                                            {[
-                                                { time: '6:00 PM', title: 'Behind the scenes reel', type: 'Reel', optimal: true },
-                                                { time: '8:30 PM', title: 'Product showcase carousel', type: 'Carousel', optimal: false },
-                                            ].map((post, i) => (
-                                                <motion.div
-                                                    key={i}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    whileInView={{ opacity: 1, x: 0 }}
-                                                    viewport={{ once: true }}
-                                                    transition={{ delay: i * 0.1 }}
-                                                    className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.03] border border-white/5"
-                                                >
-                                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center">
-                                                        <Instagram className="w-5 h-5 text-white" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <div className="text-sm text-white">{post.title}</div>
-                                                        <div className="text-xs text-white/50">{post.time} • {post.type}</div>
-                                                    </div>
-                                                    {post.optimal && (
-                                                        <span className="text-[10px] px-2 py-1 rounded bg-green-500/20 text-green-400">Optimal</span>
-                                                    )}
-                                                </motion.div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-
-                            {/* Content Queue */}
-                            <motion.div
-                                initial={{ opacity: 0, x: 30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: 0.2 }}
-                            >
-                                <div className="relative h-full">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500/30 via-rose-500/20 to-red-500/30 blur-3xl" />
-                                    <div className="relative rounded-2xl overflow-hidden border border-pink-500/20 bg-[#0a0a0a] shadow-2xl h-full">
-                                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-                                            <h3 className="font-semibold text-white">Content Queue</h3>
-                                            <span className="text-xs px-2 py-1 rounded-full bg-rose-500/20 text-rose-400">12 drafts</span>
-                                        </div>
-
-                                        <div className="p-4 space-y-3">
-                                            {[
-                                                { title: 'Morning motivation post', status: 'ready', time: 'Tomorrow 7:00 AM' },
-                                                { title: 'Tutorial: Quick tips', status: 'ready', time: 'Wed 6:00 PM' },
-                                                { title: 'Weekly Q&A story', status: 'draft', time: 'Thu 12:00 PM' },
-                                                { title: 'Product launch teaser', status: 'review', time: 'Fri 5:00 PM' },
-                                                { title: 'Weekend vibes reel', status: 'ready', time: 'Sat 10:00 AM' },
-                                            ].map((item, i) => (
-                                                <motion.div
-                                                    key={i}
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    whileInView={{ opacity: 1, y: 0 }}
-                                                    viewport={{ once: true }}
-                                                    transition={{ delay: i * 0.1 }}
-                                                    className="p-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-rose-500/30 transition-all cursor-grab"
-                                                >
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-sm text-white truncate">{item.title}</span>
-                                                        <span className={`text - [10px] px - 2 py - 0.5 rounded - full ${item.status === 'ready' ? 'bg-green-500/20 text-green-400' :
-                                                            item.status === 'review' ? 'bg-amber-500/20 text-amber-400' :
-                                                                'bg-white/10 text-white/50'
-                                                            } `}>
-                                                            {item.status}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-xs text-white/40">{item.time}</div>
-                                                </motion.div>
-                                            ))}
-                                        </div>
-
-                                        <div className="px-4 pb-4">
-                                            <button className="w-full py-2 rounded-xl border border-dashed border-rose-500/30 text-rose-400 text-sm hover:bg-rose-500/10 transition-colors">
-                                                + Add to Queue
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        </div>
+                        <SchedulingCalendarMockup />
 
                         {/* Optimal Times Heatmap */}
                         <motion.div
@@ -1818,7 +2175,7 @@ const Features = () => {
                                 <BarChart3 className="w-4 h-4 mr-2" />
                                 🎯 Command Center
                             </span>
-                            <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
+                            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6">
                                 <span className="text-white">Everything in </span>
                                 <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-violet-400 bg-clip-text text-transparent">One Place</span>
                             </h2>
@@ -1835,177 +2192,7 @@ const Features = () => {
                             viewport={{ once: true }}
                             className="mb-16"
                         >
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-violet-500/30 blur-3xl" />
-                                <div className="relative rounded-2xl overflow-hidden border border-blue-500/20 bg-[#0a0a0a] shadow-2xl">
-
-                                    {/* Dashboard Layout */}
-                                    <div className="flex">
-                                        {/* Sidebar */}
-                                        <div className="hidden md:flex w-16 flex-col items-center py-6 border-r border-white/10 bg-white/[0.02]">
-                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center mb-8">
-                                                <Sparkles className="w-4 h-4 text-white" />
-                                            </div>
-                                            {[BarChart3, MessageSquare, Users, Bell, Clock, Target].map((Icon, i) => (
-                                                <div key={i} className={`w - 10 h - 10 rounded - lg flex items - center justify - center mb - 2 cursor - pointer transition - all ${i === 0 ? 'bg-blue-500/20 text-blue-400' : 'text-white/30 hover:text-white/60 hover:bg-white/5'} `}>
-                                                    <Icon className="w-5 h-5" />
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {/* Main Content */}
-                                        <div className="flex-1 p-6">
-                                            {/* Header */}
-                                            <div className="flex items-center justify-between mb-6">
-                                                <div>
-                                                    <h3 className="text-lg font-semibold text-white">Dashboard Overview</h3>
-                                                    <p className="text-xs text-white/50">Welcome back! Here's your growth summary.</p>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-medium">
-                                                        All Systems Operational
-                                                    </div>
-                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                                                        V
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Metric Cards */}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                                {[
-                                                    { label: 'Total Followers', value: '24.5K', change: '+12.3%', icon: Users, color: 'blue' },
-                                                    { label: 'Engagement', value: '8.7%', change: '+2.1%', icon: Heart, color: 'pink' },
-                                                    { label: 'Comments', value: '847', change: '+34%', icon: MessageSquare, color: 'purple' },
-                                                    { label: 'Reach', value: '156K', change: '+18%', icon: Eye, color: 'green' },
-                                                ].map((metric, i) => (
-                                                    <motion.div
-                                                        key={i}
-                                                        initial={{ opacity: 0, y: 10 }}
-                                                        whileInView={{ opacity: 1, y: 0 }}
-                                                        viewport={{ once: true }}
-                                                        transition={{ delay: i * 0.1 }}
-                                                        className="p-4 rounded-xl bg-white/[0.03] border border-white/5"
-                                                    >
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <metric.icon className={`w - 4 h - 4 ${metric.color === 'blue' ? 'text-blue-400' :
-                                                                metric.color === 'pink' ? 'text-pink-400' :
-                                                                    metric.color === 'purple' ? 'text-purple-400' :
-                                                                        'text-green-400'
-                                                                } `} />
-                                                            <span className="text-xs text-green-400">{metric.change}</span>
-                                                        </div>
-                                                        <div className="text-xl font-bold text-white">{metric.value}</div>
-                                                        <div className="text-xs text-white/50">{metric.label}</div>
-                                                    </motion.div>
-                                                ))}
-                                            </div>
-
-                                            {/* Main Grid */}
-                                            <div className="grid lg:grid-cols-3 gap-4">
-                                                {/* Chart Area */}
-                                                <div className="lg:col-span-2 p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                                                    <div className="flex items-center justify-between mb-4">
-                                                        <h4 className="text-sm font-medium text-white">Growth Overview</h4>
-                                                        <div className="flex gap-2">
-                                                            <span className="text-[10px] px-2 py-1 rounded bg-blue-500/20 text-blue-400">7D</span>
-                                                            <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-white/40">30D</span>
-                                                            <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-white/40">90D</span>
-                                                        </div>
-                                                    </div>
-                                                    {/* Mini Chart */}
-                                                    <div className="flex items-end justify-between h-32 gap-1">
-                                                        {[40, 55, 45, 70, 65, 80, 75, 90, 85, 95, 88, 100].map((h, i) => (
-                                                            <motion.div
-                                                                key={i}
-                                                                initial={{ height: 0 }}
-                                                                whileInView={{ height: `${h}% ` }}
-                                                                viewport={{ once: true }}
-                                                                transition={{ delay: i * 0.05, duration: 0.4 }}
-                                                                className="flex-1 bg-gradient-to-t from-blue-500 to-purple-500 rounded-t opacity-70"
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                {/* Activity Feed */}
-                                                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                                                    <h4 className="text-sm font-medium text-white mb-3">Recent Activity</h4>
-                                                    <div className="space-y-3">
-                                                        {[
-                                                            { text: 'New follower milestone: 24K', time: '2m ago', icon: Users },
-                                                            { text: 'AI replied to 5 comments', time: '15m ago', icon: MessageSquare },
-                                                            { text: 'Automation triggered', time: '1h ago', icon: Zap },
-                                                            { text: 'Post scheduled', time: '2h ago', icon: Clock },
-                                                        ].map((activity, i) => (
-                                                            <div key={i} className="flex items-start gap-2">
-                                                                <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                                                                    <activity.icon className="w-3 h-3 text-blue-400" />
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-xs text-white/70 truncate">{activity.text}</p>
-                                                                    <p className="text-[10px] text-white/30">{activity.time}</p>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Bottom Row */}
-                                            <div className="grid md:grid-cols-2 gap-4 mt-4">
-                                                {/* Goals */}
-                                                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                                                    <h4 className="text-sm font-medium text-white mb-3">Monthly Goals</h4>
-                                                    <div className="space-y-3">
-                                                        {[
-                                                            { goal: 'Reach 25K followers', progress: 98, target: '24.5K / 25K' },
-                                                            { goal: '5% engagement rate', progress: 100, target: '8.7% ✓' },
-                                                            { goal: 'Post 30 times', progress: 73, target: '22 / 30' },
-                                                        ].map((item, i) => (
-                                                            <div key={i}>
-                                                                <div className="flex justify-between text-xs mb-1">
-                                                                    <span className="text-white/70">{item.goal}</span>
-                                                                    <span className="text-white/40">{item.target}</span>
-                                                                </div>
-                                                                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                                    <motion.div
-                                                                        initial={{ width: 0 }}
-                                                                        whileInView={{ width: `${item.progress}% ` }}
-                                                                        viewport={{ once: true }}
-                                                                        transition={{ delay: i * 0.1, duration: 0.5 }}
-                                                                        className={`h - full rounded - full ${item.progress >= 100 ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-purple-500'} `}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                {/* Automations Status */}
-                                                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                                                    <h4 className="text-sm font-medium text-white mb-3">Active Automations</h4>
-                                                    <div className="space-y-2">
-                                                        {[
-                                                            { name: 'Comment Auto-Reply', status: 'active', runs: '247 today' },
-                                                            { name: 'DM Responder', status: 'active', runs: '89 today' },
-                                                            { name: 'Welcome Messages', status: 'active', runs: '34 today' },
-                                                        ].map((auto, i) => (
-                                                            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                                                    <span className="text-xs text-white">{auto.name}</span>
-                                                                </div>
-                                                                <span className="text-[10px] text-white/40">{auto.runs}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <MainDashboardMockup />
                         </motion.div>
 
                         {/* Dashboard Features */}
@@ -2052,7 +2239,7 @@ const Features = () => {
 
             {/* CTA Section */}
             <section className="py-24 md:py-32 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}
@@ -2073,7 +2260,7 @@ const Features = () => {
                                 <Zap className="w-10 h-10 text-white" />
                             </motion.div>
 
-                            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+                            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 md:mb-6">
                                 Ready to Transform Your Growth?
                             </h2>
                             <p className="text-lg text-white/60 mb-10 max-w-xl mx-auto">

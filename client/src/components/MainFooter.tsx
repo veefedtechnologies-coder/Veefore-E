@@ -1,23 +1,17 @@
 import React, { useState } from 'react';
-
+import { Link, useLocation } from 'wouter';
+import { useWaitlist } from '../context/WaitlistContext';
 import { Twitter, Instagram, Linkedin } from 'lucide-react';
 
 const MainFooter = () => {
-    // Basic location check for highlighting, but navigation is forced
-    const location = window.location.pathname;
+    const [location] = useLocation();
+    const { openWaitlist } = useWaitlist();
     const [email, setEmail] = useState('');
 
     const isActive = (path: string) => location === path;
 
-    const handleNav = (e: React.MouseEvent, path: string) => {
-        e.preventDefault();
-        // Force full page navigation to ensure correct rendering
-        window.location.assign(path);
-    };
-
     const handleSubscribe = (e: React.FormEvent) => {
         e.preventDefault();
-        // Placeholder for newsletter subscription logic
         console.log('Subscribing email:', email);
         setEmail('');
         alert('Thanks for subscribing!');
@@ -27,7 +21,7 @@ const MainFooter = () => {
         product: [
             { name: 'Features', path: '/features' },
             { name: 'Pricing', path: '/pricing' },
-            { name: 'Free Trial', path: '/waitlist' }, // Assuming free trial maps to waitlist or similar
+            { name: 'Join Waitlist', path: '/#beta-signup' },
             { name: 'Changelog', path: '/changelog' },
         ],
         company: [
@@ -51,10 +45,10 @@ const MainFooter = () => {
 
                     {/* Brand Column */}
                     <div className="md:col-span-4 lg:col-span-5 space-y-6">
-                        <a href="/" className="flex items-center space-x-2" onClick={(e) => handleNav(e, '/')}>
+                        <Link href="/" className="flex items-center space-x-2">
                             <img src="/veefore-logo.png" alt="Veefore" className="w-8 h-8 object-contain" />
                             <span className="text-xl font-bold">Veefore</span>
-                        </a>
+                        </Link>
                         <p className="text-white/50 max-w-sm leading-relaxed">
                             AI-powered Growth Engine that actively increases engagement, reach, and visibility for creators — automatically.
                         </p>
@@ -79,13 +73,21 @@ const MainFooter = () => {
                             <ul className="space-y-4">
                                 {footerLinks.product.map((link) => (
                                     <li key={link.path}>
-                                        <a
-                                            href={link.path}
-                                            className={`text-sm transition-colors cursor-pointer block ${isActive(link.path) ? 'text-blue-400 font-medium' : 'text-white/60 hover:text-white'}`}
-                                            onClick={(e) => handleNav(e, link.path)}
-                                        >
-                                            {link.name}
-                                        </a>
+                                        {link.name === 'Join Waitlist' ? (
+                                            <button
+                                                onClick={openWaitlist}
+                                                className="text-sm transition-colors cursor-pointer block text-white/60 hover:text-white"
+                                            >
+                                                {link.name}
+                                            </button>
+                                        ) : (
+                                            <Link
+                                                href={link.path}
+                                                className={`text-sm transition-colors cursor-pointer block ${isActive(link.path) ? 'text-blue-400 font-medium' : 'text-white/60 hover:text-white'}`}
+                                            >
+                                                {link.name}
+                                            </Link>
+                                        )}
                                     </li>
                                 ))}
                             </ul>
@@ -97,13 +99,12 @@ const MainFooter = () => {
                             <ul className="space-y-4">
                                 {footerLinks.company.map((link) => (
                                     <li key={link.path}>
-                                        <a
+                                        <Link
                                             href={link.path}
                                             className={`text-sm transition-colors cursor-pointer block ${isActive(link.path) ? 'text-blue-400 font-medium' : 'text-white/60 hover:text-white'}`}
-                                            onClick={(e) => handleNav(e, link.path)}
                                         >
                                             {link.name}
-                                        </a>
+                                        </Link>
                                     </li>
                                 ))}
                             </ul>
@@ -115,13 +116,12 @@ const MainFooter = () => {
                             <ul className="space-y-4">
                                 {footerLinks.legal.map((link) => (
                                     <li key={link.path}>
-                                        <a
+                                        <Link
                                             href={link.path}
                                             className={`text-sm transition-colors cursor-pointer block ${isActive(link.path) ? 'text-blue-400 font-medium' : 'text-white/60 hover:text-white'}`}
-                                            onClick={(e) => handleNav(e, link.path)}
                                         >
                                             {link.name}
-                                        </a>
+                                        </Link>
                                     </li>
                                 ))}
                             </ul>
@@ -165,9 +165,9 @@ const MainFooter = () => {
                         © {new Date().getFullYear()} Veefed Technologies Pvt. Ltd. All rights reserved.
                     </p>
                     <div className="flex gap-6 text-sm text-white/40">
-                        <a href="/privacy-policy" className="hover:text-white transition-colors cursor-pointer" onClick={(e) => handleNav(e, '/privacy-policy')}>Privacy Policy</a>
-                        <a href="/terms-of-service" className="hover:text-white transition-colors cursor-pointer" onClick={(e) => handleNav(e, '/terms-of-service')}>Terms of Service</a>
-                        <a href="/gdpr" className="hover:text-white transition-colors cursor-pointer" onClick={(e) => handleNav(e, '/gdpr')}>GDPR</a>
+                        <Link href="/privacy-policy" className="hover:text-white transition-colors cursor-pointer">Privacy Policy</Link>
+                        <Link href="/terms-of-service" className="hover:text-white transition-colors cursor-pointer">Terms of Service</Link>
+                        <Link href="/gdpr" className="hover:text-white transition-colors cursor-pointer">GDPR</Link>
                     </div>
                 </div>
             </div>

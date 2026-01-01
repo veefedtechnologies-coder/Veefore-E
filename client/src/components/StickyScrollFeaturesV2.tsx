@@ -3,7 +3,8 @@ import { motion, useScroll, useSpring, useMotionValueEvent } from 'framer-motion
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
 
-const springConfig = { stiffness: 50, damping: 25, mass: 0.8 };
+// Faster spring config for snappier transitions
+const springConfig = { stiffness: 120, damping: 20, mass: 0.5 };
 
 const colorMap = {
     blue: {
@@ -126,12 +127,12 @@ function mapRange(value: number, inMin: number, inMax: number, outMin: number, o
 
 const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, isMobile?: boolean }) => {
     const colors = colorMap[feature.color];
-    
-    // Use smaller sizing for mobile mockups to prevent content cutoff
-    const baseClasses = isMobile 
-        ? "h-full w-full p-2 sm:p-3 pt-8 sm:pt-10 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden"
+
+    // Updated padding: removed top padding on mobile as IphoneMockup handles it now
+    const baseClasses = isMobile
+        ? "h-full w-full p-2 sm:p-3 pt-4 sm:pt-6 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden"
         : "h-full w-full p-4 md:p-6 lg:p-8 pt-10 md:pt-12 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden";
-    
+
     return (
         <div className={baseClasses}>
             {feature.screen.type === 'analysis' && (
@@ -215,31 +216,21 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
     );
 });
 
+import { IphoneMockup } from './ui/iphone-mockup';
+
 const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
-        <div 
-            className="w-full h-full flex flex-col items-center justify-center p-1 sm:p-2 md:p-4"
+        <div
+            className="w-full h-full flex flex-col items-center justify-center pointer-events-none"
             style={{
                 WebkitTransform: 'translate3d(0,0,0)',
                 transform: 'translate3d(0,0,0)',
             }}
         >
-            <div 
-                className="h-full max-h-[380px] sm:max-h-[440px] md:max-h-[520px] lg:max-h-[580px] w-auto aspect-[9/19] bg-black rounded-[1.5rem] sm:rounded-[2rem] md:rounded-[2.5rem] lg:rounded-[3rem] border-[4px] sm:border-[5px] md:border-[6px] lg:border-[8px] border-zinc-800 overflow-hidden relative shadow-2xl ring-1 ring-white/10"
-                style={{
-                    WebkitBackfaceVisibility: 'hidden',
-                    backfaceVisibility: 'hidden',
-                    WebkitTransformStyle: 'preserve-3d',
-                }}
-            >
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 sm:w-20 md:w-24 lg:w-28 h-4 sm:h-5 md:h-6 lg:h-7 bg-black rounded-b-xl sm:rounded-b-2xl z-20 flex justify-center items-center">
-                    <div className="w-8 sm:w-10 md:w-12 lg:w-16 h-2 sm:h-2.5 md:h-3 lg:h-4 bg-zinc-900 rounded-full" />
-                </div>
-                <div className="absolute top-1 sm:top-1.5 md:top-2 lg:top-3 left-4 sm:left-5 md:left-6 lg:left-8 text-[6px] sm:text-[7px] md:text-[8px] lg:text-[10px] font-bold text-white z-20">9:41</div>
-                <div className="absolute top-1 sm:top-1.5 md:top-2 lg:top-3 right-4 sm:right-5 md:right-6 lg:right-8 flex space-x-1 z-20">
-                    <div className="w-2 sm:w-2.5 md:w-3 lg:w-4 h-1.5 sm:h-2 md:h-2 lg:h-2.5 bg-white rounded-[1px]" />
-                </div>
-                <ScreenContent feature={feature} isMobile={true} />
+            <div className="scale-[0.6] sm:scale-[0.7] md:scale-[0.8] origin-center -mt-8 sm:-mt-0">
+                <IphoneMockup className="shadow-2xl">
+                    <ScreenContent feature={feature} isMobile={true} />
+                </IphoneMockup>
             </div>
         </div>
     );
@@ -264,10 +255,13 @@ interface TextSlideProps {
     y: number;
 }
 
+// Faster text spring for snappier transitions
+const textSpringConfig = { stiffness: 150, damping: 18, mass: 0.4 };
+
 const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     const colors = colorMap[feature.color];
-    const opacityValue = useSpring(opacity, springConfig);
-    const yValue = useSpring(y, springConfig);
+    const opacityValue = useSpring(opacity, textSpringConfig);
+    const yValue = useSpring(y, textSpringConfig);
 
     useEffect(() => {
         opacityValue.set(opacity);
@@ -275,8 +269,8 @@ const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     }, [opacity, y]);
 
     return (
-        <motion.div 
-            style={{ opacity: opacityValue, y: yValue }} 
+        <motion.div
+            style={{ opacity: opacityValue, y: yValue }}
             className="absolute w-full max-w-lg"
         >
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
@@ -297,9 +291,12 @@ interface MockupSlideProps {
     isStatic?: boolean;
 }
 
+// Faster mockup spring for snappier transitions
+const mockupSpringConfig = { stiffness: 140, damping: 16, mass: 0.4 };
+
 const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: MockupSlideProps) => {
-    const springY = useSpring(y, springConfig);
-    const springScale = useSpring(scale, springConfig);
+    const springY = useSpring(y, mockupSpringConfig);
+    const springScale = useSpring(scale, mockupSpringConfig);
 
     useEffect(() => {
         springY.set(y);
@@ -308,15 +305,15 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
 
     if (isStatic) {
         return (
-            <div 
-                style={{ 
+            <div
+                style={{
                     transform: `translate3d(0, 0, 0) scale(1)`,
                     WebkitTransform: `translate3d(0, 0, 0) scale(1)`,
                     visibility: 'visible',
                     opacity: 1,
                     WebkitBackfaceVisibility: 'hidden',
                     backfaceVisibility: 'hidden',
-                }} 
+                }}
                 className="absolute inset-0 flex items-center justify-center z-10"
             >
                 <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
@@ -328,11 +325,11 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
     if (!isVisible && y > 50) return null;
 
     return (
-        <motion.div 
-            style={{ 
+        <motion.div
+            style={{
                 y: springY,
                 scale: springScale,
-            }} 
+            }}
             className="absolute inset-0 flex items-center justify-center will-change-transform"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
@@ -349,9 +346,9 @@ const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKe
     }, [opacity]);
 
     return (
-        <motion.div 
-            style={{ opacity: springOpacity }} 
-            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`} 
+        <motion.div
+            style={{ opacity: springOpacity }}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-[opacity]`}
         />
     );
 });
@@ -366,10 +363,30 @@ export default function StickyScrollFeaturesV2() {
         offset: ["start start", "end end"]
     });
 
+    // Snapped progress - creates "resistance" at each feature boundary (Manychat style)
+    const snappedProgress = useMemo(() => {
+        // Define snap zones - content will "stick" near these points
+        const snapPoints = [0, 0.33, 0.66, 1];
+        const snapStrength = 0.12; // Increased for stronger lock / more scroll needed to escape
+
+        // Find nearest snap point and apply resistance
+        for (const snap of snapPoints) {
+            const distToSnap = Math.abs(progress - snap);
+            if (distToSnap < snapStrength) {
+                // Apply easing that makes it harder to leave snap point
+                const factor = distToSnap / snapStrength;
+                const eased = factor * factor; // Quadratic easing for "sticky" feel
+                return snap + (progress - snap > 0 ? 1 : -1) * eased * snapStrength;
+            }
+        }
+        return progress;
+    }, [progress]);
+
+    // Faster spring for snappier response
     const smoothProgress = useSpring(scrollYProgress, {
-        stiffness: 30,
-        damping: 25,
-        mass: 1.2
+        stiffness: 80,
+        damping: 20,
+        mass: 0.6
     });
 
     useMotionValueEvent(smoothProgress, "change", (latest) => {
@@ -383,101 +400,108 @@ export default function StickyScrollFeaturesV2() {
     }, []);
 
     const activeFeature = useMemo(() => {
-        if (progress < 0.33) return 0;
-        if (progress < 0.66) return 1;
+        if (snappedProgress < 0.33) return 0;
+        if (snappedProgress < 0.66) return 1;
         return 2;
-    }, [progress]);
+    }, [snappedProgress]);
 
     const isInSection = progress > 0.05 && progress < 0.95;
     const activeColors = colorMap[features[activeFeature].color];
 
+    // Use snapped progress for text transitions - creates more definitive stops
     const textSlides = useMemo(() => {
+        const p = snappedProgress;
         return features.map((feature, i) => {
             let opacity = 0;
             let y = 30;
 
+            // Tighter transition windows for sharper changes
             if (i === 0) {
-                opacity = mapRange(progress, 0, 0.27, 1, 1);
-                if (progress > 0.27) opacity = mapRange(progress, 0.27, 0.33, 1, 0);
-                y = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 0, -30) : 0;
-                if (progress < 0.05) { opacity = 1; y = 0; }
+                opacity = mapRange(p, 0, 0.28, 1, 1);
+                if (p > 0.28) opacity = mapRange(p, 0.28, 0.35, 1, 0);
+                y = p > 0.28 ? mapRange(p, 0.28, 0.35, 0, -40) : 0;
+                if (p < 0.05) { opacity = 1; y = 0; }
             } else if (i === 1) {
-                opacity = mapRange(progress, 0.30, 0.36, 0, 1);
-                if (progress > 0.60) opacity = mapRange(progress, 0.60, 0.66, 1, 0);
-                y = progress < 0.36 ? mapRange(progress, 0.30, 0.36, 30, 0) : 
-                    progress > 0.60 ? mapRange(progress, 0.60, 0.66, 0, -30) : 0;
+                opacity = mapRange(p, 0.31, 0.38, 0, 1);
+                if (p > 0.58) opacity = mapRange(p, 0.58, 0.65, 1, 0);
+                y = p < 0.38 ? mapRange(p, 0.31, 0.38, 40, 0) :
+                    p > 0.58 ? mapRange(p, 0.58, 0.65, 0, -40) : 0;
             } else {
-                opacity = mapRange(progress, 0.63, 0.70, 0, 1);
-                y = progress < 0.70 ? mapRange(progress, 0.63, 0.70, 30, 0) : 0;
+                opacity = mapRange(p, 0.62, 0.69, 0, 1);
+                y = p < 0.69 ? mapRange(p, 0.62, 0.69, 40, 0) : 0;
             }
 
             return { feature, opacity: Math.max(0, Math.min(1, opacity)), y };
         });
-    }, [progress]);
+    }, [snappedProgress]);
 
+    // Use snapped progress for mockup transitions - creates more definitive stops
     const mockupSlides = useMemo(() => {
+        const p = snappedProgress;
         return features.map((feature, i) => {
             let y = 0;
             let scale = 1;
             let isVisible = true;
             let isStatic = false;
 
+            // Tighter transition windows for sharper mockup changes
             if (i === 0) {
                 // Always show first mockup at start - critical for iPhone 16 Pro Max
-                if (!hasMounted || progress < 0.05) {
+                if (!hasMounted || p < 0.05) {
                     y = 0;
                     scale = 1;
                     isStatic = true;
                     isVisible = true;
                 } else {
-                    y = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 0, -100) * window.innerHeight / 100 : 0;
-                    scale = progress > 0.27 ? mapRange(progress, 0.27, 0.33, 1, 0.9) : 1;
-                    isVisible = progress < 0.40;
+                    y = p > 0.28 ? mapRange(p, 0.28, 0.35, 0, -100) * window.innerHeight / 100 : 0;
+                    scale = p > 0.28 ? mapRange(p, 0.28, 0.35, 1, 0.85) : 1;
+                    isVisible = p < 0.40;
                 }
             } else if (i === 1) {
-                const enterY = mapRange(progress, 0.30, 0.36, 100, 0);
-                const exitY = mapRange(progress, 0.60, 0.66, 0, -100);
-                y = (progress < 0.36 ? enterY : progress > 0.60 ? exitY : 0) * window.innerHeight / 100;
-                scale = progress < 0.40 ? mapRange(progress, 0.30, 0.40, 0.9, 1) : 
-                        progress > 0.56 ? mapRange(progress, 0.56, 0.66, 1, 0.9) : 1;
-                isVisible = progress > 0.27 && progress < 0.70;
+                const enterY = mapRange(p, 0.31, 0.38, 100, 0);
+                const exitY = mapRange(p, 0.58, 0.65, 0, -100);
+                y = (p < 0.38 ? enterY : p > 0.58 ? exitY : 0) * window.innerHeight / 100;
+                scale = p < 0.42 ? mapRange(p, 0.31, 0.42, 0.85, 1) :
+                    p > 0.54 ? mapRange(p, 0.54, 0.65, 1, 0.85) : 1;
+                isVisible = p > 0.28 && p < 0.70;
             } else {
-                y = mapRange(progress, 0.63, 0.70, 100, 0) * window.innerHeight / 100;
-                scale = mapRange(progress, 0.63, 0.73, 0.9, 1);
-                isVisible = progress > 0.60;
+                y = mapRange(p, 0.62, 0.69, 100, 0) * window.innerHeight / 100;
+                scale = mapRange(p, 0.62, 0.72, 0.85, 1);
+                isVisible = p > 0.58;
             }
 
-            return { feature, y, scale: Math.max(0.9, Math.min(1, scale)), isVisible, isStatic };
+            return { feature, y, scale: Math.max(0.85, Math.min(1, scale)), isVisible, isStatic };
         });
-    }, [progress, hasMounted]);
+    }, [snappedProgress, hasMounted]);
 
     const ambientOpacities = useMemo(() => {
+        const p = snappedProgress;
         return features.map((_, i) => {
             if (i === 0) {
-                let op = mapRange(progress, 0, 0.1, 0, 0.2);
-                if (progress > 0.23) op = mapRange(progress, 0.23, 0.33, 0.2, 0);
-                return Math.max(0, Math.min(0.2, op));
+                let op = mapRange(p, 0, 0.1, 0, 0.25);
+                if (p > 0.25) op = mapRange(p, 0.25, 0.35, 0.25, 0);
+                return Math.max(0, Math.min(0.25, op));
             } else if (i === 1) {
-                let op = mapRange(progress, 0.30, 0.40, 0, 0.2);
-                if (progress > 0.56) op = mapRange(progress, 0.56, 0.66, 0.2, 0);
-                return Math.max(0, Math.min(0.2, op));
+                let op = mapRange(p, 0.32, 0.42, 0, 0.25);
+                if (p > 0.54) op = mapRange(p, 0.54, 0.64, 0.25, 0);
+                return Math.max(0, Math.min(0.25, op));
             } else {
-                return Math.max(0, Math.min(0.2, mapRange(progress, 0.63, 0.73, 0, 0.2)));
+                return Math.max(0, Math.min(0.25, mapRange(p, 0.62, 0.72, 0, 0.25)));
             }
         });
-    }, [progress]);
+    }, [snappedProgress]);
 
     return (
-        <section 
-            ref={containerRef} 
-            className="h-[550vh] bg-black"
+        <section
+            ref={containerRef}
+            className="h-[650vh] bg-black"
             style={{ position: 'relative' }}
         >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
-            <div 
+            <div
                 className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full"
-                style={{ 
+                style={{
                     position: 'sticky',
                     WebkitOverflowScrolling: 'touch'
                 }}
@@ -519,7 +543,7 @@ export default function StickyScrollFeaturesV2() {
                             />
                         </div>
 
-                        <div 
+                        <div
                             className="relative w-full h-[90%] md:h-[80%] max-w-[700px]"
                             style={{
                                 WebkitTransform: 'translate3d(0,0,0)',
@@ -541,9 +565,9 @@ export default function StickyScrollFeaturesV2() {
                     </div>
 
                 </div>
-                
+
                 {progress > 0.02 && progress < 0.92 && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

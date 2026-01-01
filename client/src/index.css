@@ -2,6 +2,112 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Shadcn UI CSS Variables - Dark Theme Optimized */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 10%;
+    /* Dark popover background */
+    --popover-foreground: 0 0% 95%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 0 0% 20%;
+    /* Subtle dark border - NOT BLUE */
+    --input: 0 0% 20%;
+    /* Subtle dark input border - NOT BLUE */
+    --ring: 0 0% 0% / 0;
+    /* TRANSPARENT - No ring at all */
+    --radius: 0.5rem;
+  }
+
+  .dark,
+  html.dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 0 0% 10%;
+    /* Dark popover background */
+    --popover-foreground: 0 0% 95%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 0 0% 20%;
+    /* Subtle white/gray border - NOT BLUE */
+    --input: 0 0% 20%;
+    /* Subtle white/gray input border - NOT BLUE */
+    --ring: 0 0% 0% / 0;
+    /* TRANSPARENT - No ring at all */
+  }
+}
+
+/* ========================================
+   AGGRESSIVE RADIX UI BORDER REMOVAL
+   ======================================== */
+/* Target ALL Radix Select content elements */
+[data-radix-select-content],
+[data-radix-popper-content-wrapper],
+[data-radix-select-viewport],
+[role="listbox"] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Target ALL Radix Dialog/Popover elements */
+[data-radix-dialog-content],
+[data-radix-popover-content],
+[data-radix-menu-content] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25) !important;
+  /* Keep shadow, remove border */
+}
+
+/* Override any focus states on Radix elements */
+[data-radix-select-trigger]:focus,
+[data-radix-select-trigger]:focus-visible,
+[data-radix-select-content]:focus,
+[data-radix-select-content]:focus-visible {
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  ring: 0 !important;
+}
+
+/* Kill all ring utilities globally when focus */
+.ring-ring,
+.focus\:ring-ring:focus,
+.focus-visible\:ring-ring:focus-visible {
+  --tw-ring-color: transparent !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+}
+
+/* Force border color to be gray instead of blue */
+.border,
+.border-input,
+[class*="border-"] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
 /* Mobile landing page fixes - removed aggressive opacity override that was breaking text rotation */
 
 /* Landing page header - fixed on all devices */
@@ -31,44 +137,54 @@
   html {
     transition: color-scheme 0.3s ease;
   }
-  
+
   html.dark {
     color-scheme: dark;
   }
-  
+
   html.light {
     color-scheme: light;
   }
-  
+
   /* Prevent black flash by ensuring body always has background */
   body {
-    background-color: rgb(249 250 251); /* gray-50 */
-    color: rgb(17 24 39); /* gray-900 */
+    background-color: rgb(249 250 251);
+    /* gray-50 */
+    color: rgb(17 24 39);
+    /* gray-900 */
   }
-  
+
   html.dark body {
-    background-color: rgb(17 24 39); /* gray-900 */
-    color: rgb(249 250 251); /* gray-50 */
+    background-color: rgb(17 24 39);
+    /* gray-900 */
+    color: rgb(249 250 251);
+    /* gray-50 */
   }
-  
+
   /* Selective transitions - only for specific elements that need them */
-  button, input, select, textarea, a {
+  button,
+  input,
+  select,
+  textarea,
+  a {
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, transform, box-shadow;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 200ms;
   }
-  
+
   /* Remove default blue focus outline on click - use focus-visible for keyboard accessibility */
   *:focus {
-    outline: none;
+    outline: none !important;
+    box-shadow: none !important;
   }
-  
-  /* Only show focus ring for keyboard navigation (accessibility) */
+
+  /* Only show focus ring for keyboard navigation (accessibility) - Adapted for Dark Theme */
   *:focus-visible {
-    outline: 2px solid rgb(99 102 241);
-    outline-offset: 2px;
+    outline: none !important;
+    /* User requested NO border */
+    box-shadow: none !important;
   }
-  
+
   /* Specifically target buttons and interactive elements */
   button:focus,
   [role="button"]:focus,
@@ -76,17 +192,18 @@
   input:focus,
   select:focus,
   textarea:focus {
-    outline: none;
-    box-shadow: none;
+    outline: none !important;
+    box-shadow: none !important;
   }
-  
+
   button:focus-visible,
   [role="button"]:focus-visible,
   a:focus-visible {
-    outline: 2px solid rgb(99 102 241);
-    outline-offset: 2px;
+    outline: none !important;
+    /* User requested NO border */
+    box-shadow: none !important;
   }
-  
+
   /* Override for elements that shouldn't transition */
   .no-transition,
   .no-transition * {
@@ -96,33 +213,71 @@
 
 /* Essential Animations Only */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* Restore list formatting (Tailwind base removes it) */
@@ -178,8 +333,9 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+  outline: none !important;
+  /* User requested NO border */
+  box-shadow: none !important;
 }
 
 /* Loading spinner */
@@ -197,10 +353,13 @@ textarea:focus-visible {
 }
 
 @keyframes bounce {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(-25%);
     animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
   }
+
   50% {
     transform: translateY(0);
     animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
@@ -265,7 +424,7 @@ html.dark .glass {
   .no-print {
     display: none !important;
   }
-  
+
   body {
     background: white !important;
     color: black !important;
@@ -302,6 +461,7 @@ html.dark .glass {
 
 /* Reduce motion for accessibility - respects user preference for reduced motion */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -366,6 +526,7 @@ html.dark .low-end-device .glass {
 
 /* Touch-friendly tap targets on mobile */
 @media (max-width: 768px) {
+
   button,
   a,
   [role="button"],
@@ -377,19 +538,19 @@ html.dark .low-end-device .glass {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Prevent text size adjustment on orientation change */
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
-  
+
   /* Smooth momentum scrolling on iOS */
   .scroll-container {
     -webkit-overflow-scrolling: touch;
     overflow-scrolling: touch;
   }
-  
+
   /* Prevent zoom on input focus */
   input,
   textarea,
@@ -429,23 +590,19 @@ img.feature-image {
 
 /* Lazy loaded content placeholder */
 .lazy-placeholder {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.05) 25%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.05) 75%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.05) 25%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0.05) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
 
 html.dark .lazy-placeholder {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.05) 25%,
-    rgba(0, 0, 0, 0.1) 50%,
-    rgba(0, 0, 0, 0.05) 75%
-  );
+  background: linear-gradient(90deg,
+      rgba(0, 0, 0, 0.05) 25%,
+      rgba(0, 0, 0, 0.1) 50%,
+      rgba(0, 0, 0, 0.05) 75%);
   background-size: 200% 100%;
 }
 

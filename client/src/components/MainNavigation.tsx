@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ChevronRight } from 'lucide-react'
 import { Link, useLocation } from 'wouter'
+import { useWaitlist } from '../context/WaitlistContext'
 
 interface MainNavigationProps {
     onNavigate?: (page: string) => void
@@ -11,6 +12,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
     const [isScrolled, setIsScrolled] = useState(false)
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [location, setLocation] = useLocation()
+    const { openWaitlist } = useWaitlist()
 
     // Handle scroll effect
     useEffect(() => {
@@ -73,10 +75,12 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
 
                         {/* CTA Buttons */}
                         <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
-                            <Link href="/signin" className="text-sm text-white/60 hover:text-white transition-colors cursor-pointer">Login</Link>
-                            <Link href="/waitlist" className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium rounded-full bg-white text-black hover:bg-white/90 transition-colors cursor-pointer">
-                                Start Free Trial
-                            </Link>
+                            <button
+                                onClick={openWaitlist}
+                                className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium rounded-full bg-white text-black hover:bg-white/90 transition-colors cursor-pointer"
+                            >
+                                Join Waitlist
+                            </button>
                         </div>
 
                         {/* Mobile Menu Button */}
@@ -118,20 +122,12 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
                         <div className="px-6 py-8 flex flex-col h-[calc(100vh-80px)]">
                             {/* Primary Actions */}
                             <div className="flex flex-col space-y-4 mb-8">
-                                <Link
-                                    href="/waitlist"
+                                <button
+                                    onClick={() => { setMobileMenuOpen(false); openWaitlist(); }}
                                     className="w-full py-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-lg shadow-lg shadow-purple-500/20 text-center"
-                                    onClick={() => setMobileMenuOpen(false)}
                                 >
-                                    Start Free Trial
-                                </Link>
-                                <Link
-                                    href="/signin"
-                                    className="w-full py-2 text-sm font-medium text-white/60 hover:text-white uppercase tracking-wider text-center"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    Login
-                                </Link>
+                                    Join Waitlist
+                                </button>
                             </div>
 
                             {/* Navigation Links as Cards */}

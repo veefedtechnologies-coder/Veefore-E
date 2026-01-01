@@ -135,7 +135,7 @@ const About = () => {
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-16 md:pt-36 md:pb-20 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -151,7 +151,7 @@ const About = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6"
                     >
                         <span className="text-white">Building the Future of </span>
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -163,7 +163,7 @@ const About = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-base md:text-lg text-white/50 max-w-2xl mx-auto mb-8"
+                        className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-8"
                     >
                         We're on a mission to empower every creator with AI-powered tools that turn engagement into growth. Veefore is our flagship product, revolutionizing how creators connect with their audience.
                     </motion.p>
@@ -192,7 +192,7 @@ const About = () => {
 
             {/* Mission Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <motion.div
                             initial={{ opacity: 0, x: -30 }}
@@ -240,7 +240,7 @@ const About = () => {
 
             {/* Values Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6 bg-white/[0.01]">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -265,7 +265,7 @@ const About = () => {
 
             {/* Leadership Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -290,7 +290,7 @@ const About = () => {
 
             {/* Timeline Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6 bg-white/[0.01]">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-5xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -315,7 +315,7 @@ const About = () => {
 
             {/* Company Info Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}
@@ -353,7 +353,7 @@ const About = () => {
 
             {/* CTA Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto text-center">
+                <div className="max-w-5xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}

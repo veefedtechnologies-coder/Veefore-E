@@ -1,4 +1,5 @@
 import { useState, memo } from 'react'
+import { useWaitlist } from '../context/WaitlistContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     ArrowRight, Check, Zap, Sparkles, Lock,
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useIsMobile } from '../hooks/use-is-mobile';
 import { SEO } from '../lib/seo-optimization'
-import { Link } from 'wouter'
+
 import { MainNavigation } from '../components/MainNavigation'
 import MainFooter from '../components/MainFooter'
 
@@ -67,6 +68,7 @@ const FAQItem = memo(({ question, answer, isOpen, onClick }: { question: string,
 
 const Pricing = () => {
     const isMobile = useIsMobile()
+    const { openWaitlist } = useWaitlist()
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
     const [openFAQ, setOpenFAQ] = useState<number | null>(0)
 
@@ -133,7 +135,7 @@ const Pricing = () => {
 
             {/* Hero Section - Simpler than landing page */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -149,7 +151,7 @@ const Pricing = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
                     >
                         <span className="text-white">Choose Your </span>
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -161,7 +163,7 @@ const Pricing = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-base md:text-lg text-white/50 max-w-2xl mx-auto mb-8"
+                        className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-8"
                     >
                         Start with a 7-day free trial. No credit card required. Scale as you grow.
                     </motion.p>
@@ -197,7 +199,7 @@ const Pricing = () => {
 
             {/* Pricing Cards */}
             <section className="py-8 md:py-12 px-4 sm:px-6">
-                <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6 md:gap-8">
+                <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-6 md:gap-8">
                     {pricingPlans.map((plan, index) => (
                         <motion.div
                             key={plan.name}
@@ -205,7 +207,7 @@ const Pricing = () => {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: index * 0.1, duration: 0.5 }}
-                            className={`relative p-6 md:p-8 rounded-3xl border ${plan.border} bg-gradient-to-br ${plan.gradient} ${plan.popular ? 'ring-2 ring-blue-500/50' : ''}`}
+                            className={`relative p-6 sm:p-8 rounded-3xl border ${plan.border} bg-gradient-to-br ${plan.gradient} ${plan.popular ? 'ring-2 ring-blue-500/50' : ''}`}
                         >
                             {/* Popular Badge */}
                             {plan.popular && (
@@ -236,15 +238,15 @@ const Pricing = () => {
                             </div>
 
                             {/* CTA Button */}
-                            <Link
-                                href="/waitlist"
+                            <button
+                                onClick={openWaitlist}
                                 className={`block w-full py-3 rounded-xl text-center font-medium transition-all mb-6 ${plan.popular
                                     ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/25'
                                     : 'bg-white/10 text-white hover:bg-white/20'
                                     }`}
                             >
-                                Start Free Trial
-                            </Link>
+                                Join Waitlist
+                            </button>
 
                             {/* Features */}
                             <div className="space-y-3">
@@ -269,7 +271,7 @@ const Pricing = () => {
 
             {/* FAQ Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-5xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -298,7 +300,7 @@ const Pricing = () => {
 
             {/* CTA Section */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto text-center">
+                <div className="max-w-5xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}
@@ -315,13 +317,13 @@ const Pricing = () => {
                                 Join thousands of creators who are actively growing their audience with AI-powered engagement.
                             </p>
 
-                            <Link
-                                href="/waitlist"
+                            <button
+                                onClick={openWaitlist}
                                 className="inline-flex items-center px-8 py-4 rounded-full bg-white text-black font-semibold text-lg hover:bg-white/90 transition-all group"
                             >
-                                Start Free Trial
+                                Join Waitlist
                                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                            </Link>
+                            </button>
                         </div>
                     </motion.div>
                 </div>

@@ -113,7 +113,7 @@ const TermsOfService = () => {
 
       {/* Hero Section */}
       <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-7xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -129,7 +129,7 @@ const TermsOfService = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
+            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
           >
             <span className="text-white">Terms of </span>
             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -158,9 +158,9 @@ const TermsOfService = () => {
       </section>
 
       {/* Main Content */}
-      <section className="py-12 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid md:grid-cols-[250px_1fr] gap-8">
+      <section className="py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-[280px_1fr] gap-8 lg:gap-12">
             {/* Table of Contents - Desktop */}
             <aside className="hidden md:block">
               <div className="sticky top-28 p-4 rounded-2xl bg-white/[0.03] border border-white/10">

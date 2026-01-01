@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Rocket, 
-  Zap, 
-  TrendingUp, 
-  AlertCircle, 
-  CheckCircle2, 
-  BarChart3, 
+import {
+  Rocket,
+  Zap,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  BarChart3,
   Layers,
   Target,
   Instagram,
@@ -33,17 +33,17 @@ const TargetAudienceSection = () => {
     <section className="relative w-full overflow-hidden bg-[#050505] min-h-screen flex items-center py-12 md:py-24">
       {/* Cinematic Background Grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
-      
+
       {/* Ambient Glows - Adjusted to Purple/Pink for Creator Vibe */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 w-full">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-24">
-          
+
           {/* LEFT SIDE: Narrative & Selection */}
           <div className="w-full lg:w-5/12 space-y-6 md:space-y-12 text-center lg:text-left">
             <div>
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 className="inline-flex items-center space-x-2 text-purple-400 font-medium text-xs mb-4 md:mb-6 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20"
@@ -51,8 +51,8 @@ const TargetAudienceSection = () => {
                 <Sparkles className="w-3 h-3" />
                 <span>AUDIENCE FIT CHECK</span>
               </motion.div>
-              
-              <motion.h2 
+
+              <motion.h2
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4 md:mb-6 leading-tight"
@@ -62,8 +62,8 @@ const TargetAudienceSection = () => {
                   Modern Creator.
                 </span>
               </motion.h2>
-              
-              <motion.p 
+
+              <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
@@ -75,16 +75,15 @@ const TargetAudienceSection = () => {
 
             {/* Interactive Selector - Compact Grid on Mobile */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-              <div 
+              <div
                 onClick={() => setActiveProfile('pro')}
-                className={`cursor-pointer group relative p-4 md:p-6 rounded-xl border transition-all duration-500 overflow-hidden text-left ${
-                  activeProfile === 'pro' 
-                    ? 'bg-purple-900/10 border-purple-500/50' 
+                className={`cursor-pointer group relative p-4 md:p-6 rounded-xl border transition-all duration-500 overflow-hidden text-left ${activeProfile === 'pro'
+                    ? 'bg-purple-900/10 border-purple-500/50'
                     : 'bg-white/5 border-white/5 hover:bg-white/10'
-                }`}
+                  }`}
               >
                 {activeProfile === 'pro' && (
-                  <motion.div 
+                  <motion.div
                     layoutId="highlight"
                     className="absolute inset-0 bg-purple-500/5"
                   />
@@ -104,16 +103,15 @@ const TargetAudienceSection = () => {
                 </div>
               </div>
 
-              <div 
+              <div
                 onClick={() => setActiveProfile('casual')}
-                className={`cursor-pointer group relative p-4 md:p-6 rounded-xl border transition-all duration-500 overflow-hidden text-left ${
-                  activeProfile === 'casual' 
-                    ? 'bg-red-900/10 border-red-500/50' 
+                className={`cursor-pointer group relative p-4 md:p-6 rounded-xl border transition-all duration-500 overflow-hidden text-left ${activeProfile === 'casual'
+                    ? 'bg-red-900/10 border-red-500/50'
                     : 'bg-white/5 border-white/5 hover:bg-white/10'
-                }`}
+                  }`}
               >
                 {activeProfile === 'casual' && (
-                  <motion.div 
+                  <motion.div
                     layoutId="highlight"
                     className="absolute inset-0 bg-red-500/5"
                   />
@@ -137,7 +135,7 @@ const TargetAudienceSection = () => {
 
           {/* RIGHT SIDE: The "Creator Dashboard" Visual */}
           <div className="w-full lg:w-7/12 relative flex justify-center">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               className={`
@@ -162,9 +160,8 @@ const TargetAudienceSection = () => {
                     Growth_Simulator_v2.4
                   </div>
                 </div>
-                <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
-                  activeProfile === 'pro' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                }`}>
+                <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${activeProfile === 'pro' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                  }`}>
                   {activeProfile === 'pro' ? 'System Active' : 'System Idle'}
                 </div>
               </div>
@@ -184,14 +181,14 @@ const TargetAudienceSection = () => {
 
               {/* Dashboard Content */}
               <div className="p-4 md:p-8 h-full lg:h-auto relative flex flex-col gap-4 pt-12 lg:pt-8">
-                
+
                 {/* 1. Strategy Module */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                   <div className="p-3 lg:p-4 rounded-xl bg-white/5 border border-white/5">
                     <div className="text-[10px] lg:text-xs text-gray-500 mb-2 uppercase tracking-wide">Strategy Engine</div>
                     <AnimatePresence mode="wait">
                       {activeProfile === 'pro' ? (
-                        <motion.div 
+                        <motion.div
                           key="pro-strat"
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -207,7 +204,7 @@ const TargetAudienceSection = () => {
                           </div>
                         </motion.div>
                       ) : (
-                        <motion.div 
+                        <motion.div
                           key="casual-strat"
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -230,7 +227,7 @@ const TargetAudienceSection = () => {
                     <div className="text-[10px] lg:text-xs text-gray-500 mb-2 uppercase tracking-wide">Consistency</div>
                     <AnimatePresence mode="wait">
                       {activeProfile === 'pro' ? (
-                        <motion.div 
+                        <motion.div
                           key="pro-const"
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -246,7 +243,7 @@ const TargetAudienceSection = () => {
                           </div>
                         </motion.div>
                       ) : (
-                        <motion.div 
+                        <motion.div
                           key="casual-const"
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -272,7 +269,7 @@ const TargetAudienceSection = () => {
                     <div>
                       <div className="text-[10px] lg:text-xs text-gray-500 uppercase tracking-wide mb-1">Projected Reach</div>
                       <AnimatePresence mode="wait">
-                        <motion.div 
+                        <motion.div
                           key={activeProfile}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
@@ -286,7 +283,7 @@ const TargetAudienceSection = () => {
                       </AnimatePresence>
                     </div>
                     {activeProfile === 'pro' && (
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, scale: 0 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="px-2 py-1 bg-green-500 text-white text-[10px] font-bold rounded-full animate-pulse absolute top-0 right-0 lg:relative"
@@ -303,10 +300,10 @@ const TargetAudienceSection = () => {
                       // Casual: Random low noise
                       const proHeight = Math.pow(1.2, i) * 2 + 10;
                       const casualHeight = Math.random() * 20 + 10;
-                      const height = activeProfile === 'pro' 
-                        ? Math.min(proHeight, 100) 
+                      const height = activeProfile === 'pro'
+                        ? Math.min(proHeight, 100)
                         : casualHeight;
-                      
+
                       const color = activeProfile === 'pro'
                         ? i > 18 ? 'bg-green-400' : 'bg-purple-500'
                         : 'bg-gray-700';
@@ -328,7 +325,7 @@ const TargetAudienceSection = () => {
                 <div className="p-3 lg:p-4 rounded-xl bg-black/40 border border-white/5 font-mono text-[10px] lg:text-xs space-y-2">
                   <AnimatePresence mode="wait">
                     {activeProfile === 'pro' ? (
-                      <motion.div 
+                      <motion.div
                         key="pro-log"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -349,7 +346,7 @@ const TargetAudienceSection = () => {
                         </div>
                       </motion.div>
                     ) : (
-                      <motion.div 
+                      <motion.div
                         key="casual-log"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -374,10 +371,11 @@ const TargetAudienceSection = () => {
                 </div>
 
               </div>
-              
+
               {/* Scan Line Effect */}
-              <motion.div 
+              <motion.div
                 className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-purple-500/50 to-transparent opacity-50"
+                style={{ willChange: 'top' }}
                 animate={{ top: ['0%', '100%'] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               />
@@ -385,15 +383,15 @@ const TargetAudienceSection = () => {
 
             {/* Background Decorative Graphic */}
             <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] opacity-20 pointer-events-none">
-               <svg viewBox="0 0 100 100" className="w-full h-full animate-[spin_30s_linear_infinite]">
-                  <circle cx="50" cy="50" r="45" stroke="url(#gradient-creator)" strokeWidth="0.5" fill="none" strokeDasharray="8 8" />
-                  <defs>
-                    <linearGradient id="gradient-creator" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#A855F7" />
-                      <stop offset="100%" stopColor="#EC4899" />
-                    </linearGradient>
-                  </defs>
-               </svg>
+              <svg viewBox="0 0 100 100" className="w-full h-full animate-[spin_30s_linear_infinite]">
+                <circle cx="50" cy="50" r="45" stroke="url(#gradient-creator)" strokeWidth="0.5" fill="none" strokeDasharray="8 8" />
+                <defs>
+                  <linearGradient id="gradient-creator" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#A855F7" />
+                    <stop offset="100%" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
           </div>
 

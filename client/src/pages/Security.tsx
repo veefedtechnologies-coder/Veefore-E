@@ -165,7 +165,7 @@ const Security = () => {
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -181,7 +181,7 @@ const Security = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
+                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4"
                     >
                         <span className="text-white">Your Security is Our </span>
                         <span className="bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 bg-clip-text text-transparent">
@@ -193,7 +193,7 @@ const Security = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-base md:text-lg text-white/50 max-w-2xl mx-auto"
+                        className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto"
                     >
                         We take security seriously. Learn about the measures we take to protect your data and ensure the safety of our platform.
                     </motion.p>
@@ -202,7 +202,7 @@ const Security = () => {
 
             {/* Security Features */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -227,7 +227,7 @@ const Security = () => {
 
             {/* Security Commitment */}
             <section className="py-16 md:py-24 px-4 sm:px-6 bg-white/[0.01]">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <motion.div
                             initial={{ opacity: 0, x: -30 }}
@@ -269,7 +269,7 @@ const Security = () => {
 
             {/* Security Practices */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -311,7 +311,7 @@ const Security = () => {
 
             {/* Compliance */}
             <section className="py-16 md:py-24 px-4 sm:px-6 bg-white/[0.01]">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -349,7 +349,7 @@ const Security = () => {
 
             {/* Report a Vulnerability */}
             <section className="py-16 md:py-24 px-4 sm:px-6">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-5xl mx-auto">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}
