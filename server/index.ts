@@ -1124,7 +1124,7 @@ app.use((req, res, next) => {
   // Serve images and other assets with proper MIME types from built directory in production
   if (isProduction) {
     const distPublic = path.join(process.cwd(), 'dist/public');
-    app.use('/assets', express.static(distPublic, {
+    app.use('/assets', express.static(path.join(distPublic, 'assets'), {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.png')) {
           res.setHeader('Content-Type', 'image/png');
