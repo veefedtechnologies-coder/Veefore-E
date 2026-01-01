@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "client:dev": "vite --config vite.client.config.ts --port 5173 --host",
-    "client:build": "vite build --config vite.client.config.ts",
+    "client:install": "cd client && npm install",
+    "client:build": "npm run client:install && vite build --config vite.client.config.ts",
     "server:build": "cross-env NODE_ENV=production esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --external:vite",
     "tunnel": "cloudflared tunnel --config cloudflared/config.yml run",
     "build": "npm run client:build && npm run server:build",
