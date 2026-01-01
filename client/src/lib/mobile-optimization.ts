@@ -191,12 +191,18 @@ export class MobileOptimizer {
 
     // Fast tap detection (avoid 300ms delay)
     if (touchDuration < 150 && timeSinceLastTouch > 300) {
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'BUTTON' || target.closest('button, a, [role="button"]'))) {
-        // Prevent the delayed click
-        e.preventDefault();
-        // Trigger immediate click
-        target.click();
+      const target = e.target;
+      if (target && target instanceof HTMLElement) {
+        const clickableElement = target.tagName === 'BUTTON' || target.tagName === 'A' || target.getAttribute('role') === 'button'
+          ? target
+          : target.closest('button, a, [role="button"]') as HTMLElement | null;
+        
+        if (clickableElement && typeof clickableElement.click === 'function') {
+          // Prevent the delayed click
+          e.preventDefault();
+          // Trigger immediate click
+          clickableElement.click();
+        }
       }
     }
 
