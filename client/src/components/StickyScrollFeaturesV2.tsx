@@ -391,9 +391,15 @@ export default function StickyScrollFeaturesV2() {
         mass: 0.6
     });
 
+    const lastProgressRef = useRef(0);
     useMotionValueEvent(smoothProgress, "change", (latest) => {
         // Clamp progress to valid range to handle edge cases on tall screens
-        setProgress(Math.max(0, Math.min(1, latest)));
+        const clamped = Math.max(0, Math.min(1, latest));
+        // Only update state if progress changed significantly (reduces re-renders)
+        if (Math.abs(clamped - lastProgressRef.current) > 0.005) {
+            lastProgressRef.current = clamped;
+            setProgress(clamped);
+        }
     });
 
     useEffect(() => {
