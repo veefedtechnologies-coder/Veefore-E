@@ -52,13 +52,13 @@ export function LazySection({
   const fallbackContent = fallback || <DefaultFallback minHeight={minHeight} />;
 
   return (
-    <div ref={ref} style={{ minHeight: isVisible ? undefined : minHeight }}>
+    <div ref={ref}>
       {isVisible ? (
         <Suspense fallback={fallbackContent}>
           {children}
         </Suspense>
       ) : (
-        fallbackContent
+        <div style={{ minHeight }}>{fallbackContent}</div>
       )}
     </div>
   );
