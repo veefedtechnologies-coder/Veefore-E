@@ -159,12 +159,12 @@ const CreditSystemSection = () => {
                                 </div>
                                 <div className="relative h-3 w-full">
                                     <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                        <motion.div 
-                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 origin-left"
-                                            initial={{ scaleX: 0 }}
-                                            animate={{ scaleX: credits / 5000 }}
-                                            transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                            style={GPU_ACCELERATED_STYLES}
+                                        <div 
+                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 origin-left transition-transform duration-200 ease-out"
+                                            style={{ 
+                                                ...GPU_ACCELERATED_STYLES, 
+                                                transform: `scaleX(${(credits - 100) / 4900})` 
+                                            }}
                                         />
                                     </div>
                                     <input
@@ -176,14 +176,13 @@ const CreditSystemSection = () => {
                                         onChange={(e) => setCredits(Number(e.target.value))}
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                                     />
-                                    <motion.div 
-                                        className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none"
-                                        style={{ ...GPU_ACCELERATED_STYLES, x: `calc(${(credits / 5000) * 100}% - 12px)` }}
-                                        whileHover={{ scale: 1.2 }}
-                                        whileTap={{ scale: 0.9 }}
-                                    >
-                                        <div className="absolute inset-0 rounded-full bg-white/30 animate-pulse" />
-                                    </motion.div>
+                                    <div 
+                                        className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none transition-[left] duration-200 ease-out"
+                                        style={{ 
+                                            ...GPU_ACCELERATED_STYLES, 
+                                            left: `calc(${((credits - 100) / 4900) * 100}% - 12px)` 
+                                        }}
+                                    />
                                 </div>
                             </div>
 
