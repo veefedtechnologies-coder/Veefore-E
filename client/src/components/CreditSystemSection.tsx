@@ -135,27 +135,46 @@ const CreditSystemSection = () => {
             <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
 
                 <div className="text-center mb-8 md:mb-16">
-                    <div
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={VIEWPORT_ONCE}
+                        style={GPU_ACCELERATED_STYLES}
                         className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-4"
                     >
                         <Gauge className="w-3 h-3" />
                         <span>Credit System</span>
-                    </div>
-                    <h2
+                    </motion.div>
+                    <motion.h2
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={VIEWPORT_ONCE}
+                        transition={{ delay: 0.1 }}
+                        style={GPU_ACCELERATED_STYLES}
                         className="text-2xl md:text-5xl font-bold tracking-tight mb-4 md:mb-6"
                     >
                         Simple. <span className="text-amber-400">Fair.</span> Predictable.
-                    </h2>
-                    <p
+                    </motion.h2>
+                    <motion.p
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={VIEWPORT_ONCE}
+                        transition={{ delay: 0.2 }}
+                        style={GPU_ACCELERATED_STYLES}
                         className="text-sm md:text-lg text-white/40 max-w-2xl mx-auto px-4"
                     >
                         1 Credit = 1 AI Action. No hidden costs, no complexity.
-                    </p>
+                    </motion.p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
 
-                    <div
+                    <motion.div
+                        initial={{ opacity: 0, x: -50 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={VIEWPORT_ONCE}
+                        transition={{ delay: 0.2 }}
+                        style={GPU_ACCELERATED_STYLES}
                         className="lg:col-span-7"
                     >
                         <div className="relative rounded-[1.5rem] bg-neutral-900/50 border border-white/10 p-5 md:p-8 backdrop-blur-xl overflow-hidden group mb-6">
@@ -286,9 +305,14 @@ const CreditSystemSection = () => {
                             ))}
                         </div>
 
-                    </div>
+                    </motion.div>
 
-                    <div 
+                    <motion.div 
+                        initial={{ opacity: 0, x: 50 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={VIEWPORT_ONCE}
+                        transition={{ delay: 0.4 }}
+                        style={GPU_ACCELERATED_STYLES}
                         className="lg:col-span-5 space-y-4"
                     >
                         <div className="rounded-[1.5rem] bg-gradient-to-br from-amber-500 to-amber-600 p-5 md:p-6 text-black relative overflow-hidden group shadow-[0_10px_30px_rgba(245,158,11,0.2)]">
@@ -351,7 +375,7 @@ const CreditSystemSection = () => {
                             </div>
                         </div>
 
-                    </div>
+                    </motion.div>
 
                 </div>
 

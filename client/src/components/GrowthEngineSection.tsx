@@ -33,11 +33,15 @@ const FeatureCard = React.memo(({ feature, index, isLeft }: { feature: FeatureTy
     };
 
     return (
-        <div
+        <motion.div
+            initial={{ opacity: 0, x: isLeft ? -50 : 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={VIEWPORT_ONCE}
+            transition={{ delay: index * 0.2 }}
             className="group relative perspective-1000"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            style={{ perspective: 1000 }}
+            style={{ perspective: 1000, ...GPU_ACCELERATED_STYLES }}
         >
             <div className={`hidden lg:block absolute top-1/2 ${isLeft ? '-right-24' : '-left-24'} w-24 h-[2px] bg-white/5 overflow-hidden`}>
                 <motion.div
@@ -70,7 +74,7 @@ const FeatureCard = React.memo(({ feature, index, isLeft }: { feature: FeatureTy
                     </div>
                 </div>
             </motion.div>
-        </div>
+        </motion.div>
     );
 });
 
@@ -169,17 +173,26 @@ const GrowthEngineSection = () => {
             <div className="max-w-7xl mx-auto px-6 relative z-10">
 
                 <div className="text-center mb-16 md:mb-24">
-                    <div
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={VIEWPORT_ONCE}
                         className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4"
+                        style={GPU_ACCELERATED_STYLES}
                     >
                         <Cpu className="w-3 h-3" />
                         <span>Core Support Systems</span>
-                    </div>
-                    <h2
+                    </motion.div>
+                    <motion.h2
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={VIEWPORT_ONCE}
+                        transition={{ delay: 0.1 }}
                         className="text-3xl md:text-5xl font-bold tracking-tight mb-4"
+                        style={GPU_ACCELERATED_STYLES}
                     >
                         Features that <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Enable Growth</span>
-                    </h2>
+                    </motion.h2>
                 </div>
 
                 <div className="relative flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-24">

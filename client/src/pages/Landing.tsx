@@ -37,13 +37,13 @@ import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals
 
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
-// Mobile background - no blur for performance, uses opacity gradients
+// Mobile background with soft blur effects
 const MobileBackground = memo(() => (
   <div className="absolute inset-0 bg-[#030303] overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent" />
-    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent" />
-    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-radial from-blue-500/15 to-transparent rounded-full" />
-    <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-gradient-radial from-purple-500/15 to-transparent rounded-full" />
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent blur-2xl" />
+    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent blur-xl" />
+    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+    <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" />
   </div>
 ))
 
@@ -54,7 +54,7 @@ const Landing3DFallback = memo(() => (
   </div>
 ))
 
-// Gradient orbs - blur only on desktop via CSS
+// Gradient orbs with blur effects
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
   const colors = {
     blue: 'from-blue-500/30 via-blue-600/20 to-transparent',
@@ -64,7 +64,7 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
   }
 
   return (
-    <div className={`gradient-orb bg-gradient-radial ${colors[color as keyof typeof colors]} ${className}`} />
+    <div className={`gradient-orb bg-gradient-radial ${colors[color as keyof typeof colors]} blur-3xl ${className}`} />
   )
 }
 
