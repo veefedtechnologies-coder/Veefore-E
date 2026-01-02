@@ -1,21 +1,23 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Route, Switch, useLocation } from 'wouter'
-import { Sidebar } from './components/layout/sidebar'
-import { Header } from './components/layout/header'
-import { CreateDropdown } from './components/layout/create-dropdown'
-import { QuickActions } from './components/dashboard/quick-actions'
-import { PerformanceScore } from './components/dashboard/performance-score'
-import { Recommendations } from './components/dashboard/recommendations'
-import { GetStarted } from './components/dashboard/get-started'
-import { ScheduledPosts, Drafts } from './components/dashboard/scheduled-posts'
-import { Listening } from './components/dashboard/listening'
-import { SocialAccounts } from './components/dashboard/social-accounts'
-import InstagramWebhookListener from './components/dashboard/instagram-webhook-listener'
-import { ScheduledPostsSection } from './components/dashboard/scheduled-posts-section'
-import { DraftsSection } from './components/dashboard/drafts-section'
-import { CalendarView } from './components/calendar/calendar-view'
-import { AnalyticsDashboard } from './components/analytics/analytics-dashboard'
-import { CreatePost } from './components/create/create-post'
+// PERF: Dashboard components lazy-loaded to reduce initial bundle size for landing page
+const Sidebar = React.lazy(() => import('./components/layout/sidebar').then(m => ({ default: m.Sidebar })))
+const Header = React.lazy(() => import('./components/layout/header').then(m => ({ default: m.Header })))
+const CreateDropdown = React.lazy(() => import('./components/layout/create-dropdown').then(m => ({ default: m.CreateDropdown })))
+const QuickActions = React.lazy(() => import('./components/dashboard/quick-actions').then(m => ({ default: m.QuickActions })))
+const PerformanceScore = React.lazy(() => import('./components/dashboard/performance-score').then(m => ({ default: m.PerformanceScore })))
+const Recommendations = React.lazy(() => import('./components/dashboard/recommendations').then(m => ({ default: m.Recommendations })))
+const GetStarted = React.lazy(() => import('./components/dashboard/get-started').then(m => ({ default: m.GetStarted })))
+const ScheduledPosts = React.lazy(() => import('./components/dashboard/scheduled-posts').then(m => ({ default: m.ScheduledPosts })))
+const Drafts = React.lazy(() => import('./components/dashboard/scheduled-posts').then(m => ({ default: m.Drafts })))
+const Listening = React.lazy(() => import('./components/dashboard/listening').then(m => ({ default: m.Listening })))
+const SocialAccounts = React.lazy(() => import('./components/dashboard/social-accounts').then(m => ({ default: m.SocialAccounts })))
+const InstagramWebhookListener = React.lazy(() => import('./components/dashboard/instagram-webhook-listener'))
+const ScheduledPostsSection = React.lazy(() => import('./components/dashboard/scheduled-posts-section').then(m => ({ default: m.ScheduledPostsSection })))
+const DraftsSection = React.lazy(() => import('./components/dashboard/drafts-section').then(m => ({ default: m.DraftsSection })))
+const CalendarView = React.lazy(() => import('./components/calendar/calendar-view').then(m => ({ default: m.CalendarView })))
+const AnalyticsDashboard = React.lazy(() => import('./components/analytics/analytics-dashboard').then(m => ({ default: m.AnalyticsDashboard })))
+const CreatePost = React.lazy(() => import('./components/create/create-post').then(m => ({ default: m.CreatePost })))
 const VeeGPT = React.lazy(() => import('./pages/VeeGPT'))
 // Landing is eagerly loaded to prevent double loading spinner on initial load
 import Landing from './pages/Landing'
@@ -43,15 +45,20 @@ const HelpCenter = React.lazy(() => import('./pages/HelpCenter'))
 const Community = React.lazy(() => import('./pages/Community'))
 const Status = React.lazy(() => import('./pages/Status'))
 const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
-import CookieConsentBanner from './components/CookieConsentBanner'
-import OnboardingFlow from './components/onboarding/OnboardingFlow'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
+// PERF: Lazy-load non-critical UI components
+const CookieConsentBanner = React.lazy(() => import('./components/CookieConsentBanner'))
+const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'))
+const Tabs = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.Tabs })))
+const TabsContent = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsContent })))
+const TabsList = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsList })))
+const TabsTrigger = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsTrigger })))
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
 import LoadingSpinner from './components/LoadingSpinner'
 import { SkeletonPageLoader } from './components/ui/skeleton'
-import AccountNotFoundBanner from './components/AccountNotFoundBanner'
-import { SectionErrorBoundary } from './components/ErrorBoundary'
-import WorkspaceCreationOverlay from './components/WorkspaceCreationOverlay'
+// PERF: Lazy-load non-critical overlay components
+const AccountNotFoundBanner = React.lazy(() => import('./components/AccountNotFoundBanner'))
+const SectionErrorBoundary = React.lazy(() => import('./components/ErrorBoundary').then(m => ({ default: m.SectionErrorBoundary })))
+const WorkspaceCreationOverlay = React.lazy(() => import('./components/WorkspaceCreationOverlay'))
 import { getAuth } from 'firebase/auth'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest, queryClient } from '@/lib/queryClient'
@@ -66,7 +73,8 @@ const TermsOfService = TermsOfServicePage
 const Settings = React.lazy(() => import('./pages/Settings'))
 const SecurityDashboard = React.lazy(() => import('./pages/SecurityDashboard'))
 const TestFixtures = React.lazy(() => import('./pages/TestFixtures'))
-import { GuidedTour } from './components/walkthrough/GuidedTour'
+// PERF: Lazy-load walkthrough component
+const GuidedTour = React.lazy(() => import('./components/walkthrough/GuidedTour').then(m => ({ default: m.GuidedTour })))
 import { initializeTheme } from './lib/theme'
 // P6: Frontend SEO, Accessibility & UX System
 import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
@@ -1270,11 +1278,10 @@ function App() {
                   </Route>
 
                   {/* Root route - Landing for unauthenticated, Dashboard for authenticated users */}
+                  {/* PERF: Show Landing immediately without waiting for Firebase to initialize */}
                   <Route path="/"  >
-                    {!user && !loading ? (
-                      <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                        <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
-                      </React.Suspense>
+                    {!user ? (
+                      <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
                     ) : user && userData ? (
                       // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
                       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">

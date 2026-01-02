@@ -671,7 +671,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const { openWaitlist } = useWaitlist()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
-
+  
+  // PERF: Defer 3D loading to allow hero text to render first
+  const [show3D, setShow3D] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setShow3D(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
 
   // HUD State for Algorithm Science section
   const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
@@ -814,14 +820,18 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* Hero Section */}
       <section className={`relative min-h-screen flex items-center justify-center pb-20 overflow-hidden ${isMobile ? 'pt-28' : 'pt-24'}`} style={{ marginTop: '-80px', paddingTop: isMobile ? 'calc(80px + 2rem)' : 'calc(80px + 6rem)' }}>
-        {/* Background layer */}
+        {/* Background layer - PERF: Defer 3D to allow hero text to render first */}
         <div className="absolute inset-0 z-0">
           {isMobile ? (
             <MobileBackground />
           ) : (
-            <Suspense fallback={<Landing3DFallback />}>
-              <Landing3D />
-            </Suspense>
+            show3D ? (
+              <Suspense fallback={<Landing3DFallback />}>
+                <Landing3D />
+              </Suspense>
+            ) : (
+              <Landing3DFallback />
+            )
           )}
         </div>
 
