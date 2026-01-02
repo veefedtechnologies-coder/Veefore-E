@@ -28,15 +28,21 @@ export const VIEWPORT_PRELOAD = {
 } as const;
 
 export const SMOOTH_SPRING_CONFIG = {
-  stiffness: 100,
-  damping: 30,
-  mass: 0.8,
+  stiffness: 180,
+  damping: 28,
+  mass: 0.4,
 } as const;
 
 export const FAST_SPRING_CONFIG = {
-  stiffness: 150,
-  damping: 25,
-  mass: 0.5,
+  stiffness: 250,
+  damping: 30,
+  mass: 0.3,
+} as const;
+
+export const SNAPPY_SPRING_CONFIG = {
+  stiffness: 300,
+  damping: 35,
+  mass: 0.2,
 } as const;
 
 export const GPU_MOTION_PROPS = {
@@ -44,9 +50,15 @@ export const GPU_MOTION_PROPS = {
 } as const;
 
 export const optimizedTransition = (delay: number = 0) => ({
-  duration: 0.6,
+  duration: 0.35,
   delay,
-  ease: [0.25, 0.46, 0.45, 0.94],
+  ease: [0.22, 1, 0.36, 1], // Snappy ease-out
+});
+
+export const fastTransition = (delay: number = 0) => ({
+  duration: 0.25,
+  delay,
+  ease: [0.22, 1, 0.36, 1],
 });
 
 export const fadeInUp = {

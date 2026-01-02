@@ -535,18 +535,18 @@ section,
   }
 }
 
-/* RULE #4: Smoother animation timing - minimum 0.5s with ease-out curve */
+/* RULE #4: Fast, smooth animation timing - 0.3s with snappy ease-out */
 .fade-in-section,
 .scroll-reveal,
 [data-animate] {
-  transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
-    transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0) !important;
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 /* Prevent component unmounting flash - ALWAYS keep in DOM, use visibility */
 .lazy-section-content {
-  transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
-    transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Ensure sections never cause layout shifts during scroll */
@@ -556,12 +556,12 @@ section,
   overflow-anchor: none;
 }
 
-/* Smooth opacity transitions for all visibility-controlled elements */
+/* Fast opacity transitions for all visibility-controlled elements */
 .visibility-fade {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
-    visibility 0.5s;
+  transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0.25s;
 }
 
 .visibility-fade.hidden {

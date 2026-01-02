@@ -12,7 +12,7 @@ const Counter = ({ value }: { value: number }) => {
     const rounded = useTransform(count, Math.round);
 
     useEffect(() => {
-        const animation = animate(count, value, { duration: 0.5 });
+        const animation = animate(count, value, { duration: 0.3, ease: [0.22, 1, 0.36, 1] });
         return animation.stop;
     }, [value]);
 
@@ -214,7 +214,7 @@ const CreditSystemSection = () => {
                                             className="h-full bg-gradient-to-r from-amber-600 to-amber-400 origin-left"
                                             initial={{ scaleX: 0 }}
                                             animate={{ scaleX: credits / 5000 }}
-                                            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                                            transition={{ type: "spring", stiffness: 220, damping: 28, mass: 0.3 }}
                                             style={GPU_ACCELERATED_STYLES}
                                         />
                                     </div>
