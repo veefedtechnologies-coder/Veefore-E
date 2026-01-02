@@ -15,11 +15,11 @@ import { SEO, seoConfig } from '../lib/seo-optimization'
 import { useIsMobile } from '../hooks/use-is-mobile';
 import { MainNavigation } from '../components/MainNavigation';
 import GlassCard from '../components/GlassCard';
-// Keep core "above-the-fold" or "high-priority" features eager for smoothness
-import { CinematicFeatures } from '../components/CinematicFeatures';
-import StickyScrollFeaturesV2 from '../components/StickyScrollFeaturesV2';
+import { LazySection } from '../components/ui/lazy-section';
 
-// Lazy load heavy "below-the-fold" sections
+// Lazy load heavy "below-the-fold" sections (including feature showcases)
+const CinematicFeatures = React.lazy(() => import('../components/CinematicFeatures').then(m => ({ default: m.CinematicFeatures })));
+const StickyScrollFeaturesV2 = React.lazy(() => import('../components/StickyScrollFeaturesV2'));
 const PricingScrollAnimation = React.lazy(() => import('../components/PricingScrollAnimation').then(module => ({ default: module.PricingScrollAnimation })));
 const TargetAudienceSection = React.lazy(() => import('../components/TargetAudienceSection'));
 const GrowthEngineSection = React.lazy(() => import('../components/GrowthEngineSection'));
@@ -1802,7 +1802,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Sticky Scroll "Story" Features */}
-      <StickyScrollFeaturesV2 />
+      <LazySection>
+        <StickyScrollFeaturesV2 />
+      </LazySection>
 
 
       {/* Problem / Philosophy Section */}
@@ -1897,7 +1899,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Who is VeeFore For - Target Audience Section */}
-      <TargetAudienceSection />
+      <LazySection>
+        <TargetAudienceSection />
+      </LazySection>
 
       {/* Hero Features - Cinematic Scroll */}
       <section id="features" className="relative bg-black">
@@ -1914,14 +1918,20 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </p>
         </div>
 
-        <CinematicFeatures features={heroFeatures} />
+        <LazySection>
+          <CinematicFeatures features={heroFeatures} />
+        </LazySection>
       </section>
 
       {/* Support Features - Growth Engine Section */}
-      <GrowthEngineSection />
+      <LazySection>
+        <GrowthEngineSection />
+      </LazySection>
 
       {/* Credit System */}
-      <CreditSystemSection />
+      <LazySection>
+        <CreditSystemSection />
+      </LazySection>
 
       {/* VeeFore vs Traditional Tools - "The Evolution" Section */}
       <section className="py-24 relative overflow-hidden">
@@ -2130,14 +2140,18 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
 
           {/* Desktop View - Scroll Animation */}
-          <PricingScrollAnimation
-            pricingPlans={pricingPlans}
-          />
+          <LazySection>
+            <PricingScrollAnimation
+              pricingPlans={pricingPlans}
+            />
+          </LazySection>
         </div>
       </section >
 
       {/* Beta Launch */}
-      <BetaLaunchSection />
+      <LazySection>
+        <BetaLaunchSection />
+      </LazySection>
 
       {/* FAQ */}
       <section id="faq" className="py-24 md:py-32 relative">
@@ -2260,7 +2274,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section >
 
       {/* Footer */}
-      <MainFooter />
+      <LazySection rootMargin="100px">
+        <MainFooter />
+      </LazySection>
     </div >
   )
 }
