@@ -142,7 +142,7 @@ function App() {
   }
 
   const renderPublicPage = () => {
-    switch (location) {
+    switch (effectiveLocation) {
       case '/':
         return <Landing onNavigate={handleNavigate} />
       case '/features':
