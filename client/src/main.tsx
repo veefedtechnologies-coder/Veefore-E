@@ -43,69 +43,9 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
 
 const FullApp = lazy(() => import('./AppWrapper'))
 
-const AppLoader = () => (
-  <div className="min-h-screen bg-[#030303] flex items-center justify-center">
-    <style dangerouslySetInnerHTML={{
-      __html: `
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      @keyframes spin-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-      @keyframes pulse-glow {
-        0%, 100% { opacity: 0.3; filter: blur(15px); }
-        50% { opacity: 0.6; filter: blur(20px); }
-      }
-      @keyframes logo-pulse {
-        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4)); }
-        50% { transform: scale(1.03); filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.6)); }
-      }
-      @keyframes dot-pulse {
-        0%, 100% { opacity: 0.3; transform: scale(0.8); }
-        50% { opacity: 1; transform: scale(1); }
-      }
-      @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-    `}} />
+import LoadingSpinner from './components/LoadingSpinner'
 
-    <div className="flex flex-col items-center">
-      {/* Logo with orbital rings */}
-      <div className="relative w-24 h-24 flex items-center justify-center">
-        {/* Glow backdrop */}
-        <div
-          className="absolute w-16 h-16 rounded-full bg-blue-500/25"
-          style={{ animation: 'pulse-glow 3s ease-in-out infinite' }}
-        />
-
-        {/* Outer ring - blue only */}
-        <div
-          className="absolute w-24 h-24 rounded-full"
-          style={{
-            border: '2px solid transparent',
-            borderTopColor: '#3b82f6',
-            borderRightColor: 'rgba(59, 130, 246, 0.25)',
-            animation: 'spin 2s linear infinite'
-          }}
-        />
-
-        {/* Inner ring - lighter blue */}
-        <div
-          className="absolute w-16 h-16 rounded-full"
-          style={{
-            border: '2px solid transparent',
-            borderBottomColor: '#60a5fa',
-            borderLeftColor: 'rgba(96, 165, 250, 0.25)',
-            animation: 'spin-reverse 1.5s linear infinite'
-          }}
-        />
-
-        {/* VeeFore Logo */}
-        <img
-          src="/veefore.svg"
-          alt="VeeFore"
-          className="w-8 h-8 relative z-10"
-          style={{ animation: 'logo-pulse 2s ease-in-out infinite' }}
-        />
-      </div>
-    </div>
-  </div>
-)
+const AppLoader = () => <LoadingSpinner type="default" />
 
 // Always render FullApp - let wouter handle all routing internally
 // This prevents the dual-routing issue where main.tsx and wouter competed

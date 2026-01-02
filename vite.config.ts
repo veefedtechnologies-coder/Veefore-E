@@ -21,14 +21,14 @@ const forceClean = () => {
         if (outDirResolved && fs.existsSync(outDirResolved)) {
           fs.rmSync(outDirResolved, { recursive: true, force: true })
         }
-      } catch {}
+      } catch { }
     }
   }
 }
 
 export default defineConfig({
   plugins: [
-    forceClean(), 
+    forceClean(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -258,7 +258,7 @@ export default defineConfig({
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
           'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-          'ui-vendor': ['framer-motion', 'lucide-react', 'recharts'],
+          'charts-vendor': ['recharts'],
           'firebase-vendor': ['firebase', 'firebase-admin'],
           'query-vendor': ['@tanstack/react-query'],
         },
@@ -275,10 +275,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'react', 
-      'react-dom', 
-      'react-dom/client', 
-      'react/jsx-runtime', 
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react/jsx-runtime',
       'react/jsx-dev-runtime',
       '@tanstack/react-query',
       'wouter',
@@ -289,11 +289,11 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     hmr: process.env.REPLIT_DEV_DOMAIN
-      ? { 
-          protocol: 'wss', 
-          clientPort: 443,
-          host: process.env.REPLIT_DEV_DOMAIN 
-        }
+      ? {
+        protocol: 'wss',
+        clientPort: 443,
+        host: process.env.REPLIT_DEV_DOMAIN
+      }
       : { protocol: 'ws' },
   },
 });
