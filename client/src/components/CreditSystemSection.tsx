@@ -211,8 +211,11 @@ const CreditSystemSection = () => {
                                 <div className="relative h-3 w-full">
                                     <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                         <motion.div 
-                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 will-change-transform"
-                                            style={{ width: `${(credits / 5000) * 100}%`, ...GPU_ACCELERATED_STYLES }}
+                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 will-change-transform origin-left"
+                                            initial={{ scaleX: 0 }}
+                                            animate={{ scaleX: credits / 5000 }}
+                                            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                                            style={GPU_ACCELERATED_STYLES}
                                         />
                                     </div>
                                     <input
@@ -226,7 +229,7 @@ const CreditSystemSection = () => {
                                     />
                                     <motion.div 
                                         className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none will-change-transform"
-                                        style={{ left: `calc(${(credits / 5000) * 100}% - 12px)`, ...GPU_ACCELERATED_STYLES }}
+                                        style={{ ...GPU_ACCELERATED_STYLES, x: `calc(${(credits / 5000) * 100}% - 12px)` }}
                                         whileHover={{ scale: 1.2 }}
                                         whileTap={{ scale: 0.9 }}
                                     >
