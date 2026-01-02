@@ -79,19 +79,15 @@ function App() {
   useAccessibilityRouteAnnouncements(location)
 
   useEffect(() => {
-    if (!themeInitialized.current) {
-      initializeTheme()
-      themeInitialized.current = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!accessibilityInitialized.current) {
-      initializeAccessibilityCompliance()
-      accessibilityInitialized.current = true
-    }
-
-    const deferInit = () => {
+    const initAll = () => {
+      if (!themeInitialized.current) {
+        initializeTheme()
+        themeInitialized.current = true
+      }
+      if (!accessibilityInitialized.current) {
+        initializeAccessibilityCompliance()
+        accessibilityInitialized.current = true
+      }
       if (!mobileInitialized.current) {
         initializeMobileExcellence()
         mobileInitialized.current = true
@@ -114,11 +110,15 @@ function App() {
       }
     }
 
-    if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(deferInit, { timeout: 2000 })
-    } else {
-      setTimeout(deferInit, 100)
-    }
+    const timer = setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(initAll, { timeout: 3000 })
+      } else {
+        initAll()
+      }
+    }, 1500)
+    
+    return () => clearTimeout(timer)
   }, [])
 
   const effectiveLocation = location || '/'
