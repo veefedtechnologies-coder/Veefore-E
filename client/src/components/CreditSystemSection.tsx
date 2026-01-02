@@ -177,9 +177,10 @@ const CreditSystemSection = () => {
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                                     />
                                     <div 
-                                        className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none transition-[left] duration-200 ease-out"
+                                        className="absolute w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none transition-[left] duration-200 ease-out"
                                         style={{ 
-                                            ...GPU_ACCELERATED_STYLES, 
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
                                             left: `calc(${((credits - 100) / 4900) * 100}% - 12px)` 
                                         }}
                                     />
