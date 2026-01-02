@@ -319,7 +319,8 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
         );
     }
 
-    if (!isVisible && y > 50) return null;
+    // FIXED: Never return null - use CSS visibility instead to prevent layout thrashing
+    const shouldHide = !isVisible && y > 50;
 
     return (
         <motion.div
@@ -327,6 +328,10 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
                 y: springY,
                 scale: springScale,
                 ...GPU_ACCELERATED_STYLES,
+                opacity: shouldHide ? 0 : 1,
+                visibility: shouldHide ? 'hidden' : 'visible',
+                pointerEvents: shouldHide ? 'none' : 'auto',
+                willChange: 'transform, opacity',
             }}
             className="absolute inset-0 flex items-center justify-center will-change-transform"
         >
