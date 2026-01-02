@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Rocket,
@@ -18,17 +18,35 @@ import {
 
 const TargetAudienceSection = () => {
   const [activeProfile, setActiveProfile] = useState<'pro' | 'casual'>('pro');
+  const sectionRef = useRef<HTMLElement>(null);
+  const isVisibleRef = useRef(false);
 
-  // Auto-toggle between profiles every 8 seconds
+  // Auto-toggle between profiles every 8 seconds - only when visible
   useEffect(() => {
+    if (!sectionRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sectionRef.current);
+
     const interval = setInterval(() => {
-      setActiveProfile(prev => prev === 'pro' ? 'casual' : 'pro');
+      if (isVisibleRef.current) {
+        setActiveProfile(prev => prev === 'pro' ? 'casual' : 'pro');
+      }
     }, 8000);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+      observer.disconnect();
+    };
   }, []);
 
   return (
-    <section className="relative w-full overflow-hidden bg-[#050505] min-h-screen flex items-center py-12 md:py-24">
+    <section ref={sectionRef} className="relative w-full overflow-hidden bg-[#050505] min-h-screen flex items-center py-12 md:py-24">
       {/* Cinematic Background Grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
 
