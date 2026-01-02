@@ -426,7 +426,7 @@ const ScrollZoomIntro = memo(() => {
                     <div className="w-full max-w-[1200px] px-6 pt-4 md:pt-20 select-none pointer-events-auto flex flex-col items-center">
                         <motion.div
                             className="text-center mb-4 md:mb-10"
-                            style={{ opacity: headerOpacity, y: headerY, ...GPU_STYLE }}
+                            style={{ opacity: headerOpacity, y: headerY }}
                         >
                             <h3 className="text-3xl md:text-5xl font-bold text-white mb-4">
                                 Beta member <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">benefits</span>
@@ -437,8 +437,8 @@ const ScrollZoomIntro = memo(() => {
                         </motion.div>
 
                         <motion.div
-                            style={{ opacity: gridOpacity, scale: gridScale, y: gridY, ...GPU_STYLE }}
-                            className="w-full origin-top transform scale-95 sm:scale-90 md:scale-100 mt-4 sm:mt-0"
+                            style={{ opacity: gridOpacity, scale: gridScale, y: gridY }}
+                            className="w-full origin-top scale-95 sm:scale-90 md:scale-100 mt-4 sm:mt-0"
                         >
                             <BentoBenefitsGrid />
                         </motion.div>
@@ -447,7 +447,7 @@ const ScrollZoomIntro = memo(() => {
 
                 <motion.div
                     className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                    style={{ opacity: revealOpacity, ...GPU_STYLE }}
+                    style={{ opacity: revealOpacity }}
                 >
                     <motion.div
                         className="absolute w-[60vw] h-[60vw] md:w-[50vw] md:h-[50vw]"
@@ -455,7 +455,6 @@ const ScrollZoomIntro = memo(() => {
                             scale: revealScale,
                             background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(99,102,241,0.1) 30%, rgba(139,92,246,0.05) 50%, transparent 70%)',
                             filter: 'blur(40px)',
-                            ...GPU_STYLE
                         }}
                     />
 
@@ -465,7 +464,6 @@ const ScrollZoomIntro = memo(() => {
                             scale: revealScale,
                             border: '1px solid rgba(255,255,255,0.08)',
                             boxShadow: '0 0 60px 20px rgba(59,130,246,0.1), inset 0 0 40px rgba(139,92,246,0.05)',
-                            ...GPU_STYLE
                         }}
                     />
 
@@ -475,14 +473,13 @@ const ScrollZoomIntro = memo(() => {
                             scale: outerRingScale,
                             opacity: outerRingOpacity,
                             border: '1px solid rgba(99,102,241,0.2)',
-                            ...GPU_STYLE
                         }}
                     />
                 </motion.div>
 
                 <motion.div
                     className="absolute inset-0 z-25 pointer-events-none"
-                    style={{ opacity: particleOpacity, ...GPU_STYLE }}
+                    style={{ opacity: particleOpacity }}
                 >
                     {particles.map((p) => (
                         <motion.div
@@ -493,7 +490,6 @@ const ScrollZoomIntro = memo(() => {
                                 top: p.top,
                                 background: p.background,
                                 boxShadow: p.boxShadow,
-                                ...GPU_STYLE
                             }}
                             animate={{
                                 y: p.yAnim,
@@ -516,7 +512,6 @@ const ScrollZoomIntro = memo(() => {
                         scale: heroScale,
                         y: heroY,
                         filter: heroFilterBlur,
-                        ...GPU_STYLE
                     }}
                 >
                     <div className="absolute inset-0" style={GPU_STYLE}>
@@ -542,7 +537,6 @@ const ScrollZoomIntro = memo(() => {
                             opacity: textOpacity,
                             y: textY,
                             scale: textScale,
-                            ...GPU_STYLE
                         }}
                     >
                         <motion.div
@@ -572,7 +566,7 @@ const ScrollZoomIntro = memo(() => {
 
                 <motion.div
                     className="absolute bottom-6 md:bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-[60] pointer-events-none"
-                    style={{ opacity: scrollIndicatorOpacity, ...GPU_STYLE }}
+                    style={{ opacity: scrollIndicatorOpacity }}
                     initial={{ opacity: 1 }}
                 >
                     <span className="text-[11px] text-white/60 uppercase tracking-[0.15em] font-medium drop-shadow-lg">Scroll for more</span>
