@@ -178,7 +178,7 @@ const GrowthEngineSection = () => {
 
                                     <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-purple-500/10 group-hover:opacity-100 transition-opacity" />
                                     
-                                     <div className="absolute inset-2 border border-dashed border-indigo-500/10 rounded-full" />
+                                     <div className="absolute inset-2 border border-dashed border-indigo-500/10 rounded-full animate-[spin_10s_linear_infinite]" style={GPU_ACCELERATED_STYLES} />
 
                                     <div className="text-center relative z-10 p-3 sm:p-4 md:p-6">
                                         <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 mx-auto mb-2 sm:mb-3 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
@@ -205,17 +205,17 @@ const GrowthEngineSection = () => {
                     style={GPU_ACCELERATED_STYLES}
                 >
                     <div className="relative rounded-2xl border border-white/10 bg-black/40 backdrop-blur-sm p-1 overflow-hidden group">
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/5 to-transparent group-hover:via-indigo-500/10 transition-colors" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/5 to-transparent animate-pulse group-hover:via-indigo-500/10 transition-colors" />
 
                         <div className="relative rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8">
                             <div className="flex items-center gap-3 sm:gap-5 w-full md:w-auto">
                                 <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-green-900/20 border border-green-500/30 flex items-center justify-center shrink-0">
-                                    <div className="absolute inset-0 rounded-full bg-green-500/20" />
+                                    <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping" />
                                     <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-green-400 relative z-10" />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
-                                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-500" />
+                                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-500 animate-pulse" />
                                         <div className="text-[10px] sm:text-xs font-bold text-green-400 uppercase tracking-wider sm:tracking-widest">System Online</div>
                                     </div>
                                     <div className="text-white font-bold text-sm sm:text-base md:text-lg truncate">Continuous Optimization Active</div>

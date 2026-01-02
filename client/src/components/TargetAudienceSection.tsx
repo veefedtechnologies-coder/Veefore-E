@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Rocket,
@@ -18,40 +18,22 @@ import {
 
 const TargetAudienceSection = () => {
   const [activeProfile, setActiveProfile] = useState<'pro' | 'casual'>('pro');
-  const sectionRef = useRef<HTMLElement>(null);
-  const isVisibleRef = useRef(false);
 
-  // Auto-toggle between profiles every 8 seconds - only when visible
+  // Auto-toggle between profiles every 8 seconds
   useEffect(() => {
-    if (!sectionRef.current) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        isVisibleRef.current = entry.isIntersecting;
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(sectionRef.current);
-
     const interval = setInterval(() => {
-      if (isVisibleRef.current) {
-        setActiveProfile(prev => prev === 'pro' ? 'casual' : 'pro');
-      }
+      setActiveProfile(prev => prev === 'pro' ? 'casual' : 'pro');
     }, 8000);
-
-    return () => {
-      clearInterval(interval);
-      observer.disconnect();
-    };
+    return () => clearInterval(interval);
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative w-full overflow-hidden bg-[#050505] min-h-screen flex items-center py-12 md:py-24">
+    <section className="relative w-full overflow-hidden bg-[#050505] min-h-screen flex items-center py-12 md:py-24">
       {/* Cinematic Background Grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
 
-      {/* Ambient Glows - Simplified for performance (no blur) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-500/5 rounded-full opacity-50 pointer-events-none" />
+      {/* Ambient Glows - Adjusted to Purple/Pink for Creator Vibe */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 w-full">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-24">

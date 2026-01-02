@@ -1,8 +1,13 @@
-// MINIMAL GPU hints - only use on elements that ACTUALLY animate
-// Using will-change/transforms on static elements causes layer explosion
-export const GPU_ACCELERATED_STYLES = {} as const;
+export const GPU_ACCELERATED_STYLES = {
+  transform: 'translate3d(0, 0, 0)',
+  backfaceVisibility: 'hidden' as const,
+  WebkitBackfaceVisibility: 'hidden' as const,
+  perspective: '1000px',
+  WebkitFontSmoothing: 'subpixel-antialiased' as const,
+} as const;
 
 export const GPU_ACCELERATED_CONTAINER = {
+  ...GPU_ACCELERATED_STYLES,
   contain: 'layout style paint',
 } as const;
 
