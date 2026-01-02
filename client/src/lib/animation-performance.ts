@@ -1,14 +1,17 @@
 export const GPU_ACCELERATED_STYLES = {
-  willChange: 'transform, opacity',
-  transform: 'translateZ(0)',
+  transform: 'translate3d(0, 0, 0)',
   backfaceVisibility: 'hidden' as const,
   WebkitBackfaceVisibility: 'hidden' as const,
+  perspective: '1000px',
+  WebkitFontSmoothing: 'subpixel-antialiased' as const,
 } as const;
 
 export const GPU_ACCELERATED_CONTAINER = {
   ...GPU_ACCELERATED_STYLES,
   contain: 'layout style paint',
 } as const;
+
+export const GPU_STABLE_CLASS = 'gpu-stable';
 
 export const INTERSECTION_OBSERVER_CONFIG = {
   once: true,
