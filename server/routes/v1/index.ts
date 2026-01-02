@@ -29,6 +29,8 @@ export { default as automationRoutes } from './automation.routes';
 export { default as billingRoutes } from './billing.routes';
 export { default as webhooksRoutes } from './webhooks.routes';
 export { default as healthRoutes } from './health.routes';
+import { default as earlyAccessRoutes } from './early-access.routes';
+
 export { default as activityRoutes } from './activity.routes';
 
 export function mountV1Routes(app: Application, basePath: string = '/api/v1'): void {
