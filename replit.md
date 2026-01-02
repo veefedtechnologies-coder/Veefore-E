@@ -90,6 +90,14 @@ The app includes a comprehensive mobile performance optimization system for ligh
 ## Recent Changes
 
 ### January 2, 2026
+- **Route-Level Code Splitting**: Implemented separation of marketing site and authenticated app bundles for faster landing page load:
+  - Created `AuthenticatedApp.tsx` containing all protected routes, dashboard components, and RealtimeProvider
+  - Simplified `App.tsx` to be a lightweight router handling only public routes directly
+  - AuthenticatedApp is lazy-loaded only when user is authenticated
+  - RealtimeProvider (Socket.IO) only loads for authenticated users, not marketing visitors
+  - Unauthenticated users visiting landing page no longer download dashboard code
+  - Added redirect effect to send unauthenticated users to /signin when accessing protected routes
+
 - **Initial App Loading Speed Optimization**: Improved initial page load and reduced CLS from 1.37ms (poor) to 0.00ms (good):
   - Created `LazySection` component (`client/src/components/ui/lazy-section.tsx`) with IntersectionObserver-based deferred loading
   - Added `minHeight` prop for height reservation to prevent layout shifts during lazy loading

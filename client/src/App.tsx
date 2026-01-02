@@ -124,11 +124,13 @@ function App() {
     location === route || location.startsWith(route + '/')
   )
 
-  if (loading && isProtectedRoute) {
-    return <LoadingSpinner type="dashboard" />
-  }
+  useEffect(() => {
+    if (!loading && !user && isProtectedRoute) {
+      setLocation('/signin')
+    }
+  }, [loading, user, isProtectedRoute, setLocation])
 
-  if (!loading && !user && isProtectedRoute) {
+  if (loading && isProtectedRoute) {
     return <LoadingSpinner type="dashboard" />
   }
 
