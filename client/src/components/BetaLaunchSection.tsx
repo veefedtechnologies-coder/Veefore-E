@@ -406,7 +406,6 @@ const ScrollZoomIntro = memo(() => {
         <section
             ref={containerRef}
             className="h-[300vh] md:h-[400vh] relative z-10"
-            style={{ perspective: '1500px' }}
         >
             <div className="sticky top-0 h-screen overflow-hidden bg-[#020408]">
 
@@ -915,7 +914,7 @@ SignupSection.displayName = 'SignupSection';
 // ============================================
 function BetaLaunchSection() {
     return (
-        <div className="bg-[#020408] min-h-screen overflow-x-hidden">
+        <div className="bg-[#020408] min-h-screen">
             <Hero3D />
             <ScrollZoomIntro />
             <UrgencySection />
