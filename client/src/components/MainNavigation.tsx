@@ -68,7 +68,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
                         {/* Desktop Nav */}
                         <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
                             <Link href="/features" className="text-sm text-white/60 hover:text-white transition-colors cursor-pointer">Features</Link>
-                            <a href={isHome ? "#how-it-works" : "/#how-it-works"} className="text-sm text-white/60 hover:text-white transition-colors cursor-pointer">How it Works</a>
+                            <Link href="/about" className="text-sm text-white/60 hover:text-white transition-colors cursor-pointer">About Us</Link>
                             <a href={isHome ? "#pricing" : "/#pricing"} className="text-sm text-white/60 hover:text-white transition-colors cursor-pointer">Pricing</a>
                             <a href={isHome ? "#faq" : "/#faq"} className="text-sm text-white/60 hover:text-white transition-colors cursor-pointer">FAQ</a>
                         </div>
