@@ -5,7 +5,6 @@ import {
     Sparkles, Eye, Calculator, CheckCircle2, TrendingUp,
     Info, AtSign, BarChart3, Calendar
 } from 'lucide-react';
-import { GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
 
 const Counter = ({ value }: { value: number }) => {
     const count = useMotionValue(value);
@@ -99,33 +98,21 @@ const CreditSystemSection = () => {
             <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
 
                 <div className="text-center mb-8 md:mb-16">
-                    <div
-                        style={GPU_ACCELERATED_STYLES}
-                        className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-4"
-                    >
+                    <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-4">
                         <Gauge className="w-3 h-3" />
                         <span>Credit System</span>
                     </div>
-                    <h2
-                        style={GPU_ACCELERATED_STYLES}
-                        className="text-2xl md:text-5xl font-bold tracking-tight mb-4 md:mb-6"
-                    >
+                    <h2 className="text-2xl md:text-5xl font-bold tracking-tight mb-4 md:mb-6">
                         Simple. <span className="text-amber-400">Fair.</span> Predictable.
                     </h2>
-                    <p
-                        style={GPU_ACCELERATED_STYLES}
-                        className="text-sm md:text-lg text-white/40 max-w-2xl mx-auto px-4"
-                    >
+                    <p className="text-sm md:text-lg text-white/40 max-w-2xl mx-auto px-4">
                         1 Credit = 1 AI Action. No hidden costs, no complexity.
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
 
-                    <div
-                        style={GPU_ACCELERATED_STYLES}
-                        className="lg:col-span-7"
-                    >
+                    <div className="lg:col-span-7">
                         <div className="relative rounded-[1.5rem] bg-neutral-900/50 border border-white/10 p-5 md:p-8 backdrop-blur-xl overflow-hidden group mb-6">
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
                             
@@ -162,7 +149,6 @@ const CreditSystemSection = () => {
                                         <div 
                                             className="h-full bg-gradient-to-r from-amber-600 to-amber-400 origin-left transition-transform duration-200 ease-out"
                                             style={{ 
-                                                ...GPU_ACCELERATED_STYLES, 
                                                 transform: `scaleX(${(credits - 100) / 4900})` 
                                             }}
                                         />
@@ -257,10 +243,7 @@ const CreditSystemSection = () => {
 
                     </div>
 
-                    <div 
-                        style={GPU_ACCELERATED_STYLES}
-                        className="lg:col-span-5 space-y-4"
-                    >
+                    <div className="lg:col-span-5 space-y-4">
                         <div className="rounded-[1.5rem] bg-gradient-to-br from-amber-500 to-amber-600 p-5 md:p-6 text-black relative overflow-hidden group shadow-[0_10px_30px_rgba(245,158,11,0.2)]">
                             <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:rotate-12 duration-500">
                                 <Coins className="w-24 h-24" />
