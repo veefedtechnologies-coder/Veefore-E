@@ -13,7 +13,8 @@ import { useWaitlist } from '../context/WaitlistContext';
 import { VIEWPORT_ONCE } from '../lib/animation-performance';
 
 const GPU_STYLE = {
-    transform: 'translateZ(0)',
+    willChange: 'transform',
+    backfaceVisibility: 'hidden' as const,
 } as const;
 
 // ============================================
@@ -54,7 +55,6 @@ const FloatingOrb = memo(({
                 height: size,
                 background: `radial-gradient(circle at 30% 30%, ${color}, transparent 70%)`,
                 filter: isMobile ? 'none' : 'blur(1px)',
-                transform: 'translateZ(0)',
             }}
             animate={isMobile ? mobileAnimation : desktopAnimation}
             transition={{
