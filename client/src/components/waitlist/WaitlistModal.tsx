@@ -350,7 +350,7 @@ export const WaitlistModal = () => {
                             value={formData.name}
                             onChange={(v) => handleInputChange('name', v)}
                             icon={User}
-                            placeholder="Jane Doe"
+                            placeholder="Your Full Name"
                             autoFocus
                             autoComplete="name"
                             error={errors.name}
@@ -362,7 +362,7 @@ export const WaitlistModal = () => {
                             value={formData.email}
                             onChange={(v) => handleInputChange('email', v)}
                             icon={Mail}
-                            placeholder="jane@company.com"
+                            placeholder="name@company.com"
                             type="email"
                             autoComplete="email"
                             error={errors.email}
