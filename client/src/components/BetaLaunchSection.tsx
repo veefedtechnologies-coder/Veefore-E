@@ -13,10 +13,8 @@ import { useIsMobile } from '../hooks/use-is-mobile';
 import { useWaitlist } from '../context/WaitlistContext';
 import { VIEWPORT_ONCE } from '../lib/animation-performance';
 
-const GPU_STYLE = {
-    willChange: 'transform',
-    backfaceVisibility: 'hidden' as const,
-} as const;
+// Empty - GPU hints removed to prevent layer explosion
+const GPU_STYLE = {} as const;
 
 // ============================================
 // 3D FLOATING ORB COMPONENT (Memoized + Mobile Optimized)
@@ -430,10 +428,11 @@ const ScrollZoomIntro = memo(() => {
                         ...GPU_STYLE
                     }}
                 >
+                    {/* Background gradients - simplified for performance (no blur) */}
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        <div className="absolute left-[5%] top-[15%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-br from-blue-600/15 to-cyan-500/10 blur-[80px]" style={GPU_STYLE} />
-                        <div className="absolute right-[5%] bottom-[10%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-tl from-purple-600/12 to-pink-500/8 blur-[80px]" style={GPU_STYLE} />
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] rounded-full bg-gradient-to-r from-indigo-600/10 to-transparent blur-[100px]" style={GPU_STYLE} />
+                        <div className="absolute left-[5%] top-[15%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-br from-blue-600/10 to-cyan-500/5 opacity-60" style={GPU_STYLE} />
+                        <div className="absolute right-[5%] bottom-[10%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-tl from-purple-600/8 to-pink-500/5 opacity-60" style={GPU_STYLE} />
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] rounded-full bg-gradient-to-r from-indigo-600/8 to-transparent opacity-50" style={GPU_STYLE} />
                     </div>
 
                     <div className="w-full max-w-[1200px] px-6 pt-4 md:pt-20 select-none pointer-events-auto flex flex-col items-center">
@@ -618,7 +617,7 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
         <div className="grid grid-cols-2 md:grid-cols-12 gap-3 md:gap-5 w-full mx-auto relative z-10">
             <Perspective3D className="col-span-2 md:col-span-7">
                 <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/20">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[80px] rounded-full group-hover:bg-cyan-500/10 transition-colors" style={GPU_STYLE} />
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full opacity-50 group-hover:opacity-70 transition-opacity" />
 
                     <div className="relative z-10 flex flex-col h-full justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <div className="flex justify-between items-start mb-4 md:mb-8">
@@ -650,7 +649,7 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
 
             <Perspective3D className="col-span-1 md:col-span-5">
                 <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/20">
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/5 blur-[80px] rounded-full group-hover:bg-orange-500/10 transition-colors" style={GPU_STYLE} />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/5 rounded-full opacity-50 group-hover:opacity-70 transition-opacity" />
 
                     <div className="relative z-10 h-full flex flex-col justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <motion.div
@@ -674,7 +673,7 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
 
             <Perspective3D className="col-span-1 md:col-span-5">
                 <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/20">
-                    <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 blur-[80px] rounded-full group-hover:bg-blue-500/10 transition-colors" style={GPU_STYLE} />
+                    <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full opacity-50 group-hover:opacity-70 transition-opacity" />
 
                     <div className="relative z-10 flex flex-col h-full justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <div className="flex justify-between items-start mb-4 md:mb-6">
@@ -706,7 +705,7 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
 
             <Perspective3D className="col-span-2 md:col-span-7">
                 <div className="h-full group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1d]/60 backdrop-blur-xl p-3 md:p-6 transition-all duration-500 hover:bg-[#111827]/80 hover:border-yellow-500/30 hover:shadow-2xl hover:shadow-yellow-500/20">
-                    <div className="absolute bottom-0 right-0 w-64 h-64 bg-yellow-500/5 blur-[80px] rounded-full group-hover:bg-yellow-500/10 transition-colors" style={GPU_STYLE} />
+                    <div className="absolute bottom-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-full opacity-50 group-hover:opacity-70 transition-opacity" />
 
                     <div className="relative z-10 h-full flex flex-col justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <div className="flex justify-between items-start mb-4 md:mb-8">
@@ -814,8 +813,8 @@ const SignupSection = memo(() => {
 
     return (
         <section id="beta-signup" className="py-24 relative overflow-hidden">
-            <div className="absolute inset-0" style={GPU_STYLE}>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gradient-radial from-purple-500/10 via-transparent to-transparent rounded-full blur-3xl" />
+            <div className="absolute inset-0">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gradient-radial from-purple-500/10 via-transparent to-transparent rounded-full opacity-50" />
             </div>
 
             <div className="max-w-[700px] mx-auto px-6 relative z-10">

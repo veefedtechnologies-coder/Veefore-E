@@ -37,13 +37,13 @@ import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals
 
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
-// Mobile background with soft blur effects
+// Mobile background - simplified for performance (no blur)
 const MobileBackground = memo(() => (
   <div className="absolute inset-0 bg-[#030303] overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent blur-2xl" />
-    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent blur-xl" />
-    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
-    <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" />
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent" />
+    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent" />
+    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full opacity-50" />
+    <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-purple-500/10 rounded-full opacity-50" />
   </div>
 ))
 
@@ -64,7 +64,7 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
   }
 
   return (
-    <div className={`gradient-orb bg-gradient-radial ${colors[color as keyof typeof colors]} blur-3xl ${className}`} />
+    <div className={`gradient-orb bg-gradient-radial ${colors[color as keyof typeof colors]} opacity-50 ${className}`} />
   )
 }
 
@@ -1661,9 +1661,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             transition={{ duration: 0.6 }}
           >
             <div className="relative overflow-hidden">
-              {/* Background decorative elements */}
-              <div className="absolute top-0 right-0 w-48 sm:w-64 md:w-96 h-48 sm:h-64 md:h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl opacity-50" />
-              <div className="absolute bottom-0 left-0 w-32 sm:w-48 md:w-64 h-32 sm:h-48 md:h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl opacity-50" />
+              {/* Background decorative elements - simplified for performance */}
+              <div className="absolute top-0 right-0 w-48 sm:w-64 md:w-96 h-48 sm:h-64 md:h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full opacity-30" />
+              <div className="absolute bottom-0 left-0 w-32 sm:w-48 md:w-64 h-32 sm:h-48 md:h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full opacity-30" />
 
               <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center relative">
                 <div>
@@ -1687,10 +1687,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
 
                 <div className="relative w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#050505] backdrop-blur-2xl border border-white/5 shadow-2xl group/hud">
-                  {/* Premium Ambient Background Effects */}
+                  {/* Premium Ambient Background Effects - simplified for performance */}
                   <div className="absolute inset-0 opacity-40 pointer-events-none">
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '4s' }} />
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-900/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }} />
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full opacity-60" />
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-900/10 rounded-full opacity-60" />
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 md:p-8 relative z-10 items-center">
@@ -1807,9 +1807,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* Problem / Philosophy Section */}
       <section id="how-it-works" className="py-16 md:py-32 relative overflow-hidden w-full">
-        {/* Background Gradients */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-red-500/5 rounded-full blur-[60px] md:blur-[100px] pointer-events-none" />
-        <div className="absolute right-0 bottom-0 w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-blue-500/5 rounded-full blur-[60px] md:blur-[100px] pointer-events-none" />
+        {/* Background Gradients - simplified for performance */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-red-500/5 rounded-full opacity-50 pointer-events-none" />
+        <div className="absolute right-0 bottom-0 w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-blue-500/5 rounded-full opacity-50 pointer-events-none" />
 
         <div className="w-full px-4 md:px-12 lg:px-20 relative z-10">
           <div className="text-center mb-12 md:mb-20">
