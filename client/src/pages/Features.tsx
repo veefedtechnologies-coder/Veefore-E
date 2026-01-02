@@ -16,7 +16,7 @@ import { MainNavigation } from '../components/MainNavigation'
 import MainFooter from '../components/MainFooter'
 import { IphoneMockup } from '../components/ui/iphone-mockup'
 
-// Lazy load wrapper to fix "stuck loading" issues
+// Lazy load wrapper - FIXED: Components always remain in DOM, only CSS visibility changes
 const LazySection = ({ children, threshold = 0.1 }: { children: React.ReactNode, threshold?: number }) => {
     const [isVisible, setIsVisible] = useState(false);
     const ref = React.useRef<HTMLDivElement>(null);
@@ -29,7 +29,7 @@ const LazySection = ({ children, threshold = 0.1 }: { children: React.ReactNode,
                     observer.disconnect();
                 }
             },
-            { rootMargin: '100px', threshold }
+            { rootMargin: '200px', threshold }
         );
 
         if (ref.current) {
@@ -40,8 +40,24 @@ const LazySection = ({ children, threshold = 0.1 }: { children: React.ReactNode,
     }, [threshold]);
 
     return (
-        <div ref={ref} className="min-h-[50vh]">
-            {isVisible ? children : <div className="h-96 flex items-center justify-center opacity-10">Loading section...</div>}
+        <div
+            ref={ref}
+            className="min-h-[50vh]"
+            style={{
+                contentVisibility: 'auto',
+                containIntrinsicSize: '1px 1000px',
+            }}
+        >
+            <div
+                style={{
+                    opacity: isVisible ? 1 : 0,
+                    transform: isVisible ? 'none' : 'translateY(20px)',
+                    transition: 'opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0), transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0)',
+                    willChange: 'transform, opacity',
+                }}
+            >
+                {children}
+            </div>
         </div>
     );
 };

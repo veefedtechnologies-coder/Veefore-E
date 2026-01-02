@@ -675,6 +675,7 @@ html.dark .lazy-placeholder {
 
 /* Reduce backdrop-filter impact on mobile */
 @media (max-width: 768px) {
+
   .backdrop-blur-lg,
   .backdrop-blur-xl,
   .backdrop-blur-2xl,
@@ -682,7 +683,7 @@ html.dark .lazy-placeholder {
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
   }
-  
+
   .backdrop-blur-md {
     backdrop-filter: blur(4px) !important;
     -webkit-backdrop-filter: blur(4px) !important;
@@ -710,4 +711,92 @@ html {
 [style*="will-change"] {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* =================================================
+   CRITICAL FIX: PREVENT LAYOUT THRASHING & BLINKING
+   ================================================= */
+
+/* RULE #2: Content-visibility for large sections - allows browser to skip off-screen rendering */
+section,
+.landing-section,
+[data-section] {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 1000px;
+  contain: layout style paint;
+}
+
+/* RULE #3: GPU Compositing for ALL animated elements */
+[class*="motion"],
+[class*="animate-"],
+.framer-motion,
+motion,
+[data-framer-motion],
+[style*="transform"],
+[style*="opacity"] {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* RULE #4: Smoother animation timing - minimum 0.5s with ease-out curve */
+.fade-in-section,
+.scroll-reveal,
+[data-animate] {
+  transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
+    transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0) !important;
+}
+
+/* Prevent component unmounting flash - ALWAYS keep in DOM, use visibility */
+.lazy-section-content {
+  will-change: transform, opacity;
+  transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
+    transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0);
+}
+
+/* Ensure sections never cause layout shifts during scroll */
+.scroll-stable {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  overflow-anchor: none;
+}
+
+/* Smooth opacity transitions for all visibility-controlled elements */
+.visibility-fade {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
+    visibility 0.5s;
+}
+
+.visibility-fade.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Force consistent rendering for sticky elements */
+.sticky-render {
+  position: sticky;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  isolation: isolate;
+}
+
+/* Mobile-specific scroll stability */
+@media (max-width: 768px) {
+  section {
+    contain-intrinsic-size: 1px 800px;
+  }
+
+  /* Reduce will-change scope to conserve memory */
+  [class*="motion"] {
+    will-change: auto;
+  }
+
+  /* Only active animations get GPU layer */
+  [class*="motion"]:not(.inactive) {
+    will-change: transform, opacity;
+  }
 }
