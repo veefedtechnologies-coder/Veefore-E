@@ -465,23 +465,34 @@ html.dark .glass {
 }
 
 @media (max-width: 768px) {
-  /* Reduced blur values on mobile for performance while keeping visual effects */
-  .gradient-orb {
-    filter: blur(60px);
-  }
-
+  /* MOBILE PERFORMANCE: Disable all blur effects inside animated containers */
+  /* Only static backgrounds should have blur - animated elements must not */
+  .gradient-orb,
   .fallback-orb {
-    filter: blur(50px);
+    filter: none !important;
   }
 
-  /* Backdrop blur allowed on mobile with slightly reduced intensity */
+  /* Disable blur utilities on mobile to prevent GPU layer explosion */
+  .blur-xl,
+  .blur-2xl,
+  .blur-3xl,
+  [class*="blur-["] {
+    filter: none !important;
+  }
+
+  /* Disable backdrop blur on mobile - use solid backgrounds instead */
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
   .backdrop-blur-xl,
   .backdrop-blur-2xl,
   .backdrop-blur-3xl {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(0, 0, 0, 0.6) !important;
   }
 
+  /* This selector no longer needed - merged above */
   .blur-xl, .blur-2xl, .blur-3xl {
     filter: none !important;
   }
