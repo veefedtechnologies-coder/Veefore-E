@@ -60,7 +60,7 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
   return (
     <motion.div
       style={{ x: xWithUnits, zIndex, scale, opacity, ...GPU_ACCELERATED_STYLES }}
-      className="absolute inset-0 h-screen w-screen flex items-center justify-center overflow-hidden bg-black will-change-transform"
+      className="absolute inset-0 h-screen w-screen flex items-center justify-center overflow-hidden bg-black"
     >
       {/* Optimized Backgrounds: removed heavy blur for better performance */}
       <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-[0.05]`} />
@@ -104,7 +104,7 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
           {/* Fixed aspect ratio container that scales with screen width */}
           <div className="relative w-full h-auto aspect-auto md:max-h-[60vh] order-1 lg:order-2 flex items-center justify-center z-10 mb-6 md:mb-0">
             {/* Removed backdrop-blur-xl and reduced to md for performance */}
-            <div className="relative w-full h-auto bg-gradient-to-tr from-white/10 to-white/0 rounded-xl md:rounded-[2rem] border border-white/10 backdrop-blur-md overflow-hidden shadow-2xl p-0.5 md:p-1 transform transition-transform hover:scale-[1.02] duration-500 will-change-transform">
+            <div className="relative w-full h-auto bg-gradient-to-tr from-white/10 to-white/0 rounded-xl md:rounded-[2rem] border border-white/10 backdrop-blur-md overflow-hidden shadow-2xl p-0.5 md:p-1 transform transition-transform hover:scale-[1.02] duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 pointer-events-none" />
               <div className="w-full h-auto rounded-[0.7rem] md:rounded-[1.9rem] overflow-hidden flex items-center justify-center bg-black/60">
                 <div className="w-full h-auto flex items-center justify-center">

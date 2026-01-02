@@ -357,7 +357,6 @@ const OptimizedImage = forwardRef<HTMLImageElement, OptimizedImageProps>(
       opacity: isLoaded ? 1 : 0,
       transform: isLoaded ? 'translateZ(0) scale(1)' : 'translateZ(0) scale(1.02)',
       transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
-      willChange: 'opacity, transform'
     };
 
     if (!alt) {

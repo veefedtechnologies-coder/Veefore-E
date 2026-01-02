@@ -312,11 +312,11 @@ export class WebVitalsMonitor {
       }, 50);
     });
 
-    // Prioritize visible elements
+    // Prioritize visible elements - use transform3d instead of will-change to avoid GPU layer explosion
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting && entry.target instanceof HTMLElement) {
-          entry.target.style.willChange = 'transform';
+          entry.target.style.transform = 'translateZ(0)';
         }
       });
     });
