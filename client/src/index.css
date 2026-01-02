@@ -583,8 +583,18 @@ section,
     contain-intrinsic-size: 1px 800px;
   }
 
-  /* NUCLEAR: Force will-change: auto on ALL elements on mobile to prevent GPU layer explosion */
-  * {
+  /* Scoped will-change reset - only for motion elements, allow GPU compositing for essential transforms */
+  [class*="motion"],
+  [class*="animate-"],
+  .framer-motion,
+  [data-framer-motion] {
     will-change: auto !important;
+  }
+
+  /* Allow GPU compositing for explicitly marked stable elements */
+  .gpu-stable {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 }

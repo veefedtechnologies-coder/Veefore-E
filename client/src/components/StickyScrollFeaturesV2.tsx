@@ -4,8 +4,8 @@ import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
 import { GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
 
-// Optimized spring config for smooth, fast transitions
-const springConfig = { stiffness: 220, damping: 30, mass: 0.3 };
+// Lightning fast spring config - low solver overhead
+const springConfig = { stiffness: 80, damping: 20, mass: 1 };
 
 const colorMap = {
     blue: {

@@ -27,22 +27,24 @@ export const VIEWPORT_PRELOAD = {
   amount: 0.05,
 } as const;
 
-export const SMOOTH_SPRING_CONFIG = {
-  stiffness: 180,
-  damping: 28,
-  mass: 0.4,
+// Use tweens instead of springs on mobile for performance
+export const SMOOTH_TWEEN = {
+  type: 'tween' as const,
+  duration: 0.25,
+  ease: [0.22, 1, 0.36, 1],
 } as const;
 
-export const FAST_SPRING_CONFIG = {
-  stiffness: 250,
-  damping: 30,
-  mass: 0.3,
+export const FAST_TWEEN = {
+  type: 'tween' as const,
+  duration: 0.15,
+  ease: [0.22, 1, 0.36, 1],
 } as const;
 
-export const SNAPPY_SPRING_CONFIG = {
-  stiffness: 300,
-  damping: 35,
-  mass: 0.2,
+// Light spring for desktop only - minimal solver overhead
+export const LIGHT_SPRING_CONFIG = {
+  stiffness: 100,
+  damping: 20,
+  mass: 1,
 } as const;
 
 export const GPU_MOTION_PROPS = {
