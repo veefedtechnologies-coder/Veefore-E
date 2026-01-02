@@ -7,7 +7,6 @@ import { useWaitlist } from '../context/WaitlistContext';
 // Interfaces
 interface PricingPlan {
     name: string;
-    price: number;
     credits: number;
     description: string;
     features: string[];
@@ -19,12 +18,11 @@ interface PricingPlan {
 
 interface PricingScrollAnimationProps {
     pricingPlans: PricingPlan[];
-    billingCycle: 'monthly' | 'yearly';
-    onNavigate: (page: string) => void;
 }
 
 // Simplified components for Desktop-only use
 const TiltCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => {
+    // ... existing TiltCard code ...
     const ref = useRef<HTMLDivElement>(null)
     const x = useMotionValue(0)
     const y = useMotionValue(0)
@@ -97,7 +95,7 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
     )
 }
 
-export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ pricingPlans, billingCycle, onNavigate }) => {
+export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ pricingPlans }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const { scrollYProgress } = useScroll({
         target: containerRef,
@@ -141,7 +139,7 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
                         style={{ x: leftX, scale: leftScale, opacity: leftOpacity, rotate: leftRotate, zIndex: leftZ }}
                         className="absolute w-[350px] h-full origin-bottom-right"
                     >
-                        <PricingCard plan={pricingPlans[0]} billingCycle={billingCycle} onNavigate={onNavigate} />
+                        <PricingCard plan={pricingPlans[0]} />
                     </motion.div>
 
                     {/* Right Card - Pro */}
@@ -149,7 +147,7 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
                         style={{ x: rightX, scale: rightScale, opacity: rightOpacity, rotate: rightRotate, zIndex: rightZ }}
                         className="absolute w-[350px] h-full origin-bottom-left"
                     >
-                        <PricingCard plan={pricingPlans[2]} billingCycle={billingCycle} onNavigate={onNavigate} />
+                        <PricingCard plan={pricingPlans[2]} />
                     </motion.div>
 
                     {/* Middle Card - Growth - Stays on top */}
@@ -157,7 +155,7 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
                         style={{ scale: middleScale, y: middleY, zIndex: 10 }}
                         className="absolute w-[380px] h-full shadow-2xl shadow-blue-500/20 rounded-3xl"
                     >
-                        <PricingCard plan={pricingPlans[1]} billingCycle={billingCycle} onNavigate={onNavigate} isHero />
+                        <PricingCard plan={pricingPlans[1]} isHero />
                     </motion.div>
 
                 </div>
@@ -182,7 +180,7 @@ export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ 
 };
 
 // Reusable Pricing Card Component (Internal)
-const PricingCard = ({ plan, billingCycle, onNavigate, isHero = false }: { plan: PricingPlan, billingCycle: string, onNavigate: (p: string) => void, isHero?: boolean }) => {
+const PricingCard = ({ plan, isHero = false }: { plan: PricingPlan, isHero?: boolean }) => {
     const { openWaitlist } = useWaitlist();
     return (
         <TiltCard className="h-full group">
@@ -199,10 +197,22 @@ const PricingCard = ({ plan, billingCycle, onNavigate, isHero = false }: { plan:
                 </div>
 
                 <div className="mb-8">
-                    <div className="flex items-baseline">
-                        <span className={`text-5xl font-bold ${isHero ? 'text-white' : 'text-white/90'}`}>₹{plan.price.toLocaleString()}</span>
-                        <span className="text-white/40 ml-2">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                    {/* Hidden Price - Coming Soon */}
+                    <div className="relative mb-2">
+                        {/* Blurred price hint */}
+                        <div className="flex items-baseline filter blur-sm select-none pointer-events-none opacity-50">
+                            <span className={`text-5xl font-bold ${isHero ? 'text-white' : 'text-white/90'}`}>₹???</span>
+                            <span className="text-white/40 ml-2">/mo</span>
+                        </div>
+                        {/* Coming Soon Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 backdrop-blur-md">
+                                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                <span className="text-sm font-medium text-white/90">Coming Soon</span>
+                            </div>
+                        </div>
                     </div>
+
                     <p className={`text-sm mt-2 font-medium ${isHero ? 'text-blue-400' : 'text-white/30'}`}>
                         {plan.credits.toLocaleString()} credits/month
                     </p>
@@ -225,12 +235,12 @@ const PricingCard = ({ plan, billingCycle, onNavigate, isHero = false }: { plan:
 
                 <MagneticButton
                     className={`w-full rounded-full py-4 font-bold transition-all duration-300 ${isHero
-                            ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25'
-                            : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
+                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25'
+                        : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
                         }`}
                     onClick={openWaitlist}
                 >
-                    Get Started
+                    Get Notified
                 </MagneticButton>
             </GlassCard>
         </TiltCard>

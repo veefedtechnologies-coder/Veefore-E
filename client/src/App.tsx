@@ -39,6 +39,11 @@ import Security from './pages/Security'
 import GDPR from './pages/GDPR'
 import PrivacyPolicyPage from './pages/PrivacyPolicy'
 import TermsOfServicePage from './pages/TermsOfService'
+import HelpCenter from './pages/HelpCenter'
+import Community from './pages/Community'
+import Status from './pages/Status'
+import CookiePolicy from './pages/CookiePolicy'
+import CookieConsentBanner from './components/CookieConsentBanner'
 import OnboardingFlow from './components/onboarding/OnboardingFlow'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
@@ -433,6 +438,7 @@ function App() {
           <RealtimeProvider>
             <>
               <WaitlistModal />
+              <CookieConsentBanner />
 
               {/* Public Pages - Eagerly loaded for instant navigation (no loading spinner) */}
               {location === '/features' && (
@@ -473,13 +479,29 @@ function App() {
                 <div className="min-h-screen"><FreeTrial /></div>
               )}
 
+              {location === '/help' && (
+                <div className="min-h-screen"><HelpCenter /></div>
+              )}
+
+              {location === '/community' && (
+                <div className="min-h-screen"><Community /></div>
+              )}
+
+              {location === '/status' && (
+                <div className="min-h-screen"><Status /></div>
+              )}
+
+              {location === '/cookies' && (
+                <div className="min-h-screen"><CookiePolicy /></div>
+              )}
+
               {/* Root "/" - Landing page for unauthenticated users (renders immediately, no auth wait) */}
               {location === '/' && !user && (
                 <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
               )}
 
               {/* Switch for remaining routes (authenticated "/" and all other routes) */}
-              {!['/features', '/pricing', '/changelog', '/about', '/blog', '/careers', '/contact', '/security', '/gdpr', '/privacy-policy', '/terms-of-service', '/waitlist', '/free-trial'].includes(location) && (location !== '/' || user) && (
+              {!['/features', '/pricing', '/changelog', '/about', '/blog', '/careers', '/contact', '/security', '/gdpr', '/privacy-policy', '/terms-of-service', '/waitlist', '/free-trial', '/help', '/community', '/status', '/cookies'].includes(location) && (location !== '/' || user) && (
                 <Switch location={location}>
                   {/* Features Page - now handled above */}
 

@@ -69,14 +69,12 @@ const FAQItem = memo(({ question, answer, isOpen, onClick }: { question: string,
 const Pricing = () => {
     const isMobile = useIsMobile()
     const { openWaitlist } = useWaitlist()
-    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
     const [openFAQ, setOpenFAQ] = useState<number | null>(0)
 
     // Pricing Plans
     const pricingPlans = [
         {
             name: 'Starter',
-            price: billingCycle === 'monthly' ? 399 : 3990,
             credits: 300,
             description: 'For new creators testing growth',
             features: ['AI Hook Generator', 'Caption & CTA Engine', 'Basic Scheduler', '1 Competitor Analysis', 'Read-only Analytics'],
@@ -86,7 +84,6 @@ const Pricing = () => {
         },
         {
             name: 'Growth',
-            price: billingCycle === 'monthly' ? 899 : 8990,
             credits: 1200,
             description: 'For serious creators ready to scale',
             features: ['Everything in Starter', 'AI Comment Automation', 'Smart DM Replies', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics'],
@@ -97,7 +94,6 @@ const Pricing = () => {
         },
         {
             name: 'Pro',
-            price: billingCycle === 'monthly' ? 1999 : 19990,
             credits: 3000,
             description: 'For agencies and power users',
             features: ['Everything in Growth', '3-5 Social Accounts', 'Advanced DM Funnels', 'Team Access (2-5)', 'Priority Processing', 'Dedicated Support'],
@@ -167,105 +163,118 @@ const Pricing = () => {
                     >
                         Start with a 7-day free trial. No credit card required. Scale as you grow.
                     </motion.p>
-
-                    {/* Billing Toggle */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.3 }}
-                        className="flex items-center justify-center gap-4 mb-12"
-                    >
-                        <button
-                            onClick={() => setBillingCycle('monthly')}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${billingCycle === 'monthly'
-                                ? 'bg-white text-black'
-                                : 'text-white/60 hover:text-white'
-                                }`}
-                        >
-                            Monthly
-                        </button>
-                        <button
-                            onClick={() => setBillingCycle('yearly')}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${billingCycle === 'yearly'
-                                ? 'bg-white text-black'
-                                : 'text-white/60 hover:text-white'
-                                }`}
-                        >
-                            Yearly <span className="text-green-400 text-xs ml-1">Save 17%</span>
-                        </button>
-                    </motion.div>
                 </div>
             </section>
 
-            {/* Pricing Cards */}
+            {/* Pricing Cards - Coming Soon */}
             <section className="py-8 md:py-12 px-4 sm:px-6">
-                <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-6 md:gap-8">
-                    {pricingPlans.map((plan, index) => (
-                        <motion.div
-                            key={plan.name}
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: index * 0.1, duration: 0.5 }}
-                            className={`relative p-6 sm:p-8 rounded-3xl border ${plan.border} bg-gradient-to-br ${plan.gradient} ${plan.popular ? 'ring-2 ring-blue-500/50' : ''}`}
-                        >
-                            {/* Popular Badge */}
-                            {plan.popular && (
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                                    <span className="px-4 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
-                                        Most Popular
-                                    </span>
-                                </div>
-                            )}
+                <div className="max-w-7xl mx-auto">
+                    {/* Coming Soon Banner */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        className="text-center mb-12"
+                    >
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 text-amber-400 text-sm mb-4">
+                            <Sparkles className="w-4 h-4" />
+                            Pricing Reveal Coming Soon
+                        </div>
+                        <p className="text-white/50 max-w-xl mx-auto">
+                            We're finalizing our pricing to ensure maximum value. Join the waitlist to be notified when pricing is revealed and get exclusive early-access deals.
+                        </p>
+                    </motion.div>
 
-                            {/* Plan Header */}
-                            <div className="mb-6">
-                                <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
-                                <p className="text-sm text-white/50">{plan.description}</p>
-                            </div>
-
-                            {/* Price */}
-                            <div className="mb-6">
-                                <div className="flex items-baseline gap-1">
-                                    <span className="text-sm text-white/50">₹</span>
-                                    <span className="text-4xl font-bold text-white">{plan.price}</span>
-                                    <span className="text-white/50">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
-                                </div>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <Zap className="w-4 h-4 text-amber-400" />
-                                    <span className="text-sm text-white/60">{plan.credits} credits/month</span>
-                                </div>
-                            </div>
-
-                            {/* CTA Button */}
-                            <button
-                                onClick={openWaitlist}
-                                className={`block w-full py-3 rounded-xl text-center font-medium transition-all mb-6 ${plan.popular
-                                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/25'
-                                    : 'bg-white/10 text-white hover:bg-white/20'
-                                    }`}
+                    <div className="grid md:grid-cols-3 gap-6 md:gap-8">
+                        {pricingPlans.map((plan, index) => (
+                            <motion.div
+                                key={plan.name}
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: index * 0.1, duration: 0.5 }}
+                                className={`relative p-6 sm:p-8 rounded-3xl border ${plan.border} bg-gradient-to-br ${plan.gradient} ${plan.popular ? 'ring-2 ring-blue-500/50' : ''}`}
                             >
-                                Join Waitlist
-                            </button>
+                                {/* Popular Badge */}
+                                {plan.popular && (
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                        <span className="px-4 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
+                                            Most Popular
+                                        </span>
+                                    </div>
+                                )}
 
-                            {/* Features */}
-                            <div className="space-y-3">
-                                <p className="text-xs uppercase tracking-wider text-white/30 mb-3">What's included</p>
-                                {plan.features.map((feature, i) => (
-                                    <div key={i} className="flex items-start gap-3">
-                                        <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm text-white/70">{feature}</span>
+                                {/* Plan Header */}
+                                <div className="mb-6">
+                                    <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
+                                    <p className="text-sm text-white/50">{plan.description}</p>
+                                </div>
+
+                                {/* Hidden Price - Coming Soon */}
+                                <div className="mb-6">
+                                    <div className="relative">
+                                        {/* Blurred price hint */}
+                                        <div className="flex items-baseline gap-1 filter blur-sm select-none pointer-events-none opacity-30">
+                                            <span className="text-sm text-white/50">₹</span>
+                                            <span className="text-4xl font-bold text-white">???</span>
+                                            <span className="text-white/50">/mo</span>
+                                        </div>
+                                        {/* Coming Soon Overlay */}
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+                                                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                                <span className="text-sm font-medium text-white/70">Coming Soon</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                ))}
-                                {plan.locked.map((feature, i) => (
-                                    <div key={i} className="flex items-start gap-3 opacity-50">
-                                        <Lock className="w-4 h-4 text-white/30 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm text-white/40 line-through">{feature}</span>
+                                    <div className="flex items-center gap-2 mt-4">
+                                        <Zap className="w-4 h-4 text-amber-400" />
+                                        <span className="text-sm text-white/60">{plan.credits} credits/month</span>
                                     </div>
-                                ))}
-                            </div>
-                        </motion.div>
-                    ))}
+                                </div>
+
+                                {/* CTA Button */}
+                                <button
+                                    onClick={openWaitlist}
+                                    className={`block w-full py-3 rounded-xl text-center font-medium transition-all mb-6 ${plan.popular
+                                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/25'
+                                        : 'bg-white/10 text-white hover:bg-white/20'
+                                        }`}
+                                >
+                                    Get Notified
+                                </button>
+
+                                {/* Features */}
+                                <div className="space-y-3">
+                                    <p className="text-xs uppercase tracking-wider text-white/30 mb-3">What's included</p>
+                                    {plan.features.map((feature, i) => (
+                                        <div key={i} className="flex items-start gap-3">
+                                            <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm text-white/70">{feature}</span>
+                                        </div>
+                                    ))}
+                                    {plan.locked.map((feature, i) => (
+                                        <div key={i} className="flex items-start gap-3 opacity-50">
+                                            <Lock className="w-4 h-4 text-white/30 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm text-white/40 line-through">{feature}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    {/* Early Access Note */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        className="text-center mt-12"
+                    >
+                        <p className="text-sm text-white/40">
+                            🎁 <span className="text-amber-400">Early Waitlist Members</span> will receive exclusive discounts when pricing is revealed
+                        </p>
+                    </motion.div>
                 </div>
             </section>
 

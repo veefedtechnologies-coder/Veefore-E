@@ -82,7 +82,7 @@ router.get('/waitlist-users', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { page = 1, limit = 10, status = 'all', search = '' } = req.query;
     const pageNum = parseInt(page.toString());
     const limitNum = parseInt(limit.toString());
@@ -90,11 +90,11 @@ router.get('/waitlist-users', async (req, res) => {
 
     // Build query
     let query: any = {};
-    
+
     if (status !== 'all') {
       query.status = status;
     }
-    
+
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -114,7 +114,7 @@ router.get('/waitlist-users', async (req, res) => {
     // Transform users to include questionnaire data
     const transformedUsers = waitlistUsers.map(user => {
       const questionnaire = user.metadata?.questionnaire || {};
-      
+
       return {
         id: user._id.toString(),
         name: user.name,
@@ -131,24 +131,59 @@ router.get('/waitlist-users', async (req, res) => {
         joinedAt: user.joinedAt || user.createdAt,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
-        
-        // Questionnaire data
+
+        // Pass the FULL questionnaire data with all new role-based fields
         questionnaire: {
+          // Organization type
+          orgType: questionnaire.orgType || null,
+
+          // Creator/Solo fields
+          primaryPlatform: questionnaire.primaryPlatform || null,
+          contentNiche: questionnaire.contentNiche || null,
+          creatorAudienceSize: questionnaire.creatorAudienceSize || null,
+          postingFrequency: questionnaire.postingFrequency || null,
+
+          // Startup/Brand fields
+          startupStage: questionnaire.startupStage || null,
+          startupGrowthChannel: questionnaire.startupGrowthChannel || null,
+          startupTeamSize: questionnaire.startupTeamSize || null,
+
+          // Agency fields
+          agencyClientCount: questionnaire.agencyClientCount || null,
+          agencyServices: questionnaire.agencyServices || null,
+          agencyNiche: questionnaire.agencyNiche || null,
+          agencyMonthlyOutput: questionnaire.agencyMonthlyOutput || null,
+
+          // Enterprise fields
+          enterpriseIndustry: questionnaire.enterpriseIndustry || null,
+          enterpriseDepartment: questionnaire.enterpriseDepartment || null,
+          enterpriseSecurity: questionnaire.enterpriseSecurity || null,
+          enterpriseBudget: questionnaire.enterpriseBudget || null,
+
+          // Common fields
+          timeline: questionnaire.timeline || null,
+          referralSource: questionnaire.referralSource || null,
+          primaryGoal: questionnaire.primaryGoal || null,
+          painPoints: questionnaire.painPoints || null,
+
+          // Legacy fields for backward compatibility
           businessType: questionnaire.businessType || null,
           teamSize: questionnaire.teamSize || null,
           currentTools: questionnaire.currentTools || [],
-          primaryGoal: questionnaire.primaryGoal || null,
           contentTypes: questionnaire.contentTypes || [],
           budget: questionnaire.budget || null,
           urgency: questionnaire.urgency || null
         },
-        
-        // Additional metadata
+
+        // Full metadata including role
         metadata: {
-          ipAddress: user.metadata?.ipAddress || null,
+          role: user.metadata?.role || null,
+          questionnaire: user.metadata?.questionnaire || null,
+          ipAddress: user.metadata?.ipAddress || user.metadata?.ip || null,
           userAgent: user.metadata?.userAgent || null,
           emailVerified: user.metadata?.emailVerified || false,
-          joinedAt: user.metadata?.joinedAt || null
+          joinedAt: user.metadata?.joinedAt || null,
+          source: user.metadata?.source || null
         }
       };
     });
@@ -180,9 +215,9 @@ router.get('/waitlist-users/:id', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const user = await WaitlistUser.findById(req.params.id).lean();
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -191,7 +226,7 @@ router.get('/waitlist-users/:id', async (req, res) => {
     }
 
     const questionnaire = user.metadata?.questionnaire || {};
-    
+
     const transformedUser = {
       id: user._id.toString(),
       name: user.name,
@@ -208,24 +243,59 @@ router.get('/waitlist-users/:id', async (req, res) => {
       joinedAt: user.joinedAt || user.createdAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      
-      // Questionnaire data
+
+      // Pass the FULL questionnaire data with all new role-based fields
       questionnaire: {
+        // Organization type
+        orgType: questionnaire.orgType || null,
+
+        // Creator/Solo fields
+        primaryPlatform: questionnaire.primaryPlatform || null,
+        contentNiche: questionnaire.contentNiche || null,
+        creatorAudienceSize: questionnaire.creatorAudienceSize || null,
+        postingFrequency: questionnaire.postingFrequency || null,
+
+        // Startup/Brand fields
+        startupStage: questionnaire.startupStage || null,
+        startupGrowthChannel: questionnaire.startupGrowthChannel || null,
+        startupTeamSize: questionnaire.startupTeamSize || null,
+
+        // Agency fields
+        agencyClientCount: questionnaire.agencyClientCount || null,
+        agencyServices: questionnaire.agencyServices || null,
+        agencyNiche: questionnaire.agencyNiche || null,
+        agencyMonthlyOutput: questionnaire.agencyMonthlyOutput || null,
+
+        // Enterprise fields
+        enterpriseIndustry: questionnaire.enterpriseIndustry || null,
+        enterpriseDepartment: questionnaire.enterpriseDepartment || null,
+        enterpriseSecurity: questionnaire.enterpriseSecurity || null,
+        enterpriseBudget: questionnaire.enterpriseBudget || null,
+
+        // Common fields
+        timeline: questionnaire.timeline || null,
+        referralSource: questionnaire.referralSource || null,
+        primaryGoal: questionnaire.primaryGoal || null,
+        painPoints: questionnaire.painPoints || null,
+
+        // Legacy fields for backward compatibility
         businessType: questionnaire.businessType || null,
         teamSize: questionnaire.teamSize || null,
         currentTools: questionnaire.currentTools || [],
-        primaryGoal: questionnaire.primaryGoal || null,
         contentTypes: questionnaire.contentTypes || [],
         budget: questionnaire.budget || null,
         urgency: questionnaire.urgency || null
       },
-      
-      // Additional metadata
+
+      // Full metadata including role
       metadata: {
-        ipAddress: user.metadata?.ipAddress || null,
+        role: user.metadata?.role || null,
+        questionnaire: user.metadata?.questionnaire || null,
+        ipAddress: user.metadata?.ipAddress || user.metadata?.ip || null,
         userAgent: user.metadata?.userAgent || null,
         emailVerified: user.metadata?.emailVerified || false,
-        joinedAt: user.metadata?.joinedAt || null
+        joinedAt: user.metadata?.joinedAt || null,
+        source: user.metadata?.source || null
       }
     };
 
@@ -249,10 +319,10 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
     const User = connection.model('User', MainAppUserSchema, 'users');
-    
+
     const { id } = req.params;
     const { adminNotes } = req.body;
-    
+
     // Get waitlist user
     const waitlistUser = await WaitlistUser.findById(id).lean();
     if (!waitlistUser) {
@@ -264,7 +334,7 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
 
     // Check if user already exists in main collection
     let mainUser = await User.findOne({ email: waitlistUser.email }).lean();
-    
+
     if (!mainUser) {
       // Create new user in main collection
       const newUser = new User({
@@ -286,7 +356,7 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
           originalWaitlistData: waitlistUser.metadata?.questionnaire || {}
         }
       });
-      
+
       mainUser = await newUser.save();
     } else {
       // Update existing user
@@ -342,10 +412,10 @@ router.post('/waitlist-users/:id/reject', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { id } = req.params;
     const { reason, adminNotes } = req.body;
-    
+
     // Update waitlist user status
     await WaitlistUser.findByIdAndUpdate(id, {
       status: 'rejected',
@@ -385,10 +455,10 @@ router.post('/waitlist-users/:id/ban', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { id } = req.params;
     const { reason, adminNotes } = req.body;
-    
+
     // Update waitlist user status
     await WaitlistUser.findByIdAndUpdate(id, {
       status: 'banned',
@@ -427,10 +497,10 @@ router.post('/waitlist-users/:id/remove', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { id } = req.params;
     const { reason, adminNotes } = req.body;
-    
+
     // Update waitlist user status
     await WaitlistUser.findByIdAndUpdate(id, {
       status: 'removed',
@@ -469,10 +539,10 @@ router.post('/waitlist-users/:id/suspend', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { id } = req.params;
     const { reason, adminNotes, suspendUntil } = req.body;
-    
+
     // Update waitlist user status
     await WaitlistUser.findByIdAndUpdate(id, {
       status: 'suspended',
@@ -513,10 +583,10 @@ router.post('/waitlist-users/:id/postpone', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { id } = req.params;
     const { reason, adminNotes, postponeUntil } = req.body;
-    
+
     // Update waitlist user status
     await WaitlistUser.findByIdAndUpdate(id, {
       status: 'postponed',
@@ -557,10 +627,10 @@ router.post('/waitlist-users/:id/restore', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { id } = req.params;
     const { newStatus, adminNotes } = req.body;
-    
+
     // Update waitlist user status
     await WaitlistUser.findByIdAndUpdate(id, {
       status: newStatus || 'waitlisted',
@@ -598,10 +668,10 @@ router.delete('/waitlist-users/:id', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { id } = req.params;
     const { reason, adminNotes } = req.body;
-    
+
     // Find the user first to get their details for logging
     const userToDelete = await WaitlistUser.findById(id);
     if (!userToDelete) {
@@ -641,9 +711,9 @@ router.post('/waitlist-users/bulk-action', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const { userIds, action, reason, adminNotes, additionalData } = req.body;
-    
+
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
         success: false,
@@ -763,7 +833,7 @@ router.get('/waitlist-stats', async (req, res) => {
   try {
     const connection = await connectToMainApp();
     const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    
+
     const stats = await WaitlistUser.aggregate([
       {
         $group: {

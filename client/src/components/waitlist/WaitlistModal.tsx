@@ -59,7 +59,7 @@ interface CustomDropdownProps {
 }
 
 const CustomDropdown: React.FC<CustomDropdownProps> = ({
-    label, value, onChange, options, icon: Icon, placeholder = "Select..."
+    label, value, onChange, options, placeholder = "Select..."
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -268,28 +268,78 @@ export const WaitlistModal = () => {
         }
     };
 
-    const nextStep = () => {
-        if (!validateStep(step)) return;
+    const nextStep = async () => {
+        const isValid = await validateStep(step);
+        if (!isValid) return;
         setStep(prev => prev + 1);
     };
 
     const prevStep = () => setStep(prev => prev - 1);
 
-    const validateStep = (currentStep: number) => {
+    // Check for disposable/temporary email domains
+    const isDisposableEmail = (email: string): boolean => {
+        const disposableDomains = [
+            'tempmail.com', 'throwaway.com', 'mailinator.com', 'guerrillamail.com',
+            'temp-mail.org', 'fakeinbox.com', '10minutemail.com', 'trashmail.com',
+            'getairmail.com', 'yopmail.com', 'sharklasers.com', 'spam4.me'
+        ];
+        const domain = email.split('@')[1]?.toLowerCase();
+        return disposableDomains.includes(domain);
+    };
+
+    const validateStep = async (currentStep: number): Promise<boolean> => {
         const newErrors: Record<string, string> = {};
         let isValid = true;
 
         if (currentStep === 1) {
-            if (!formData.name.trim()) {
-                newErrors.name = "Name is required";
+            const trimmedName = formData.name.trim();
+            const trimmedEmail = formData.email.trim().toLowerCase();
+
+            // Name validation
+            if (!trimmedName) {
+                newErrors.name = "Please enter your name";
+                isValid = false;
+            } else if (trimmedName.length < 2) {
+                newErrors.name = "Name must be at least 2 characters";
                 isValid = false;
             }
-            if (!formData.email.trim()) {
-                newErrors.email = "Email is required";
+
+            // Email validation
+            if (!trimmedEmail) {
+                newErrors.email = "Please enter your email address";
                 isValid = false;
-            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-                newErrors.email = "Please enter a valid email address";
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+                newErrors.email = "Please enter a valid email address (e.g., name@example.com)";
                 isValid = false;
+            } else if (isDisposableEmail(trimmedEmail)) {
+                newErrors.email = "Please use a permanent email address, not a disposable one";
+                isValid = false;
+            } else {
+                // Check domain validity
+                const domain = trimmedEmail.split('@')[1];
+                if (!domain || domain.length < 4 || !domain.includes('.')) {
+                    newErrors.email = "Please enter a valid email domain";
+                    isValid = false;
+                } else {
+                    // Check if email already exists on waitlist
+                    try {
+                        const response = await fetch(`/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+
+                        if (response.status === 429) {
+                            newErrors.email = "Too many requests. Please wait a moment and try again.";
+                            isValid = false;
+                        } else if (response.ok) {
+                            const data = await response.json();
+                            if (data.exists) {
+                                newErrors.email = data.message || "This email is already on the waitlist! Check your inbox for updates.";
+                                isValid = false;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error checking email:', error);
+                        // Don't block on network errors, let the final submit handle it
+                    }
+                }
             }
         }
         if (currentStep === 2 && !formData.orgType) {
@@ -305,15 +355,94 @@ export const WaitlistModal = () => {
         setIsSubmitting(true);
         try {
             await new Promise(resolve => setTimeout(resolve, 1500));
-            await fetch('/api/early-access/join', {
+            const response = await fetch('/api/early-access/join', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: formData.name, email: formData.email, role: formData.orgType, questionnaire: { ...formData } })
+                body: JSON.stringify({ name: formData.name.trim(), email: formData.email.trim().toLowerCase(), role: formData.orgType, questionnaire: { ...formData } })
             });
-            setStep(5);
+
+            // Handle various HTTP status codes
+            if (response.status === 400) {
+                const data = await response.json().catch(() => ({}));
+                toast({
+                    title: "Invalid Data",
+                    description: data.error || "Please check your information and try again.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            if (response.status === 409) {
+                toast({
+                    title: "Already Registered",
+                    description: "This email is already on the waitlist. Check your inbox for updates!",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            if (response.status === 429) {
+                toast({
+                    title: "Too Many Requests",
+                    description: "Please wait a few minutes and try again.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            if (response.status >= 500) {
+                toast({
+                    title: "Server Busy",
+                    description: "Our servers are busy. Please try again in a moment.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                toast({
+                    title: "Registration Failed",
+                    description: data.error || "Something went wrong. Please try again.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            const data = await response.json();
+
+            if (data.success !== false) {
+                setStep(5);
+            } else {
+                toast({
+                    title: "Registration Failed",
+                    description: data.error || "Could not complete registration. Please try again.",
+                    variant: "destructive"
+                });
+            }
         } catch (error) {
             console.error('Submission error:', error);
-            toast({ title: "Error", description: "Please try again.", variant: "destructive" });
+
+            // Determine error type
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                toast({
+                    title: "Connection Error",
+                    description: "Unable to connect. Please check your internet connection.",
+                    variant: "destructive"
+                });
+            } else if (error instanceof SyntaxError) {
+                toast({
+                    title: "Server Error",
+                    description: "Server returned an invalid response. Please try again.",
+                    variant: "destructive"
+                });
+            } else {
+                toast({
+                    title: "Unexpected Error",
+                    description: "An unexpected error occurred. Please try again later.",
+                    variant: "destructive"
+                });
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -588,7 +717,7 @@ export const WaitlistModal = () => {
     return (
         <AnimatePresence>
             {isWaitlistOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-4">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}

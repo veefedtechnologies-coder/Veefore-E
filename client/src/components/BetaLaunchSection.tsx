@@ -927,13 +927,8 @@ const BetaLaunchSection: React.FC<BetaLaunchSectionProps> = () => {
             {/* Scroll Zoom Intro - ManyChat Style */}
             <ScrollZoomIntro />
 
-
-
             {/* Urgency */}
             <UrgencySection />
-
-            {/* Signup */}
-            <SignupSection />
         </div>
     );
 };

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, Suspense, useCallback, memo } from 'react'
+import { Link } from 'wouter'
 import { useWaitlist } from '../context/WaitlistContext'
 
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import {
-  ArrowRight, Play, Zap, CheckCircle, MessageSquare, Bot, TrendingUp,
+  ArrowRight, Zap, CheckCircle, MessageSquare, Bot, TrendingUp,
   Users, Sparkles, Brain, Plus,
   Clock, Shield, BarChart3, Send, Layers,
   Crown, RefreshCw, Lock,
-  X,
+  X, Mail,
   MessageCircle, Check, DollarSign, Search
 } from 'lucide-react'
 import { SEO, seoConfig } from '../lib/seo-optimization'
@@ -58,11 +59,11 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
 
   // On mobile, skip blur entirely for performance
   if (isMobile) {
-    return <div className={`absolute rounded-full ${colors[color as keyof typeof colors]} ${className}`} style={{ filter: 'blur(40px)' }} />
+    return <div className={`absolute rounded - full ${colors[color as keyof typeof colors]} ${className} `} style={{ filter: 'blur(40px)' }} />
   }
 
   return (
-    <div className={`absolute rounded-full blur-[100px] bg-gradient-radial ${colors[color as keyof typeof colors]} ${className}`} />
+    <div className={`absolute rounded - full blur - [100px] bg - gradient - radial ${colors[color as keyof typeof colors]} ${className} `} />
   )
 }
 
@@ -253,7 +254,7 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className={`${className}`}
+      className={`${className} `}
     >
       {children}
     </motion.div>
@@ -273,7 +274,7 @@ const DashboardPageContent = memo(() => (
           <p className="text-[10px] text-white/40 mb-1">{stat.label}</p>
           <div className="flex items-end justify-between">
             <span className="text-xl font-bold">{stat.value}</span>
-            <span className={`text-xs ${stat.color}`}>{stat.change}</span>
+            <span className={`text - xs ${stat.color} `}>{stat.change}</span>
           </div>
         </div>
       ))}
@@ -288,7 +289,7 @@ const DashboardPageContent = memo(() => (
       </div>
       <div className="h-32 flex items-end space-x-2">
         {[40, 55, 45, 70, 60, 80, 75, 90, 85, 95, 88, 100].map((h, i) => (
-          <div key={i} style={{ height: `${h}%` }} className="flex-1 rounded-t-sm bg-gradient-to-t from-blue-600 to-blue-400" />
+          <div key={i} style={{ height: `${h}% ` }} className="flex-1 rounded-t-sm bg-gradient-to-t from-blue-600 to-blue-400" />
         ))}
       </div>
     </div>
@@ -337,7 +338,7 @@ const EngagementPageContent = memo(() => (
           <div key={i} className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.05]">
             <div className="flex items-start justify-between mb-2">
               <span className="text-xs font-medium text-blue-400">{item.user}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.status === 'sent' ? 'bg-green-500/20 text-green-400' : item.status === 'sending' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white/40'}`}>{item.status}</span>
+              <span className={`text - [10px] px - 2 py - 0.5 rounded - full ${item.status === 'sent' ? 'bg-green-500/20 text-green-400' : item.status === 'sending' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white/40'} `}>{item.status}</span>
             </div>
             <p className="text-[11px] text-white/50 mb-1.5">"{item.comment}"</p>
             <div className="flex items-center space-x-2">
@@ -631,7 +632,7 @@ const AnimatedDashboard = memo(() => {
                     <div
                       key={item.name}
                       ref={el => { itemRefs.current[i] = el }}
-                      className={`px-3 py-2 rounded-lg text-xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'}`}
+                      className={`px - 3 py - 2 rounded - lg text - xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'} `}
                     >
                       {item.name}
                     </div>
@@ -670,7 +671,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const { openWaitlist } = useWaitlist()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+
 
   // HUD State for Algorithm Science section
   const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
@@ -718,7 +719,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const pricingPlans = [
     {
       name: 'Starter',
-      price: billingCycle === 'monthly' ? 399 : 3990,
+
       credits: 300,
       description: 'For new creators testing growth',
       features: ['AI Hook Generator', 'Caption & CTA Engine', 'Basic Scheduler', '1 Competitor', 'Read-only Analytics'],
@@ -728,7 +729,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     },
     {
       name: 'Growth',
-      price: billingCycle === 'monthly' ? 899 : 8990,
+
       credits: 1200,
       description: 'For serious creators ready to scale',
       features: ['Everything in Starter', 'AI Comment Automation', 'Smart DM Replies', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics'],
@@ -739,7 +740,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     },
     {
       name: 'Pro',
-      price: billingCycle === 'monthly' ? 1999 : 19990,
+
       credits: 3000,
       description: 'For agencies and power users',
       features: ['Everything in Growth', '3-5 Social Accounts', 'Advanced DM Funnels', 'Team Access (2-5)', 'Priority Processing', 'Dedicated Support'],
@@ -752,12 +753,46 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
 
   const faqs = [
-    { q: "What exactly is VeeFore?", a: "VeeFore is an AI-powered Growth Engine that actively increases engagement, reach, and visibility for creators — automatically. Unlike schedulers or content tools, VeeFore participates in your growth through AI-driven engagement automation, hook intelligence, and smart DM funnels." },
-    { q: "How is VeeFore different from other tools?", a: "Most tools help you create and schedule. VeeFore helps you RESPOND faster, ENGAGE at scale, and MAINTAIN momentum. We follow a Growth-First philosophy: engagement before volume, interaction before impressions." },
-    { q: "Is the automation safe?", a: "Absolutely. VeeFore uses context-aware AI with human-like tone control and strictly adheres to platform-safe automation limits. Our system mimics natural engagement patterns to protect your account." },
-    { q: "How does the credit system work?", a: "1 Credit = 1 AI Action. Actions include generating hooks, creating captions, replying to comments or DMs. Credits reset monthly. Starter gets 300, Growth gets 1,200, Pro gets 3,000 credits." },
-    { q: "What do I get by joining the beta?", a: "Beta members get 500 bonus credits, a surprise exclusive feature, 30 days free trial when we launch, and priority email updates about pricing and new features." },
-    { q: "Who is VeeFore for?", a: "Instagram & short-form creators with 5k-200k followers who value time and want scale without spam. Not for casual posters or hobby accounts." }
+    {
+      q: "What exactly is VeeFore?",
+      a: "VeeFore is an AI-powered Social Media Growth Engine designed for serious creators and brands. Unlike basic scheduling tools, VeeFore actively participates in your growth through three core systems: AI Engagement Automation (smart comment replies), Hook Intelligence (trend analysis & viral hook suggestions), and Smart DM Funnels (converting followers into customers). Think of it as having a 24/7 growth team powered by AI.",
+      category: "About"
+    },
+    {
+      q: "How is VeeFore different from Hootsuite, Buffer, or Later?",
+      a: "Those tools help you schedule and publish content. VeeFore focuses on what happens AFTER you post. We help you respond to comments faster, engage with your audience at scale, identify trending hooks before they blow up, and turn DM conversations into conversions. Our philosophy: Engagement before volume, interaction before impressions.",
+      category: "Comparison"
+    },
+    {
+      q: "Is the automation safe for my account?",
+      a: "Absolutely. VeeFore uses context-aware AI that mimics natural human engagement patterns. We implement strict rate limits well below platform thresholds, use human-like delays between actions, and our AI generates contextually relevant responses—not generic spam. Your account safety is our top priority, which is why we've built compliance into every feature.",
+      category: "Safety"
+    },
+    {
+      q: "How does the credit system work?",
+      a: "1 Credit = 1 AI Action. Actions include: generating viral hooks, creating captions with CTAs, replying to comments, sending DM responses, or analyzing trends. Credits reset monthly based on your plan. Starter gets 300 credits, Growth gets 1,200, and Pro gets 3,000 credits. Unused credits don't roll over, so use them!",
+      category: "Pricing"
+    },
+    {
+      q: "Which platforms does VeeFore support?",
+      a: "We're launching with full Instagram support (posts, reels, stories, DMs). TikTok, YouTube Shorts, and Twitter/X integrations are on our roadmap for Q2 2025. Beta users will get early access to new platform integrations as they roll out.",
+      category: "Platforms"
+    },
+    {
+      q: "What do I get by joining the beta waitlist?",
+      a: "Beta members receive exclusive perks: 500 bonus credits on launch, access to a surprise feature we haven't announced yet, 30 days free trial (vs. 14 days for regular users), founding member pricing locked in forever, and direct access to our team for feedback and support. Plus, you'll help shape the product roadmap.",
+      category: "Beta"
+    },
+    {
+      q: "Who is VeeFore built for?",
+      a: "VeeFore is designed for Instagram creators with 5K-500K followers, personal brands, coaches, agencies managing multiple accounts, and e-commerce brands using social for sales. If you're serious about growth and value your time, VeeFore is for you. Not ideal for casual posters or hobby accounts.",
+      category: "About"
+    },
+    {
+      q: "Can I cancel anytime?",
+      a: "Yes, absolutely. No contracts, no commitments. You can cancel your subscription at any time from your dashboard. Your access continues until the end of your billing period. We believe in earning your business every month, not locking you in.",
+      category: "Pricing"
+    }
   ]
 
   return (
@@ -781,7 +816,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center pt-24 pb-20 overflow-hidden" style={{ marginTop: '-80px', paddingTop: 'calc(80px + 6rem)' }}>
+      <section className={`relative min-h-screen flex items-center justify-center pb-20 overflow-hidden ${isMobile ? 'pt-28' : 'pt-24'}`} style={{ marginTop: '-80px', paddingTop: isMobile ? 'calc(80px + 2rem)' : 'calc(80px + 6rem)' }}>
         {/* Background layer */}
         <div className="absolute inset-0 z-0">
           {isMobile ? (
@@ -818,23 +853,17 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
+            <div className="flex items-center justify-center px-4">
               <MagneticButton
-                className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
+                className="group relative bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white rounded-full px-6 sm:px-7 md:px-8 py-3 sm:py-3.5 text-sm sm:text-sm md:text-base font-semibold overflow-hidden shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-shadow duration-300"
                 onClick={openWaitlist}
               >
                 <span className="relative z-10 flex items-center">
                   Join Waitlist
-                  <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5" />
+                  <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               </MagneticButton>
-
-              <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
-                </div>
-                <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
-              </button>
             </div>
 
             <div className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4">
@@ -888,28 +917,21 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 1.1 }}
-              className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4"
+              className="flex items-center justify-center px-4"
             >
               <MagneticButton
-                className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-5 text-sm sm:text-base md:text-lg font-bold overflow-hidden"
+                className="group relative bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white rounded-full px-7 sm:px-8 md:px-10 py-3.5 sm:py-4 text-sm sm:text-base md:text-lg font-semibold overflow-hidden shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-shadow duration-300"
                 onClick={openWaitlist}
               >
                 <span className="relative z-10 flex items-center">
                   Join Waitlist
-                  <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="ml-2 w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                 </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="absolute inset-[-2px] bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur-xl opacity-50" />
+                  <div className="absolute inset-[-3px] bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur-xl opacity-40" />
                 </div>
               </MagneticButton>
-
-              <button className="group flex items-center space-x-2 sm:space-x-3 text-white/60 hover:text-white transition-colors px-4 sm:px-6 py-3 sm:py-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-hover:border-white/20 transition-all">
-                  <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
-                </div>
-                <span className="font-semibold text-sm sm:text-base">Watch Demo</span>
-              </button>
             </motion.div>
 
             <motion.div
@@ -964,7 +986,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     {[30, 45, 35, 60, 75, 65, 90, 85, 95].map((h, i) => (
                       <div
                         key={i}
-                        style={{ height: `${h}%` }}
+                        style={{ height: `${h}% ` }}
                         className="flex-1 bg-gradient-to-t from-pink-500 to-rose-400 rounded-sm"
                       />
                     ))}
@@ -1543,16 +1565,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     <div className="flex items-start gap-3">
                       {/* Node circle with glow */}
                       <div className="relative">
-                        <div className={`absolute inset-0 ${item.bgColor} rounded-full blur-md opacity-40`} />
-                        <div className={`relative w-11 h-11 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg`}>
+                        <div className={`absolute inset - 0 ${item.bgColor} rounded - full blur - md opacity - 40`} />
+                        <div className={`relative w - 11 h - 11 rounded - full ${item.bgColor} flex items - center justify - center shadow - lg`}>
                           <item.icon className="w-5 h-5 text-white" />
                         </div>
                       </div>
                       {/* Content card */}
                       <div className="bg-[#0d0d0d]/80 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 min-w-[170px]">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-bold ${item.color} uppercase`}>Step {item.step}</span>
-                          <span className={`text-[10px] font-medium ${item.color} bg-white/10 px-1.5 py-0.5 rounded`}>{item.metric}</span>
+                          <span className={`text - [10px] font - bold ${item.color} uppercase`}>Step {item.step}</span>
+                          <span className={`text - [10px] font - medium ${item.color} bg - white / 10 px - 1.5 py - 0.5 rounded`}>{item.metric}</span>
                         </div>
                         <h4 className="text-sm font-semibold text-white mb-0.5">{item.title}</h4>
                         <p className="text-xs text-white/50">{item.desc}</p>
@@ -1605,16 +1627,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   >
                     {/* Node with glow */}
                     <div className="relative shrink-0">
-                      <div className={`absolute inset-0 ${item.bgColor} rounded-full blur-md opacity-40`} />
-                      <div className={`relative w-11 h-11 rounded-full ${item.bgColor} flex items-center justify-center shadow-lg`}>
+                      <div className={`absolute inset - 0 ${item.bgColor} rounded - full blur - md opacity - 40`} />
+                      <div className={`relative w - 11 h - 11 rounded - full ${item.bgColor} flex items - center justify - center shadow - lg`}>
                         <item.icon className="w-5 h-5 text-white" />
                       </div>
                     </div>
                     {/* Content */}
                     <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[10px] font-bold ${item.color} uppercase tracking-wider`}>Step {item.step}</span>
-                        <span className={`text-[10px] font-medium ${item.color} bg-white/10 px-2 py-0.5 rounded-full`}>{item.metric}</span>
+                        <span className={`text - [10px] font - bold ${item.color} uppercase tracking - wider`}>Step {item.step}</span>
+                        <span className={`text - [10px] font - medium ${item.color} bg - white / 10 px - 2 py - 0.5 rounded - full`}>{item.metric}</span>
                       </div>
                       <h4 className="text-sm font-semibold text-white mb-0.5">{item.title}</h4>
                       <p className="text-xs text-white/50">{item.desc}</p>
@@ -1756,7 +1778,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                           className="relative overflow-hidden rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 cursor-default group transition-all duration-300 hover:border-white/15 hover:bg-white/[0.04] hover:shadow-lg min-h-[90px] flex flex-col justify-between"
                         >
                           {/* Hover Gradient Background */}
-                          <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                          <div className={`absolute inset - 0 bg - gradient - to - br ${item.gradient} opacity - 0 group - hover: opacity - 100 transition - opacity duration - 500`} />
 
                           <div className="relative z-10 w-full">
                             <div className="flex justify-between items-start mb-1">
@@ -1765,7 +1787,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                             </div>
 
                             <div className="mt-2">
-                              <span className={`text-xl font-bold text-white tracking-tight group-hover:scale-105 inline-block transition-transform duration-300 origin-left`}>
+                              <span className={`text - xl font - bold text - white tracking - tight group - hover: scale - 105 inline - block transition - transform duration - 300 origin - left`}>
                                 {item.value}
                               </span>
                               <p className="text-[9px] text-white/30 font-medium mt-0 leading-tight">{item.sub}</p>
@@ -1881,8 +1903,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       { title: 'Momentum before aesthetics', sub: 'Keep the wheel turning automatically. Consistency wins.', icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/20' }
                     ].map((item, i) => (
                       <div key={i} className="flex items-start space-x-3 md:space-x-5 group">
-                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl ${item.bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300`}>
-                          <item.icon className={`w-5 h-5 md:w-6 md:h-6 ${item.color}`} />
+                        <div className={`w - 10 h - 10 md: w - 12 md: h - 12 rounded - xl ${item.bg} flex items - center justify - center shrink - 0 group - hover: scale - 110 transition - transform duration - 300`}>
+                          <item.icon className={`w - 5 h - 5 md: w - 6 md: h - 6 ${item.color} `} />
                         </div>
                         <div>
                           <h4 className="text-sm md:text-lg font-bold text-white/90 mb-0.5 md:mb-1 group-hover:text-white transition-colors">{item.title}</h4>
@@ -1993,7 +2015,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               >
                 <div className="group relative overflow-hidden rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all duration-500">
                   {/* Subtle hover glow */}
-                  <div className={`absolute inset-0 bg-gradient-to-r ${card.gradient} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-500 pointer-events-none`} />
+                  <div className={`absolute inset - 0 bg - gradient - to - r ${card.gradient} opacity - 0 group - hover: opacity - [0.03] transition - opacity duration - 500 pointer - events - none`} />
 
                   <div className="flex flex-col md:flex-row items-stretch">
                     {/* Old Way - 40% width */}
@@ -2010,14 +2032,14 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       <div className="absolute top-3 right-4 md:top-4 md:right-6 text-[9px] font-mono uppercase tracking-widest text-white/20">VeeFore</div>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-4 sm:gap-0">
                         <div className="flex items-center space-x-4">
-                          <div className={`p-2.5 rounded-xl bg-gradient-to-br ${card.gradient} text-white shadow-lg shadow-black/50`}>
+                          <div className={`p - 2.5 rounded - xl bg - gradient - to - br ${card.gradient} text - white shadow - lg shadow - black / 50`}>
                             <card.newIcon size={20} />
                           </div>
                           <h3 className="text-xl font-bold text-white tracking-tight">{card.newTitle}</h3>
                         </div>
                         {/* Metric */}
                         <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 w-fit">
-                          <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${card.gradient}`} />
+                          <div className={`w - 1.5 h - 1.5 rounded - full bg - gradient - to - r ${card.gradient} `} />
                           <span className="text-xs font-mono font-medium text-white/70">{card.metric}</span>
                         </div>
                       </div>
@@ -2047,28 +2069,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <GradientOrb className="w-[600px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="blue" />
 
         <div className="max-w-[1200px] mx-auto px-6 relative">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
+          <div className="text-center mb-10 sm:mb-16">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 sm:mb-6">
               Choose your <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth speed</span>
             </h2>
-            <p className="text-xl text-white/40 max-w-2xl mx-auto mb-10">
+            <p className="text-sm sm:text-lg md:text-xl text-white/40 max-w-2xl mx-auto mb-6 sm:mb-10 px-4">
               We don't sell features. We sell saved time, increased engagement, and automation leverage.
             </p>
 
-            <div className="inline-flex items-center p-1 rounded-full bg-white/5 border border-white/10">
-              <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${billingCycle === 'monthly' ? 'bg-white text-black' : 'text-white/50 hover:text-white'}`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${billingCycle === 'yearly' ? 'bg-white text-black' : 'text-white/50 hover:text-white'}`}
-              >
-                Yearly <span className="text-green-500 ml-1 text-xs">-17%</span>
-              </button>
-            </div>
+
           </div>
 
           {/* Mobile View - Sticky Stack */}
@@ -2084,48 +2093,59 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               >
                 <TiltCard className="h-full group">
                   {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-auto max-w-full px-4 py-1 rounded-full bg-blue-500 text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-500/30 text-white z-30 whitespace-nowrap pointer-events-none">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-auto max-w-full px-3 py-1 rounded-full bg-blue-500 text-[10px] font-bold uppercase tracking-wider shadow-lg shadow-blue-500/30 text-white z-30 whitespace-nowrap pointer-events-none">
                       Most Popular
                     </div>
                   )}
-                  <GlassCard className={`p-6 h-full flex flex-col !bg-gradient-to-br ${plan.gradient} ${plan.border} relative shadow-xl`}>
+                  <GlassCard className={`p-4 sm:p-6 h-full flex flex-col bg-gradient-to-br ${plan.gradient} ${plan.border} relative shadow-xl`}>
 
-                    <div className="mb-4">
-                      <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
-                      <p className="text-sm text-white/40">{plan.description}</p>
+                    <div className="mb-3 sm:mb-4">
+                      <h3 className="text-xl sm:text-2xl font-bold mb-1">{plan.name}</h3>
+                      <p className="text-xs sm:text-sm text-white/40">{plan.description}</p>
                     </div>
 
-                    <div className="mb-6">
-                      <div className="flex items-baseline">
-                        <span className="text-4xl font-bold">₹{plan.price.toLocaleString()}</span>
-                        <span className="text-white/40 ml-2">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                    <div className="mb-4 sm:mb-6">
+                      {/* Hidden Price - Coming Soon */}
+                      <div className="relative mb-1">
+                        {/* Blurred price hint */}
+                        <div className="flex items-baseline filter blur-sm select-none pointer-events-none opacity-50">
+                          <span className="text-2xl sm:text-4xl font-bold">₹???</span>
+                          <span className="text-white/40 ml-2 text-sm">/mo</span>
+                        </div>
+                        {/* Coming Soon Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 backdrop-blur-md">
+                            <Lock className="w-3 h-3 text-amber-400" />
+                            <span className="text-xs sm:text-sm font-medium text-white/90">Coming Soon</span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-white/30 mt-1">{plan.credits.toLocaleString()} credits/month</p>
+                      <p className="text-xs sm:text-sm text-white/30 mt-1">{plan.credits.toLocaleString()} credits/month</p>
                     </div>
 
-                    <div className="space-y-3 mb-6 flex-1">
+                    <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6 flex-1">
                       {plan.features.map((feature, j) => (
-                        <div key={j} className="flex items-center space-x-2 text-sm text-white/60">
-                          <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                        <div key={j} className="flex items-start space-x-2 text-xs sm:text-sm text-white/60">
+                          <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500 shrink-0 mt-0.5" />
                           <span>{feature}</span>
                         </div>
                       ))}
                       {plan.locked.map((feature, j) => (
-                        <div key={j} className="flex items-center space-x-2 text-sm text-white/30">
-                          <Lock className="w-4 h-4 shrink-0" />
+                        <div key={j} className="flex items-start space-x-2 text-xs sm:text-sm text-white/30">
+                          <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 mt-0.5" />
                           <span>{feature}</span>
                         </div>
                       ))}
                     </div>
 
                     <MagneticButton
-                      className={`w-full rounded-full py-3 font-bold transition-all ${plan.popular
+                      className={`w-full rounded-full py-2.5 sm:py-3 font-bold text-sm sm:text-base transition-all ${plan.popular
                         ? 'bg-white text-black hover:bg-white/90'
                         : 'bg-white/5 border border-white/10 hover:bg-white/10'
                         }`}
                       onClick={openWaitlist}
                     >
-                      Get Started
+                      Get Notified
                     </MagneticButton>
                   </GlassCard>
                 </TiltCard>
@@ -2136,7 +2156,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           {/* Desktop View - Scroll Animation */}
           <PricingScrollAnimation
             pricingPlans={pricingPlans}
-            billingCycle={billingCycle}
             onNavigate={onNavigate}
           />
         </div>
@@ -2146,23 +2165,46 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       <BetaLaunchSection onNavigate={onNavigate} />
 
       {/* FAQ */}
-      < section id="faq" className="py-32 relative" >
-        <div className="max-w-[800px] mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold">Frequently Asked</h2>
+      <section id="faq" className="py-24 md:py-32 relative">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-950/10 to-transparent pointer-events-none" />
+
+        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 relative">
+          {/* Header */}
+          <div className="text-center mb-12 md:mb-16">
+            <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/60 mb-4 sm:mb-6">
+              Got Questions?
+            </span>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4">
+              Frequently Asked <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Questions</span>
+            </h2>
+            <p className="text-white/40 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto px-2">
+              Everything you need to know about VeeFore and how it can help you grow.
+            </p>
           </div>
 
-          <div className="space-y-3">
+          {/* FAQ Grid */}
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
             {faqs.map((faq, i) => (
-              <div key={i}>
-                <GlassCard className="overflow-hidden">
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.4, delay: i * 0.05 }}
+              >
+                <div className="h-full bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] rounded-xl sm:rounded-2xl overflow-hidden hover:border-white/10 transition-colors duration-300">
                   <button
                     onClick={() => setActiveFaq(activeFaq === i ? null : i)}
-                    className="w-full p-6 flex items-center justify-between text-left"
-                  >
-                    <span className="font-bold pr-4">{faq.q}</span>
-                    <div className={`w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0 transition-transform duration-300 ${activeFaq === i ? 'rotate-45' : ''}`}>
-                      <Plus className="w-4 h-4" />
+                    className="w-full p-4 sm:p-5 md:p-6 flex items-start justify-between text-left gap-3 sm:gap-4">
+                    <div className="flex-1">
+                      <span className="inline-block px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-[9px] sm:text-[10px] md:text-xs font-medium text-blue-300/80 mb-1.5 sm:mb-2">
+                        {faq.category}
+                      </span>
+                      <span className="block font-semibold text-xs sm:text-sm md:text-base text-white/90 leading-snug">{faq.q}</span>
+                    </div>
+                    <div className={`w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center shrink-0 transition-all duration-300 ${activeFaq === i ? 'rotate-45 from-blue-500/30 to-purple-500/30' : ''}`}>
+                      <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-white/70" />
                     </div>
                   </button>
                   <AnimatePresence>
@@ -2171,19 +2213,45 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="px-6 pb-6 text-white/50 leading-relaxed"
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className="overflow-hidden"
                       >
-                        {faq.a}
+                        <div className="px-4 sm:px-5 md:px-6 pb-4 sm:pb-5 md:pb-6 pt-0">
+                          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-3 sm:mb-4" />
+                          <p className="text-white/50 text-xs sm:text-sm md:text-[15px] leading-relaxed">
+                            {faq.a}
+                          </p>
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </GlassCard>
-              </div>
+                </div>
+              </motion.div>
             ))}
           </div>
+
+          {/* Still have questions CTA */}
+          <div className="text-center mt-8 sm:mt-12 md:mt-16">
+            <p className="text-white/40 text-sm mb-3 sm:mb-4">Still have questions?</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href="/contact"
+                className="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-full bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 hover:text-white transition-all duration-300 text-xs sm:text-sm font-medium"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Contact Support
+              </Link>
+              <a
+                href="mailto:support@veefore.com"
+                className="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-full bg-transparent border border-white/10 text-white/60 hover:bg-white/5 hover:text-white/80 transition-all duration-300 text-xs sm:text-sm font-medium"
+              >
+                <Mail className="w-4 h-4" />
+                Email Us
+              </a>
+            </div>
+          </div>
         </div>
-      </section >
+      </section>
 
       {/* Final CTA */}
       < section className="py-32 relative overflow-hidden" >

@@ -8,7 +8,7 @@ import { registerAdminRoutes } from './admin-routes';
 import videoRoutes, { setupVideoWebSocket } from './video-routes';
 import authRoutes from './auth-routes';
 import authCookiesRouter from './routes/auth-cookies';
-import { 
+import {
   authRateLimiter,
   bruteForceMiddleware,
   aiRateLimiter
@@ -19,14 +19,19 @@ import { defaultWorkspaceEnforcer } from './middleware/default-workspace-enforce
 import { mountV1Routes } from './routes/v1/index';
 import { createMediaUpload } from './infrastructure/media-upload';
 
+import { default as earlyAccessRoutes } from './routes/v1/early-access.routes';
+
 export { initializeLeaderElection } from './infrastructure/leader-election';
 
 export async function registerRoutes(app: Express, storage: IStorage, httpServer: Server, _upload?: multer.Multer): Promise<void> {
   const mediaUpload = createMediaUpload();
 
   app.use('/api', defaultWorkspaceEnforcer(storage));
-  
+
   app.use('/api/ai', aiRateLimiter);
+
+  // Register early access routes explicitly
+  app.use('/api/early-access', earlyAccessRoutes);
 
   mountV1Routes(app, '/api');
 
@@ -40,15 +45,15 @@ export async function registerRoutes(app: Express, storage: IStorage, httpServer
   }, videoRoutes);
 
   app.use('/api/admin/*', strictCorsMiddleware);
-  
+
   app.use('/api/admin/*', auditTrailMiddleware('admin_operation'));
 
   registerAdminRoutes(app);
 
   app.use('/api/auth', authRateLimiter, bruteForceMiddleware, authRoutes);
-  
+
   app.use('/api/auth-cookies', authRateLimiter, bruteForceMiddleware, authCookiesRouter);
-  
+
   setupVideoWebSocket(httpServer);
   console.log('[WS] Video WebSocket server initialized on /ws/video');
 }
