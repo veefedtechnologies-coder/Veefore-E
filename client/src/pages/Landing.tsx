@@ -2163,7 +2163,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section >
 
       {/* Beta Launch */}
-      <BetaLaunchSection onNavigate={onNavigate} />
+      <BetaLaunchSection />
 
       {/* FAQ */}
       <section id="faq" className="py-24 md:py-32 relative">

@@ -1,0 +1,24 @@
+Act as a Principal Frontend Performance Engineer. I need you to refactor my current landing page code to achieve "Enterprise-Grade" 60fps performance on mobile devices, specifically targeting scroll smoothness and animation stability.
+
+Here is the diagnosis of the current problem:
+1. SCROLL JANK: The scroll event loop is blocked, causing stuttering.
+2. FLASHING/BLINKING: Components triggered by scroll (Intersection Observers) are unmounting/remounting aggressively or have incorrect hydration states, causing them to "flash" or "blink" into existence.
+3. TIMING ISSUES: Animations are running too fast or skipping frames due to main-thread blocking.
+
+Your Task is to optimize this code WITHOUT removing any visuals, graphics, animations, or mockups. The design must remain 100% identical.
+
+Apply the following specific technical fixes:
+
+1. FORCE HARDWARE ACCELERATION: Apply `will-change: transform, opacity` and `transform: translateZ(0)` to all animated containers to promote them to their own composite layers. This moves rendering from the CPU to the GPU.
+
+2. OPTIMIZE ANIMATION PROPERTIES: Ensure all animations target ONLY `transform` and `opacity`. Refactor any animations currently changing layout properties (like `width`, `height`, `margin`, `top`, `left`) to use transforms instead to prevent Layout Thrashing.
+
+3. FIX INTERSECTION OBSERVERS:
+   - Set `triggerOnce: true` (or equivalent) for scroll animations so elements don't re-render or flash when scrolling back up.
+   - Adjust the `threshold` and `rootMargin` so elements are pre-loaded before they enter the viewport, eliminating the "pop-in" blink effect.
+
+4. PREVENT RE-RENDERS: Memoize heavy components (using React.memo or equivalent) to prevent unnecessary re-renders during the scroll event.
+
+5. BLUR/GLASSMORPHISM OPTIMIZATION: If backdrop-filter is causing lag, implement a fallback or optimize the stacking context so it doesn't force a repaint of the whole page.
+
+Please analyze my code and apply these optimizations immediately to make the scroll butter-smooth while keeping every visual detail intact.

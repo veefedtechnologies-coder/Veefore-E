@@ -2,6 +2,7 @@ import { useRef, memo, useState, useMemo, useEffect } from 'react';
 import { motion, useScroll, useSpring, useTransform, MotionValue, useMotionValueEvent } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
+import { GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
 
 interface Feature {
   id: string;
@@ -58,7 +59,7 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
 
   return (
     <motion.div
-      style={{ x: xWithUnits, zIndex, scale, opacity }}
+      style={{ x: xWithUnits, zIndex, scale, opacity, ...GPU_ACCELERATED_STYLES }}
       className="absolute inset-0 h-screen w-screen flex items-center justify-center overflow-hidden bg-black will-change-transform"
     >
       {/* Optimized Backgrounds: removed heavy blur for better performance */}
@@ -170,11 +171,12 @@ export const CinematicFeatures = ({ features }: CinematicFeaturesProps) => {
     else setShowHint(false);
   });
 
-  const activeIndex = useTransform(snappedMotionValue, (value) => {
+  const _activeIndex = useTransform(snappedMotionValue, (value) => {
     const total = features.length;
     if (total <= 1) return 0;
     return Math.min(Math.round(value * (total - 1)), total - 1);
   });
+  void _activeIndex;
 
   return (
     <section ref={targetRef} className="relative" style={{ height: `${features.length * 250}vh` }}>
