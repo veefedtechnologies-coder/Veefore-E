@@ -26,9 +26,9 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
   });
 
   const x = useSpring(targetX as any, {
-    stiffness: 80,
-    damping: 20,
-    mass: 0.6
+    stiffness: 180,
+    damping: 28,
+    mass: 0.35
   });
 
   const xWithUnits = useTransform(x, (value) => `${value}vw`);
@@ -39,7 +39,7 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
       if (index > current) return 1.1; // Parallax scale for incoming
       return 1;
     }) as any,
-    { stiffness: 80, damping: 20 }
+    { stiffness: 200, damping: 30, mass: 0.3 }
   );
 
   const opacity = useSpring(
@@ -48,7 +48,7 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
       if (index > current) return 0; // Incoming starts invisible
       return 1;
     }) as any,
-    { stiffness: 80, damping: 20 }
+    { stiffness: 200, damping: 30, mass: 0.3 }
   );
 
   const zIndex = useTransform(activeIndex, (current: number) => {
