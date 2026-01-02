@@ -5,19 +5,24 @@ interface LazySectionProps {
   fallback?: React.ReactNode;
   rootMargin?: string;
   threshold?: number;
+  minHeight?: string;
 }
 
-const DefaultFallback = () => (
-  <div className="min-h-[50vh] flex items-center justify-center">
+const DefaultFallback = ({ minHeight }: { minHeight: string }) => (
+  <div 
+    className="flex items-center justify-center"
+    style={{ minHeight }}
+  >
     <div className="w-8 h-8 border-2 border-white/20 border-t-amber-500 rounded-full animate-spin" />
   </div>
 );
 
 export function LazySection({ 
   children, 
-  fallback = <DefaultFallback />,
+  fallback,
   rootMargin = '200px',
-  threshold = 0
+  threshold = 0,
+  minHeight = '50vh'
 }: LazySectionProps) {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -44,14 +49,16 @@ export function LazySection({
     }
   }, [rootMargin, threshold]);
 
+  const fallbackContent = fallback || <DefaultFallback minHeight={minHeight} />;
+
   return (
-    <div ref={ref}>
+    <div ref={ref} style={{ minHeight: isVisible ? undefined : minHeight }}>
       {isVisible ? (
-        <Suspense fallback={fallback}>
+        <Suspense fallback={fallbackContent}>
           {children}
         </Suspense>
       ) : (
-        fallback
+        fallbackContent
       )}
     </div>
   );
