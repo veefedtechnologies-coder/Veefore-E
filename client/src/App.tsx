@@ -117,11 +117,13 @@ function App() {
     }
   }, [])
 
+  const effectiveLocation = location || '/'
+  
   const isPublicRoute = publicRoutes.some(route => 
-    location === route || location.startsWith(route + '/')
+    effectiveLocation === route || effectiveLocation.startsWith(route + '/')
   )
   const isProtectedRoute = protectedRoutes.some(route => 
-    location === route || location.startsWith(route + '/')
+    effectiveLocation === route || effectiveLocation.startsWith(route + '/')
   )
 
   useEffect(() => {
@@ -130,7 +132,7 @@ function App() {
     }
   }, [loading, user, isProtectedRoute, setLocation])
 
-  if (loading && isProtectedRoute) {
+  if (loading && !isPublicRoute) {
     return <LoadingSpinner type="dashboard" />
   }
 
@@ -205,11 +207,11 @@ function App() {
               <CookieConsentBanner />
             </React.Suspense>
 
-            {!user && isPublicRoute && location !== '/' ? (
+            {!user && isPublicRoute && effectiveLocation !== '/' ? (
               <div className="min-h-screen">
                 {renderPublicPage()}
               </div>
-            ) : !user && location === '/' ? (
+            ) : !user && effectiveLocation === '/' ? (
               <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
             ) : user ? (
               <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
