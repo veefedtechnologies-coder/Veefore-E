@@ -592,6 +592,7 @@ export function AdaptiveAnimationProvider({
   const manualTierRef = useRef<QualityTier | null>(null);
   const downgradeCountRef = useRef(0);
   const upgradeCountRef = useRef(0);
+  const isSettledRef = useRef(false);
   
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -610,12 +611,19 @@ export function AdaptiveAnimationProvider({
   const [isMonitoring, setIsMonitoring] = useState(false);
   
   useEffect(() => {
+    const timer = setTimeout(() => {
+      isSettledRef.current = true;
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const handler = (e: MediaQueryListEvent) => {
       setPrefersReducedMotion(e.matches);
-      if (e.matches && manualTierRef.current === null) {
+      if (e.matches && manualTierRef.current === null && isSettledRef.current) {
         setQualityTierState('low');
       }
     };
@@ -633,7 +641,7 @@ export function AdaptiveAnimationProvider({
       const newCapabilities = getDeviceCapabilities();
       setDeviceCapabilities(newCapabilities);
       
-      if (manualTierRef.current === null) {
+      if (manualTierRef.current === null && isSettledRef.current) {
         const newTier = determineQualityTier(newCapabilities, prefersReducedMotion);
         setQualityTierState(newTier);
       }
@@ -663,7 +671,7 @@ export function AdaptiveAnimationProvider({
               isCharging: battery.charging
             }));
             
-            if (battery.level < 0.15 && !battery.charging && manualTierRef.current === null) {
+            if (battery.level < 0.15 && !battery.charging && manualTierRef.current === null && isSettledRef.current) {
               setQualityTierState(prev => prev === 'ultra' ? 'high' : prev === 'high' ? 'medium' : prev);
             }
           };
@@ -699,7 +707,7 @@ export function AdaptiveAnimationProvider({
         downgradeCountRef.current++;
         upgradeCountRef.current = 0;
         
-        if (downgradeCountRef.current >= 3) {
+        if (downgradeCountRef.current >= 3 && isSettledRef.current) {
           setQualityTierState(prev => {
             const tiers: QualityTier[] = ['ultra', 'high', 'medium', 'low'];
             const currentIndex = tiers.indexOf(prev);
@@ -715,7 +723,7 @@ export function AdaptiveAnimationProvider({
         upgradeCountRef.current++;
         downgradeCountRef.current = 0;
         
-        if (upgradeCountRef.current >= 5) {
+        if (upgradeCountRef.current >= 5 && isSettledRef.current) {
           setQualityTierState(prev => {
             const tiers: QualityTier[] = ['ultra', 'high', 'medium', 'low'];
             const currentIndex = tiers.indexOf(prev);
