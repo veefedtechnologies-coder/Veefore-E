@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useLocation } from 'wouter'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
 import LoadingSpinner from './components/LoadingSpinner'
@@ -67,6 +67,10 @@ function App() {
 
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
+  
+  const handleNavigate = useCallback((page: string) => {
+    setLocation(`/${page}`)
+  }, [setLocation])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -119,12 +123,13 @@ function App() {
 
   const effectiveLocation = location || '/'
   
-  const isPublicRoute = publicRoutes.some(route => 
+  const isPublicRoute = useMemo(() => publicRoutes.some(route => 
     effectiveLocation === route || effectiveLocation.startsWith(route + '/')
-  )
-  const isProtectedRoute = protectedRoutes.some(route => 
+  ), [effectiveLocation])
+  
+  const isProtectedRoute = useMemo(() => protectedRoutes.some(route => 
     effectiveLocation === route || effectiveLocation.startsWith(route + '/')
-  )
+  ), [effectiveLocation])
 
   useEffect(() => {
     if (!loading && !user && isProtectedRoute) {
@@ -139,7 +144,7 @@ function App() {
   const renderPublicPage = () => {
     switch (location) {
       case '/':
-        return <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+        return <Landing onNavigate={handleNavigate} />
       case '/features':
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Features /></React.Suspense>
       case '/pricing':
@@ -175,7 +180,7 @@ function App() {
       case '/signup':
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignUpIntegrated /></React.Suspense>
       case '/signin':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignIn onNavigate={(page: string) => setLocation(`/${page}`)} /></React.Suspense>
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignIn onNavigate={handleNavigate} /></React.Suspense>
       case '/admin-login':
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><AdminLogin /></React.Suspense>
       case '/3d':
@@ -187,7 +192,7 @@ function App() {
       case '/robot-hero':
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><RobotHeroLanding /></React.Suspense>
       case '/landing':
-        return <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+        return <Landing onNavigate={handleNavigate} />
       default:
         return null
     }
@@ -212,7 +217,7 @@ function App() {
                 {renderPublicPage()}
               </div>
             ) : !user && effectiveLocation === '/' ? (
-              <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+              <Landing onNavigate={handleNavigate} />
             ) : user ? (
               <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
                 <AuthenticatedApp />
