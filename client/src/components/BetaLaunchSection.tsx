@@ -3,7 +3,8 @@ import {
     motion, AnimatePresence,
     useScroll,
     useTransform,
-    useSpring
+    useSpring,
+    useMotionValue
 } from 'framer-motion';
 import {
     Rocket, Gift, Calendar, Mail, ArrowRight, Lock, Check
@@ -69,47 +70,44 @@ const FloatingOrb = memo(({
 FloatingOrb.displayName = 'FloatingOrb';
 
 // ============================================
-// 3D PERSPECTIVE CONTAINER (Memoized)
+// 3D PERSPECTIVE CONTAINER (Memoized + No Re-renders)
 // ============================================
 const Perspective3D = memo(({ children, className }: { children: React.ReactNode; className?: string }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [rotateX, setRotateX] = useState(0);
-    const [rotateY, setRotateY] = useState(0);
     const isMobile = useIsMobile();
-    const lastMoveRef = useRef(0);
+    
+    const rotateXMotion = useMotionValue(0);
+    const rotateYMotion = useMotionValue(0);
+    const smoothRotateX = useSpring(rotateXMotion, { stiffness: 300, damping: 30 });
+    const smoothRotateY = useSpring(rotateYMotion, { stiffness: 300, damping: 30 });
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         if (isMobile || !containerRef.current) return;
-        const now = Date.now();
-        if (now - lastMoveRef.current < 32) return;
-        lastMoveRef.current = now;
-        
         const rect = containerRef.current.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         const x = (e.clientX - centerX) / (rect.width / 2);
         const y = (e.clientY - centerY) / (rect.height / 2);
-        setRotateY(x * 5);
-        setRotateX(-y * 5);
-    }, [isMobile]);
+        rotateYMotion.set(x * 5);
+        rotateXMotion.set(-y * 5);
+    }, [isMobile, rotateXMotion, rotateYMotion]);
 
     const handleMouseLeave = useCallback(() => {
-        setRotateX(0);
-        setRotateY(0);
-    }, []);
+        rotateXMotion.set(0);
+        rotateYMotion.set(0);
+    }, [rotateXMotion, rotateYMotion]);
 
     return (
         <motion.div
             ref={containerRef}
-            className={`gpu-stable ${className || ''}`}
+            className={className || ''}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            animate={{ rotateX, rotateY }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
             style={{
+                rotateX: smoothRotateX,
+                rotateY: smoothRotateY,
                 transformStyle: 'preserve-3d',
                 perspective: '1000px',
-                ...GPU_STYLE
             }}
         >
             {children}
@@ -119,40 +117,56 @@ const Perspective3D = memo(({ children, className }: { children: React.ReactNode
 Perspective3D.displayName = 'Perspective3D';
 
 // ============================================
-// IMMERSIVE 3D HERO SECTION (Memoized + Throttled)
+// IMMERSIVE 3D HERO SECTION (Memoized + No Re-renders)
 // ============================================
 const Hero3D = memo(() => {
-    const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
     const isMobile = useIsMobile();
     const { openWaitlist } = useWaitlist();
-    const lastMoveRef = useRef(0);
+    const sectionRef = useRef<HTMLElement>(null);
+    const gradientRef = useRef<HTMLDivElement>(null);
+    const isInViewRef = useRef(true);
 
     useEffect(() => {
-        if (isMobile) return;
+        if (isMobile || !sectionRef.current) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                isInViewRef.current = entry.isIntersecting;
+            },
+            { threshold: 0 }
+        );
+        observer.observe(sectionRef.current);
+
+        let rafId: number;
         const handleMouseMove = (e: MouseEvent) => {
-            const now = Date.now();
-            if (now - lastMoveRef.current < 50) return;
-            lastMoveRef.current = now;
-            
-            setMousePos({
-                x: e.clientX / window.innerWidth,
-                y: e.clientY / window.innerHeight
+            if (!isInViewRef.current || !gradientRef.current) return;
+            cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                const x = (e.clientX / window.innerWidth) * 100;
+                const y = (e.clientY / window.innerHeight) * 100;
+                if (gradientRef.current) {
+                    gradientRef.current.style.background = `radial-gradient(ellipse at ${x}% ${y}%, rgba(139, 92, 246, 0.15) 0%, transparent 50%)`;
+                }
             });
         };
+
         window.addEventListener('mousemove', handleMouseMove, { passive: true });
-        return () => window.removeEventListener('mousemove', handleMouseMove);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            observer.disconnect();
+            cancelAnimationFrame(rafId);
+        };
     }, [isMobile]);
 
     return (
-        <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0" style={GPU_STYLE}>
-                <motion.div
+        <section ref={sectionRef} className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+            <div className="absolute inset-0">
+                <div
+                    ref={gradientRef}
                     className="absolute inset-0"
-                    animate={{
-                        background: `radial-gradient(ellipse at ${mousePos.x * 100}% ${mousePos.y * 100}%, rgba(139, 92, 246, 0.15) 0%, transparent 50%)`
+                    style={{
+                        background: 'radial-gradient(ellipse at 50% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 50%)'
                     }}
-                    transition={{ type: "tween", duration: 0.3 }}
-                    style={GPU_STYLE}
                 />
 
                 <FloatingOrb size={400} color="rgba(139,92,246,0.1)" delay={0} duration={20} className="top-[10%] left-[10%]" />
