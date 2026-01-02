@@ -26,23 +26,23 @@ const RobotHeroLanding = React.lazy(() => import('./pages/RobotHeroLanding'))
 const SignUpIntegrated = React.lazy(() => import('./pages/SignUpIntegrated'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
 const Workspaces = React.lazy(() => import('./pages/Workspaces'))
-// Public pages - eagerly loaded for instant navigation (no loading spinner)
-import Features from './pages/Features'
-import Pricing from './pages/Pricing'
-import FreeTrial from './pages/FreeTrial'
-import Changelog from './pages/Changelog'
-import About from './pages/About'
-import Blog from './pages/Blog'
-import Careers from './pages/Careers'
-import Contact from './pages/Contact'
-import Security from './pages/Security'
-import GDPR from './pages/GDPR'
-import PrivacyPolicyPage from './pages/PrivacyPolicy'
-import TermsOfServicePage from './pages/TermsOfService'
-import HelpCenter from './pages/HelpCenter'
-import Community from './pages/Community'
-import Status from './pages/Status'
-import CookiePolicy from './pages/CookiePolicy'
+// Public pages - lazy loaded for performance
+const Features = React.lazy(() => import('./pages/Features'))
+const Pricing = React.lazy(() => import('./pages/Pricing'))
+const FreeTrial = React.lazy(() => import('./pages/FreeTrial'))
+const Changelog = React.lazy(() => import('./pages/Changelog'))
+const About = React.lazy(() => import('./pages/About'))
+const Blog = React.lazy(() => import('./pages/Blog'))
+const Careers = React.lazy(() => import('./pages/Careers'))
+const Contact = React.lazy(() => import('./pages/Contact'))
+const Security = React.lazy(() => import('./pages/Security'))
+const GDPR = React.lazy(() => import('./pages/GDPR'))
+const PrivacyPolicyPage = React.lazy(() => import('./pages/PrivacyPolicy'))
+const TermsOfServicePage = React.lazy(() => import('./pages/TermsOfService'))
+const HelpCenter = React.lazy(() => import('./pages/HelpCenter'))
+const Community = React.lazy(() => import('./pages/Community'))
+const Status = React.lazy(() => import('./pages/Status'))
+const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
 import CookieConsentBanner from './components/CookieConsentBanner'
 import OnboardingFlow from './components/onboarding/OnboardingFlow'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
@@ -440,60 +440,63 @@ function App() {
               <WaitlistModal />
               <CookieConsentBanner />
 
-              {/* Public Pages - Eagerly loaded for instant navigation (no loading spinner) */}
-              {location === '/features' && (
-                <div className="min-h-screen"><Features /></div>
-              )}
-              {location === '/pricing' && (
-                <div className="min-h-screen"><Pricing /></div>
-              )}
-              {location === '/changelog' && (
-                <div className="min-h-screen"><Changelog /></div>
-              )}
-              {location === '/about' && (
-                <div className="min-h-screen"><About /></div>
-              )}
-              {location === '/blog' && (
-                <div className="min-h-screen"><Blog /></div>
-              )}
-              {location === '/careers' && (
-                <div className="min-h-screen"><Careers /></div>
-              )}
-              {location === '/contact' && (
-                <div className="min-h-screen"><Contact /></div>
-              )}
-              {location === '/security' && (
-                <div className="min-h-screen"><Security /></div>
-              )}
-              {location === '/gdpr' && (
-                <div className="min-h-screen"><GDPR /></div>
-              )}
-              {location === '/privacy-policy' && (
-                <PrivacyPolicy />
-              )}
-              {location === '/terms-of-service' && (
-                <TermsOfService />
-              )}
 
-              {location === '/free-trial' && (
-                <div className="min-h-screen"><FreeTrial /></div>
-              )}
+              {/* Public Pages - Lazy loaded with Suspense */}
+              <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                {location === '/features' && (
+                  <div className="min-h-screen"><Features /></div>
+                )}
+                {location === '/pricing' && (
+                  <div className="min-h-screen"><Pricing /></div>
+                )}
+                {location === '/changelog' && (
+                  <div className="min-h-screen"><Changelog /></div>
+                )}
+                {location === '/about' && (
+                  <div className="min-h-screen"><About /></div>
+                )}
+                {location === '/blog' && (
+                  <div className="min-h-screen"><Blog /></div>
+                )}
+                {location === '/careers' && (
+                  <div className="min-h-screen"><Careers /></div>
+                )}
+                {location === '/contact' && (
+                  <div className="min-h-screen"><Contact /></div>
+                )}
+                {location === '/security' && (
+                  <div className="min-h-screen"><Security /></div>
+                )}
+                {location === '/gdpr' && (
+                  <div className="min-h-screen"><GDPR /></div>
+                )}
+                {location === '/privacy-policy' && (
+                  <PrivacyPolicy />
+                )}
+                {location === '/terms-of-service' && (
+                  <TermsOfService />
+                )}
 
-              {location === '/help' && (
-                <div className="min-h-screen"><HelpCenter /></div>
-              )}
+                {location === '/free-trial' && (
+                  <div className="min-h-screen"><FreeTrial /></div>
+                )}
 
-              {location === '/community' && (
-                <div className="min-h-screen"><Community /></div>
-              )}
+                {location === '/help' && (
+                  <div className="min-h-screen"><HelpCenter /></div>
+                )}
 
-              {location === '/status' && (
-                <div className="min-h-screen"><Status /></div>
-              )}
+                {location === '/community' && (
+                  <div className="min-h-screen"><Community /></div>
+                )}
 
-              {location === '/cookies' && (
-                <div className="min-h-screen"><CookiePolicy /></div>
-              )}
+                {location === '/status' && (
+                  <div className="min-h-screen"><Status /></div>
+                )}
+
+                {location === '/cookies' && (
+                  <div className="min-h-screen"><CookiePolicy /></div>
+                )}
+              </React.Suspense>
 
               {/* Root "/" - Landing page for unauthenticated users (renders immediately, no auth wait) */}
               {location === '/' && !user && (

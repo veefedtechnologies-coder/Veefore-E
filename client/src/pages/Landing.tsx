@@ -15,14 +15,20 @@ import { SEO, seoConfig } from '../lib/seo-optimization'
 import { useIsMobile } from '../hooks/use-is-mobile';
 import { MainNavigation } from '../components/MainNavigation';
 import GlassCard from '../components/GlassCard';
-import { PricingScrollAnimation } from '../components/PricingScrollAnimation';
+// Keep core "above-the-fold" or "high-priority" features eager for smoothness
 import { CinematicFeatures } from '../components/CinematicFeatures';
+import StickyScrollFeaturesV2 from '../components/StickyScrollFeaturesV2';
+
+// Lazy load heavy "below-the-fold" sections
+const PricingScrollAnimation = React.lazy(() => import('../components/PricingScrollAnimation').then(module => ({ default: module.PricingScrollAnimation })));
+const TargetAudienceSection = React.lazy(() => import('../components/TargetAudienceSection'));
+const GrowthEngineSection = React.lazy(() => import('../components/GrowthEngineSection'));
+const CreditSystemSection = React.lazy(() => import('../components/CreditSystemSection'));
+const BetaLaunchSection = React.lazy(() => import('../components/BetaLaunchSection'));
+const MainFooter = React.lazy(() => import('../components/MainFooter'));
+
+// Visuals for Hero section (keep eager as they are above fold)
 import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals';
-import TargetAudienceSection from '../components/TargetAudienceSection';
-import GrowthEngineSection from '../components/GrowthEngineSection';
-import MainFooter from '../components/MainFooter'
-import CreditSystemSection from '../components/CreditSystemSection';
-import BetaLaunchSection from '../components/BetaLaunchSection';
 
 // Check if device should have reduced animations (low-end mobile, reduced motion preference)
 
@@ -46,7 +52,6 @@ const Landing3DFallback = memo(() => (
   </div>
 ))
 
-import StickyScrollFeaturesV2 from '../components/StickyScrollFeaturesV2';
 // Mobile-optimized gradient orbs - use opacity gradient instead of expensive blur
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
   const isMobile = useIsMobile()
@@ -798,9 +803,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   return (
     <div ref={containerRef} className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
       <SEO {...seoConfig.landing} />
-
-      {/* Preload logo image for instant display in mobile menu */}
-      <link rel="preload" href="/veefore.svg" as="image" />
       <img src="/veefore.svg" alt="" className="hidden" aria-hidden="true" />
 
       {/* Ambient Background - absolute on mobile to avoid iOS fixed stacking issues */}
@@ -2156,7 +2158,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           {/* Desktop View - Scroll Animation */}
           <PricingScrollAnimation
             pricingPlans={pricingPlans}
-            onNavigate={onNavigate}
           />
         </div>
       </section >
