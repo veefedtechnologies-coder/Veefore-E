@@ -8,7 +8,7 @@ packages = ["ffmpeg", "yt-dlp", "cairo", "pango", "libjpeg", "giflib", "librsvg"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["node", "./dist/index.cjs"]
+run = ["node", "./dist/index.js"]
 build = ["npm", "run", "build"]
 
 [workflows]
