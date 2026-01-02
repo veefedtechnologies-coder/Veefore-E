@@ -435,258 +435,54 @@ html.dark .glass {
    MOBILE PERFORMANCE OPTIMIZATIONS
    ================================= */
 
-/* GPU Acceleration for animated elements */
-.gpu-accelerated,
-[data-animate],
-.animate-fade-in,
-.animate-slide-in,
-.animate-scale {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
+/* Optimized Gradient Orbs - No blur on mobile */
+.gradient-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: -1;
 }
 
-/* Will-change hints for frequently animated properties */
-.will-animate-transform {
-  will-change: transform;
+.fallback-orb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  border-radius: 9999px;
+  background-color: rgba(37, 99, 235, 0.1);
+  filter: blur(80px);
 }
 
-.will-animate-opacity {
-  will-change: opacity;
+.hero-text-blur {
+  filter: blur(8px);
 }
 
-.will-animate-all {
-  will-change: transform, opacity;
+.hero-text-no-blur {
+  filter: blur(0px);
 }
 
-/* Reduce motion for accessibility - respects user preference for reduced motion */
-@media (prefers-reduced-motion: reduce) {
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.1s !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Low-end device optimizations via class - less aggressive than prefers-reduced-motion */
-/* Reduces animation duration but keeps essential UI feedback (hovers, focus states) working */
-.reduce-motion *,
-.reduce-motion *::before,
-.reduce-motion *::after {
-  animation-duration: 0.1s !important;
-  animation-iteration-count: 1 !important;
-}
-
-.low-end-device .glass {
-  backdrop-filter: none;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-html.dark .low-end-device .glass {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-/* Disable expensive effects on low-end devices */
-.low-end-device .blur-effect,
-.low-end-device [class*="blur-"] {
-  filter: none !important;
-  backdrop-filter: none !important;
-}
-
-/* Quality tier specific optimizations */
-[data-quality-tier="low"] .complex-shadow {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-}
-
-[data-quality-tier="low"] .gradient-complex {
-  background: var(--fallback-color, #3b82f6) !important;
-}
-
-[data-quality-tier="medium"] .complex-shadow {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Adaptive animation duration via CSS custom properties */
-:root {
-  --animation-duration: 0.3s;
-  --animation-stagger: 0.1s;
-  --animation-delay: 0s;
-}
-
-.adaptive-animation {
-  animation-duration: var(--animation-duration);
-}
-
-.adaptive-transition {
-  transition-duration: var(--animation-duration);
-}
-
-/* Touch-friendly tap targets on mobile */
 @media (max-width: 768px) {
-
-  button,
-  a,
-  [role="button"],
-  input[type="button"],
-  input[type="submit"],
-  input[type="checkbox"],
-  input[type="radio"],
-  .clickable {
-    min-height: 44px;
-    min-width: 44px;
+  .gradient-orb, .fallback-orb, .hero-text-blur, .hero-text-no-blur {
+    filter: none !important;
+    backdrop-filter: none !important;
   }
 
-  /* Prevent text size adjustment on orientation change */
-  html {
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-  }
-
-  /* Smooth momentum scrolling on iOS */
-  .scroll-container {
-    -webkit-overflow-scrolling: touch;
-    overflow-scrolling: touch;
-  }
-
-  /* Prevent zoom on input focus */
-  input,
-  textarea,
-  select {
-    font-size: 16px !important;
-  }
-}
-
-/* Optimize paint performance */
-.contain-layout {
-  contain: layout;
-}
-
-.contain-paint {
-  contain: paint;
-}
-
-.contain-strict {
-  contain: strict;
-}
-
-.contain-content {
-  contain: content;
-}
-
-/* Image rendering optimization */
-img {
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-}
-
-/* Large images should be optimized for quality */
-img.hero-image,
-img.feature-image {
-  image-rendering: auto;
-}
-
-/* Lazy loaded content placeholder */
-.lazy-placeholder {
-  background: linear-gradient(90deg,
-      rgba(255, 255, 255, 0.05) 25%,
-      rgba(255, 255, 255, 0.1) 50%,
-      rgba(255, 255, 255, 0.05) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-html.dark .lazy-placeholder {
-  background: linear-gradient(90deg,
-      rgba(0, 0, 0, 0.05) 25%,
-      rgba(0, 0, 0, 0.1) 50%,
-      rgba(0, 0, 0, 0.05) 75%);
-  background-size: 200% 100%;
-}
-
-/* Content visibility for off-screen content */
-.content-auto {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 500px;
-}
-
-/* Font display optimization */
-@font-face {
-  font-display: swap;
-}
-
-/* Optimize layer creation */
-.layer-optimize {
-  isolation: isolate;
-}
-
-/* Scrollbar hiding for fullscreen experiences */
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/* =========================================
-   60FPS SCROLL PERFORMANCE OPTIMIZATIONS
-   ========================================= */
-
-/* Force GPU compositing for motion elements */
-.will-change-transform {
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-/* Optimized animation layer */
-.gpu-layer {
-  transform: translate3d(0, 0, 0);
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  perspective: 1000px;
-  -webkit-perspective: 1000px;
-}
-
-/* Scroll container optimization */
-.scroll-optimized {
-  overflow-anchor: none;
-  overscroll-behavior: contain;
-}
-
-/* Prevent layout thrashing during scroll */
-.scroll-section {
-  contain: layout style paint;
-  transform: translateZ(0);
-}
-
-/* Optimize sticky elements for scroll performance */
-.sticky {
-  will-change: transform;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-}
-
-/* Reduce backdrop-filter impact on mobile */
-@media (max-width: 768px) {
-
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
   .backdrop-blur-lg,
   .backdrop-blur-xl,
   .backdrop-blur-2xl,
   .backdrop-blur-3xl {
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(0, 0, 0, 0.4) !important; /* Fallback for transparency */
   }
 
-  .backdrop-blur-md {
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
+  .blur-sm, .blur-md, .blur-lg, .blur-xl, .blur-2xl, .blur-3xl {
+    filter: none !important;
   }
 }
 
@@ -726,15 +522,12 @@ section,
   contain: layout style paint;
 }
 
-/* RULE #3: GPU Compositing for ALL animated elements */
+/* RULE #3: GPU Compositing for ALL animated elements - NO will-change to prevent layer explosion */
 [class*="motion"],
 [class*="animate-"],
 .framer-motion,
 motion,
-[data-framer-motion],
-[style*="transform"],
-[style*="opacity"] {
-  will-change: transform, opacity;
+[data-framer-motion] {
   transform: translateZ(0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -750,7 +543,6 @@ motion,
 
 /* Prevent component unmounting flash - ALWAYS keep in DOM, use visibility */
 .lazy-section-content {
-  will-change: transform, opacity;
   transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
     transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0);
 }
@@ -779,7 +571,6 @@ motion,
 /* Force consistent rendering for sticky elements */
 .sticky-render {
   position: sticky;
-  will-change: transform;
   transform: translate3d(0, 0, 0);
   isolation: isolate;
 }
@@ -790,13 +581,12 @@ motion,
     contain-intrinsic-size: 1px 800px;
   }
 
-  /* Reduce will-change scope to conserve memory */
-  [class*="motion"] {
-    will-change: auto;
-  }
-
-  /* Only active animations get GPU layer */
-  [class*="motion"]:not(.inactive) {
-    will-change: transform, opacity;
+  /* Disable will-change entirely on mobile to prevent GPU layer explosion */
+  [class*="motion"],
+  [class*="animate-"],
+  .framer-motion,
+  motion,
+  [data-framer-motion] {
+    will-change: auto !important;
   }
 }

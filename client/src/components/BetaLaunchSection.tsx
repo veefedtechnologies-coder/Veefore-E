@@ -13,7 +13,6 @@ import { useWaitlist } from '../context/WaitlistContext';
 import { VIEWPORT_ONCE } from '../lib/animation-performance';
 
 const GPU_STYLE = {
-    willChange: 'transform, opacity',
     transform: 'translateZ(0)',
 } as const;
 
@@ -49,13 +48,12 @@ const FloatingOrb = memo(({
 
     return (
         <motion.div
-            className={`absolute rounded-full pointer-events-none ${className}`}
+            className={`absolute rounded-full pointer-events-none gpu-stable ${className}`}
             style={{
                 width: size,
                 height: size,
                 background: `radial-gradient(circle at 30% 30%, ${color}, transparent 70%)`,
                 filter: isMobile ? 'none' : 'blur(1px)',
-                willChange: 'transform',
                 transform: 'translateZ(0)',
             }}
             animate={isMobile ? mobileAnimation : desktopAnimation}
@@ -103,7 +101,7 @@ const Perspective3D = memo(({ children, className }: { children: React.ReactNode
     return (
         <motion.div
             ref={containerRef}
-            className={className}
+            className={`gpu-stable ${className || ''}`}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             animate={{ rotateX, rotateY }}
@@ -163,7 +161,7 @@ const Hero3D = memo(() => {
                 <FloatingOrb size={150} color="rgba(16,185,129,0.08)" delay={1} duration={22} className="top-[30%] right-[30%]" />
 
                 <div
-                    className="absolute bottom-0 left-0 right-0 h-[50vh] opacity-20"
+                    className="absolute bottom-0 left-0 right-0 h-[50vh] opacity-20 gpu-stable"
                     style={{
                         background: `linear-gradient(to top, rgba(139, 92, 246, 0.1), transparent),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
@@ -171,7 +169,6 @@ const Hero3D = memo(() => {
                         backgroundSize: '100% 100%, 40px 40px, 40px 40px',
                         transform: 'perspective(500px) rotateX(60deg) translateZ(0)',
                         transformOrigin: 'center bottom',
-                        willChange: 'transform'
                     }}
                 />
             </div>
@@ -182,28 +179,26 @@ const Hero3D = memo(() => {
                         initial={{ opacity: 0, y: 30, rotateX: -30 }}
                         animate={{ opacity: 1, y: 0, rotateX: 0 }}
                         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                        className="relative inline-flex items-center gap-3 px-6 py-3 rounded-2xl"
+                        className="relative inline-flex items-center gap-3 px-6 py-3 rounded-2xl gpu-stable"
                         style={{
                             background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(59,130,246,0.2) 100%)',
                             border: '1px solid rgba(139,92,246,0.3)',
                             boxShadow: '0 20px 40px -20px rgba(139,92,246,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
                             transform: 'translateZ(20px)',
-                            willChange: 'transform, opacity'
                         }}
                     >
                         <motion.div
                             animate={{ rotate: 360 }}
                             transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                            style={{ willChange: 'transform' }}
+                            className="gpu-stable"
                         >
                             <Rocket className="w-5 h-5 text-purple-400" />
                         </motion.div>
                         <span className="text-sm font-semibold text-white">Beta Launch Coming Soon</span>
                         <motion.div
-                            className="w-2 h-2 rounded-full bg-green-400"
+                            className="w-2 h-2 rounded-full bg-green-400 gpu-stable"
                             animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
                             transition={{ duration: 2, repeat: Infinity }}
-                            style={{ willChange: 'transform, opacity' }}
                         />
                     </motion.div>
                 </Perspective3D>
@@ -245,13 +240,12 @@ const Hero3D = memo(() => {
                         initial={{ opacity: 0, scale: 0.8, rotateY: -20 }}
                         animate={{ opacity: 1, scale: 1, rotateY: 0 }}
                         transition={{ duration: 1, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                        className="relative px-8 py-6 rounded-3xl"
+                        className="relative px-8 py-6 rounded-3xl gpu-stable"
                         style={{
                             background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
                             border: '1px solid rgba(255,255,255,0.1)',
                             boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
                             transform: 'translateZ(40px)',
-                            willChange: 'transform, opacity'
                         }}
                     >
                         <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
@@ -278,20 +272,18 @@ const Hero3D = memo(() => {
                     <motion.button
                         whileHover={{ scale: 1.05, boxShadow: '0 0 40px rgba(139,92,246,0.4)' }}
                         whileTap={{ scale: 0.98 }}
-                        className="group relative px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold text-lg overflow-hidden"
+                        className="group relative px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold text-lg overflow-hidden gpu-stable"
                         onClick={openWaitlist}
-                        style={{ willChange: 'transform' }}
                     >
                         <span className="relative z-10 flex items-center gap-2">
                             Join Beta Waitlist
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </span>
                         <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500"
+                            className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 gpu-stable"
                             initial={{ x: '-100%' }}
                             whileHover={{ x: 0 }}
                             transition={{ duration: 0.3 }}
-                            style={{ willChange: 'transform' }}
                         />
                     </motion.button>
                 </motion.div>
@@ -317,8 +309,8 @@ const MysteryDateDigits = memo(() => {
             {[0, 1].map(i => (
                 <motion.span
                     key={`d${i}`}
-                    className="w-8 h-10 flex items-center justify-center rounded-lg bg-purple-500/20 text-purple-400"
-                    style={{ willChange: 'transform', transform: 'translateZ(0)' }}
+                    className="w-8 h-10 flex items-center justify-center rounded-lg bg-purple-500/20 text-purple-400 gpu-stable"
+                    style={{ transform: 'translateZ(0)' }}
                     animate={{ rotateX: [0, 360] }}
                     transition={{ duration: 0.5, delay: i * 0.1, repeat: Infinity, repeatDelay: 2 }}
                 >
@@ -329,8 +321,8 @@ const MysteryDateDigits = memo(() => {
             {[0, 1].map(i => (
                 <motion.span
                     key={`m${i}`}
-                    className="w-8 h-10 flex items-center justify-center rounded-lg bg-blue-500/20 text-blue-400"
-                    style={{ willChange: 'transform', transform: 'translateZ(0)' }}
+                    className="w-8 h-10 flex items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 gpu-stable"
+                    style={{ transform: 'translateZ(0)' }}
                     animate={{ rotateX: [0, 360] }}
                     transition={{ duration: 0.5, delay: 0.2 + i * 0.1, repeat: Infinity, repeatDelay: 2 }}
                 >
@@ -585,22 +577,20 @@ const ScrollZoomIntro = memo(() => {
                 >
                     <span className="text-[11px] text-white/60 uppercase tracking-[0.15em] font-medium drop-shadow-lg">Scroll for more</span>
                     <motion.div
-                        className="w-7 h-11 rounded-full border-2 border-white/30 flex justify-center pt-2.5 backdrop-blur-md bg-black/20 shadow-lg"
+                        className="w-7 h-11 rounded-full border-2 border-white/30 flex justify-center pt-2.5 backdrop-blur-md bg-black/20 shadow-lg gpu-stable"
                         animate={{ y: [0, 5, 0] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                        style={{ willChange: 'transform' }}
                     >
                         <motion.div
-                            className="w-1.5 h-3 rounded-full bg-white/70"
+                            className="w-1.5 h-3 rounded-full bg-white/70 gpu-stable"
                             animate={{ y: [0, 12, 0] }}
                             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                            style={{ willChange: 'transform' }}
                         />
                     </motion.div>
                     <motion.div
+                        className="gpu-stable"
                         animate={{ y: [0, 8, 0], opacity: [0.5, 1, 0.5] }}
                         transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                        style={{ willChange: 'transform, opacity' }}
                     >
                         <ArrowRight className="w-5 h-5 text-white/50 rotate-90 drop-shadow-md" />
                     </motion.div>
@@ -626,8 +616,8 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
                     <div className="relative z-10 flex flex-col h-full justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <div className="flex justify-between items-start mb-4 md:mb-8">
                             <motion.div
-                                className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-cyan-500/30 transition-colors"
-                                style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
+                                className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-cyan-500/30 transition-colors gpu-stable"
+                                style={{ transform: 'translateZ(40px)' }}
                                 animate={{ y: [0, -6, 0] }}
                                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                             >
@@ -657,8 +647,8 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
 
                     <div className="relative z-10 h-full flex flex-col justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <motion.div
-                            className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-orange-500/30 transition-colors"
-                            style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
+                            className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-orange-500/30 transition-colors gpu-stable"
+                            style={{ transform: 'translateZ(40px)' }}
                             animate={{ y: [0, -6, 0] }}
                             transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
                         >
@@ -682,8 +672,8 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
                     <div className="relative z-10 flex flex-col h-full justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <div className="flex justify-between items-start mb-4 md:mb-6">
                             <motion.div
-                                className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-blue-500/30 transition-colors"
-                                style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
+                                className="p-2 md:p-3 rounded-2xl bg-white/10 border border-white/10 group-hover:border-blue-500/30 transition-colors gpu-stable"
+                                style={{ transform: 'translateZ(40px)' }}
                                 animate={{ y: [0, -6, 0] }}
                                 transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
                             >
@@ -714,8 +704,8 @@ const BentoBenefitsGrid = memo(function BentoBenefitsGrid() {
                     <div className="relative z-10 h-full flex flex-col justify-between" style={{ transformStyle: 'preserve-3d' }}>
                         <div className="flex justify-between items-start mb-4 md:mb-8">
                             <motion.div
-                                className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-yellow-500/30 transition-colors"
-                                style={{ transform: 'translateZ(40px)', willChange: 'transform' }}
+                                className="p-2 md:p-3 w-fit rounded-2xl bg-white/10 border border-white/10 mb-4 md:mb-8 group-hover:border-yellow-500/30 transition-colors gpu-stable"
+                                style={{ transform: 'translateZ(40px)' }}
                                 animate={{ y: [0, -6, 0] }}
                                 transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
                             >
@@ -777,7 +767,6 @@ function UrgencySection() {
                                 whileInView={{ width: `${percentage}%` }}
                                 viewport={VIEWPORT_ONCE}
                                 transition={{ duration: 1, ease: "easeOut" }}
-                                style={{ willChange: 'width' }}
                             />
                         </div>
                         <p className="text-xs text-white/30 mt-2">{Math.floor(percentage)}% filled</p>
@@ -787,8 +776,7 @@ function UrgencySection() {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={openWaitlist}
-                        className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm transition-colors"
-                        style={{ willChange: 'transform' }}
+                        className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm transition-colors gpu-stable"
                     >
                         Reserve your spot
                     </motion.button>
@@ -879,15 +867,13 @@ const SignupSection = memo(() => {
                                             disabled={isSubmitting}
                                             whileHover={{ scale: isMobile ? 1 : 1.02 }}
                                             whileTap={{ scale: 0.98 }}
-                                            className="px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold disabled:opacity-60"
-                                            style={{ willChange: 'transform' }}
+                                            className="px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold disabled:opacity-60 gpu-stable"
                                         >
                                             {isSubmitting ? (
                                                 <motion.div
-                                                    className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full mx-auto"
+                                                    className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full mx-auto gpu-stable"
                                                     animate={{ rotate: 360 }}
                                                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                                    style={{ willChange: 'transform' }}
                                                 />
                                             ) : (
                                                 <span className="flex items-center gap-2">
@@ -915,8 +901,7 @@ const SignupSection = memo(() => {
                                 initial={{ scale: 0, rotateY: -180 }}
                                 animate={{ scale: 1, rotateY: 0 }}
                                 transition={{ type: "spring", duration: 0.8 }}
-                                className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center"
-                                style={{ willChange: 'transform' }}
+                                className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center gpu-stable"
                             >
                                 <Check className="w-10 h-10 text-white" />
                             </motion.div>

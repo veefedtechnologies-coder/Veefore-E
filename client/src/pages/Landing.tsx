@@ -48,27 +48,21 @@ const MobileBackground = memo(() => (
 const Landing3DFallback = memo(() => (
   <div className="absolute inset-0 bg-black">
     <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/30 to-black" />
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] bg-blue-600/10 rounded-full blur-[80px]" />
+    <div className="fallback-orb" />
   </div>
 ))
 
 // Mobile-optimized gradient orbs - use opacity gradient instead of expensive blur
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
-  const isMobile = useIsMobile()
   const colors = {
-    blue: isMobile ? 'bg-blue-600/10' : 'from-blue-500/30 via-blue-600/20 to-transparent',
-    purple: isMobile ? 'bg-purple-600/10' : 'from-purple-500/30 via-purple-600/20 to-transparent',
-    indigo: isMobile ? 'bg-indigo-500/8' : 'from-indigo-500/30 via-indigo-600/20 to-transparent',
-    cyan: isMobile ? 'bg-cyan-500/8' : 'from-cyan-500/20 via-cyan-600/10 to-transparent'
-  }
-
-  // On mobile, skip blur entirely for performance
-  if (isMobile) {
-    return <div className={`absolute rounded - full ${colors[color as keyof typeof colors]} ${className} `} style={{ filter: 'blur(40px)' }} />
+    blue: 'from-blue-500/30 via-blue-600/20 to-transparent',
+    purple: 'from-purple-500/30 via-purple-600/20 to-transparent',
+    indigo: 'from-indigo-500/30 via-indigo-600/20 to-transparent',
+    cyan: 'from-cyan-500/20 via-cyan-600/10 to-transparent'
   }
 
   return (
-    <div className={`absolute rounded - full blur - [100px] bg - gradient - radial ${colors[color as keyof typeof colors]} ${className} `} />
+    <div className={`gradient-orb bg-gradient-radial ${colors[color as keyof typeof colors]} ${className}`} />
   )
 }
 
@@ -192,14 +186,13 @@ const RotatingHeroText = memo(() => {
             animate={{
               opacity: isActive ? 1 : 0,
               y: isActive ? 0 : (isExiting ? '-100%' : '100%'),
-              filter: isMobile ? 'none' : (isActive ? 'blur(0px)' : 'blur(8px)'),
               scale: isActive ? 1 : 0.95
             }}
             transition={{
               duration: isMobile ? 0.5 : 0.9,
               ease: [0.22, 1, 0.36, 1]
             }}
-            className="absolute inset-0 flex flex-col items-center justify-center will-change-transform"
+            className={`absolute inset-0 flex flex-col items-center justify-center will-change-transform ${isActive ? 'hero-text-no-blur' : 'hero-text-blur'}`}
             style={{ pointerEvents: isActive ? 'auto' : 'none' }}
           >
             <span className="block text-white" style={{ lineHeight: '1.15' }}>
