@@ -70,7 +70,7 @@ const FeatureCard = React.memo(({ feature, index, isLeft }: { feature: FeatureTy
                     </div>
                 </div>
             </motion.div>
-        </motion.div>
+        </div>
     );
 });
 
