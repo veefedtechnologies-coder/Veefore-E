@@ -17,9 +17,11 @@ import { MainNavigation } from '../components/MainNavigation';
 import GlassCard from '../components/GlassCard';
 import { LazySection } from '../components/ui/lazy-section';
 
-// Lazy load heavy "below-the-fold" sections (including feature showcases)
-const CinematicFeatures = React.lazy(() => import('../components/CinematicFeatures').then(m => ({ default: m.CinematicFeatures })));
-const StickyScrollFeaturesV2 = React.lazy(() => import('../components/StickyScrollFeaturesV2'));
+// Eager load feature showcases with mockups (need time to load images)
+import { CinematicFeatures } from '../components/CinematicFeatures';
+import StickyScrollFeaturesV2 from '../components/StickyScrollFeaturesV2';
+
+// Lazy load other heavy "below-the-fold" sections
 const PricingScrollAnimation = React.lazy(() => import('../components/PricingScrollAnimation').then(module => ({ default: module.PricingScrollAnimation })));
 const TargetAudienceSection = React.lazy(() => import('../components/TargetAudienceSection'));
 const GrowthEngineSection = React.lazy(() => import('../components/GrowthEngineSection'));
@@ -1812,9 +1814,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Sticky Scroll "Story" Features */}
-      <LazySection minHeight="550vh">
-        <StickyScrollFeaturesV2 />
-      </LazySection>
+      <StickyScrollFeaturesV2 />
 
 
       {/* Problem / Philosophy Section */}
@@ -1928,9 +1928,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </p>
         </div>
 
-        <LazySection minHeight="660vh">
-          <CinematicFeatures features={heroFeatures} />
-        </LazySection>
+        <CinematicFeatures features={heroFeatures} />
       </section>
 
       {/* Support Features - Growth Engine Section */}
