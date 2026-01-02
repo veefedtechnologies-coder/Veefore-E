@@ -110,7 +110,7 @@ const CreditSystemSection = () => {
             {particleData.map((particle) => (
                 <motion.div
                     key={particle.id}
-                    className="absolute w-1 h-1 bg-amber-400/40 rounded-full will-change-transform"
+                    className="absolute w-1 h-1 bg-amber-400/40 rounded-full"
                     style={{ ...GPU_ACCELERATED_STYLES }}
                     initial={{
                         x: particle.initialX,
@@ -140,7 +140,7 @@ const CreditSystemSection = () => {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={VIEWPORT_ONCE}
                         style={GPU_ACCELERATED_STYLES}
-                        className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-4 will-change-transform"
+                        className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-4"
                     >
                         <Gauge className="w-3 h-3" />
                         <span>Credit System</span>
@@ -151,7 +151,7 @@ const CreditSystemSection = () => {
                         viewport={VIEWPORT_ONCE}
                         transition={{ delay: 0.1 }}
                         style={GPU_ACCELERATED_STYLES}
-                        className="text-2xl md:text-5xl font-bold tracking-tight mb-4 md:mb-6 will-change-transform"
+                        className="text-2xl md:text-5xl font-bold tracking-tight mb-4 md:mb-6"
                     >
                         Simple. <span className="text-amber-400">Fair.</span> Predictable.
                     </motion.h2>
@@ -161,7 +161,7 @@ const CreditSystemSection = () => {
                         viewport={VIEWPORT_ONCE}
                         transition={{ delay: 0.2 }}
                         style={GPU_ACCELERATED_STYLES}
-                        className="text-sm md:text-lg text-white/40 max-w-2xl mx-auto px-4 will-change-transform"
+                        className="text-sm md:text-lg text-white/40 max-w-2xl mx-auto px-4"
                     >
                         1 Credit = 1 AI Action. No hidden costs, no complexity.
                     </motion.p>
@@ -175,7 +175,7 @@ const CreditSystemSection = () => {
                         viewport={VIEWPORT_ONCE}
                         transition={{ delay: 0.2 }}
                         style={GPU_ACCELERATED_STYLES}
-                        className="lg:col-span-7 will-change-transform"
+                        className="lg:col-span-7"
                     >
                         <div className="relative rounded-[1.5rem] bg-neutral-900/50 border border-white/10 p-5 md:p-8 backdrop-blur-xl overflow-hidden group mb-6">
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
@@ -211,7 +211,7 @@ const CreditSystemSection = () => {
                                 <div className="relative h-3 w-full">
                                     <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                         <motion.div 
-                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 will-change-transform origin-left"
+                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 origin-left"
                                             initial={{ scaleX: 0 }}
                                             animate={{ scaleX: credits / 5000 }}
                                             transition={{ type: "spring", stiffness: 100, damping: 20 }}
@@ -228,7 +228,7 @@ const CreditSystemSection = () => {
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                                     />
                                     <motion.div 
-                                        className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none will-change-transform"
+                                        className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none"
                                         style={{ ...GPU_ACCELERATED_STYLES, x: `calc(${(credits / 5000) * 100}% - 12px)` }}
                                         whileHover={{ scale: 1.2 }}
                                         whileTap={{ scale: 0.9 }}
@@ -313,7 +313,7 @@ const CreditSystemSection = () => {
                         viewport={VIEWPORT_ONCE}
                         transition={{ delay: 0.4 }}
                         style={GPU_ACCELERATED_STYLES}
-                        className="lg:col-span-5 space-y-4 will-change-transform"
+                        className="lg:col-span-5 space-y-4"
                     >
                         <div className="rounded-[1.5rem] bg-gradient-to-br from-amber-500 to-amber-600 p-5 md:p-6 text-black relative overflow-hidden group shadow-[0_10px_30px_rgba(245,158,11,0.2)]">
                             <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:rotate-12 duration-500">

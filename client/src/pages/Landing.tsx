@@ -124,7 +124,7 @@ const Marquee = memo(({ children, direction = 'left' }: { children: React.ReactN
   return (
     <div className="flex overflow-hidden w-full mask-linear-fade">
       <motion.div
-        className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16 shrink-0 will-change-transform"
+        className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16 shrink-0"
         animate={{ x: direction === 'left' ? ["0%", "-100%"] : ["-100%", "0%"] }}
         transition={{
           duration: 40, // Slower, smoother
@@ -136,7 +136,7 @@ const Marquee = memo(({ children, direction = 'left' }: { children: React.ReactN
         {children}
       </motion.div>
       <motion.div
-        className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16 shrink-0 will-change-transform"
+        className="flex items-center space-x-8 md:space-x-16 pr-8 md:pr-16 shrink-0"
         animate={{ x: direction === 'left' ? ["0%", "-100%"] : ["-100%", "0%"] }}
         transition={{
           duration: 40,
@@ -192,7 +192,7 @@ const RotatingHeroText = memo(() => {
               duration: isMobile ? 0.5 : 0.9,
               ease: [0.22, 1, 0.36, 1]
             }}
-            className={`absolute inset-0 flex flex-col items-center justify-center will-change-transform ${isActive ? 'hero-text-no-blur' : 'hero-text-blur'}`}
+            className={`absolute inset-0 flex flex-col items-center justify-center ${isActive ? 'hero-text-no-blur' : 'hero-text-blur'}`}
             style={{ pointerEvents: isActive ? 'auto' : 'none' }}
           >
             <span className="block text-white" style={{ lineHeight: '1.15' }}>
@@ -603,7 +603,7 @@ const AnimatedDashboard = memo(() => {
             <div className="grid grid-cols-12 gap-4">
               <div ref={sidebarRef} className="col-span-2 space-y-1 relative">
                 <motion.div
-                  className="absolute pointer-events-none z-50 will-change-transform"
+                  className="absolute pointer-events-none z-50"
                   style={{ width: 20, height: 20 }}
                   animate={{
                     left: cursorPos.x - 10,
@@ -1445,7 +1445,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             {/* Desktop: Ascending graph layout */}
             <div className="hidden md:block">
               {/* SVG Graph with wavy ascending line */}
-              <svg className="absolute inset-0 w-full h-[400px] pointer-events-none will-change-transform" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid meet">
+              <svg className="absolute inset-0 w-full h-[400px] pointer-events-none" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid meet">
                 <defs>
                   <linearGradient id="graphLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#3b82f6" />
@@ -1554,7 +1554,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.5 + i * 0.3, type: "spring", stiffness: 100 }}
-                    className="absolute will-change-transform"
+                    className="absolute"
                     style={{ top: item.top, left: item.left }}
                   >
                     <div className="flex items-start gap-3">
@@ -1583,7 +1583,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             {/* Mobile: Vertical curved layout */}
             <div className="md:hidden relative px-4">
               {/* Curved SVG connector */}
-              <svg className="absolute left-0 top-0 w-full h-full pointer-events-none will-change-transform" viewBox="0 0 100 400" preserveAspectRatio="none">
+              <svg className="absolute left-0 top-0 w-full h-full pointer-events-none" viewBox="0 0 100 400" preserveAspectRatio="none">
                 <motion.path
                   d="M 20 20 Q 30 80, 20 120 Q 10 160, 20 200 Q 30 240, 20 280 Q 10 320, 20 360"
                   fill="none"

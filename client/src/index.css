@@ -522,15 +522,17 @@ section,
   contain: layout style paint;
 }
 
-/* RULE #3: GPU Compositing for ALL animated elements - NO will-change to prevent layer explosion */
-[class*="motion"],
-[class*="animate-"],
-.framer-motion,
-motion,
-[data-framer-motion] {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+/* RULE #3: GPU Compositing for animated elements - DESKTOP ONLY to prevent mobile layer explosion */
+@media (min-width: 769px) {
+  [class*="motion"],
+  [class*="animate-"],
+  .framer-motion,
+  motion,
+  [data-framer-motion] {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
 }
 
 /* RULE #4: Smoother animation timing - minimum 0.5s with ease-out curve */
@@ -581,12 +583,8 @@ motion,
     contain-intrinsic-size: 1px 800px;
   }
 
-  /* Disable will-change entirely on mobile to prevent GPU layer explosion */
-  [class*="motion"],
-  [class*="animate-"],
-  .framer-motion,
-  motion,
-  [data-framer-motion] {
+  /* NUCLEAR: Force will-change: auto on ALL elements on mobile to prevent GPU layer explosion */
+  * {
     will-change: auto !important;
   }
 }

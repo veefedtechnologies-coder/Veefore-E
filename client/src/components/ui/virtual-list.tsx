@@ -398,7 +398,7 @@ function VirtualListInner<T>(
               ? { [isHorizontal ? 'width' : 'height']: itemHeight }
               : {}),
           }}
-          className="will-change-transform"
+          className=""
         >
           {renderItem(item, i)}
         </div>

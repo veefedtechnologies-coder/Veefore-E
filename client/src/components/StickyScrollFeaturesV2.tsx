@@ -222,7 +222,7 @@ import { IphoneMockup } from './ui/iphone-mockup';
 const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
         <div
-            className="w-full h-full flex flex-col items-center justify-center pointer-events-none will-change-transform"
+            className="w-full h-full flex flex-col items-center justify-center pointer-events-none"
             style={{
                 ...GPU_ACCELERATED_STYLES,
             }}
@@ -238,7 +238,7 @@ const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
 
 const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center will-change-transform" style={GPU_ACCELERATED_STYLES}>
+        <div className="w-full h-full flex flex-col items-center justify-center" style={GPU_ACCELERATED_STYLES}>
             <div className="w-full aspect-[16/10] bg-black rounded-t-2xl border-[6px] border-zinc-800 overflow-hidden relative shadow-2xl">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20" />
                 <ScreenContent feature={feature} />
@@ -271,7 +271,7 @@ const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     return (
         <motion.div
             style={{ opacity: opacityValue, y: yValue, ...GPU_ACCELERATED_STYLES }}
-            className="absolute w-full max-w-lg will-change-transform"
+            className="absolute w-full max-w-lg"
         >
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
@@ -311,7 +311,7 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
                     visibility: 'visible',
                     opacity: 1,
                 }}
-                className="absolute inset-0 flex items-center justify-center z-10 will-change-transform"
+                className="absolute inset-0 flex items-center justify-center z-10"
             >
                 <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
                 <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
@@ -331,9 +331,8 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
                 opacity: shouldHide ? 0 : 1,
                 visibility: shouldHide ? 'hidden' : 'visible',
                 pointerEvents: shouldHide ? 'none' : 'auto',
-                willChange: 'transform, opacity',
             }}
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
+            className="absolute inset-0 flex items-center justify-center"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
@@ -351,7 +350,7 @@ const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKe
     return (
         <motion.div
             style={{ opacity: springOpacity, ...GPU_ACCELERATED_STYLES }}
-            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full will-change-transform`}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`}
         />
     );
 });
