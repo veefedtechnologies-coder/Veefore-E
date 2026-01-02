@@ -1802,7 +1802,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Sticky Scroll "Story" Features */}
-      <LazySection>
+      <LazySection minHeight="550vh">
         <StickyScrollFeaturesV2 />
       </LazySection>
 
@@ -1899,7 +1899,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Who is VeeFore For - Target Audience Section */}
-      <LazySection>
+      <LazySection minHeight="100vh">
         <TargetAudienceSection />
       </LazySection>
 
@@ -1918,18 +1918,18 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </p>
         </div>
 
-        <LazySection>
+        <LazySection minHeight="660vh">
           <CinematicFeatures features={heroFeatures} />
         </LazySection>
       </section>
 
       {/* Support Features - Growth Engine Section */}
-      <LazySection>
+      <LazySection minHeight="100vh">
         <GrowthEngineSection />
       </LazySection>
 
       {/* Credit System */}
-      <LazySection>
+      <LazySection minHeight="100vh">
         <CreditSystemSection />
       </LazySection>
 
@@ -2140,7 +2140,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
 
           {/* Desktop View - Scroll Animation */}
-          <LazySection>
+          <LazySection minHeight="120vh">
             <PricingScrollAnimation
               pricingPlans={pricingPlans}
             />
@@ -2149,7 +2149,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section >
 
       {/* Beta Launch */}
-      <LazySection>
+      <LazySection minHeight="80vh">
         <BetaLaunchSection />
       </LazySection>
 
