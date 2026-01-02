@@ -73,12 +73,9 @@ const TargetAudienceSection = () => {
                     : 'bg-white/5 border-white/5 hover:bg-white/10'
                   }`}
               >
-                {activeProfile === 'pro' && (
-                  <motion.div
-                    layoutId="highlight"
-                    className="absolute inset-0 bg-purple-500/5"
-                  />
-                )}
+                <div
+                  className={`absolute inset-0 bg-purple-500/5 transition-opacity duration-300 ${activeProfile === 'pro' ? 'opacity-100' : 'opacity-0'}`}
+                />
                 <div className="relative flex items-start gap-4">
                   <div className={`p-2 md:p-3 rounded-lg ${activeProfile === 'pro' ? 'bg-purple-500 text-white' : 'bg-white/10 text-gray-400'}`}>
                     <Rocket className="w-5 h-5 md:w-6 md:h-6" />
@@ -101,12 +98,9 @@ const TargetAudienceSection = () => {
                     : 'bg-white/5 border-white/5 hover:bg-white/10'
                   }`}
               >
-                {activeProfile === 'casual' && (
-                  <motion.div
-                    layoutId="highlight"
-                    className="absolute inset-0 bg-red-500/5"
-                  />
-                )}
+                <div
+                  className={`absolute inset-0 bg-red-500/5 transition-opacity duration-300 ${activeProfile === 'casual' ? 'opacity-100' : 'opacity-0'}`}
+                />
                 <div className="relative flex items-start gap-4">
                   <div className={`p-2 md:p-3 rounded-lg ${activeProfile === 'casual' ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-400'}`}>
                     <AlertCircle className="w-5 h-5 md:w-6 md:h-6" />
