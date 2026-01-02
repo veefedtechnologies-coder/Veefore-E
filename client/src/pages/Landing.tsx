@@ -1813,34 +1813,23 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
         <div className="w-full px-4 md:px-12 lg:px-20 relative z-10">
           <div className="text-center mb-12 md:mb-20">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+            <div
               className="inline-flex items-center space-x-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] md:text-xs font-bold text-red-400 uppercase tracking-widest mb-4 md:mb-6"
             >
               <span className="flex h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-red-500 animate-pulse mr-1.5 md:mr-2" />
               <span>The Real Problem</span>
-            </motion.div>
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
+            </div>
+            <h2
               className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight mb-4 md:mb-6"
             >
               Why Creators <span className="text-red-500 drop-shadow-sm">Fail</span>
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
+            </h2>
+            <p
               className="text-sm sm:text-lg md:text-xl text-white/40 max-w-2xl mx-auto leading-relaxed"
             >
               Most tools focus on posting, scheduling, and analytics. <br className="hidden md:block" />
               But creators don't fail because they lack tools.
-            </motion.p>
+            </p>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-20 items-stretch">
@@ -1853,13 +1842,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 { title: 'Time Burnout', desc: 'hours wasted on repetitive, low-value typing' },
                 { title: 'Blind Creation', desc: 'Posting without knowing what actually hooks' }
               ].map((item, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -30 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.2 + (i * 0.1) }}
-                >
+                <div key={i}>
                   <GlassCard
                     className="p-3 md:p-5 flex items-center space-x-3 md:space-x-5 !bg-red-500/[0.02] !border-red-500/10 group hover:!bg-red-500/[0.06] hover:!border-red-500/30 transition-all duration-300"
                   >
@@ -1871,16 +1854,12 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       <p className="text-xs md:text-sm text-white/40 group-hover:text-white/60 transition-colors leading-snug">{item.desc}</p>
                     </div>
                   </GlassCard>
-                </motion.div>
+                </div>
               ))}
             </div>
 
             {/* Right Column: The Solution Philosophy */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.4 }}
+            <div
               className="h-full mt-6 lg:mt-0"
             >
               <TiltCard className="h-full">
@@ -1912,7 +1891,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   </div>
                 </GlassCard>
               </TiltCard>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
