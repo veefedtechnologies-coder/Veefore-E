@@ -418,9 +418,9 @@ const ScrollZoomIntro = memo(() => {
                     }}
                 >
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        <div className="absolute left-[5%] top-[15%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-br from-blue-600/10 to-cyan-500/5 blur-[100px]" style={GPU_STYLE} />
-                        <div className="absolute right-[5%] bottom-[10%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-tl from-purple-600/8 to-pink-500/5 blur-[100px]" style={GPU_STYLE} />
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] rounded-full bg-gradient-to-r from-indigo-600/5 to-transparent blur-[120px]" style={GPU_STYLE} />
+                        <div className="absolute left-[5%] top-[15%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-br from-blue-600/15 to-cyan-500/10 blur-[80px]" style={GPU_STYLE} />
+                        <div className="absolute right-[5%] bottom-[10%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-tl from-purple-600/12 to-pink-500/8 blur-[80px]" style={GPU_STYLE} />
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] rounded-full bg-gradient-to-r from-indigo-600/10 to-transparent blur-[100px]" style={GPU_STYLE} />
                     </div>
 
                     <div className="w-full max-w-[1200px] px-6 pt-4 md:pt-20 select-none pointer-events-auto flex flex-col items-center">
@@ -525,13 +525,13 @@ const ScrollZoomIntro = memo(() => {
                             alt=""
                             className="absolute w-full h-full object-cover object-center"
                             style={{
-                                filter: 'brightness(0.5) saturate(1.1)',
+                                filter: 'brightness(0.7) saturate(1.2)',
                             }}
                         />
-                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,rgba(2,4,8,0.7)_70%,rgba(2,4,8,0.95)_100%)]" />
-                        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#020408] to-transparent" />
-                        <div className="absolute inset-x-0 bottom-0 h-60 bg-gradient-to-t from-[#020408] via-[#020408]/80 to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-transparent to-purple-900/10 mix-blend-overlay" />
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(2,4,8,0.5)_60%,rgba(2,4,8,0.85)_100%)]" />
+                        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[#020408] to-transparent" />
+                        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#020408] via-[#020408]/60 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-purple-900/20 mix-blend-overlay" />
                     </div>
                 </motion.div>
 
