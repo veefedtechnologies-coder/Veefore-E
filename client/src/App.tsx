@@ -1,34 +1,29 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Route, Switch, useLocation } from 'wouter'
-// PERF: Dashboard components lazy-loaded to reduce initial bundle size for landing page
-const Sidebar = React.lazy(() => import('./components/layout/sidebar').then(m => ({ default: m.Sidebar })))
-const Header = React.lazy(() => import('./components/layout/header').then(m => ({ default: m.Header })))
-const CreateDropdown = React.lazy(() => import('./components/layout/create-dropdown').then(m => ({ default: m.CreateDropdown })))
-const QuickActions = React.lazy(() => import('./components/dashboard/quick-actions').then(m => ({ default: m.QuickActions })))
-const PerformanceScore = React.lazy(() => import('./components/dashboard/performance-score').then(m => ({ default: m.PerformanceScore })))
-const Recommendations = React.lazy(() => import('./components/dashboard/recommendations').then(m => ({ default: m.Recommendations })))
-const GetStarted = React.lazy(() => import('./components/dashboard/get-started').then(m => ({ default: m.GetStarted })))
-const ScheduledPosts = React.lazy(() => import('./components/dashboard/scheduled-posts').then(m => ({ default: m.ScheduledPosts })))
-const Drafts = React.lazy(() => import('./components/dashboard/scheduled-posts').then(m => ({ default: m.Drafts })))
-const Listening = React.lazy(() => import('./components/dashboard/listening').then(m => ({ default: m.Listening })))
-const SocialAccounts = React.lazy(() => import('./components/dashboard/social-accounts').then(m => ({ default: m.SocialAccounts })))
-const InstagramWebhookListener = React.lazy(() => import('./components/dashboard/instagram-webhook-listener'))
-const ScheduledPostsSection = React.lazy(() => import('./components/dashboard/scheduled-posts-section').then(m => ({ default: m.ScheduledPostsSection })))
-const DraftsSection = React.lazy(() => import('./components/dashboard/drafts-section').then(m => ({ default: m.DraftsSection })))
-const CalendarView = React.lazy(() => import('./components/calendar/calendar-view').then(m => ({ default: m.CalendarView })))
-const AnalyticsDashboard = React.lazy(() => import('./components/analytics/analytics-dashboard').then(m => ({ default: m.AnalyticsDashboard })))
-const CreatePost = React.lazy(() => import('./components/create/create-post').then(m => ({ default: m.CreatePost })))
-const VeeGPT = React.lazy(() => import('./pages/VeeGPT'))
-// Landing is eagerly loaded to prevent double loading spinner on initial load
+import React, { useEffect, useRef } from 'react'
+import { useLocation } from 'wouter'
+import { useFirebaseAuth } from './hooks/useFirebaseAuth'
+import LoadingSpinner from './components/LoadingSpinner'
+import { initializeTheme } from './lib/theme'
+import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
+import { initializeAccessibilityCompliance, useAccessibilityRouteAnnouncements } from './lib/accessibility-compliance'
+import { initializeMobileExcellence } from './lib/mobile-excellence'
+import { AdaptiveAnimationProvider } from '@/lib/mobile-performance-optimizer'
+import { initializeSEO } from './lib/seo-optimization'
+import { initializeCoreWebVitals } from './lib/core-web-vitals'
+import { initializeComponentModernization } from './lib/component-modernization'
+import { WaitlistProvider } from './context/WaitlistContext'
+import { WaitlistModal } from './components/waitlist/WaitlistModal'
+
 import Landing from './pages/Landing'
+
+const AuthenticatedApp = React.lazy(() => import('./AuthenticatedApp'))
+
 const Landing3D = React.lazy(() => import('./pages/Landing3D'))
 const Landing3DAdvanced = React.lazy(() => import('./pages/Landing3DAdvanced'))
 const SplineKeyboardLanding = React.lazy(() => import('./pages/SplineKeyboardLanding'))
 const RobotHeroLanding = React.lazy(() => import('./pages/RobotHeroLanding'))
 const SignUpIntegrated = React.lazy(() => import('./pages/SignUpIntegrated'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
-const Workspaces = React.lazy(() => import('./pages/Workspaces'))
-// Public pages - lazy loaded for performance
+const AdminLogin = React.lazy(() => import('./pages/AdminLogin'))
 const Features = React.lazy(() => import('./pages/Features'))
 const Pricing = React.lazy(() => import('./pages/Pricing'))
 const FreeTrial = React.lazy(() => import('./pages/FreeTrial'))
@@ -45,84 +40,23 @@ const HelpCenter = React.lazy(() => import('./pages/HelpCenter'))
 const Community = React.lazy(() => import('./pages/Community'))
 const Status = React.lazy(() => import('./pages/Status'))
 const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
-// PERF: Lazy-load non-critical UI components
 const CookieConsentBanner = React.lazy(() => import('./components/CookieConsentBanner'))
-const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'))
-const Tabs = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.Tabs })))
-const TabsContent = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsContent })))
-const TabsList = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsList })))
-const TabsTrigger = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsTrigger })))
-import { useFirebaseAuth } from './hooks/useFirebaseAuth'
-import LoadingSpinner from './components/LoadingSpinner'
-import { SkeletonPageLoader } from './components/ui/skeleton'
-// PERF: Lazy-load non-critical overlay components
-const AccountNotFoundBanner = React.lazy(() => import('./components/AccountNotFoundBanner'))
-const SectionErrorBoundary = React.lazy(() => import('./components/ErrorBoundary').then(m => ({ default: m.SectionErrorBoundary })))
-const WorkspaceCreationOverlay = React.lazy(() => import('./components/WorkspaceCreationOverlay'))
-import { getAuth } from 'firebase/auth'
-import { useQuery } from '@tanstack/react-query'
-import { apiRequest, queryClient } from '@/lib/queryClient'
-const Profile = React.lazy(() => import('./pages/Profile'))
-const Integration = React.lazy(() => import('./pages/Integration'))
-const AutomationStepByStep = React.lazy(() => import('./pages/AutomationStepByStep'))
-const VideoGeneratorAdvanced = React.lazy(() => import('./pages/VideoGeneratorAdvanced'))
-const AdminPanel = React.lazy(() => import('./pages/AdminPanel'))
-const AdminLogin = React.lazy(() => import('./pages/AdminLogin'))
-const PrivacyPolicy = PrivacyPolicyPage
-const TermsOfService = TermsOfServicePage
-const Settings = React.lazy(() => import('./pages/Settings'))
-const SecurityDashboard = React.lazy(() => import('./pages/SecurityDashboard'))
-const TestFixtures = React.lazy(() => import('./pages/TestFixtures'))
-// PERF: Lazy-load walkthrough component
-const GuidedTour = React.lazy(() => import('./components/walkthrough/GuidedTour').then(m => ({ default: m.GuidedTour })))
-import { initializeTheme } from './lib/theme'
-// P6: Frontend SEO, Accessibility & UX System
-import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
-import { RealtimeProvider } from './contexts/RealtimeContext'
-// P7: Accessibility System
-import { initializeAccessibilityCompliance, useAccessibilityRouteAnnouncements } from './lib/accessibility-compliance'
-// P11: Mobile & Cross-Platform Excellence
-import { initializeMobileExcellence } from './lib/mobile-excellence'
-// Mobile Performance Optimizer - Adaptive animations based on device capabilities
-import { AdaptiveAnimationProvider } from '@/lib/mobile-performance-optimizer'
-// P7: SEO, Core Web Vitals & Accessibility Excellence
-import { initializeSEO } from './lib/seo-optimization';
-import { initializeCoreWebVitals } from './lib/core-web-vitals';
-import { initializeComponentModernization } from './lib/component-modernization';
-import { ProtectedRoute } from './components/ProtectedRoute'
-import { WaitlistProvider } from './context/WaitlistContext'
-import { WaitlistModal } from './components/waitlist/WaitlistModal'
 
-const EncryptionHealth = React.lazy(() => import('./pages/EncryptionHealth'))
+const publicRoutes = [
+  '/', '/features', '/pricing', '/changelog', '/about', '/blog', '/careers',
+  '/contact', '/security', '/gdpr', '/privacy-policy', '/terms-of-service',
+  '/free-trial', '/help', '/community', '/status', '/cookies', '/waitlist',
+  '/signup', '/signin', '/admin-login', '/3d', '/3d-advanced', '/keyboard',
+  '/robot-hero', '/landing'
+]
 
-// ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
-interface NormalizedWorkspace {
-  id: string;
-  _id?: string;
-  name: string;
-  description?: string;
-  theme?: string;
-  aiPersonality?: string;
-  isDefault?: boolean;
-  maxTeamMembers?: number;
-  credits?: number;
-  createdAt?: string;
-}
-
-const normalizeWorkspace = (ws: any): NormalizedWorkspace => ({
-  ...ws,
-  id: ws.id || ws._id,  // Use id if exists, fallback to _id
-});
-
-const normalizeWorkspaces = (workspaces: any): NormalizedWorkspace[] => {
-  // Handle nested API response { success: true, data: [...] }
-  const rawWorkspaces = workspaces?.data || workspaces || [];
-  if (!Array.isArray(rawWorkspaces)) return [];
-  return rawWorkspaces.map(normalizeWorkspace);
-};
+const protectedRoutes = [
+  '/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator',
+  '/workspaces', '/profile', '/automation', '/veegpt', '/admin', '/settings',
+  '/security-dashboard', '/integrations', '/test-fixtures', '/encryption-health'
+]
 
 function App() {
-  // Initialization guards to prevent re-initialization
   const themeInitialized = useRef(false)
   const p6Initialized = useRef(false)
   const accessibilityInitialized = useRef(false)
@@ -131,22 +65,15 @@ function App() {
   const webVitalsInitialized = useRef(false)
   const componentModernizationInitialized = useRef(false)
 
-  // Always call hooks at the top level - never inside conditions
-  const [isCreateDropdownOpen, setIsCreateDropdownOpen] = useState(false)
-  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false)
-  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
 
-  // Scroll to top when route changes (SPA navigation)
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [location])
 
-  // P7: Route announcements for accessibility
   useAccessibilityRouteAnnouncements(location)
 
-  // Initialize theme system - only once
   useEffect(() => {
     if (!themeInitialized.current) {
       initializeTheme()
@@ -154,18 +81,12 @@ function App() {
     }
   }, [])
 
-  // P6: Initialize Frontend SEO, Accessibility & UX System  
-  // P7: Initialize Accessibility System
-  // P11: Initialize Mobile & Cross-Platform Excellence
-  // Optimized: Defer non-critical initializations to prevent blank page
   useEffect(() => {
-    // Critical: Run immediately for accessibility - only once
     if (!accessibilityInitialized.current) {
       initializeAccessibilityCompliance()
       accessibilityInitialized.current = true
     }
 
-    // Defer non-critical initializations to prevent blocking render
     const deferInit = () => {
       if (!mobileInitialized.current) {
         initializeMobileExcellence()
@@ -184,255 +105,88 @@ function App() {
         componentModernizationInitialized.current = true
       }
       if (!p6Initialized.current) {
-        initializeP6System({
-          seo: {
-            defaultTitle: 'VeeFore - AI-Powered Social Media Management',
-            defaultDescription: 'Transform your social media presence with VeeFore\'s AI-powered content creation, automated scheduling, and comprehensive analytics.',
-            siteName: 'VeeFore',
-            twitterHandle: '@VeeFore'
-          },
-          accessibility: {
-            enableScreenReaderSupport: true,
-            enableKeyboardNavigation: true,
-            announceRouteChanges: true
-          },
-          ux: {
-            enableLoadingStates: true,
-            enableToastNotifications: true,
-            autoSaveInterval: 30000
-          },
-          mobile: {
-            enableTouchOptimization: true,
-            enableGestureSupport: true,
-            enablePullToRefresh: true
-          },
-          performance: {
-            enableLazyLoading: true,
-            enableImageOptimization: true,
-            enableWebVitalsMonitoring: true
-          }
-        })
+        initializeP6System()
         p6Initialized.current = true
       }
     }
 
-    // Use requestIdleCallback if available, otherwise setTimeout
     if ('requestIdleCallback' in window) {
-      requestIdleCallback(deferInit)
+      (window as any).requestIdleCallback(deferInit, { timeout: 2000 })
     } else {
-      setTimeout(deferInit, 1)
+      setTimeout(deferInit, 100)
     }
   }, [])
 
-  // Google sign-in is now handled directly in SignIn.tsx with popup method
-  // No need for redirect result handling
-
-  // Fetch user data when authenticated - with retry for new users
-  const { data: userData, isLoading: userDataLoading, error: userDataError } = useQuery({
-    queryKey: ['/api/user'],
-    queryFn: () => apiRequest('/api/user'),
-    enabled: !!user && !loading,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
-  })
-
-  // Check for Firebase auth in localStorage
-  const hasFirebaseAuthInStorage = Object.keys(localStorage).some(key =>
-    key.includes('firebase:authUser') && localStorage.getItem(key)
+  const isPublicRoute = publicRoutes.some(route => 
+    location === route || location.startsWith(route + '/')
   )
-  useEffect(() => {
-    if (!loading && !user && hasFirebaseAuthInStorage) {
-      Object.keys(localStorage).forEach((key) => {
-        if (key.includes('firebase:authUser')) localStorage.removeItem(key)
-      })
-    }
-  }, [user, loading, hasFirebaseAuthInStorage])
+  const isProtectedRoute = protectedRoutes.some(route => 
+    location === route || location.startsWith(route + '/')
+  )
 
-  // Pre-fetch workspaces data for faster navigation - uses global cache settings
-  const { data: rawWorkspacesResponse, isLoading: workspacesLoading } = useQuery({
-    queryKey: ['/api/workspaces'],
-    queryFn: () => apiRequest('/api/workspaces'),
-    enabled: !!user && !loading && !!userData,
-  })
-
-  // ✅ CRITICAL FIX: Normalize workspace data to ensure 'id' field exists (MongoDB returns _id)
-  const workspaces = useMemo(() => normalizeWorkspaces(rawWorkspacesResponse), [rawWorkspacesResponse])
-
-  const [enforceHang, setEnforceHang] = useState(false)
-  const needEnforce = !!user && !!userData && !workspacesLoading && (workspaces.length === 0 || !workspaces.some((w) => w.isDefault === true))
-  const { data: enforceResult, isLoading: enforcing, error: enforceError, refetch: enforceRefetch } = useQuery({
-    queryKey: ['/api/workspaces/enforce-default'],
-    queryFn: () => apiRequest('/api/workspaces/enforce-default', { method: 'POST' }),
-    enabled: needEnforce,
-    retry: false,
-    staleTime: 5 * 60 * 1000
-  })
-
-  useEffect(() => {
-    if (enforcing) {
-      const t = setTimeout(() => setEnforceHang(true), 7000)
-      return () => clearTimeout(t)
-    } else {
-      setEnforceHang(false)
-    }
-  }, [enforcing])
-
-  useEffect(() => {
-    if (enforceResult && (enforceResult as any).success) {
-      queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
-      queryClient.refetchQueries({ queryKey: ['/api/workspaces'], type: 'active' })
-    }
-  }, [enforceResult])
-
-  // ✅ PRODUCTION FIX: Clean up any 'undefined' string in localStorage on app initialization
-  useEffect(() => {
-    const storedId = localStorage.getItem('currentWorkspaceId');
-    if (storedId === 'undefined' || storedId === 'null' || storedId === '') {
-      console.warn('[APP INIT] 🧹 Removing invalid localStorage value:', storedId);
-      localStorage.removeItem('currentWorkspaceId');
-    }
-  }, []);
-
-  // ✅ PRODUCTION FIX: Validate workspace ID on app initialization
-  useEffect(() => {
-    const safeWorkspaces = Array.isArray(workspaces) ? workspaces : [];
-    if (!safeWorkspaces || safeWorkspaces.length === 0) return;
-
-    const validateAndCorrectWorkspace = async () => {
-      const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
-
-      // Check if stored workspace ID is a valid string (not 'undefined', 'null', empty)
-      const isValidString = storedWorkspaceId && storedWorkspaceId !== 'undefined' && storedWorkspaceId !== 'null' && storedWorkspaceId !== '';
-
-      // Check if stored workspace ID exists in user's workspaces
-      const isValid = isValidString && safeWorkspaces.some((ws: any) => ws.id === storedWorkspaceId);
-
-      if (!isValid) {
-        // INVALID WORKSPACE ID - Auto-correct on app initialization
-        console.warn('[APP INIT] ❌ Invalid workspace ID detected:', storedWorkspaceId);
-        console.log('[APP INIT] 🔧 Auto-correcting to valid workspace...');
-
-        const defaultWorkspace = safeWorkspaces.find((ws: any) => ws.isDefault) || safeWorkspaces[0];
-
-        // ✅ GUARD: Only set if we have a valid workspace with a valid ID
-        if (!defaultWorkspace || !defaultWorkspace.id) {
-          console.warn('[APP INIT] ⚠️ No valid workspace found, cannot auto-correct');
-          return;
-        }
-
-        const correctedWorkspaceId = defaultWorkspace.id;
-
-        console.log('[APP INIT] ✅ Auto-corrected workspace:', {
-          from: storedWorkspaceId,
-          to: correctedWorkspaceId,
-          name: defaultWorkspace.name
-        });
-
-        // Update localStorage with correct workspace ID
-        localStorage.setItem('currentWorkspaceId', correctedWorkspaceId);
-
-        // ✅ CRITICAL: Invalidate all React Query caches that depend on workspace ID
-        console.log('[APP INIT] 🔄 Invalidating all workspace-dependent queries...');
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] }),
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] }),
-          queryClient.invalidateQueries({ queryKey: ['/api/analytics/historical'] }),
-          queryClient.invalidateQueries({ queryKey: ['/api/content'] }),
-          // Refetch immediately to get data for correct workspace
-          queryClient.refetchQueries({ queryKey: ['/api/social-accounts'], type: 'active' }),
-          queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics'], type: 'active' })
-        ]);
-        console.log('[APP INIT] ✅ All queries invalidated and refetched with correct workspace ID');
-
-        // Dispatch events to notify components
-        window.dispatchEvent(new Event('workspace-changed'));
-      } else {
-        console.log('[APP INIT] ✅ Workspace ID validated:', storedWorkspaceId);
-      }
-    };
-
-    validateAndCorrectWorkspace();
-  }, [workspaces]);
-
-  // Pre-fetch social accounts for current workspace to eliminate loading on Integration page
-  // ✅ PRODUCTION FIX: Use localStorage workspace ID (now validated)
-  const safeWorkspacesForPrefetch = Array.isArray(workspaces) ? workspaces : [];
-  // ✅ GUARD: Filter out invalid localStorage values ('undefined', 'null', '')
-  const storedWorkspaceId = localStorage.getItem('currentWorkspaceId');
-  const validStoredId = storedWorkspaceId && storedWorkspaceId !== 'undefined' && storedWorkspaceId !== 'null' && storedWorkspaceId !== '' ? storedWorkspaceId : null;
-  const currentWorkspaceId = validStoredId || safeWorkspacesForPrefetch.find((w: any) => w.isDefault)?.id || safeWorkspacesForPrefetch[0]?.id;
-  // ✅ GUARD: Ensure currentWorkspaceId is valid before making API call
-  const isValidWorkspaceId = currentWorkspaceId && currentWorkspaceId !== 'undefined' && currentWorkspaceId !== 'null';
-  useQuery({
-    queryKey: ['/api/social-accounts', currentWorkspaceId],
-    queryFn: () => isValidWorkspaceId ? apiRequest(`/api/social-accounts?workspaceId=${currentWorkspaceId}`) : Promise.resolve([]),
-    enabled: !!user && !loading && !!isValidWorkspaceId,
-  })
-
-  // Authentication and onboarding guard logic - STRICT ENFORCEMENT
-  useEffect(() => {
-    // Force-correct: if userData reports not onboarded but workspaces exist, mark modal closed
-    if (!loading && !userDataLoading) {
-      const workspacesLoaded = !workspacesLoading && Array.isArray(workspaces)
-      const hasWorkspaces = workspacesLoaded && workspaces.length > 0
-      const localOnboarded = localStorage.getItem('isOnboarded') === 'true'
-      if (user && userData && (userData.isOnboarded || hasWorkspaces)) {
-        if (location === '/signin' || location === '/signup' || location === '/onboarding') {
-          setLocation('/')
-        }
-        // Close onboarding modal if open
-        if (isOnboardingModalOpen) {
-          setIsOnboardingModalOpen(false)
-        }
-        // If backend userData.isOnboarded is stale, invalidate to refresh
-        if (!userData.isOnboarded && hasWorkspaces) {
-          queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-        }
-        if (!userData.isOnboarded && localOnboarded) {
-          queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-        }
-      } else if (user && userData && !userData.isOnboarded && workspacesLoaded && !hasWorkspaces) {
-        // Always ensure modal is open for non-onboarded users
-        if (!isOnboardingModalOpen) {
-          setIsOnboardingModalOpen(true)
-        }
-
-        // FORCE redirect away from auth pages to dashboard where modal will show
-        if (location === '/signin' || location === '/signup') {
-          setLocation('/')
-          return // Exit early to prevent rendering auth page
-        }
-      }
-
-      // If user is not authenticated, close modal and restrict access
-      else if (!user && !loading) {
-        if (isOnboardingModalOpen) {
-          setIsOnboardingModalOpen(false)
-        }
-        if (location === '/onboarding') {
-          setLocation('/')
-        }
-      }
-    }
-  }, [user, loading, userData, userDataLoading, location, setLocation, isOnboardingModalOpen, workspaces, workspacesLoading])
-
-  // Only show loading spinner for protected routes when user is not authenticated
-  // Public pages (landing, features, pricing, etc.) can render without waiting for auth
-  const protectedRoutes = ['/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator', '/workspaces', '/profile', '/automation', '/veegpt', '/admin', '/settings', '/security-dashboard']
-  const isProtectedRoute = protectedRoutes.some(route => location.startsWith(route))
-
-  // Only block rendering for protected routes while auth is loading
   if (loading && isProtectedRoute) {
     return <LoadingSpinner type="dashboard" />
   }
 
-  // Redirect unauthenticated users away from protected routes (after auth finishes loading)
   if (!loading && !user && isProtectedRoute) {
     return <LoadingSpinner type="dashboard" />
   }
 
-  const handleCreateOptionSelect = () => {
-    setIsCreateDropdownOpen(false)
+  const renderPublicPage = () => {
+    switch (location) {
+      case '/':
+        return <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+      case '/features':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Features /></React.Suspense>
+      case '/pricing':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Pricing /></React.Suspense>
+      case '/changelog':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Changelog /></React.Suspense>
+      case '/about':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><About /></React.Suspense>
+      case '/blog':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Blog /></React.Suspense>
+      case '/careers':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Careers /></React.Suspense>
+      case '/contact':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Contact /></React.Suspense>
+      case '/security':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Security /></React.Suspense>
+      case '/gdpr':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><GDPR /></React.Suspense>
+      case '/privacy-policy':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><PrivacyPolicyPage /></React.Suspense>
+      case '/terms-of-service':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><TermsOfServicePage /></React.Suspense>
+      case '/free-trial':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><FreeTrial /></React.Suspense>
+      case '/help':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><HelpCenter /></React.Suspense>
+      case '/community':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Community /></React.Suspense>
+      case '/status':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Status /></React.Suspense>
+      case '/cookies':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><CookiePolicy /></React.Suspense>
+      case '/signup':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignUpIntegrated /></React.Suspense>
+      case '/signin':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignIn onNavigate={(page: string) => setLocation(`/${page}`)} /></React.Suspense>
+      case '/admin-login':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><AdminLogin /></React.Suspense>
+      case '/3d':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing3D /></React.Suspense>
+      case '/3d-advanced':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing3DAdvanced /></React.Suspense>
+      case '/keyboard':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SplineKeyboardLanding /></React.Suspense>
+      case '/robot-hero':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><RobotHeroLanding /></React.Suspense>
+      case '/landing':
+        return <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+      default:
+        return null
+    }
   }
 
   return (
@@ -443,1085 +197,52 @@ function App() {
     >
       <P6Provider>
         <WaitlistProvider>
-          <RealtimeProvider>
-            <>
-              <WaitlistModal />
+          <>
+            <WaitlistModal />
+            <React.Suspense fallback={null}>
               <CookieConsentBanner />
+            </React.Suspense>
 
-
-              {/* Public Pages - Lazy loaded with Suspense */}
-              <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                {location === '/features' && (
-                  <div className="min-h-screen"><Features /></div>
-                )}
-                {location === '/pricing' && (
-                  <div className="min-h-screen"><Pricing /></div>
-                )}
-                {location === '/changelog' && (
-                  <div className="min-h-screen"><Changelog /></div>
-                )}
-                {location === '/about' && (
-                  <div className="min-h-screen"><About /></div>
-                )}
-                {location === '/blog' && (
-                  <div className="min-h-screen"><Blog /></div>
-                )}
-                {location === '/careers' && (
-                  <div className="min-h-screen"><Careers /></div>
-                )}
-                {location === '/contact' && (
-                  <div className="min-h-screen"><Contact /></div>
-                )}
-                {location === '/security' && (
-                  <div className="min-h-screen"><Security /></div>
-                )}
-                {location === '/gdpr' && (
-                  <div className="min-h-screen"><GDPR /></div>
-                )}
-                {location === '/privacy-policy' && (
-                  <PrivacyPolicy />
-                )}
-                {location === '/terms-of-service' && (
-                  <TermsOfService />
-                )}
-
-                {location === '/free-trial' && (
-                  <div className="min-h-screen"><FreeTrial /></div>
-                )}
-
-                {location === '/help' && (
-                  <div className="min-h-screen"><HelpCenter /></div>
-                )}
-
-                {location === '/community' && (
-                  <div className="min-h-screen"><Community /></div>
-                )}
-
-                {location === '/status' && (
-                  <div className="min-h-screen"><Status /></div>
-                )}
-
-                {location === '/cookies' && (
-                  <div className="min-h-screen"><CookiePolicy /></div>
-                )}
+            {!user && isPublicRoute && location !== '/' ? (
+              <div className="min-h-screen">
+                {renderPublicPage()}
+              </div>
+            ) : !user && location === '/' ? (
+              <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
+            ) : user ? (
+              <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
+                <AuthenticatedApp />
               </React.Suspense>
-
-              {/* Root "/" - Landing page for unauthenticated users (renders immediately, no auth wait) */}
-              {location === '/' && !user && (
-                <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
-              )}
-
-              {/* Switch for remaining routes (authenticated "/" and all other routes) */}
-              {!['/features', '/pricing', '/changelog', '/about', '/blog', '/careers', '/contact', '/security', '/gdpr', '/privacy-policy', '/terms-of-service', '/waitlist', '/free-trial', '/help', '/community', '/status', '/cookies'].includes(location) && (location !== '/' || user) && (
-                <Switch location={location}>
-                  {/* Features Page - now handled above */}
-
-
-
-                  {/* Authentication pages - full screen without sidebar */}
-                  <Route path="/signup">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <SignUpIntegrated />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  <Route path="/signin">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <SignIn onNavigate={(page: string) => setLocation(`/${page}`)} />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Removed old onboarding route - now handled by modal */}
-
-
-                  {/* Admin Login - Accessible to everyone */}
-                  <Route path="/admin-login">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <AdminLogin />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Admin Panel - Protected */}
-                  <Route path="/admin">
-                    <ProtectedRoute>
-                      <React.Suspense fallback={<LoadingSpinner type="admin" />}>
-                        <div className="min-h-screen bg-gray-50">
-                          <AdminPanel />
-                        </div>
-                      </React.Suspense>
-                    </ProtectedRoute>
-                  </Route>
-
-                  {/* 3D Landing Page - Public access */}
-                  <Route path="/3d">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <Landing3D />
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Advanced 3D Landing Page with Spline Robot - Public access */}
-                  <Route path="/3d-advanced">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <Landing3DAdvanced />
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Spline Keyboard Landing Page - Public access */}
-                  <Route path="/keyboard">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <SplineKeyboardLanding />
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Robot Hero Landing Page - Public access */}
-                  <Route path="/robot-hero">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <RobotHeroLanding />
-                    </React.Suspense>
-                  </Route>
-
-
-
-                  {/* Original Landing Page - Public access */}
-
-
-                  {/* Original Landing Page - Public access */}
-                  <Route path="/landing">
-                    <div className="min-h-screen">
-                      <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
-                    </div>
-                  </Route>
-
-
-
-                  {/* Pricing Page - Public access */}
-                  <Route path="/pricing">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <Pricing />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Free Trial Page - Public access */}
-                  <Route path="/free-trial">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <FreeTrial />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Changelog Page - Public access */}
-                  <Route path="/changelog">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <Changelog />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* About Page - Public access */}
-                  <Route path="/about">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <About />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Blog Page - Public access */}
-                  <Route path="/blog">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <Blog />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Careers Page - Public access */}
-                  <Route path="/careers">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <Careers />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Contact Page - Public access */}
-                  <Route path="/contact">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <Contact />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Privacy Policy Page - Public access */}
-                  <Route path="/privacy-policy">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <PrivacyPolicy />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Terms of Service Page - Public access */}
-                  <Route path="/terms-of-service">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <TermsOfService />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Security Page - Public access */}
-                  <Route path="/security">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <Security />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* GDPR Page - Public access */}
-                  <Route path="/gdpr">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <div className="min-h-screen">
-                        <GDPR />
-                      </div>
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Protected routes with sidebar layout - uses ProtectedRoute for auth */}
-                  <Route path="/plan">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <div className="space-y-6">
-                              <Tabs defaultValue="calendar" className="w-full">
-                                <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                                  <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                                  <TabsTrigger value="drafts">Drafts</TabsTrigger>
-                                  <TabsTrigger value="content">Content</TabsTrigger>
-                                  <TabsTrigger value="dm-automation">DM automation</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="calendar" className="mt-6">
-                                  <CalendarView />
-                                </TabsContent>
-                                <TabsContent value="drafts" className="mt-6">
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <ScheduledPosts />
-                                    <Drafts />
-                                  </div>
-                                </TabsContent>
-                                <TabsContent value="content" className="mt-6">
-                                  <div className="text-center py-12">
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Content Library</h3>
-                                    <p className="text-gray-600 dark:text-gray-400">Manage your content library and templates here.</p>
-                                  </div>
-                                </TabsContent>
-                                <TabsContent value="dm-automation" className="mt-6">
-                                  <div className="text-center py-12">
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">DM Automation</h3>
-                                    <p className="text-gray-600 dark:text-gray-400">Set up automated direct message responses.</p>
-                                  </div>
-                                </TabsContent>
-                              </Tabs>
-                            </div>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/create">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            {/* Instagram Webhook Listener for Real-time Updates */}
-                            <InstagramWebhookListener />
-                            <CreatePost />
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/analytics">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            {/* Instagram Webhook Listener for Real-time Updates */}
-                            <InstagramWebhookListener />
-                            <AnalyticsDashboard />
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/inbox">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <div className="text-center py-12">
-                              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Inbox 2.0</h3>
-                              <p className="text-gray-600 dark:text-gray-400">Manage your social media conversations here.</p>
-                            </div>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-
-
-                  <Route path="/video-generator">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Cosmos Studio interface without VeeFore header */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Cosmos Studio Interface - Full height with scrolling */}
-                          <main className="flex-1 overflow-y-auto">
-                            <React.Suspense fallback={<SkeletonPageLoader type="video" />}>
-                              <VideoGeneratorAdvanced />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/workspaces">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <React.Suspense fallback={<SkeletonPageLoader type="workspaces" />}>
-                              <Workspaces />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-
-
-                  <Route path="/profile">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <React.Suspense fallback={<SkeletonPageLoader type="profile" />}>
-                              <Profile />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/integration">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            {/* Instagram Webhook Listener for Real-time Updates */}
-                            <InstagramWebhookListener />
-                            <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
-                              <Integration />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/automation">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <React.Suspense fallback={<SkeletonPageLoader type="automation" />}>
-                              <AutomationStepByStep />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  {/* VeeGPT Route - with main sidebar */}
-                  <Route path="/veegpt">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - VeeGPT takes full remaining space */}
-                        <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                          <React.Suspense fallback={<SkeletonPageLoader type="veegpt" />}>
-                            <VeeGPT />
-                          </React.Suspense>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/integrations">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            {/* Instagram Webhook Listener for Real-time Updates */}
-                            <InstagramWebhookListener />
-                            <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
-                              <Integration />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/settings">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={(option) => {
-                                setIsCreateDropdownOpen(false)
-                                // Handle navigation based on option
-                                if (option === 'post') setLocation('/create')
-                                if (option === 'automation') setLocation('/automation')
-                                if (option === 'video') setLocation('/video-generator')
-                              }}
-                            />
-                          )}
-
-                          {/* Page Content */}
-                          <div className="flex-1 overflow-y-auto">
-                            <React.Suspense fallback={<SkeletonPageLoader type="settings" />}>
-                              <Settings />
-                            </React.Suspense>
-                          </div>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  {/* P8: Security Operations Center Route */}
-                  <Route path="/security">
-                    <ProtectedRoute>
-                      <React.Suspense fallback={<LoadingSpinner type="security" />}>
-                        <SecurityDashboard />
-                      </React.Suspense>
-                    </ProtectedRoute>
-                  </Route>
-
-                  {/* Privacy Policy Route - Public access */}
-                  <Route path="/privacy-policy">
-                    <PrivacyPolicy />
-                  </Route>
-
-                  <Route path="/test-fixtures">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <React.Suspense fallback={<LoadingSpinner type="default" />}>
-                              <TestFixtures />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  <Route path="/encryption-health">
-                    <ProtectedRoute>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        <div className="h-screen overflow-y-auto">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <React.Suspense fallback={<LoadingSpinner type="security" />}>
-                              <EncryptionHealth />
-                            </React.Suspense>
-                          </main>
-                        </div>
-                      </div>
-                    </ProtectedRoute>
-                  </Route>
-
-                  {/* Terms of Service Route - Public access */}
-                  <Route path="/terms-of-service">
-                    <TermsOfService />
-                  </Route>
-
-                  {/* Public routes for legal pages - accessible without authentication */}
-                  <Route path="/privacy-policy">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <PrivacyPolicy />
-                    </React.Suspense>
-                  </Route>
-
-                  <Route path="/terms-of-service">
-                    <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                      <TermsOfService />
-                    </React.Suspense>
-                  </Route>
-
-                  {/* Root route - Landing for unauthenticated, Dashboard for authenticated users */}
-                  {/* PERF: Show Landing immediately without waiting for Firebase to initialize */}
-                  <Route path="/"  >
-                    {!user ? (
-                      <Landing onNavigate={(page: string) => setLocation(`/${page}`)} />
-                    ) : user && userData ? (
-                      // ONBOARDED users see dashboard - Check userData FIRST to avoid stuck loading
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-                        {(needEnforce && enforcing && !enforceHang) && <WorkspaceCreationOverlay onRetry={() => { }} />}
-                        {(needEnforce && ((enforceHang && enforcing) || (!enforcing && enforceError))) && (
-                          <WorkspaceCreationOverlay
-                            error={String(enforceError || 'Taking longer than usual')}
-                            onRetry={() => enforceRefetch()}
-                            onSignOut={() => { const auth = getAuth(); auth.signOut(); setLocation('/signin'); }}
-                          />
-                        )}
-                        {/* Sidebar - Fixed height with independent scrolling */}
-                        <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
-                          <Sidebar
-                            className="w-24 bg-white dark:bg-gray-800 h-full transition-colors duration-300"
-                            isCreateDropdownOpen={isCreateDropdownOpen}
-                            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                          />
-                        </div>
-
-                        {/* Main Content Area - Independent scrolling */}
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                          {/* Header */}
-                          <Header
-                            onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)}
-                          />
-
-                          {/* Create Dropdown */}
-                          {isCreateDropdownOpen && (
-                            <CreateDropdown
-                              isOpen={isCreateDropdownOpen}
-                              onClose={() => setIsCreateDropdownOpen(false)}
-                              onOptionSelect={handleCreateOptionSelect}
-                            />
-                          )}
-
-                          {/* Main Content - Scrollable */}
-                          <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                            <>
-                              {/* Instagram Webhook Listener for Real-time Updates */}
-                              <InstagramWebhookListener />
-
-                              {/* Quick Actions - Top Section */}
-                              <div className="mb-8">
-                                <QuickActions />
-                              </div>
-
-                              {/* Main Dashboard Layout - Hootsuite Style */}
-                              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-                                {/* Left Column - Performance Score + Get Started + Scheduled Posts + Drafts */}
-                                <div className="space-y-6">
-                                  <SectionErrorBoundary sectionName="Performance Score">
-                                    <PerformanceScore />
-                                  </SectionErrorBoundary>
-                                  <SectionErrorBoundary sectionName="Get Started">
-                                    <GetStarted />
-                                  </SectionErrorBoundary>
-                                  <SectionErrorBoundary sectionName="Scheduled Posts">
-                                    <ScheduledPostsSection />
-                                  </SectionErrorBoundary>
-                                  <SectionErrorBoundary sectionName="Drafts">
-                                    <DraftsSection />
-                                  </SectionErrorBoundary>
-                                </div>
-
-                                {/* Right Column - Recommendations + Social Accounts + Listening */}
-                                <div className="space-y-6">
-                                  <SectionErrorBoundary sectionName="Recommendations">
-                                    <Recommendations />
-                                  </SectionErrorBoundary>
-                                  <SectionErrorBoundary sectionName="Social Accounts">
-                                    <SocialAccounts />
-                                  </SectionErrorBoundary>
-                                  <SectionErrorBoundary sectionName="Listening">
-                                    <Listening />
-                                  </SectionErrorBoundary>
-                                </div>
-                              </div>
-                            </>
-                          </main>
-                        </div>
-
-                        {/* Onboarding Flow for new users - triple safety check:
-                1. Backend says not onboarded
-                2. localStorage doesn't say onboarded
-                3. User doesn't have workspaces (which indicates completed onboarding) */}
-                        {userData && !userData.isOnboarded &&
-                          localStorage.getItem('isOnboarded') !== 'true' &&
-                          !(Array.isArray(workspaces) && workspaces.length > 0) && (
-                            <OnboardingFlow
-                              open={isOnboardingModalOpen}
-                              userData={userData}
-                              onComplete={async (onboardingData) => {
-                                console.log('🎯 COMPLETING ONBOARDING with data:', onboardingData)
-                                try {
-                                  const response = await fetch('/api/user/complete-onboarding', {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'Authorization': `Bearer ${await user?.getIdToken()}`
-                                    },
-                                    body: JSON.stringify({ preferences: onboardingData })
-                                  })
-                                  if (response.ok) {
-                                    console.log('✅ Onboarding completed successfully!')
-
-                                    // First, close the onboarding modal immediately
-                                    setIsOnboardingModalOpen(false)
-                                    localStorage.setItem('isOnboarded', 'true')
-
-                                    // Invalidate and refetch user data in background
-                                    queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                                    queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
-
-                                    // Wait a bit for the modal to close, then start the guided tour
-                                    setTimeout(() => {
-                                      setIsWalkthroughOpen(true)
-                                    }, 500) // Small delay to ensure modal closes first
-                                  } else {
-                                    const errorText = await response.text().catch(() => 'Unknown error')
-                                    console.error('❌ Failed to complete onboarding:', errorText)
-                                    throw new Error(`Failed to complete onboarding: ${response.status}`)
-                                  }
-                                } catch (error) {
-                                  console.error('❌ Onboarding completion error:', error)
-                                  throw error // Re-throw to let OnboardingFlow handle it
-                                }
-                              }}
-                            />
-                          )}
-                      </div>
-                    ) : userDataLoading ? (
-                      <LoadingSpinner type="dashboard" />
-                    ) : user && !userData && !userDataLoading && userDataError ? (
-                      String(userDataError).includes('404') ? (
-                        <AccountNotFoundBanner
-                          onSignup={() => setLocation('/signup')}
-                          onSignOut={() => { getAuth().signOut(); setLocation('/signin') }}
-                          onAssociate={async () => {
-                            try {
-                              await apiRequest('/api/auth/associate-uid', { method: 'POST' })
-                              queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                              window.location.reload()
-                            } catch { }
-                          }}
-                        />
-                      ) : (
-                        // If user exists but userData failed to load after retries, show error
-                        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
-                          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-                            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                              </svg>
-                            </div>
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                              Unable to Load Account
-                            </h2>
-                            <p className="text-gray-600 dark:text-gray-400 mb-6">
-                              We're having trouble loading your account. This might be a temporary issue.
-                            </p>
-                            <div className="space-y-3">
-                              <button
-                                onClick={() => {
-                                  queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                                  window.location.reload()
-                                }}
-                                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                Try Again
-                              </button>
-                              <button
-                                onClick={() => {
-                                  getAuth().signOut()
-                                  setLocation('/signin')
-                                }}
-                                className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                              >
-                                Sign Out and Try Again
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    ) : (
-                      <LoadingSpinner type="dashboard" />
-                    )}
-                  </Route>
-
-                  {/* Catch-all route - 404 for unmatched routes */}
-                  <Route>
-                    {() => {
-                      // For authenticated users loading
-                      if (user && !userData && userDataLoading) {
-                        return <LoadingSpinner type="dashboard" />
-                      }
-                      if (user && userData && !userData.isOnboarded) {
-                        setLocation('/')
-                        return <LoadingSpinner type="dashboard" />
-                      }
-                      // For all users (including unauthenticated), show 404 for unmatched routes
-                      return (
-                        <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">
-                          <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-                            <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <h2 className="text-xl font-semibold text-white mb-2">
-                              Page Not Found
-                            </h2>
-                            <p className="text-white/60 mb-6">
-                              The page you're looking for doesn't exist or has been moved.
-                            </p>
-                            <button
-                              onClick={() => setLocation('/')}
-                              className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                            >
-                              Go to Home
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    }}
-                  </Route>
-
-                </Switch>
-              )}
-
-              {/* Guided Tour */}
-              <GuidedTour
-                isActive={isWalkthroughOpen}
-                onClose={() => setIsWalkthroughOpen(false)}
-              />
-
-              {/* P6: Toast notifications container */}
-              <ToastContainer position="top-right" />
-            </>
-          </RealtimeProvider>
+            ) : isPublicRoute ? (
+              <div className="min-h-screen">
+                {renderPublicPage()}
+              </div>
+            ) : (
+              <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">
+                <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+                  <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white mb-2">
+                    Page Not Found
+                  </h2>
+                  <p className="text-white/60 mb-6">
+                    The page you're looking for doesn't exist or has been moved.
+                  </p>
+                  <button
+                    onClick={() => setLocation('/')}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+                  >
+                    Go Home
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <ToastContainer position="top-right" />
+          </>
         </WaitlistProvider>
       </P6Provider>
     </AdaptiveAnimationProvider>
