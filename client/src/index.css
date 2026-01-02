@@ -631,3 +631,83 @@ html.dark .lazy-placeholder {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* =========================================
+   60FPS SCROLL PERFORMANCE OPTIMIZATIONS
+   ========================================= */
+
+/* Force GPU compositing for motion elements */
+.will-change-transform {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Optimized animation layer */
+.gpu-layer {
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+}
+
+/* Scroll container optimization */
+.scroll-optimized {
+  overflow-anchor: none;
+  overscroll-behavior: contain;
+}
+
+/* Prevent layout thrashing during scroll */
+.scroll-section {
+  contain: layout style paint;
+  transform: translateZ(0);
+}
+
+/* Optimize sticky elements for scroll performance */
+.sticky {
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Reduce backdrop-filter impact on mobile */
+@media (max-width: 768px) {
+  .backdrop-blur-lg,
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
+  
+  .backdrop-blur-md {
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+}
+
+/* Intersection observer optimization - prevent flash */
+[data-inview] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Smooth scroll for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Optimize framer-motion animations */
+[style*="will-change"] {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
