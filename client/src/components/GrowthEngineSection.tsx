@@ -40,11 +40,9 @@ const FeatureCard = React.memo(({ feature, index, isLeft }: { feature: FeatureTy
             style={{ perspective: 1000, ...GPU_ACCELERATED_STYLES }}
         >
             <div className={`hidden lg:block absolute top-1/2 ${isLeft ? '-right-24' : '-left-24'} w-24 h-[2px] bg-white/5 overflow-hidden`}>
-                <motion.div
-                    className={`w-full h-full bg-gradient-to-${isLeft ? 'r' : 'l'} from-transparent via-indigo-500 to-transparent`}
-                    animate={{ x: isLeft ? ['-100%', '100%'] : ['100%', '-100%'] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: index * 0.5 }}
-                    style={GPU_ACCELERATED_STYLES}
+                <div
+                    className={`w-full h-full bg-gradient-to-${isLeft ? 'r' : 'l'} from-transparent via-indigo-500 to-transparent animate-[shimmer-slide_2s_ease-in-out_infinite]`}
+                    style={{ ...GPU_ACCELERATED_STYLES, animationDelay: `${index * 0.5}s` }}
                 />
             </div>
 
@@ -116,55 +114,12 @@ const GrowthEngineSection = () => {
         }
     ], []);
 
-    const particleData = useMemo(() => 
-        [...Array(30)].map(() => ({
-            initialX: Math.random() * 1500 - 750,
-            initialY: Math.random() * 1000 - 500,
-            animateY: Math.random() * -200,
-            duration: Math.random() * 5 + 8,
-            delay: Math.random() * 5,
-        })), []
-    );
-
-    const orbitingNodeData = useMemo(() => 
-        [0, 1, 2, 3].map((index) => ({
-            startX: Math.cos(index * 1.5) * 100,
-            endX: Math.cos(index * 1.5 + Math.PI) * 100,
-            startY: Math.sin(index * 1.5) * 100,
-            endY: Math.sin(index * 1.5 + Math.PI) * 100,
-            delay: index * 1.2,
-        })), []
-    );
 
     return (
         <section className="py-24 md:py-32 relative w-full overflow-hidden bg-black" style={GPU_ACCELERATED_STYLES}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/10 via-black to-black" />
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px] [mask-image:radial-gradient(circle_at_center,black_40%,transparent_100%)] pointer-events-none opacity-50" />
 
-            {particleData.map((particle, i) => (
-                <motion.div
-                    key={i}
-                    className="absolute w-1 h-1 bg-indigo-500/30 rounded-full"
-                    initial={{
-                        x: particle.initialX,
-                        y: particle.initialY,
-                        opacity: 0,
-                        scale: 0
-                    }}
-                    animate={{
-                        y: [particle.initialY, particle.initialY + particle.animateY],
-                        opacity: [0, 0.8, 0],
-                        scale: [0, 1.5, 0]
-                    }}
-                    transition={{
-                        duration: particle.duration,
-                        repeat: Infinity,
-                        delay: particle.delay,
-                        ease: "linear"
-                    }}
-                    style={{ left: '50%', top: '50%', ...GPU_ACCELERATED_STYLES }}
-                />
-            ))}
 
             <div className="max-w-7xl mx-auto px-6 relative z-10">
 
@@ -195,22 +150,17 @@ const GrowthEngineSection = () => {
                     <div className="relative w-full lg:w-1/3 flex justify-center order-1 lg:order-2 py-8 sm:py-12 lg:py-0">
                         <div className="relative w-56 h-56 sm:w-72 sm:h-72 md:w-96 md:h-96" style={GPU_ACCELERATED_STYLES}>
 
-                            <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                                className="absolute inset-0 rounded-full border border-dashed border-indigo-500/20"
+                            {/* Use CSS animations instead of Framer Motion for orbit rings - more efficient */}
+                            <div
+                                className="absolute inset-0 rounded-full border border-dashed border-indigo-500/20 animate-[spin_30s_linear_infinite]"
                                 style={GPU_ACCELERATED_STYLES}
                             />
-                            <motion.div
-                                animate={{ rotate: -360 }}
-                                transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-                                className="absolute inset-8 rounded-full border border-dotted border-cyan-500/20"
+                            <div
+                                className="absolute inset-8 rounded-full border border-dotted border-cyan-500/20 animate-[spin_40s_linear_infinite_reverse]"
                                 style={GPU_ACCELERATED_STYLES}
                             />
-                            <motion.div
-                                animate={{ rotate: 180 }}
-                                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                                className="absolute inset-16 rounded-full border border-white/5"
+                            <div
+                                className="absolute inset-16 rounded-full border border-white/5 animate-[spin_25s_linear_infinite]"
                                 style={GPU_ACCELERATED_STYLES}
                             />
 
@@ -218,23 +168,15 @@ const GrowthEngineSection = () => {
                                 <Hexagon className="w-full h-full text-indigo-500" strokeWidth={0.5} />
                              </div>
 
-                            <div className="absolute inset-0 rounded-full bg-indigo-500/5 blur-2xl animate-pulse" />
+                            <div className="absolute inset-0 rounded-full bg-indigo-500/5 blur-2xl" />
 
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <motion.div 
-                                    whileHover={{ scale: 1.05 }}
-                                    className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-56 md:h-56 rounded-full bg-black/80 backdrop-blur-sm border border-indigo-500/30 shadow-[0_0_60px_rgba(79,70,229,0.15)] flex items-center justify-center group cursor-pointer z-20 overflow-hidden"
+                                <div 
+                                    className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-56 md:h-56 rounded-full bg-black/80 backdrop-blur-sm border border-indigo-500/30 shadow-[0_0_60px_rgba(79,70,229,0.15)] flex items-center justify-center group cursor-pointer z-20 overflow-hidden hover:scale-105 transition-transform duration-300"
                                     style={GPU_ACCELERATED_STYLES}
                                 >
 
                                     <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-purple-500/10 group-hover:opacity-100 transition-opacity" />
-
-                                    <motion.div
-                                        className="absolute inset-0 bg-gradient-to-b from-transparent via-indigo-400/10 to-transparent h-[20%]"
-                                        animate={{ top: ['-20%', '120%'] }}
-                                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                                        style={GPU_ACCELERATED_STYLES}
-                                    />
                                     
                                      <div className="absolute inset-2 border border-dashed border-indigo-500/10 rounded-full animate-[spin_10s_linear_infinite]" style={GPU_ACCELERATED_STYLES} />
 
@@ -245,28 +187,8 @@ const GrowthEngineSection = () => {
                                         <div className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-indigo-300 uppercase tracking-[0.15em] sm:tracking-[0.2em] mb-0.5 sm:mb-1">Central Intelligence</div>
                                         <div className="text-base sm:text-lg md:text-2xl font-bold text-white leading-tight">Adaptive<br />Growth Loop</div>
                                     </div>
-                                </motion.div>
+                                </div>
                             </div>
-
-                            {orbitingNodeData.map((node, i) => (
-                                <motion.div
-                                    key={i}
-                                    className="absolute w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full shadow-[0_0_15px_rgba(255,255,255,0.8)] z-10 hidden sm:block"
-                                    animate={{
-                                        x: [node.startX, node.endX],
-                                        y: [node.startY, node.endY],
-                                        scale: [1, 0.5, 1],
-                                        opacity: [1, 0.3, 1]
-                                    }}
-                                    transition={{
-                                        duration: 5,
-                                        repeat: Infinity,
-                                        delay: node.delay,
-                                        ease: "easeInOut"
-                                    }}
-                                    style={{ top: '50%', left: '50%', ...GPU_ACCELERATED_STYLES }}
-                                />
-                            ))}
                         </div>
                     </div>
 
