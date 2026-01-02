@@ -1,8 +1,8 @@
-import { Suspense, lazy, memo, Component, ErrorInfo, ReactNode } from 'react'
+import { memo, Component, ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import AppWrapper from './AppWrapper'
 
-// Simple error boundary for the app
 class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
     super(props)
@@ -41,20 +41,10 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
   }
 }
 
-const FullApp = lazy(() => import('./AppWrapper'))
-
-import LoadingSpinner from './components/LoadingSpinner'
-
-const AppLoader = () => <LoadingSpinner type="default" />
-
-// Always render FullApp - let wouter handle all routing internally
-// This prevents the dual-routing issue where main.tsx and wouter competed
 const Router = memo(() => {
   return (
     <AppErrorBoundary>
-      <Suspense fallback={<AppLoader />}>
-        <FullApp />
-      </Suspense>
+      <AppWrapper />
     </AppErrorBoundary>
   )
 })

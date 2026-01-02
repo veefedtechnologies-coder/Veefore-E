@@ -97,6 +97,9 @@ The app includes a comprehensive mobile performance optimization system for ligh
   - RealtimeProvider (Socket.IO) only loads for authenticated users, not marketing visitors
   - Unauthenticated users visiting landing page no longer download dashboard code
   - Added redirect effect to send unauthenticated users to /signin when accessing protected routes
+  - Fixed loading spinner issue: Added `effectiveLocation` fallback for empty initial location, changed guard to `!isPublicRoute` to prevent spinner on public routes during auth initialization
+  - Removed lazy loading of AppWrapper in main.tsx for direct synchronous import
+  - Removed RouteSuspense wrapper from AppWrapper for faster initial render
 
 - **Initial App Loading Speed Optimization**: Improved initial page load and reduced CLS from 1.37ms (poor) to 0.00ms (good):
   - Created `LazySection` component (`client/src/components/ui/lazy-section.tsx`) with IntersectionObserver-based deferred loading
