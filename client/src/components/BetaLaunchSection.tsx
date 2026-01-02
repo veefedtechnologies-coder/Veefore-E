@@ -914,7 +914,7 @@ SignupSection.displayName = 'SignupSection';
 // ============================================
 function BetaLaunchSection() {
     return (
-        <div className="bg-[#020408] min-h-screen">
+        <div className="bg-[#020408] min-h-screen overflow-x-clip">
             <Hero3D />
             <ScrollZoomIntro />
             <UrgencySection />
