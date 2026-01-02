@@ -25,30 +25,32 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
     return 100;
   });
 
+  // Use lighter spring for smooth but fast transitions
   const x = useSpring(targetX as any, {
-    stiffness: 180,
-    damping: 28,
-    mass: 0.35
+    stiffness: 80,
+    damping: 20,
+    mass: 1
   });
 
   const xWithUnits = useTransform(x, (value) => `${value}vw`);
 
+  // Lighter springs for scale/opacity - less solver overhead
   const scale = useSpring(
     useTransform(activeIndex, (current: number) => {
       if (index < current) return 0.9;
-      if (index > current) return 1.1; // Parallax scale for incoming
+      if (index > current) return 1.1;
       return 1;
     }) as any,
-    { stiffness: 200, damping: 30, mass: 0.3 }
+    { stiffness: 80, damping: 20, mass: 1 }
   );
 
   const opacity = useSpring(
     useTransform(activeIndex, (current: number) => {
-      if (index < current) return 0; // Fade out completely
-      if (index > current) return 0; // Incoming starts invisible
+      if (index < current) return 0;
+      if (index > current) return 0;
       return 1;
     }) as any,
-    { stiffness: 200, damping: 30, mass: 0.3 }
+    { stiffness: 80, damping: 20, mass: 1 }
   );
 
   const zIndex = useTransform(activeIndex, (current: number) => {

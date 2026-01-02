@@ -214,7 +214,7 @@ const CreditSystemSection = () => {
                                             className="h-full bg-gradient-to-r from-amber-600 to-amber-400 origin-left"
                                             initial={{ scaleX: 0 }}
                                             animate={{ scaleX: credits / 5000 }}
-                                            transition={{ type: "spring", stiffness: 220, damping: 28, mass: 0.3 }}
+                                            transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                                             style={GPU_ACCELERATED_STYLES}
                                         />
                                     </div>
