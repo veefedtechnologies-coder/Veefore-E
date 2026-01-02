@@ -465,23 +465,24 @@ html.dark .glass {
 }
 
 @media (max-width: 768px) {
-  .gradient-orb, .fallback-orb, .hero-text-blur, .hero-text-no-blur {
-    filter: none !important;
-    backdrop-filter: none !important;
+  /* Reduced blur values on mobile for performance while keeping visual effects */
+  .gradient-orb {
+    filter: blur(60px);
   }
 
-  .backdrop-blur-sm,
-  .backdrop-blur-md,
-  .backdrop-blur-lg,
+  .fallback-orb {
+    filter: blur(50px);
+  }
+
+  /* Backdrop blur allowed on mobile with slightly reduced intensity */
   .backdrop-blur-xl,
   .backdrop-blur-2xl,
   .backdrop-blur-3xl {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background-color: rgba(0, 0, 0, 0.4) !important; /* Fallback for transparency */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
-  .blur-sm, .blur-md, .blur-lg, .blur-xl, .blur-2xl, .blur-3xl {
+  .blur-xl, .blur-2xl, .blur-3xl {
     filter: none !important;
   }
 }
