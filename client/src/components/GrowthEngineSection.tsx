@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Sparkles, Clock, Eye, RefreshCw, Cpu, Activity, Hexagon } from 'lucide-react';
-import { VIEWPORT_ONCE, GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
+import { GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
 
 interface FeatureType {
     icon: React.ComponentType<{ className?: string }>;
@@ -33,12 +33,8 @@ const FeatureCard = React.memo(({ feature, index, isLeft }: { feature: FeatureTy
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: isLeft ? -50 : 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={VIEWPORT_ONCE}
-            transition={{ delay: index * 0.2 }}
-            className="group relative perspective-1000"
+        <div
+            className="group relative"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             style={{ perspective: 1000, ...GPU_ACCELERATED_STYLES }}
@@ -74,7 +70,7 @@ const FeatureCard = React.memo(({ feature, index, isLeft }: { feature: FeatureTy
                     </div>
                 </div>
             </motion.div>
-        </motion.div>
+        </div>
     );
 });
 
@@ -173,26 +169,19 @@ const GrowthEngineSection = () => {
             <div className="max-w-7xl mx-auto px-6 relative z-10">
 
                 <div className="text-center mb-16 md:mb-24">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={VIEWPORT_ONCE}
+                    <div
                         className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4"
                         style={GPU_ACCELERATED_STYLES}
                     >
                         <Cpu className="w-3 h-3" />
                         <span>Core Support Systems</span>
-                    </motion.div>
-                    <motion.h2
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={VIEWPORT_ONCE}
-                        transition={{ delay: 0.1 }}
+                    </div>
+                    <h2
                         className="text-3xl md:text-5xl font-bold tracking-tight mb-4"
                         style={GPU_ACCELERATED_STYLES}
                     >
                         Features that <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Enable Growth</span>
-                    </motion.h2>
+                    </h2>
                 </div>
 
                 <div className="relative flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-24">
@@ -289,11 +278,7 @@ const GrowthEngineSection = () => {
 
                 </div>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={VIEWPORT_ONCE}
-                    transition={{ delay: 0.4 }}
+                <div
                     className="mt-20 md:mt-32 max-w-5xl mx-auto"
                     style={GPU_ACCELERATED_STYLES}
                 >
@@ -329,7 +314,7 @@ const GrowthEngineSection = () => {
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </div>
 
             </div>
         </section>
