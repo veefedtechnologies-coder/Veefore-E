@@ -64,8 +64,8 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
       style={{ x: xWithUnits, zIndex, scale, opacity, ...GPU_ACCELERATED_STYLES }}
       className="absolute inset-0 h-screen w-screen flex items-center justify-center overflow-hidden bg-black"
     >
-      {/* Background with blur effects restored */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-[0.08] blur-3xl`} />
+      {/* Background - simplified for performance */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-[0.08]`} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#000_100%)]" />
 
       {/* Responsive Container */}
@@ -74,8 +74,8 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
 
           {/* Left: Text Content */}
           <div className="flex flex-col justify-center order-2 lg:order-1 z-10">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 w-fit mb-4 md:mb-6 backdrop-blur-md">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 w-fit mb-4 md:mb-6">
+              <span className="w-2 h-2 rounded-full bg-white" />
               <span className="text-[10px] md:text-xs font-bold tracking-widest text-white/60 uppercase">Feature 0{index + 1}</span>
             </div>
 
@@ -87,7 +87,7 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
               {feature.tagline}
             </p>
 
-            <div className="p-5 md:p-8 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md shadow-xl">
+            <div className="p-5 md:p-8 rounded-2xl bg-black/60 border border-white/10 shadow-xl">
               <p className="text-white/80 mb-6 leading-relaxed text-sm md:text-lg">
                 {feature.description}
               </p>
@@ -106,7 +106,7 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
           {/* Fixed aspect ratio container that scales with screen width */}
           <div className="relative w-full h-auto aspect-auto md:max-h-[60vh] order-1 lg:order-2 flex items-center justify-center z-10 mb-6 md:mb-0">
             {/* Visual container with blur effects */}
-            <div className="relative w-full h-auto bg-gradient-to-tr from-white/10 to-white/0 rounded-xl md:rounded-[2rem] border border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl p-0.5 md:p-1 transform transition-transform hover:scale-[1.02] duration-500">
+            <div className="relative w-full h-auto bg-gradient-to-tr from-white/10 to-white/0 rounded-xl md:rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl p-0.5 md:p-1 transform transition-transform hover:scale-[1.02] duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 pointer-events-none" />
               <div className="w-full h-auto rounded-[0.7rem] md:rounded-[1.9rem] overflow-hidden flex items-center justify-center bg-black/60">
                 <div className="w-full h-auto flex items-center justify-center">
@@ -115,9 +115,9 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
               </div>
             </div>
 
-            {/* Glows with enhanced blur */}
-            <div className={`absolute -top-10 -right-10 w-40 h-40 md:w-64 md:h-64 bg-gradient-to-br ${feature.gradient} rounded-full blur-[100px] md:blur-[150px] opacity-40 pointer-events-none`} />
-            <div className={`absolute -bottom-10 -left-10 w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr ${feature.gradient} rounded-full blur-[80px] md:blur-[120px] opacity-30 pointer-events-none`} />
+            {/* Glows - simplified for performance */}
+            <div className={`absolute -top-10 -right-10 w-40 h-40 md:w-64 md:h-64 bg-gradient-to-br ${feature.gradient} rounded-full opacity-20 pointer-events-none`} />
+            <div className={`absolute -bottom-10 -left-10 w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr ${feature.gradient} rounded-full opacity-15 pointer-events-none`} />
           </div>
         </div>
       </div>

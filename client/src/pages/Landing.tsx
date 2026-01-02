@@ -325,7 +325,7 @@ const EngagementPageContent = memo(() => (
           </div>
         </div>
         <div className="px-3 py-1.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium flex items-center space-x-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-green-400" />
           <span>Active</span>
         </div>
       </div>
@@ -1720,7 +1720,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                           <p className="text-2xl text-white/90 font-semibold tracking-wide flex items-center gap-2">
                             Efficiency Score
                             <span className="relative flex h-2.5 w-2.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                             </span>
                           </p>
@@ -1816,7 +1816,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <div
               className="inline-flex items-center space-x-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] md:text-xs font-bold text-red-400 uppercase tracking-widest mb-4 md:mb-6"
             >
-              <span className="flex h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-red-500 animate-pulse mr-1.5 md:mr-2" />
+              <span className="flex h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-red-500 mr-1.5 md:mr-2" />
               <span>The Real Problem</span>
             </div>
             <h2

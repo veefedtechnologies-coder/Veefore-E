@@ -185,7 +185,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
             {feature.screen.type === 'sales' && (
                 <div className={`h-full flex flex-col justify-center ${isMobile ? 'space-y-3 sm:space-y-4 px-1 sm:px-2' : 'space-y-6 md:space-y-8 px-4 md:px-12'}`}>
                     <div className={`text-center ${isMobile ? 'mb-1 sm:mb-2' : 'mb-4 md:mb-6'}`}>
-                        <div className={`${isMobile ? 'w-10 h-10 sm:w-12 sm:h-12 mb-2 sm:mb-3' : 'w-16 h-16 md:w-20 md:h-20 mb-4 md:mb-6'} bg-green-500/20 rounded-full flex items-center justify-center mx-auto animate-pulse`}>
+                        <div className={`${isMobile ? 'w-10 h-10 sm:w-12 sm:h-12 mb-2 sm:mb-3' : 'w-16 h-16 md:w-20 md:h-20 mb-4 md:mb-6'} bg-green-500/20 rounded-full flex items-center justify-center mx-auto`}>
                             <DollarSign className={`${isMobile ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-8 h-8 md:w-10 md:h-10'} text-green-400`} />
                         </div>
                         <h4 className={`font-bold ${isMobile ? 'text-sm sm:text-base' : 'text-xl md:text-2xl'}`}>{feature.screen.title}</h4>
@@ -200,7 +200,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                                 <div className={`${isMobile ? 'w-5 h-5 sm:w-6 sm:h-6 border' : 'w-8 h-8 md:w-10 md:h-10 border-2'} rounded-full flex items-center justify-center shrink-0 ${step.status === 'complete' ? 'bg-green-500 border-green-500' : 'bg-transparent border-green-500/30'
                                     }`}>
                                     {step.status === 'complete' && <CheckCircle className={`${isMobile ? 'w-2.5 h-2.5 sm:w-3 sm:h-3' : 'w-4 h-4 md:w-5 md:h-5'} text-white`} />}
-                                    {step.status === 'active' && <div className={`${isMobile ? 'w-1.5 h-1.5 sm:w-2 sm:h-2' : 'w-2.5 h-2.5 md:w-3 md:h-3'} bg-green-500 rounded-full animate-ping`} />}
+                                    {step.status === 'active' && <div className={`${isMobile ? 'w-1.5 h-1.5 sm:w-2 sm:h-2' : 'w-2.5 h-2.5 md:w-3 md:h-3'} bg-green-500 rounded-full`} />}
                                 </div>
                                 <span className={`${isMobile ? 'text-[9px] sm:text-[10px]' : 'text-sm md:text-base'} ${step.status === 'active' ? 'text-white font-medium' : 'text-white/50'}`}>
                                     {step.text}
@@ -211,8 +211,8 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                 </div>
             )}
 
-            <div className={`absolute -bottom-32 -right-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48 blur-[15px] sm:blur-[20px]' : 'w-60 h-60 md:w-80 md:h-80 blur-[20px] md:blur-[30px]'} ${colors.bg} rounded-full pointer-events-none`} />
-            <div className={`absolute -top-32 -left-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48 blur-[15px] sm:blur-[20px]' : 'w-60 h-60 md:w-80 md:h-80 blur-[20px] md:blur-[30px]'} ${colors.bgLight} rounded-full pointer-events-none`} />
+            <div className={`absolute -bottom-32 -right-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48' : 'w-60 h-60 md:w-80 md:h-80'} ${colors.bg} rounded-full pointer-events-none opacity-50`} />
+            <div className={`absolute -top-32 -left-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48' : 'w-60 h-60 md:w-80 md:h-80'} ${colors.bgLight} rounded-full pointer-events-none opacity-50`} />
         </div>
     );
 });
