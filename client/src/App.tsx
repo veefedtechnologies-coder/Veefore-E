@@ -212,13 +212,7 @@ function App() {
               <CookieConsentBanner />
             </React.Suspense>
 
-            {!user && isPublicRoute && effectiveLocation !== '/' ? (
-              <div className="min-h-screen">
-                {renderPublicPage()}
-              </div>
-            ) : !user && effectiveLocation === '/' ? (
-              <Landing onNavigate={handleNavigate} />
-            ) : user ? (
+            {user ? (
               <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
                 <AuthenticatedApp />
               </React.Suspense>
