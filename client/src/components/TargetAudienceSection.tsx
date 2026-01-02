@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Rocket,
@@ -9,8 +9,6 @@ import {
   BarChart3,
   Layers,
   Target,
-  Instagram,
-  Smartphone,
   Sparkles,
   Battery,
   Signal,
@@ -43,34 +41,27 @@ const TargetAudienceSection = () => {
           {/* LEFT SIDE: Narrative & Selection */}
           <div className="w-full lg:w-5/12 space-y-6 md:space-y-12 text-center lg:text-left">
             <div>
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
+              <div
                 className="inline-flex items-center space-x-2 text-purple-400 font-medium text-xs mb-4 md:mb-6 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20"
               >
                 <Sparkles className="w-3 h-3" />
                 <span>AUDIENCE FIT CHECK</span>
-              </motion.div>
+              </div>
 
-              <motion.h2
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+              <h2
                 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4 md:mb-6 leading-tight"
               >
                 Built for the <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
                   Modern Creator.
                 </span>
-              </motion.h2>
+              </h2>
 
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
+              <p
                 className="text-base md:text-lg text-gray-400 leading-relaxed max-w-md mx-auto lg:mx-0"
               >
                 VeeFore replaces guesswork with a predictable growth system. Designed for creators and brands treating content as a scalable business.
-              </motion.p>
+              </p>
             </div>
 
             {/* Interactive Selector - Compact Grid on Mobile */}
@@ -135,9 +126,7 @@ const TargetAudienceSection = () => {
 
           {/* RIGHT SIDE: The "Creator Dashboard" Visual */}
           <div className="w-full lg:w-7/12 relative flex justify-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
+            <div
               className={`
                 relative overflow-hidden shadow-2xl shadow-black/50 bg-[#0F1117] border border-white/10 transition-all duration-500
                 /* Desktop Styles: Landscape Window */
@@ -379,7 +368,7 @@ const TargetAudienceSection = () => {
                 animate={{ top: ['0%', '100%'] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               />
-            </motion.div>
+            </div>
 
             {/* Background Decorative Graphic */}
             <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] opacity-20 pointer-events-none">
