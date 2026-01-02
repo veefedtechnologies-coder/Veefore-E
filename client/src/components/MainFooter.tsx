@@ -4,7 +4,7 @@ import { useWaitlist } from '../context/WaitlistContext';
 import { Twitter, Instagram, Linkedin, ArrowRight, Sparkles, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 const MainFooter = () => {
-    const [location] = useLocation();
+    const [location, setLocation] = useLocation();
     const { openWaitlist } = useWaitlist();
     const [email, setEmail] = useState('');
     const [isSubscribed, setIsSubscribed] = useState(false);
@@ -211,13 +211,13 @@ const MainFooter = () => {
             <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
             {/* Main CTA Section */}
-            <div className="relative z-10 py-16 sm:py-20 px-4 sm:px-6">
+            <div className="relative z-10 py-10 sm:py-20 px-4 sm:px-6">
                 <div className="max-w-4xl mx-auto text-center">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-white/10 mb-6">
                         <Sparkles className="w-4 h-4 text-blue-400" />
                         <span className="text-sm font-medium text-white/70">Join 500+ creators on the waitlist</span>
                     </div>
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 leading-tight">
+                    <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 leading-tight">
                         Ready to <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">transform</span> your growth?
                     </h2>
                     <p className="text-white/50 text-base sm:text-lg max-w-2xl mx-auto mb-8">
@@ -237,16 +237,16 @@ const MainFooter = () => {
             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
             {/* Main Footer Content */}
-            <div className="relative z-10 py-12 sm:py-16 px-4 sm:px-6">
+            <div className="relative z-10 py-8 sm:py-16 px-4 sm:px-6">
                 <div className="max-w-7xl mx-auto">
-                    <div className="grid grid-cols-2 md:grid-cols-6 lg:grid-cols-12 gap-8 lg:gap-12">
+                    <div className="grid grid-cols-2 md:grid-cols-6 lg:grid-cols-12 gap-x-4 gap-y-8 lg:gap-12">
 
                         {/* Brand Column */}
                         <div className="col-span-2 md:col-span-6 lg:col-span-4 space-y-6">
-                            <Link href="/" className="inline-flex items-center gap-2.5 group">
-                                <img src="/veefore-logo.png" alt="Veefore" className="w-9 h-9 object-contain" />
-                                <span className="text-2xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent group-hover:from-blue-400 group-hover:to-purple-400 transition-all duration-300">Veefore</span>
-                            </Link>
+                            <div className="flex items-center gap-1 group cursor-pointer" onClick={() => setLocation('/')}>
+                                <img src="/veefore.svg" alt="Veefore" className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 object-contain" />
+                                <span className="text-lg sm:text-xl md:text-2xl font-bold -ml-1.5 tracking-tight bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent group-hover:from-blue-400 group-hover:to-purple-400 transition-all duration-300">eefore</span>
+                            </div>
                             <p className="text-white/50 text-sm leading-relaxed max-w-xs">
                                 AI-powered Growth Engine that actively increases engagement, reach, and visibility for creators — automatically.
                             </p>
@@ -279,7 +279,7 @@ const MainFooter = () => {
                         {/* Product Links */}
                         <div className="col-span-1 md:col-span-2 lg:col-span-2">
                             <h4 className="font-semibold text-white text-sm mb-4">Product</h4>
-                            <ul className="space-y-3">
+                            <ul className="space-y-2 sm:space-y-3">
                                 {footerLinks.product.map((link) => (
                                     <li key={link.path}>
                                         <Link
@@ -304,7 +304,7 @@ const MainFooter = () => {
                         {/* Company Links */}
                         <div className="col-span-1 md:col-span-2 lg:col-span-2">
                             <h4 className="font-semibold text-white text-sm mb-4">Company</h4>
-                            <ul className="space-y-3">
+                            <ul className="space-y-2 sm:space-y-3">
                                 {footerLinks.company.map((link) => (
                                     <li key={link.path}>
                                         <Link
@@ -321,7 +321,7 @@ const MainFooter = () => {
                         {/* Resources Links */}
                         <div className="col-span-1 md:col-span-2 lg:col-span-2">
                             <h4 className="font-semibold text-white text-sm mb-4">Resources</h4>
-                            <ul className="space-y-3">
+                            <ul className="space-y-2 sm:space-y-3">
                                 {footerLinks.resources.map((link) => (
                                     <li key={link.path}>
                                         <Link
@@ -338,7 +338,7 @@ const MainFooter = () => {
                         {/* Legal Links */}
                         <div className="col-span-1 md:col-span-2 lg:col-span-2">
                             <h4 className="font-semibold text-white text-sm mb-4">Legal</h4>
-                            <ul className="space-y-3">
+                            <ul className="space-y-2 sm:space-y-3">
                                 {footerLinks.legal.map((link) => (
                                     <li key={link.path}>
                                         <Link
@@ -354,7 +354,7 @@ const MainFooter = () => {
                     </div>
 
                     {/* Newsletter Section */}
-                    <div className="mt-12 sm:mt-16 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10 relative overflow-hidden">
+                    <div className="mt-8 sm:mt-16 p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10 relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-purple-500/5 pointer-events-none" />
                         <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
                             <div className="text-center lg:text-left">
