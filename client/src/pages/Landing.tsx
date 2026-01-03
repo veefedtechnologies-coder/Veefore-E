@@ -15,8 +15,7 @@ import { SEO, seoConfig } from '../lib/seo-optimization'
 import { MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 import { useIsMobile } from '../hooks/use-is-mobile';
 import GlassCard from '../components/GlassCard';
-import { MainNavigation } from '../components/MainNavigation';
-import MainFooter from '../components/MainFooter';
+// MainNavigation and MainFooter are rendered by App.tsx for all public pages
 
 // PERMANENT FIX: All sections now eagerly imported to eliminate async loading flickering
 // React.lazy() with Suspense causes brief fallback flashes when chunks load
@@ -831,9 +830,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%221%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22 opacity=%220.03%22/%3E%3C/svg%3E')] opacity-50" />
       </div>
 
-
-      <MainNavigation onNavigate={onNavigate} />
-
+      {/* MainNavigation is rendered by App.tsx */}
 
       {/* Hero Section */}
       <section className={`relative min-h-screen flex items-center justify-center pb-20 overflow-hidden ${isMobile ? 'pt-28' : 'pt-24'}`} style={{ marginTop: '-80px', paddingTop: isMobile ? 'calc(80px + 2rem)' : 'calc(80px + 6rem)' }}>
@@ -2284,11 +2281,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </MagneticButton>
           </motion.div>
         </div>
-      </section >
+      </section>
 
-      {/* Footer */}
-      <MainFooter />
-    </div >
+      {/* MainFooter is rendered by App.tsx */}
+    </div>
   )
 }
 
