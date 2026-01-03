@@ -630,15 +630,18 @@ app.use((req, res, next) => {
   try {
     const { initQueues } = await import('./lib/queue');
     const { initEmailWorker } = await import('./workers/email.worker');
-    const { getRedisClient } = await import('./lib/redis');
+    const { getRedisClient, getRateLimitRedisClient } = await import('./lib/redis');
 
-    // Connect to Redis
+    // Connect to Redis (Standard client for queues)
     const redis = getRedisClient();
+
+    // Connect to Redis (Fail-fast client for rate limiting)
+    const rateLimitRedis = getRateLimitRedisClient();
 
     // Initialize systems
     initQueues();
     initEmailWorker();
-    initializeRateLimiting(redis); // Connect rate limiter to Upstash
+    initializeRateLimiting(rateLimitRedis); // Connect rate limiter to fail-fast client
 
     console.log('[INFRA] Background workers and Rate Limiting connected to Redis');
   } catch (error) {
