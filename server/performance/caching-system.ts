@@ -37,6 +37,9 @@ interface CacheStats {
 /**
  * P5-1.2: Production Redis caching system
  */
+import { getRateLimitRedisClient } from '../lib/redis';
+// ... imports
+
 export class CachingSystem {
   private static redisClient: any;
   private static config: CacheConfig = {
@@ -57,33 +60,37 @@ export class CachingSystem {
   /**
    * P5-1.2a: Initialize caching system
    */
+  /**
+   * P5-1.2a: Initialize caching system
+   */
   static async initialize(): Promise<void> {
     try {
-      // Try to use existing Redis connection
-      if (process.env.REDIS_URL) {
-        const { createClient } = require('redis');
-        this.redisClient = createClient({ url: process.env.REDIS_URL });
-        
+      // Use the robust, fail-fast Redis client (reusing the rate limit client as it has the right profile: fail-fast, ipv4, tls)
+      this.redisClient = getRateLimitRedisClient();
+
+      if (this.redisClient) {
         this.redisClient.on('error', (err: Error) => {
-          logger.warn({
-            event: 'CACHE_REDIS_ERROR',
-            error: err.message
-          }, '⚠️ Redis cache error, falling back to in-memory cache');
+          // Only log unique errors to avoid flooding
+          if (!err.message.includes('fail-safe')) {
+            logger.warn({
+              event: 'CACHE_REDIS_ERROR',
+              error: err.message
+            }, '⚠️ Redis cache error (using fallback)');
+          }
           this.stats.errors++;
         });
 
-        this.redisClient.on('connect', () => {
+        // ioredis connects automatically. We can check status.
+        if (this.redisClient.status === 'ready' || this.redisClient.status === 'connecting') {
           logger.info({
             event: 'CACHE_REDIS_CONNECTED'
-          }, '🔐 P5-1: Redis caching system connected');
-        });
-
-        await this.redisClient.connect();
+          }, '🔐 P5-1: Redis caching system linked');
+        }
       } else {
         logger.info({
           event: 'CACHE_FALLBACK_MEMORY',
-          reason: 'Redis not configured'
-        }, '📱 P5-1: Using in-memory cache (Redis not available)');
+          reason: 'Redis client not initialized'
+        }, '📱 P5-1: Using in-memory cache');
       }
 
       // Setup cache cleanup interval
@@ -121,7 +128,7 @@ export class CachingSystem {
         if (cached) {
           result = JSON.parse(cached);
           this.stats.hits++;
-          
+
           StructuredLogger.metric(
             'cache_hit',
             1,
@@ -138,7 +145,7 @@ export class CachingSystem {
         if (memoryItem && this.isItemValid(memoryItem)) {
           result = memoryItem.data;
           this.stats.hits++;
-          
+
           StructuredLogger.metric(
             'cache_hit',
             1,
@@ -206,13 +213,13 @@ export class CachingSystem {
 
       if (this.redisClient) {
         // Set in Redis with TTL
-        await this.redisClient.setEx(fullKey, ttl, JSON.stringify(data));
-        
+        await this.redisClient.set(fullKey, JSON.stringify(data), 'EX', ttl);
+
         // Store tags for invalidation
         if (tags.length > 0) {
           for (const tag of tags) {
             const tagKey = `${this.config.keyPrefix}tags:${tag}`;
-            await this.redisClient.sAdd(tagKey, fullKey);
+            await this.redisClient.sadd(tagKey, fullKey);
             await this.redisClient.expire(tagKey, ttl);
           }
         }
@@ -306,8 +313,8 @@ export class CachingSystem {
 
       if (this.redisClient) {
         const tagKey = `${this.config.keyPrefix}tags:${tag}`;
-        const keys = await this.redisClient.sMembers(tagKey);
-        
+        const keys = await this.redisClient.smembers(tagKey);
+
         if (keys.length > 0) {
           await this.redisClient.del(...keys);
           await this.redisClient.del(tagKey);
@@ -527,7 +534,7 @@ export class CachingSystem {
 
     // This would typically pre-load frequently accessed data
     // For now, we'll just log that warming is available
-    
+
     logger.info({
       event: 'CACHE_WARMING_COMPLETED'
     }, '✅ P5-1: Cache warming completed');
@@ -541,11 +548,11 @@ export function cacheMiddleware(ttl: number = 300, tags: string[] = []) {
   return (req: Request, res: Response, next: NextFunction) => {
     // Generate cache key based on URL and query parameters
     const cacheKey = `route:${req.method}:${req.originalUrl}:${req.user?.id || 'anonymous'}`;
-    
+
     // Add cache helper to request
     req.cache = {
       get: (key: string) => CachingSystem.get(key, req.correlationId),
-      set: (key: string, data: any, customTTL?: number) => 
+      set: (key: string, data: any, customTTL?: number) =>
         CachingSystem.set(key, data, customTTL || ttl, tags, req.correlationId),
       delete: (key: string) => CachingSystem.delete(key, req.correlationId),
       invalidateByTag: (tag: string) => CachingSystem.invalidateByTag(tag, req.correlationId),
@@ -561,7 +568,7 @@ export function cacheMiddleware(ttl: number = 300, tags: string[] = []) {
  */
 export async function initializeCachingSystem(): Promise<void> {
   await CachingSystem.initialize();
-  
+
   // Setup metrics collection for cache performance
   setInterval(() => {
     const stats = CachingSystem.getStats();
