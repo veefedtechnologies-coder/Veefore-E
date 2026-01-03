@@ -14,10 +14,10 @@ import { Request, Response, NextFunction } from 'express';
 const getAllowedOrigins = (): string[] => {
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   // Base allowed origins
   const allowedOrigins: string[] = [];
-  
+
   if (isDevelopment) {
     // Development origins - local development
     allowedOrigins.push(
@@ -32,7 +32,7 @@ const getAllowedOrigins = (): string[] => {
       'https://61ac61b0-5835-4a08-a9df-b5bdf937f9b4-00-2ixvi7v9sb9yz.worf.replit.dev'
     );
   }
-  
+
   if (isProduction) {
     // Production origins - explicit domains only
     allowedOrigins.push(
@@ -47,13 +47,13 @@ const getAllowedOrigins = (): string[] => {
       'http://0.0.0.0:5000'
     );
   }
-  
+
   // Add Replit production domains if available
   const replitDomain = process.env.REPLIT_DEV_DOMAIN;
   if (replitDomain) {
     allowedOrigins.push(`https://${replitDomain}`);
   }
-  
+
   // Add any custom allowed origins from environment
   const customOrigins = process.env.ALLOWED_ORIGINS;
   if (customOrigins) {
@@ -64,30 +64,52 @@ const getAllowedOrigins = (): string[] => {
       }
     });
   }
-  
+
   console.log(`🔒 CORS: Configured ${allowedOrigins.length} allowed origins for ${process.env.NODE_ENV} environment`);
   return allowedOrigins;
 };
 
 /**
  * P1-5.1: Origin validation with security logging
+ * UPDATED: Added ngrok domain support for mobile development testing
  */
 function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
   if (!origin) {
     // Allow same-origin requests (no origin header)
     return true;
   }
-  
-  const isAllowed = allowedOrigins.includes(origin);
-  
-  if (!isAllowed) {
-    console.warn(`🚨 CORS SECURITY: Blocked unauthorized origin: ${origin}`);
-    console.warn(`🔒 CORS SECURITY: Allowed origins: ${allowedOrigins.join(', ')}`);
-  } else {
+
+  // Check exact match first
+  if (allowedOrigins.includes(origin)) {
     console.log(`✅ CORS SECURITY: Allowed origin: ${origin}`);
+    return true;
   }
-  
-  return isAllowed;
+
+  // In development, allow ngrok tunnels for mobile testing
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  if (isDevelopment) {
+    // Allow ngrok domains (*.ngrok-free.dev, *.ngrok.io, *.ngrok-free.app)
+    if (origin.includes('.ngrok-free.dev') ||
+      origin.includes('.ngrok.io') ||
+      origin.includes('.ngrok-free.app') ||
+      origin.includes('.ngrok.app')) {
+      console.log(`✅ CORS SECURITY: Allowed ngrok tunnel origin: ${origin}`);
+      return true;
+    }
+
+    // Allow localhost on any port
+    if (origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:') ||
+      origin.startsWith('http://0.0.0.0:')) {
+      console.log(`✅ CORS SECURITY: Allowed localhost origin: ${origin}`);
+      return true;
+    }
+  }
+
+  console.warn(`🚨 CORS SECURITY: Blocked unauthorized origin: ${origin}`);
+  console.warn(`🔒 CORS SECURITY: Allowed origins: ${allowedOrigins.join(', ')}`);
+
+  return false;
 }
 
 /**
@@ -110,7 +132,7 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
     maxAge = 86400, // 24 hours cache for preflight
     exposedHeaders = [
       'X-RateLimit-Limit',
-      'X-RateLimit-Remaining', 
+      'X-RateLimit-Remaining',
       'X-RateLimit-Reset',
       'X-Total-Count',
       'ETag',
@@ -118,7 +140,7 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
     ],
     allowedMethods = [
       'GET',
-      'POST', 
+      'POST',
       'PUT',
       'PATCH',
       'DELETE',
@@ -139,12 +161,12 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
       'If-None-Match'
     ]
   } = options;
-  
+
   const allowedOrigins = getAllowedOrigins();
-  
+
   return (req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin;
-    
+
     // P1-5.1: Origin validation with explicit allowlist
     if (origin && !isOriginAllowed(origin, allowedOrigins)) {
       return res.status(403).json({
@@ -153,39 +175,39 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
         timestamp: new Date().toISOString()
       });
     }
-    
+
     // P1-5.2: Set secure CORS headers
     if (origin && isOriginAllowed(origin, allowedOrigins)) {
       res.header('Access-Control-Allow-Origin', origin);
     }
-    
+
     // P1-5.2: Credentials handling (required for HTTP-only cookies)
     if (allowCredentials) {
       res.header('Access-Control-Allow-Credentials', 'true');
     }
-    
+
     // P1-5.3: Optimized preflight handling
     if (req.method === 'OPTIONS') {
       // Preflight request
       res.header('Access-Control-Allow-Methods', allowedMethods.join(', '));
       res.header('Access-Control-Allow-Headers', allowedHeaders.join(', '));
       res.header('Access-Control-Max-Age', maxAge.toString());
-      
+
       // P1-5.3: Additional preflight security headers
       res.header('Vary', 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-      
+
       console.log(`✅ CORS: Preflight response for ${origin} → ${req.headers['access-control-request-method']}`);
       return res.status(204).end();
     }
-    
+
     // P1-5.2: Expose headers for actual requests
     if (exposedHeaders.length > 0) {
       res.header('Access-Control-Expose-Headers', exposedHeaders.join(', '));
     }
-    
+
     // P1-5.2: Vary header for caching optimization
     res.header('Vary', 'Origin');
-    
+
     next();
   };
 }
@@ -196,7 +218,7 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
 export function strictCorsMiddleware(req: Request, res: Response, next: NextFunction) {
   const allowedOrigins = getAllowedOrigins();
   const origin = req.headers.origin;
-  
+
   // Require explicit origin for sensitive operations
   if (!origin) {
     console.warn('🚨 STRICT CORS: Missing origin header for sensitive endpoint');
@@ -205,14 +227,14 @@ export function strictCorsMiddleware(req: Request, res: Response, next: NextFunc
       code: 'CORS_ORIGIN_REQUIRED'
     });
   }
-  
+
   if (!isOriginAllowed(origin, allowedOrigins)) {
     return res.status(403).json({
       error: 'CORS policy violation: Unauthorized origin for sensitive endpoint',
       code: 'CORS_STRICT_DENIED'
     });
   }
-  
+
   console.log(`✅ STRICT CORS: Authorized origin for sensitive endpoint: ${origin}`);
   next();
 }
@@ -223,11 +245,11 @@ export function strictCorsMiddleware(req: Request, res: Response, next: NextFunc
 export function apiCorsMiddleware(req: Request, res: Response, next: NextFunction) {
   const allowedOrigins = getAllowedOrigins();
   const origin = req.headers.origin;
-  
+
   // Check for API-specific threats
   const userAgent = req.headers['user-agent'] || '';
   const referer = req.headers.referer || '';
-  
+
   // P1-5.2: Block suspicious requests
   const suspiciousPatterns = [
     /bot/i,
@@ -235,9 +257,9 @@ export function apiCorsMiddleware(req: Request, res: Response, next: NextFunctio
     /spider/i,
     /scraper/i
   ];
-  
+
   const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(userAgent));
-  
+
   if (isSuspicious && origin && !isOriginAllowed(origin, allowedOrigins)) {
     console.warn(`🚨 API CORS: Blocked suspicious request from ${origin} with UA: ${userAgent}`);
     return res.status(403).json({
@@ -245,14 +267,14 @@ export function apiCorsMiddleware(req: Request, res: Response, next: NextFunctio
       code: 'API_SECURITY_BLOCKED'
     });
   }
-  
+
   // P1-5.2: Validate referer for state-changing operations
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
     if (referer && origin) {
       try {
         const refererUrl = new URL(referer);
         const refererOrigin = `${refererUrl.protocol}//${refererUrl.host}`;
-        
+
         if (refererOrigin !== origin) {
           console.warn(`🚨 API CORS: Origin/Referer mismatch - Origin: ${origin}, Referer: ${refererOrigin}`);
           return res.status(403).json({
@@ -265,7 +287,7 @@ export function apiCorsMiddleware(req: Request, res: Response, next: NextFunctio
       }
     }
   }
-  
+
   next();
 }
 
@@ -276,12 +298,12 @@ export function corsMetricsMiddleware(req: Request, res: Response, next: NextFun
   const origin = req.headers.origin;
   const method = req.method;
   const userAgent = req.headers['user-agent'] || 'unknown';
-  
+
   // Log CORS activity for monitoring
   if (origin) {
     console.log(`📊 CORS METRICS: ${method} from ${origin} - UA: ${userAgent.substring(0, 50)}`);
   }
-  
+
   // Add CORS metrics to response headers for monitoring
   res.on('finish', () => {
     const statusCode = res.statusCode;
@@ -289,7 +311,7 @@ export function corsMetricsMiddleware(req: Request, res: Response, next: NextFun
       console.warn(`📊 CORS METRICS: Error ${statusCode} for origin ${origin} on ${method} ${req.path}`);
     }
   });
-  
+
   next();
 }
 
@@ -298,7 +320,7 @@ export function corsMetricsMiddleware(req: Request, res: Response, next: NextFun
  */
 export function corsContentSecurityPolicy(req: Request, res: Response, next: NextFunction) {
   const allowedOrigins = getAllowedOrigins();
-  
+
   // Build CSP connect-src from allowed origins
   const connectSrc = [
     "'self'",
@@ -312,19 +334,19 @@ export function corsContentSecurityPolicy(req: Request, res: Response, next: Nex
     'wss:',
     'ws:'
   ].join(' ');
-  
+
   // Set CSP header that complements CORS policy - allow Replit iframe in development
   const isDevelopment = process.env.NODE_ENV !== 'production';
-  const frameAncestors = isDevelopment ? 
+  const frameAncestors = isDevelopment ?
     `frame-ancestors 'self' https://replit.com https://*.replit.dev https://*.worf.replit.dev; ` :
     `frame-ancestors 'none'; `;
-    
-  res.header('Content-Security-Policy', 
+
+  res.header('Content-Security-Policy',
     `connect-src ${connectSrc}; ` +
     frameAncestors +
     `base-uri 'self';`
   );
-  
+
   next();
 }
 
@@ -333,12 +355,12 @@ export function corsContentSecurityPolicy(req: Request, res: Response, next: Nex
  */
 export function emergencyCorsLockdown(req: Request, res: Response, next: NextFunction) {
   const isLockdownActive = process.env.CORS_EMERGENCY_LOCKDOWN === 'true';
-  
+
   if (isLockdownActive) {
     const origin = req.headers.origin;
-    
+
     console.error(`🚨 EMERGENCY CORS LOCKDOWN: Blocking all cross-origin requests`);
-    
+
     if (origin) {
       return res.status(503).json({
         error: 'Service temporarily unavailable due to security lockdown',
@@ -347,7 +369,7 @@ export function emergencyCorsLockdown(req: Request, res: Response, next: NextFun
       });
     }
   }
-  
+
   next();
 }
 
@@ -357,7 +379,7 @@ export function emergencyCorsLockdown(req: Request, res: Response, next: NextFun
 export function corsHealthCheck(req: Request, res: Response) {
   const allowedOrigins = getAllowedOrigins();
   const origin = req.headers.origin;
-  
+
   res.json({
     cors: {
       status: 'active',

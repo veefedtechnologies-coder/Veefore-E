@@ -2,20 +2,16 @@ import { auth } from './firebase'
 
 // Get the correct API base URL based on current environment
 function getApiBaseUrl(): string {
-  // First check for environment variable (set in Vite config)
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  // First check for environment variable (Standardized name)
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
   }
-  
-  const currentHost = window.location.hostname;
-  
-  // If we're on a known production domain, use HTTPS explicitly
-  if (currentHost.includes('veefore.com')) {
-    return `https://${currentHost}`;
-  }
-  
-  // For all environments (localhost, Replit proxy, etc.), use window.location.origin
-  // This includes protocol, hostname, and port - ensuring proper URL construction
+
+  // In production (Vercel), if we are here, it means the user forgot the env var.
+  // HOWEVER, we might be using Vercel Rewrites. If so, relative path is fine.
+  // But if this is a cross-domain request (Vercel -> Render), we need the absolute URL.
+
+  // For development (or self-hosted), window.location.origin is a safe fallback.
   return window.location.origin;
 }
 
@@ -23,7 +19,7 @@ export class ApiClient {
   private static async getAuthToken(): Promise<string | null> {
     const user = auth.currentUser
     if (!user) return null
-    
+
     try {
       return await user.getIdToken()
     } catch (error) {
@@ -34,13 +30,13 @@ export class ApiClient {
 
   static async request(url: string, options: RequestInit = {}) {
     const token = await this.getAuthToken()
-    
+
     // Ensure URL is absolute
     if (!url.startsWith('http')) {
       const baseUrl = getApiBaseUrl();
       url = `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
     }
-    
+
     const headers = {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),

@@ -35,12 +35,12 @@ const FloatingOrb = memo(({
     className?: string;
 }) => {
     const isMobile = useIsMobile();
-    
+
     const mobileAnimation = useMemo(() => ({
         y: [0, -15, 0],
         scale: [1, 1.05, 1],
     }), []);
-    
+
     const desktopAnimation = useMemo(() => ({
         y: [0, -30, 0],
         x: [0, 15, 0],
@@ -75,7 +75,7 @@ FloatingOrb.displayName = 'FloatingOrb';
 const Perspective3D = memo(({ children, className }: { children: React.ReactNode; className?: string }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const isMobile = useIsMobile();
-    
+
     const rotateXMotion = useMotionValue(0);
     const rotateYMotion = useMotionValue(0);
     const smoothRotateX = useSpring(rotateXMotion, { stiffness: 300, damping: 30 });
@@ -364,9 +364,23 @@ const ScrollZoomIntro = memo(() => {
         offset: ["start end", "end end"]
     });
 
-    const smoothProgress = useSpring(scrollYProgress, {
-        stiffness: 50,
-        damping: 30,
+    const snappedProgress = useTransform(scrollYProgress, (latest: number) => {
+        const snapPoints = [0, 0.6, 1];
+        const snapStrength = 0.15; // Moderate snap for this section
+        for (const snap of snapPoints) {
+            const dist = Math.abs(latest - snap);
+            if (dist < snapStrength) {
+                const factor = dist / snapStrength;
+                const eased = factor * factor;
+                return snap + (latest - snap > 0 ? 1 : -1) * eased * snapStrength;
+            }
+        }
+        return latest;
+    });
+
+    const smoothProgress = useSpring(snappedProgress, {
+        stiffness: 220,
+        damping: 40,
         mass: 1
     });
 

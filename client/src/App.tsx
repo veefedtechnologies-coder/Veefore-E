@@ -5,8 +5,10 @@ import LoadingSpinner from './components/LoadingSpinner'
 import { initializeTheme } from './lib/theme'
 import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
 import { initializeAccessibilityCompliance, useAccessibilityRouteAnnouncements } from './lib/accessibility-compliance'
-import { initializeMobileExcellence } from './lib/mobile-excellence'
-import { AdaptiveAnimationProvider } from '@/lib/mobile-performance-optimizer'
+// DISABLED: initializeMobileExcellence was causing mobile flickering - see comment in useEffect below
+// import { initializeMobileExcellence } from './lib/mobile-excellence'
+// DISABLED: AdaptiveAnimationProvider had event listeners causing performance issues
+// import { AdaptiveAnimationProvider } from '@/lib/mobile-performance-optimizer'
 import { initializeSEO } from './lib/seo-optimization'
 import { initializeCoreWebVitals } from './lib/core-web-vitals'
 import { initializeComponentModernization } from './lib/component-modernization'
@@ -60,14 +62,14 @@ function App() {
   const themeInitialized = useRef(false)
   const p6Initialized = useRef(false)
   const accessibilityInitialized = useRef(false)
-  const mobileInitialized = useRef(false)
+  // const mobileInitialized = useRef(false)  // DISABLED with initializeMobileExcellence
   const seoInitialized = useRef(false)
   const webVitalsInitialized = useRef(false)
   const componentModernizationInitialized = useRef(false)
 
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
-  
+
   const handleNavigate = useCallback((page: string) => {
     setLocation(`/${page}`)
   }, [setLocation])
@@ -88,10 +90,12 @@ function App() {
         initializeAccessibilityCompliance()
         accessibilityInitialized.current = true
       }
-      if (!mobileInitialized.current) {
-        initializeMobileExcellence()
-        mobileInitialized.current = true
-      }
+      // DISABLED - mobile-excellence adds many event listeners, ResizeObservers,
+      // setIntervals, and class manipulations that cause flickering on mobile
+      // if (!mobileInitialized.current) {
+      //   initializeMobileExcellence()
+      //   mobileInitialized.current = true
+      // }
       if (!seoInitialized.current) {
         initializeSEO()
         seoInitialized.current = true
@@ -117,17 +121,17 @@ function App() {
         initAll()
       }
     }, 1500)
-    
+
     return () => clearTimeout(timer)
   }, [])
 
   const effectiveLocation = location || '/'
-  
-  const isPublicRoute = useMemo(() => publicRoutes.some(route => 
+
+  const isPublicRoute = useMemo(() => publicRoutes.some(route =>
     effectiveLocation === route || effectiveLocation.startsWith(route + '/')
   ), [effectiveLocation])
-  
-  const isProtectedRoute = useMemo(() => protectedRoutes.some(route => 
+
+  const isProtectedRoute = useMemo(() => protectedRoutes.some(route =>
     effectiveLocation === route || effectiveLocation.startsWith(route + '/')
   ), [effectiveLocation])
 
@@ -199,56 +203,50 @@ function App() {
   }
 
   return (
-    <AdaptiveAnimationProvider
-      autoMonitor={true}
-      autoDowngradeThreshold={25}
-      autoUpgradeThreshold={50}
-    >
-      <P6Provider>
-        <WaitlistProvider>
-          <>
-            <WaitlistModal />
-            <React.Suspense fallback={null}>
-              <CookieConsentBanner />
+    <P6Provider>
+      <WaitlistProvider>
+        <>
+          <WaitlistModal />
+          <React.Suspense fallback={null}>
+            <CookieConsentBanner />
+          </React.Suspense>
+
+          {user ? (
+            <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
+              <AuthenticatedApp />
             </React.Suspense>
-
-            {user ? (
-              <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
-                <AuthenticatedApp />
-              </React.Suspense>
-            ) : isPublicRoute ? (
-              <div className="min-h-screen">
-                {renderPublicPage()}
-              </div>
-            ) : (
-              <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">
-                <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-                  <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold text-white mb-2">
-                    Page Not Found
-                  </h2>
-                  <p className="text-white/60 mb-6">
-                    The page you're looking for doesn't exist or has been moved.
-                  </p>
-                  <button
-                    onClick={() => setLocation('/')}
-                    className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    Go Home
-                  </button>
+          ) : isPublicRoute ? (
+            <div className="min-h-screen">
+              {renderPublicPage()}
+            </div>
+          ) : (
+            <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">
+              <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+                <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
+                <h2 className="text-xl font-semibold text-white mb-2">
+                  Page Not Found
+                </h2>
+                <p className="text-white/60 mb-6">
+                  The page you're looking for doesn't exist or has been moved.
+                </p>
+                <button
+                  onClick={() => setLocation('/')}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Go Home
+                </button>
               </div>
-            )}
+            </div>
+          )}
 
-            <ToastContainer position="top-right" />
-          </>
-        </WaitlistProvider>
-      </P6Provider>
-    </AdaptiveAnimationProvider>
+          <ToastContainer position="top-right" />
+        </>
+      </WaitlistProvider>
+    </P6Provider>
   )
 }
 

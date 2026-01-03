@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Sparkles, Clock, Eye, RefreshCw, Cpu, Activity, Hexagon } from 'lucide-react';
-import { GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
+import { GPU_ACCELERATED_STYLES, MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 
 interface FeatureType {
     icon: React.ComponentType<{ className?: string }>;
@@ -37,12 +37,12 @@ const FeatureCard = React.memo(({ feature, index, isLeft }: { feature: FeatureTy
             className="group relative"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            style={{ perspective: 1000, ...GPU_ACCELERATED_STYLES }}
+            style={{ ...GPU_ACCELERATED_STYLES }}
         >
             <div className={`hidden lg:block absolute top-1/2 ${isLeft ? '-right-24' : '-left-24'} w-24 h-[2px] bg-white/5 overflow-hidden`}>
                 <div
                     className={`w-full h-full bg-gradient-to-${isLeft ? 'r' : 'l'} from-transparent via-indigo-500 to-transparent animate-[shimmer-slide_2s_ease-in-out_infinite]`}
-                    style={{ ...GPU_ACCELERATED_STYLES, animationDelay: `${index * 0.5}s` }}
+                    style={{ ...MOBILE_OPTIMIZED_LAYER, animationDelay: `${index * 0.5}s` }}
                 />
             </div>
 
@@ -153,32 +153,32 @@ const GrowthEngineSection = () => {
                             {/* Use CSS animations instead of Framer Motion for orbit rings - more efficient */}
                             <div
                                 className="absolute inset-0 rounded-full border border-dashed border-indigo-500/20 animate-[spin_30s_linear_infinite]"
-                                style={GPU_ACCELERATED_STYLES}
+                                style={MOBILE_OPTIMIZED_LAYER}
                             />
                             <div
                                 className="absolute inset-8 rounded-full border border-dotted border-cyan-500/20 animate-[spin_40s_linear_infinite_reverse]"
-                                style={GPU_ACCELERATED_STYLES}
+                                style={MOBILE_OPTIMIZED_LAYER}
                             />
                             <div
                                 className="absolute inset-16 rounded-full border border-white/5 animate-[spin_25s_linear_infinite]"
-                                style={GPU_ACCELERATED_STYLES}
+                                style={MOBILE_OPTIMIZED_LAYER}
                             />
 
-                             <div className="absolute inset-0 flex items-center justify-center opacity-10 animate-[spin_60s_linear_infinite]" style={GPU_ACCELERATED_STYLES}>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-10 animate-[spin_60s_linear_infinite]" style={MOBILE_OPTIMIZED_LAYER}>
                                 <Hexagon className="w-full h-full text-indigo-500" strokeWidth={0.5} />
-                             </div>
+                            </div>
 
                             <div className="absolute inset-0 rounded-full bg-indigo-500/5 blur-2xl" />
 
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <div 
+                                <div
                                     className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-56 md:h-56 rounded-full bg-black/80 backdrop-blur-sm border border-indigo-500/30 shadow-[0_0_60px_rgba(79,70,229,0.15)] flex items-center justify-center group cursor-pointer z-20 overflow-hidden hover:scale-105 transition-transform duration-300"
                                     style={GPU_ACCELERATED_STYLES}
                                 >
 
                                     <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-purple-500/10 group-hover:opacity-100 transition-opacity" />
-                                    
-                                     <div className="absolute inset-2 border border-dashed border-indigo-500/10 rounded-full animate-[spin_10s_linear_infinite]" style={GPU_ACCELERATED_STYLES} />
+
+                                    <div className="absolute inset-2 border border-dashed border-indigo-500/10 rounded-full animate-[spin_10s_linear_infinite]" style={MOBILE_OPTIMIZED_LAYER} />
 
                                     <div className="text-center relative z-10 p-3 sm:p-4 md:p-6">
                                         <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 mx-auto mb-2 sm:mb-3 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
@@ -194,7 +194,7 @@ const GrowthEngineSection = () => {
 
                     <div className="flex flex-col gap-8 w-full lg:w-1/3 order-3">
                         {[features[1], features[3]].map((feature, i) => (
-                             <FeatureCard key={i} feature={feature} index={i} isLeft={false} />
+                            <FeatureCard key={i} feature={feature} index={i} isLeft={false} />
                         ))}
                     </div>
 

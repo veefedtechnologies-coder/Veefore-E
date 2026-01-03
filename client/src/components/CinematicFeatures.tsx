@@ -1,8 +1,8 @@
-import { useRef, memo, useState, useMemo, useEffect } from 'react';
-import { motion, useScroll, useSpring, useTransform, MotionValue, useMotionValueEvent } from 'framer-motion';
+import { useRef, memo } from 'react';
+import { motion, useScroll, useSpring, useTransform, MotionValue } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
-import { GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
+import { GPU_ACCELERATED_STYLES, MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 
 interface Feature {
   id: string;
@@ -18,50 +18,57 @@ interface CinematicFeaturesProps {
   features: Feature[];
 }
 
-const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: number, activeIndex: MotionValue<number> }) => {
-  const targetX = useTransform(activeIndex, (current: number) => {
-    if (index === current) return 0;
-    if (index < current) return -5;
-    return 100;
+// 1. Scroll Spring: Responsive but smooth tracking of the "snapped" scroll position
+const scrollSpringConfig = { stiffness: 220, damping: 40, mass: 1 };
+
+// 2. Transition Spring: Neutral, natural feel (not too fast, not too slow)
+const transitionSpringConfig = { stiffness: 180, damping: 30, mass: 1 };
+
+// Helper for mapping ranges (Removed as unused)
+
+const Card = memo(({ feature, index, progress }: { feature: Feature, index: number, progress: MotionValue<number> }) => {
+  // STEP-BASED LOGIC:
+  // 1. Determine "Active Index" by rounding the continuous progress
+  // 2. Set distinct target states based on whether this card is active, previous, or next
+  // 3. Spring to those targets for smooth transitions
+
+  const activeIndex = useTransform(progress, (v) => Math.round(v));
+
+  // Target X Position (Carousel effect)
+  const targetX = useTransform(activeIndex, (current) => {
+    if (index === current) return 0;       // Active: Center
+    if (index < current) return -20;       // Previous: Move Left (Exit) - Increased from -5 for better motion
+    return 100;                            // Next: Far Right (Waiting)
   });
+  const xSpring = useSpring(targetX as any, transitionSpringConfig);
+  const x = useTransform(xSpring, (v) => `${v}vw`);
 
-  // Use lighter spring for smooth but fast transitions
-  const x = useSpring(targetX as any, {
-    stiffness: 80,
-    damping: 20,
-    mass: 1
+  // Target Scale
+  const targetScale = useTransform(activeIndex, (current) => {
+    return index === current ? 1 : 0.9;
   });
+  const scale = useSpring(targetScale as any, transitionSpringConfig);
 
-  const xWithUnits = useTransform(x, (value) => `${value}vw`);
+  // Target Opacity
+  const targetOpacity = useTransform(activeIndex, (current) => {
+    return index === current ? 1 : 0;
+  });
+  const opacity = useSpring(targetOpacity as any, transitionSpringConfig);
 
-  // Lighter springs for scale/opacity - less solver overhead
-  const scale = useSpring(
-    useTransform(activeIndex, (current: number) => {
-      if (index < current) return 0.9;
-      if (index > current) return 1.1;
-      return 1;
-    }) as any,
-    { stiffness: 80, damping: 20, mass: 1 }
-  );
-
-  const opacity = useSpring(
-    useTransform(activeIndex, (current: number) => {
-      if (index < current) return 0;
-      if (index > current) return 0;
-      return 1;
-    }) as any,
-    { stiffness: 80, damping: 20, mass: 1 }
-  );
-
-  const zIndex = useTransform(activeIndex, (current: number) => {
-    if (index === current) return 10;
-    if (index > current) return 5;
-    return 0;
+  // Target Z-Index (Instant, no spring needed)
+  const zIndex = useTransform(activeIndex, (current) => {
+    return index === current ? 10 : 0;
   });
 
   return (
     <motion.div
-      style={{ x: xWithUnits, zIndex, scale, opacity, ...GPU_ACCELERATED_STYLES }}
+      style={{
+        x,
+        scale,
+        opacity,
+        zIndex,
+        ...MOBILE_OPTIMIZED_LAYER
+      }}
       className="absolute inset-0 h-screen w-screen flex items-center justify-center overflow-hidden bg-black"
     >
       {/* Background with blur effects restored */}
@@ -127,83 +134,60 @@ const Card = memo(({ feature, index, activeIndex }: { feature: Feature, index: n
 
 export const CinematicFeatures = ({ features }: CinematicFeaturesProps) => {
   const targetRef = useRef<HTMLDivElement>(null);
-  const [showHint, setShowHint] = useState(true);
-  const [progress, setProgress] = useState(0);
-
   const { scrollYProgress } = useScroll({
     target: targetRef,
     offset: ["start start", "end end"]
   });
 
   // Snapped progress - creates "resistance" at each feature boundary
-  const snappedProgress = useMemo(() => {
+  // Ported to useTransform to avoid React re-renders
+  const snappedProgress = useTransform(scrollYProgress, (latest: number) => {
     const total = features.length;
-    if (total <= 1) return progress;
+    if (total <= 1) return latest;
 
     const snapPoints = Array.from({ length: total }, (_, i) => i / (total - 1));
-    const snapStrength = 0.12 / total; // Balanced snap strength
+    const snapStrength = 0.5 / total; // Strongly increased strength for better locking
 
     // Find nearest snap point and apply resistance
     for (const snap of snapPoints) {
-      const distToSnap = Math.abs(progress - snap);
+      const distToSnap = Math.abs(latest - snap);
       if (distToSnap < snapStrength) {
         const factor = distToSnap / snapStrength;
         const eased = factor * factor; // Quadratic easing for "sticky" feel
-        return snap + (progress - snap > 0 ? 1 : -1) * eased * snapStrength;
+        return snap + (latest - snap > 0 ? 1 : -1) * eased * snapStrength;
       }
     }
-    return progress;
-  }, [progress, features.length]);
-
-  // Create a MotionValue for the spring to consume
-  const snappedMotionValue = useSpring(snappedProgress, {
-    stiffness: 80,
-    damping: 20,
-    mass: 0.6
+    return latest;
   });
 
-  // Sync state to spring
-  useEffect(() => {
-    snappedMotionValue.set(snappedProgress);
-  }, [snappedProgress, snappedMotionValue]);
+  // Optimized spring for mobile - higher stiffness = fewer solver iterations = better performance
+  const snappedMotionValue = useSpring(snappedProgress, scrollSpringConfig);
 
-  useMotionValueEvent(scrollYProgress, "change", (latest) => {
-    setProgress(latest);
-    // Show hint while section is locked on screen
-    if (latest > 0.05 && latest < 0.90) setShowHint(true);
-    else setShowHint(false);
-  });
+  // Convert normalized progress (0-1) to Index Progress (0 - total-1)
+  // We use this directly in Card to derive steps, AVOIDING double-springs
+  const continuousIndex = useTransform(snappedMotionValue, v => v * (features.length - 1));
 
-  const _activeIndex = useTransform(snappedMotionValue, (value) => {
-    const total = features.length;
-    if (total <= 1) return 0;
-    return Math.min(Math.round(value * (total - 1)), total - 1);
-  });
-  void _activeIndex;
+  // Reactive hint opacity
+  const hintOpacity = useTransform(scrollYProgress, (v: number) => (v > 0.05 && v < 0.90) ? 1 : 0);
 
   return (
-    <section ref={targetRef} className="relative" style={{ height: `${features.length * 250}vh` }}>
+    <section ref={targetRef} className="relative" style={{ height: `${features.length * 200}vh` }}>
       <div className="sticky top-0 h-screen overflow-hidden bg-black">
         {features.map((feature, index) => (
           <Card
             key={feature.id}
             feature={feature}
             index={index}
-            // Add slight parallax lag to visual vs text if we split this, but for now just passing main index
-            activeIndex={useTransform(snappedMotionValue, v => Math.min(Math.round(v * (features.length - 1)), features.length - 1))}
+            progress={continuousIndex}
           />
         ))}
 
-        {showHint && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
-          >
-            <ScrollHint />
-          </motion.div>
-        )}
+        <motion.div
+          style={{ opacity: hintOpacity }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none z-50 mix-blend-difference"
+        >
+          <ScrollHint />
+        </motion.div>
       </div>
     </section>
   );
