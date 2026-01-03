@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { waitlistUserRepository } from '../../repositories/WaitlistUserRepository';
 import { generateReferralCode } from '../../storage/converters';
 import { emailService } from '../../email-service';
+import { getEmailQueue } from '../../lib/queue';
+import { apiRateLimiter } from '../../middleware/rate-limiting-working';
 
 const router = Router();
 
@@ -88,52 +90,19 @@ const emailCheckSchema = z.object({
 });
 
 // ============================================
-// RATE LIMITING (In-memory, per-IP)
+// RATE LIMITING
 // ============================================
-
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 10;     // 10 requests per minute
-
-const checkRateLimit = (ip: string): boolean => {
-    const now = Date.now();
-    const entry = rateLimitStore.get(ip);
-
-    if (!entry || now > entry.resetTime) {
-        rateLimitStore.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-        return true;
-    }
-
-    if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
-        return false;
-    }
-
-    entry.count++;
-    return true;
-};
-
-// Cleanup old entries periodically
-setInterval(() => {
-    const now = Date.now();
-    for (const [ip, entry] of rateLimitStore.entries()) {
-        if (now > entry.resetTime) {
-            rateLimitStore.delete(ip);
-        }
-    }
-}, 5 * 60 * 1000); // Every 5 minutes
+// Using distributed Redis rate limiter (apiRateLimiter) imported above
+// to support Vercel/Serverless architecture.
 
 // ============================================
 // ROUTES
 // ============================================
 
 // Check if email already exists on waitlist
-router.get('/check-email', async (req: Request, res: Response) => {
+router.get('/check-email', apiRateLimiter, async (req: Request, res: Response) => {
     try {
-        // Rate limiting
-        const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
-        if (!checkRateLimit(clientIp)) {
-            return res.status(429).json({ error: "Too many requests. Please try again later." });
-        }
+        // Rate limiting handled by middleware
 
         // Validate email parameter
         const emailParam = req.query.email;
@@ -161,13 +130,10 @@ router.get('/check-email', async (req: Request, res: Response) => {
 });
 
 // Join the waitlist
-router.post('/join', async (req: Request, res: Response) => {
+router.post('/join', apiRateLimiter, async (req: Request, res: Response) => {
     try {
-        // Rate limiting
+        // Rate limiting handled by middleware
         const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
-        if (!checkRateLimit(clientIp)) {
-            return res.status(429).json({ error: "Too many requests. Please try again later." });
-        }
 
         // Validate and sanitize all input
         const validatedData = waitlistSchema.parse(req.body);
@@ -197,10 +163,16 @@ router.post('/join', async (req: Request, res: Response) => {
             }
         });
 
-        // Send welcome email (don't await - fire and forget)
-        emailService.sendWaitlistWelcomeEmail(email, name).catch(err => {
-            console.error('[WAITLIST] Failed to send welcome email:', err);
-        });
+        // Add email job to queue for background processing (Reliable & Fast)
+        try {
+            const emailQueue = getEmailQueue();
+            await emailQueue.add('send-welcome', { email, name });
+            console.log(`[WAITLIST] Queued welcome email for ${email}`);
+        } catch (queueError) {
+            console.error('[WAITLIST] Failed to queue welcome email:', queueError);
+            // Non-blocking catch: we log it, but user is registered successfully.
+            // In a real scenario, we might want to fallback to direct send or retry later.
+        }
 
         // Don't expose internal database IDs - use a safe identifier
         res.status(201).json({

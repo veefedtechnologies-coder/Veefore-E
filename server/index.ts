@@ -626,6 +626,25 @@ app.use((req, res, next) => {
   // P5 PERFORMANCE: Run startup optimizations
   await performStartupOptimizations();
 
+  // INFRASTRUCTURE: Initialize Queues & Workers
+  try {
+    const { initQueues } = await import('./lib/queue');
+    const { initEmailWorker } = await import('./workers/email.worker');
+    const { getRedisClient } = await import('./lib/redis');
+
+    // Connect to Redis
+    const redis = getRedisClient();
+
+    // Initialize systems
+    initQueues();
+    initEmailWorker();
+    initializeRateLimiting(redis); // Connect rate limiter to Upstash
+
+    console.log('[INFRA] Background workers and Rate Limiting connected to Redis');
+  } catch (error) {
+    console.warn('[INFRA] Failed to initialize workers (Redis might be missing):', (error as Error).message);
+  }
+
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const id = req.correlationId || '';
     const status = err?.status || 500;

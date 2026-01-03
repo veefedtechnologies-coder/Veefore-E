@@ -36,7 +36,7 @@ interface LoggerConfig {
 
 export class Logger {
   private static config: LoggerConfig = {
-    logLevel: process.env.NODE_ENV === 'production' ? LogLevel.INFO : LogLevel.DEBUG,
+    logLevel: LogLevel.INFO, // Default to INFO to reduce console noise (was DEBUG)
     enableConsole: true,
     enableFile: true,
     logDirectory: path.join(process.cwd(), 'logs'),
@@ -52,7 +52,7 @@ export class Logger {
    */
   static configure(config: Partial<LoggerConfig>): void {
     this.config = { ...this.config, ...config };
-    
+
     // Ensure log directory exists
     if (this.config.enableFile) {
       this.ensureLogDirectory();
@@ -357,7 +357,7 @@ export class Logger {
     if (entry.workspaceId) contextParts.push(`ws:${entry.workspaceId}`);
     if (entry.userId) contextParts.push(`user:${entry.userId}`);
     if (entry.instagramAccountId) contextParts.push(`ig:${entry.instagramAccountId}`);
-    
+
     const context = contextParts.length > 0 ? `[${contextParts.join('|')}]` : '';
 
     // Format message
@@ -405,11 +405,11 @@ export class Logger {
    */
   private static getLogFileName(entry: LogEntry): string {
     const date = entry.timestamp.toISOString().split('T')[0]; // YYYY-MM-DD
-    
+
     if (this.config.includeWorkspaceInLogs && entry.workspaceId) {
       return `metrics-${entry.workspaceId}-${date}.log`;
     }
-    
+
     return `metrics-${date}.log`;
   }
 
@@ -434,7 +434,7 @@ export class Logger {
       ...(entry.userId && { userId: entry.userId }),
       ...(entry.instagramAccountId && { instagramAccountId: entry.instagramAccountId }),
       ...(entry.metadata && { metadata: entry.metadata }),
-      ...(entry.error && { 
+      ...(entry.error && {
         error: {
           message: entry.error.message,
           stack: entry.error.stack
@@ -465,7 +465,7 @@ export class Logger {
         for (let i = this.config.maxFiles - 1; i > 0; i--) {
           const oldFile = path.join(dir, `${baseName}.${i}${ext}`);
           const newFile = path.join(dir, `${baseName}.${i + 1}${ext}`);
-          
+
           if (fs.existsSync(oldFile)) {
             if (i === this.config.maxFiles - 1) {
               fs.unlinkSync(oldFile); // Delete oldest
