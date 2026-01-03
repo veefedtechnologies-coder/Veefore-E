@@ -15,9 +15,15 @@ export default defineConfig({
       "@assets": path.resolve(__dirname, "./src/assets"),
     },
   },
-  server: {
-    host: true,
-    cors: true,
-    allowedHosts: 'all',
+  host: true,
+  cors: true,
+  allowedHosts: 'all',
+  proxy: {
+    '/api': {
+      target: 'http://localhost:5000',
+      changeOrigin: true,
+      secure: false,
+    }
   }
+}
 })
