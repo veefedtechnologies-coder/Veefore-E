@@ -62,24 +62,24 @@ const CreditSystemSection = () => {
         const normalizationFactor = totalActiveWeight > 0 ? 1 / totalActiveWeight : 0;
 
         return [
-            { 
+            {
                 id: 'hooks',
-                label: 'Viral Hooks', 
-                amount: selectedFeatures.hooks ? Math.floor(credits * weights.hooks * normalizationFactor) : 0, 
+                label: 'Viral Hooks',
+                amount: selectedFeatures.hooks ? Math.floor(credits * weights.hooks * normalizationFactor) : 0,
                 icon: TrendingUp,
                 active: selectedFeatures.hooks
             },
-            { 
+            {
                 id: 'replies',
-                label: 'Smart Replies', 
-                amount: selectedFeatures.replies ? Math.floor(credits * weights.replies * normalizationFactor) : 0, 
+                label: 'Smart Replies',
+                amount: selectedFeatures.replies ? Math.floor(credits * weights.replies * normalizationFactor) : 0,
                 icon: MessageSquare,
                 active: selectedFeatures.replies
             },
-            { 
+            {
                 id: 'dms',
-                label: 'DM Conversions', 
-                amount: selectedFeatures.dms ? Math.floor(credits * weights.dms * normalizationFactor) : 0, 
+                label: 'DM Conversions',
+                amount: selectedFeatures.dms ? Math.floor(credits * weights.dms * normalizationFactor) : 0,
                 icon: Bot,
                 active: selectedFeatures.dms
             }
@@ -115,7 +115,7 @@ const CreditSystemSection = () => {
                     <div className="lg:col-span-7">
                         <div className="relative rounded-[1.5rem] bg-neutral-900/50 border border-white/10 p-5 md:p-8 backdrop-blur-xl overflow-hidden group mb-6">
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
-                            
+
                             <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full" />
 
                             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-6">
@@ -144,15 +144,19 @@ const CreditSystemSection = () => {
                                     <span>Growth</span>
                                     <span>Scale</span>
                                 </div>
-                                <div className="relative h-12 w-full flex items-center">
-                                    <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 origin-left transition-transform duration-200 ease-out"
-                                            style={{ 
-                                                transform: `scaleX(${(credits - 100) / 4900})` 
+                                {/* Custom Slider Container */}
+                                <div className="relative h-12 w-full flex items-center select-none">
+                                    {/* Background Track */}
+                                    <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-2 bg-white/10 rounded-full overflow-hidden">
+                                        {/* Filled Track - uses width for instant sync with orb */}
+                                        <div
+                                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full"
+                                            style={{
+                                                width: `${((credits - 100) / 4900) * 100}%`
                                             }}
                                         />
                                     </div>
+                                    {/* Hidden Range Input for accessibility and interaction */}
                                     <input
                                         type="range"
                                         min="100"
@@ -161,14 +165,19 @@ const CreditSystemSection = () => {
                                         value={credits}
                                         onChange={(e) => setCredits(Number(e.target.value))}
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                        style={{ touchAction: 'none' }}
+                                        style={{
+                                            touchAction: 'none',
+                                            WebkitAppearance: 'none',
+                                            MozAppearance: 'none'
+                                        }}
                                     />
-                                    <div 
-                                        className="absolute w-6 h-6 bg-amber-500 rounded-full border-2 border-neutral-900 shadow-[0_0_15px_rgba(245,158,11,0.5)] z-10 pointer-events-none transition-[left] duration-200 ease-out"
-                                        style={{ 
+                                    {/* Orb/Thumb - positioned using same percentage */}
+                                    <div
+                                        className="absolute w-7 h-7 md:w-6 md:h-6 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full border-[3px] border-neutral-900 shadow-[0_0_20px_rgba(245,158,11,0.6),0_2px_8px_rgba(0,0,0,0.4)] z-10 pointer-events-none"
+                                        style={{
                                             top: '50%',
-                                            transform: 'translateY(-50%)',
-                                            left: `calc(${((credits - 100) / 4900) * 100}% - 12px)` 
+                                            transform: 'translateX(-50%) translateY(-50%)',
+                                            left: `${((credits - 100) / 4900) * 100}%`
                                         }}
                                     />
                                 </div>
@@ -181,19 +190,19 @@ const CreditSystemSection = () => {
                                         <span className="text-xs font-bold text-white/60 uppercase tracking-widest">Potential Output</span>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        <button 
+                                        <button
                                             onClick={() => toggleFeature('hooks')}
                                             className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border transition-all ${selectedFeatures.hooks ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10'}`}
                                         >
                                             Hooks
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => toggleFeature('replies')}
                                             className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border transition-all ${selectedFeatures.replies ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10'}`}
                                         >
                                             Replies
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => toggleFeature('dms')}
                                             className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border transition-all ${selectedFeatures.dms ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10'}`}
                                         >
@@ -204,8 +213,8 @@ const CreditSystemSection = () => {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     {capabilities.map((cap, i) => (
-                                        <div 
-                                            key={i} 
+                                        <div
+                                            key={i}
                                             className={`rounded-xl p-3 border flex flex-col items-center text-center transition-all duration-300 ${cap.active ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-amber-500/20' : 'bg-white/[0.02] border-white/[0.02] opacity-50'}`}
                                         >
                                             <div className={`mb-2 p-1.5 rounded-lg ${cap.active ? 'bg-black/40 text-amber-400' : 'bg-black/20 text-white/20'}`}>
@@ -223,7 +232,7 @@ const CreditSystemSection = () => {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                             {freeFeatures.map((feature, i) => (
+                            {freeFeatures.map((feature, i) => (
                                 <div key={i} className="group relative overflow-hidden rounded-xl bg-neutral-900/30 border border-white/5 p-4 hover:bg-white/[0.02] hover:border-amber-500/20 transition-all duration-300">
                                     <div className="flex items-start gap-3">
                                         <div className={`w-8 h-8 rounded-lg ${feature.bg} flex items-center justify-center ${feature.color} group-hover:scale-110 transition-transform`}>
@@ -280,7 +289,7 @@ const CreditSystemSection = () => {
                             </div>
                         </div>
 
-                         <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             {addons.map((addon, i) => (
                                 <div key={i} className={`relative rounded-xl bg-neutral-900/50 border p-2 md:p-3 text-center transition-all cursor-pointer group overflow-hidden ${addon.popular ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'border-white/10 hover:border-amber-500/30'}`}>
                                     {addon.popular && (
@@ -293,7 +302,7 @@ const CreditSystemSection = () => {
                             ))}
                         </div>
 
-                         <div className="mt-4 p-3 rounded-xl bg-amber-950/40 border border-amber-500/20 flex gap-3 items-start relative overflow-hidden">
+                        <div className="mt-4 p-3 rounded-xl bg-amber-950/40 border border-amber-500/20 flex gap-3 items-start relative overflow-hidden">
                             <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 relative z-10" />
                             <div className="relative z-10">
                                 <p className="text-[10px] md:text-xs text-amber-200/90 leading-relaxed font-medium">

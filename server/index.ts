@@ -1229,17 +1229,9 @@ app.use((req, res, next) => {
           etag: true,
           lastModified: true
         }));
-        // Prevent caching of JS chunks to avoid stale asset mismatches
-        app.use((req, res, next) => {
-          try {
-            if (req.path && req.path.startsWith('/assets/') && req.path.endsWith('.js')) {
-              res.setHeader('Cache-Control', 'no-store');
-              res.setHeader('Pragma', 'no-cache');
-              res.setHeader('Expires', '0');
-            }
-          } catch { }
-          next();
-        });
+        // NOTE: JS/CSS caching is handled by Vite's content hashing (e.g., chunk-abc123.js).
+        // When code changes, the hash changes, automatically invalidating the old cache.
+        // index.html is set to no-cache below to ensure users get updated script references.
 
         // Handle SPA routes - serve index.html for all non-API routes
         app.get('*', (req, res, next) => {

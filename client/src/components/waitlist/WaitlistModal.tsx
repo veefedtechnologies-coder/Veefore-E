@@ -56,10 +56,12 @@ interface CustomDropdownProps {
     options: DropdownOption[];
     icon: React.ElementType;
     placeholder?: string;
+    required?: boolean;
+    error?: string;
 }
 
 const CustomDropdown: React.FC<CustomDropdownProps> = ({
-    label, value, onChange, options, placeholder = "Select..."
+    label, value, onChange, options, placeholder = "Select...", required = true, error
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -107,7 +109,9 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
     return (
         <div className="space-y-1 md:space-y-2">
-            <label className="text-[10px] md:text-xs font-medium text-white/60 block uppercase tracking-wider">{label}</label>
+            <label className="text-[10px] md:text-xs font-medium text-white/60 block uppercase tracking-wider">
+                {label} {required && <span className="text-red-400">*</span>}
+            </label>
             <div className="relative">
                 <button
                     ref={buttonRef}
@@ -118,7 +122,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     className="w-full h-10 md:h-12 px-3 md:px-4 pr-8 rounded-lg md:rounded-xl text-left text-xs md:text-sm transition-all duration-200 hover:bg-white/[0.08]"
                     style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                        border: isFocused || isOpen ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        border: error ? '1px solid rgba(239, 68, 68, 0.5)' : (isFocused || isOpen ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)'),
                         color: selectedOption ? 'white' : 'rgba(255, 255, 255, 0.4)',
                         outline: 'none',
                     }}
@@ -161,6 +165,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 </div>,
                 document.body
             )}
+            {error && <p className="text-red-400 text-[10px] md:text-xs mt-1">{error}</p>}
         </div>
     );
 };
@@ -269,9 +274,19 @@ export const WaitlistModal = () => {
     };
 
     const nextStep = async () => {
-        const isValid = await validateStep(step);
-        if (!isValid) return;
-        setStep(prev => prev + 1);
+        console.log('[Waitlist] nextStep called, current step:', step);
+        try {
+            const isValid = await validateStep(step);
+            console.log('[Waitlist] validateStep returned:', isValid);
+            if (!isValid) {
+                console.log('[Waitlist] Validation failed, not advancing');
+                return;
+            }
+            setStep(prev => prev + 1);
+            console.log('[Waitlist] Advanced to step:', step + 1);
+        } catch (error) {
+            console.error('[Waitlist] nextStep error:', error);
+        }
     };
 
     const prevStep = () => setStep(prev => prev - 1);
@@ -304,47 +319,94 @@ export const WaitlistModal = () => {
                 isValid = false;
             }
 
-            // Email validation
+            // Email validation - comprehensive checks
             if (!trimmedEmail) {
                 newErrors.email = "Please enter your email address";
                 isValid = false;
-            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-                newErrors.email = "Please enter a valid email address (e.g., name@example.com)";
-                isValid = false;
-            } else if (isDisposableEmail(trimmedEmail)) {
-                newErrors.email = "Please use a permanent email address, not a disposable one";
-                isValid = false;
             } else {
-                // Check domain validity
-                const domain = trimmedEmail.split('@')[1];
-                if (!domain || domain.length < 4 || !domain.includes('.')) {
-                    newErrors.email = "Please enter a valid email domain";
+                // Basic format check with stricter regex
+                // Requires: alphanumeric/dots/hyphens before @, then domain with letters/numbers, then TLD with letters only
+                const emailRegex = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
+
+                if (!emailRegex.test(trimmedEmail)) {
+                    newErrors.email = "Please enter a valid email address (e.g., name@company.com)";
+                    isValid = false;
+                } else if (isDisposableEmail(trimmedEmail)) {
+                    newErrors.email = "Please use a permanent email address, not a disposable one";
                     isValid = false;
                 } else {
-                    // Check if email already exists on waitlist
-                    try {
-                        const response = await fetch(`/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+                    // Additional domain checks
+                    const domain = trimmedEmail.split('@')[1];
+                    const domainParts = domain.split('.');
+                    const tld = domainParts[domainParts.length - 1];
 
-                        if (response.status === 429) {
-                            newErrors.email = "Too many requests. Please wait a moment and try again.";
-                            isValid = false;
-                        } else if (response.ok) {
-                            const data = await response.json();
-                            if (data.exists) {
-                                newErrors.email = data.message || "This email is already on the waitlist! Check your inbox for updates.";
+                    // Check TLD is valid (2-10 chars, letters only)
+                    if (tld.length < 2 || tld.length > 10 || !/^[a-zA-Z]+$/.test(tld)) {
+                        newErrors.email = "Please enter a valid email domain";
+                        isValid = false;
+                    } else if (domain.length < 4) {
+                        newErrors.email = "Please enter a valid email domain";
+                        isValid = false;
+                    } else {
+                        // Check if email already exists on waitlist
+                        try {
+                            const response = await fetch(`/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+
+                            if (response.status === 429) {
+                                newErrors.email = "Too many requests. Please wait a moment and try again.";
                                 isValid = false;
+                            } else if (response.ok) {
+                                const data = await response.json();
+                                if (data.exists) {
+                                    newErrors.email = data.message || "This email is already on the waitlist! Check your inbox for updates.";
+                                    isValid = false;
+                                }
                             }
+                        } catch (error) {
+                            console.error('Error checking email:', error);
+                            // Don't block on network errors, let the final submit handle it
                         }
-                    } catch (error) {
-                        console.error('Error checking email:', error);
-                        // Don't block on network errors, let the final submit handle it
                     }
                 }
             }
         }
+
+        // Step 2: Profile type validation
         if (currentStep === 2 && !formData.orgType) {
             toast({ title: "Required", description: "Please select your profile type.", variant: "destructive" });
             return false;
+        }
+
+        // Step 3: Profile-specific fields validation
+        if (currentStep === 3) {
+            if (formData.orgType === 'solo') {
+                if (!formData.primaryPlatform) { newErrors.primaryPlatform = "Required"; isValid = false; }
+                if (!formData.contentNiche) { newErrors.contentNiche = "Required"; isValid = false; }
+                if (!formData.creatorAudienceSize) { newErrors.creatorAudienceSize = "Required"; isValid = false; }
+                if (!formData.postingFrequency) { newErrors.postingFrequency = "Required"; isValid = false; }
+            } else if (formData.orgType === 'startup') {
+                if (!formData.startupStage) { newErrors.startupStage = "Required"; isValid = false; }
+                if (!formData.startupTeamSize) { newErrors.startupTeamSize = "Required"; isValid = false; }
+                if (!formData.startupGrowthChannel) { newErrors.startupGrowthChannel = "Required"; isValid = false; }
+                if (!formData.timeline) { newErrors.timeline = "Required"; isValid = false; }
+            } else if (formData.orgType === 'agency') {
+                if (!formData.agencyClientCount) { newErrors.agencyClientCount = "Required"; isValid = false; }
+                if (!formData.agencyServices) { newErrors.agencyServices = "Required"; isValid = false; }
+                if (!formData.agencyNiche) { newErrors.agencyNiche = "Required"; isValid = false; }
+                if (!formData.agencyMonthlyOutput) { newErrors.agencyMonthlyOutput = "Required"; isValid = false; }
+            } else if (formData.orgType === 'enterprise') {
+                if (!formData.enterpriseIndustry) { newErrors.enterpriseIndustry = "Required"; isValid = false; }
+                if (!formData.enterpriseDepartment) { newErrors.enterpriseDepartment = "Required"; isValid = false; }
+                if (!formData.enterpriseSecurity) { newErrors.enterpriseSecurity = "Required"; isValid = false; }
+                if (!formData.enterpriseBudget) { newErrors.enterpriseBudget = "Required"; isValid = false; }
+            }
+        }
+
+        // Step 4: Use Case validation (Biggest Challenge is optional)
+        if (currentStep === 4) {
+            if (!formData.referralSource) { newErrors.referralSource = "Required"; isValid = false; }
+            if (!formData.primaryGoal) { newErrors.primaryGoal = "Required"; isValid = false; }
+            // painPoints (Biggest Challenge) is optional - no validation needed
         }
 
         setErrors(newErrors);
@@ -352,6 +414,12 @@ export const WaitlistModal = () => {
     };
 
     const handleSubmit = async () => {
+        // Validate Step 4 required fields before submitting
+        const isValid = await validateStep(4);
+        if (!isValid) {
+            return; // Don't proceed if validation fails
+        }
+
         setIsSubmitting(true);
         try {
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -499,15 +567,16 @@ export const WaitlistModal = () => {
                         />
 
                         <motion.button
+                            type="button"
                             whileHover={{ scale: 1.02, y: -2 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={nextStep}
-                            className="w-full h-12 md:h-14 rounded-xl bg-white text-black font-bold text-sm md:text-base flex items-center justify-center gap-2 relative overflow-hidden group"
+                            className="w-full h-12 md:h-14 rounded-xl bg-white text-black font-bold text-sm md:text-base flex items-center justify-center gap-2 relative overflow-hidden group z-10"
                             style={{ border: 'none', outline: 'none' }}
                         >
                             <span className="relative z-10">Start Application</span>
                             <ArrowRight className="w-4 h-4 md:w-5 md:h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-white via-gray-100 to-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-gradient-to-r from-white via-gray-100 to-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                         </motion.button>
 
                         {/* Trust badges */}
@@ -538,6 +607,7 @@ export const WaitlistModal = () => {
                             ].map((item) => (
                                 <motion.button
                                     key={item.id}
+                                    type="button"
                                     whileHover={{ scale: 1.03, y: -4 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => { handleInputChange('orgType', item.id); setTimeout(() => setStep(3), 200); }}
@@ -574,42 +644,44 @@ export const WaitlistModal = () => {
                             </div>
                             <h2 className="text-xl md:text-2xl font-bold text-white">Tell us more</h2>
                             <p className="text-white/50 text-xs md:text-sm">Help us customize your experience</p>
+                            <p className="text-white/40 text-[10px] md:text-xs mt-1">Fields marked with <span className="text-red-400">*</span> are required</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2 md:gap-4">
                             {formData.orgType === 'solo' && (
                                 <>
-                                    <CustomDropdown label="Platform" value={formData.primaryPlatform} onChange={(v) => handleInputChange('primaryPlatform', v)} options={[{ value: 'instagram', label: 'Instagram' }, { value: 'tiktok', label: 'TikTok' }, { value: 'youtube', label: 'YouTube' }, { value: 'linkedin', label: 'LinkedIn' }]} icon={Globe} />
-                                    <CustomDropdown label="Niche" value={formData.contentNiche} onChange={(v) => handleInputChange('contentNiche', v)} options={[{ value: 'tech', label: 'Tech & AI' }, { value: 'lifestyle', label: 'Lifestyle' }, { value: 'education', label: 'Education' }, { value: 'entertainment', label: 'Entertainment' }]} icon={Layers} />
-                                    <CustomDropdown label="Audience" value={formData.creatorAudienceSize} onChange={(v) => handleInputChange('creatorAudienceSize', v)} options={[{ value: '0-1k', label: 'Just Starting' }, { value: '1k-10k', label: '1k - 10k' }, { value: '10k-100k', label: '10k - 100k' }, { value: '100k+', label: '100k+' }]} icon={Users} />
-                                    <CustomDropdown label="Frequency" value={formData.postingFrequency} onChange={(v) => handleInputChange('postingFrequency', v)} options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'sporadic', label: 'Sporadic' }]} icon={Clock} />
+                                    <CustomDropdown label="Platform" value={formData.primaryPlatform} onChange={(v) => handleInputChange('primaryPlatform', v)} options={[{ value: 'instagram', label: 'Instagram' }, { value: 'tiktok', label: 'TikTok' }, { value: 'youtube', label: 'YouTube' }, { value: 'linkedin', label: 'LinkedIn' }]} icon={Globe} error={errors.primaryPlatform} />
+                                    <CustomDropdown label="Niche" value={formData.contentNiche} onChange={(v) => handleInputChange('contentNiche', v)} options={[{ value: 'tech', label: 'Tech & AI' }, { value: 'lifestyle', label: 'Lifestyle' }, { value: 'education', label: 'Education' }, { value: 'entertainment', label: 'Entertainment' }]} icon={Layers} error={errors.contentNiche} />
+                                    <CustomDropdown label="Audience" value={formData.creatorAudienceSize} onChange={(v) => handleInputChange('creatorAudienceSize', v)} options={[{ value: '0-1k', label: 'Just Starting' }, { value: '1k-10k', label: '1k - 10k' }, { value: '10k-100k', label: '10k - 100k' }, { value: '100k+', label: '100k+' }]} icon={Users} error={errors.creatorAudienceSize} />
+                                    <CustomDropdown label="Frequency" value={formData.postingFrequency} onChange={(v) => handleInputChange('postingFrequency', v)} options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'sporadic', label: 'Sporadic' }]} icon={Clock} error={errors.postingFrequency} />
                                 </>
                             )}
                             {formData.orgType === 'startup' && (
                                 <>
-                                    <CustomDropdown label="Stage" value={formData.startupStage} onChange={(v) => handleInputChange('startupStage', v)} options={[{ value: 'bootstrap', label: 'Bootstrapped' }, { value: 'pre-seed', label: 'Pre-Seed' }, { value: 'seed', label: 'Seed' }, { value: 'series-a', label: 'Series A+' }]} icon={Rocket} />
-                                    <CustomDropdown label="Team Size" value={formData.startupTeamSize} onChange={(v) => handleInputChange('startupTeamSize', v)} options={[{ value: '1-10', label: '1 - 10' }, { value: '11-50', label: '11 - 50' }, { value: '51-200', label: '51 - 200' }]} icon={Users} />
-                                    <CustomDropdown label="Growth Channel" value={formData.startupGrowthChannel} onChange={(v) => handleInputChange('startupGrowthChannel', v)} options={[{ value: 'organic', label: 'Organic Social' }, { value: 'ads', label: 'Paid Ads' }, { value: 'content', label: 'Content Marketing' }, { value: 'sales', label: 'Outbound Sales' }]} icon={BarChart3} />
-                                    <CustomDropdown label="Timeline" value={formData.timeline} onChange={(v) => handleInputChange('timeline', v)} options={[{ value: 'urgent', label: 'Immediately' }, { value: 'q3', label: 'This Quarter' }, { value: 'q4', label: 'Next Quarter' }]} icon={Clock} />
+                                    <CustomDropdown label="Stage" value={formData.startupStage} onChange={(v) => handleInputChange('startupStage', v)} options={[{ value: 'bootstrap', label: 'Bootstrapped' }, { value: 'pre-seed', label: 'Pre-Seed' }, { value: 'seed', label: 'Seed' }, { value: 'series-a', label: 'Series A+' }]} icon={Rocket} error={errors.startupStage} />
+                                    <CustomDropdown label="Team Size" value={formData.startupTeamSize} onChange={(v) => handleInputChange('startupTeamSize', v)} options={[{ value: '1-10', label: '1 - 10' }, { value: '11-50', label: '11 - 50' }, { value: '51-200', label: '51 - 200' }]} icon={Users} error={errors.startupTeamSize} />
+                                    <CustomDropdown label="Growth Channel" value={formData.startupGrowthChannel} onChange={(v) => handleInputChange('startupGrowthChannel', v)} options={[{ value: 'organic', label: 'Organic Social' }, { value: 'ads', label: 'Paid Ads' }, { value: 'content', label: 'Content Marketing' }, { value: 'sales', label: 'Outbound Sales' }]} icon={BarChart3} error={errors.startupGrowthChannel} />
+                                    <CustomDropdown label="Timeline" value={formData.timeline} onChange={(v) => handleInputChange('timeline', v)} options={[{ value: 'urgent', label: 'Immediately' }, { value: 'q3', label: 'This Quarter' }, { value: 'q4', label: 'Next Quarter' }]} icon={Clock} error={errors.timeline} />
                                 </>
                             )}
                             {formData.orgType === 'agency' && (
                                 <>
-                                    <CustomDropdown label="Clients" value={formData.agencyClientCount} onChange={(v) => handleInputChange('agencyClientCount', v)} options={[{ value: '1-5', label: '1 - 5' }, { value: '6-20', label: '6 - 20' }, { value: '20+', label: '20+' }]} icon={Briefcase} />
-                                    <CustomDropdown label="Service" value={formData.agencyServices} onChange={(v) => handleInputChange('agencyServices', v)} options={[{ value: 'smm', label: 'Social Media' }, { value: 'ads', label: 'Paid Media' }, { value: 'content', label: 'Content' }, { value: 'full', label: 'Full Service' }]} icon={Layers} />
-                                    <CustomDropdown label="Niche" value={formData.agencyNiche} onChange={(v) => handleInputChange('agencyNiche', v)} options={[{ value: 'ecom', label: 'E-Commerce' }, { value: 'b2b', label: 'B2B Tech' }, { value: 'local', label: 'Local' }, { value: 'mixed', label: 'Mixed' }]} icon={Target} />
-                                    <CustomDropdown label="Output" value={formData.agencyMonthlyOutput} onChange={(v) => handleInputChange('agencyMonthlyOutput', v)} options={[{ value: 'low', label: '< 20 videos' }, { value: 'medium', label: '20 - 100' }, { value: 'high', label: '100+' }]} icon={PieChart} />
+                                    <CustomDropdown label="Clients" value={formData.agencyClientCount} onChange={(v) => handleInputChange('agencyClientCount', v)} options={[{ value: '1-5', label: '1 - 5' }, { value: '6-20', label: '6 - 20' }, { value: '20+', label: '20+' }]} icon={Briefcase} error={errors.agencyClientCount} />
+                                    <CustomDropdown label="Service" value={formData.agencyServices} onChange={(v) => handleInputChange('agencyServices', v)} options={[{ value: 'smm', label: 'Social Media' }, { value: 'ads', label: 'Paid Media' }, { value: 'content', label: 'Content' }, { value: 'full', label: 'Full Service' }]} icon={Layers} error={errors.agencyServices} />
+                                    <CustomDropdown label="Niche" value={formData.agencyNiche} onChange={(v) => handleInputChange('agencyNiche', v)} options={[{ value: 'ecom', label: 'E-Commerce' }, { value: 'b2b', label: 'B2B Tech' }, { value: 'local', label: 'Local' }, { value: 'mixed', label: 'Mixed' }]} icon={Target} error={errors.agencyNiche} />
+                                    <CustomDropdown label="Output" value={formData.agencyMonthlyOutput} onChange={(v) => handleInputChange('agencyMonthlyOutput', v)} options={[{ value: 'low', label: '< 20 videos' }, { value: 'medium', label: '20 - 100' }, { value: 'high', label: '100+' }]} icon={PieChart} error={errors.agencyMonthlyOutput} />
                                 </>
                             )}
                             {formData.orgType === 'enterprise' && (
                                 <>
-                                    <CustomDropdown label="Industry" value={formData.enterpriseIndustry} onChange={(v) => handleInputChange('enterpriseIndustry', v)} options={[{ value: 'fintech', label: 'Finance' }, { value: 'health', label: 'Healthcare' }, { value: 'retail', label: 'Retail' }, { value: 'tech', label: 'Technology' }]} icon={Building2} />
-                                    <CustomDropdown label="Department" value={formData.enterpriseDepartment} onChange={(v) => handleInputChange('enterpriseDepartment', v)} options={[{ value: 'marketing', label: 'Marketing' }, { value: 'product', label: 'Product' }, { value: 'sales', label: 'Sales' }, { value: 'hr', label: 'HR' }]} icon={Briefcase} />
-                                    <CustomDropdown label="Security" value={formData.enterpriseSecurity} onChange={(v) => handleInputChange('enterpriseSecurity', v)} options={[{ value: 'soc2', label: 'SOC2' }, { value: 'gdpr', label: 'GDPR' }, { value: 'on-prem', label: 'On-Premise' }, { value: 'standard', label: 'Standard' }]} icon={ShieldCheck} />
-                                    <CustomDropdown label="Budget" value={formData.enterpriseBudget} onChange={(v) => handleInputChange('enterpriseBudget', v)} options={[{ value: '10k', label: '$10k - $50k' }, { value: '50k', label: '$50k - $200k' }, { value: '200k+', label: '$200k+' }, { value: 'undecided', label: 'Undecided' }]} icon={Wallet} />
+                                    <CustomDropdown label="Industry" value={formData.enterpriseIndustry} onChange={(v) => handleInputChange('enterpriseIndustry', v)} options={[{ value: 'fintech', label: 'Finance' }, { value: 'health', label: 'Healthcare' }, { value: 'retail', label: 'Retail' }, { value: 'tech', label: 'Technology' }]} icon={Building2} error={errors.enterpriseIndustry} />
+                                    <CustomDropdown label="Department" value={formData.enterpriseDepartment} onChange={(v) => handleInputChange('enterpriseDepartment', v)} options={[{ value: 'marketing', label: 'Marketing' }, { value: 'product', label: 'Product' }, { value: 'sales', label: 'Sales' }, { value: 'hr', label: 'HR' }]} icon={Briefcase} error={errors.enterpriseDepartment} />
+                                    <CustomDropdown label="Security" value={formData.enterpriseSecurity} onChange={(v) => handleInputChange('enterpriseSecurity', v)} options={[{ value: 'soc2', label: 'SOC2' }, { value: 'gdpr', label: 'GDPR' }, { value: 'on-prem', label: 'On-Premise' }, { value: 'standard', label: 'Standard' }]} icon={ShieldCheck} error={errors.enterpriseSecurity} />
+                                    <CustomDropdown label="Budget" value={formData.enterpriseBudget} onChange={(v) => handleInputChange('enterpriseBudget', v)} options={[{ value: '10k', label: '$10k - $50k' }, { value: '50k', label: '$50k - $200k' }, { value: '200k+', label: '$200k+' }, { value: 'undecided', label: 'Undecided' }]} icon={Wallet} error={errors.enterpriseBudget} />
                                 </>
                             )}
                         </div>
                         <motion.button
+                            type="button"
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={nextStep}
@@ -631,13 +703,16 @@ export const WaitlistModal = () => {
                             </div>
                             <h2 className="text-2xl font-bold text-white">Almost there!</h2>
                             <p className="text-white/50 text-sm">Just a few more details</p>
+                            <p className="text-white/40 text-[10px] md:text-xs mt-1">Fields marked with <span className="text-red-400">*</span> are required</p>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <CustomDropdown label="How did you find us?" value={formData.referralSource} onChange={(v) => handleInputChange('referralSource', v)} options={[{ value: 'social', label: 'Social Media' }, { value: 'search', label: 'Search' }, { value: 'friend', label: 'Friend' }, { value: 'ads', label: 'Ads' }]} icon={Search} />
-                            <CustomDropdown label="Primary Goal" value={formData.primaryGoal} onChange={(v) => handleInputChange('primaryGoal', v)} options={[{ value: 'viral', label: 'Viral Growth' }, { value: 'leads', label: 'Lead Gen' }, { value: 'quality', label: 'Scale Output' }, { value: 'automation', label: 'Automation' }]} icon={Target} />
+                            <CustomDropdown label="How did you find us?" value={formData.referralSource} onChange={(v) => handleInputChange('referralSource', v)} options={[{ value: 'social', label: 'Social Media' }, { value: 'search', label: 'Search' }, { value: 'friend', label: 'Friend' }, { value: 'ads', label: 'Ads' }]} icon={Search} error={errors.referralSource} />
+                            <CustomDropdown label="Primary Goal" value={formData.primaryGoal} onChange={(v) => handleInputChange('primaryGoal', v)} options={[{ value: 'viral', label: 'Viral Growth' }, { value: 'leads', label: 'Lead Gen' }, { value: 'quality', label: 'Scale Output' }, { value: 'automation', label: 'Automation' }]} icon={Target} error={errors.primaryGoal} />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-medium text-white/60 block uppercase tracking-wider">Biggest Challenge?</label>
+                            <label className="text-xs font-medium text-white/60 block uppercase tracking-wider">
+                                Biggest Challenge? <span className="text-white/40 normal-case">(optional)</span>
+                            </label>
                             <div className="relative">
                                 <MessageSquare className="absolute left-4 top-4 w-5 h-5 text-white/40 pointer-events-none" />
                                 <textarea
@@ -650,6 +725,7 @@ export const WaitlistModal = () => {
                             </div>
                         </div>
                         <motion.button
+                            type="button"
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={handleSubmit}
@@ -691,6 +767,7 @@ export const WaitlistModal = () => {
                             We'll reach out to <span className="text-indigo-400 font-medium">{formData.email}</span> with your exclusive invite.
                         </motion.p>
                         <motion.button
+                            type="button"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.6 }}
