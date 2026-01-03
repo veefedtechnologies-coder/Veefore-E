@@ -8,8 +8,7 @@ import {
 import { useIsMobile } from '../hooks/use-is-mobile'
 import { SEO } from '../lib/seo-optimization'
 import { Link } from 'wouter'
-import { MainNavigation } from '../components/MainNavigation'
-import MainFooter from '../components/MainFooter'
+
 
 // Mobile-optimized gradient orbs
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
@@ -241,7 +240,7 @@ const Status = () => {
             </div>
 
             {/* Navigation */}
-            <MainNavigation />
+
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
@@ -282,10 +281,10 @@ const Status = () => {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
                         className={`p-6 rounded-2xl border ${overallStatus === 'operational'
-                                ? 'bg-green-500/10 border-green-500/20'
-                                : overallStatus === 'degraded'
-                                    ? 'bg-yellow-500/10 border-yellow-500/20'
-                                    : 'bg-red-500/10 border-red-500/20'
+                            ? 'bg-green-500/10 border-green-500/20'
+                            : overallStatus === 'degraded'
+                                ? 'bg-yellow-500/10 border-yellow-500/20'
+                                : 'bg-red-500/10 border-red-500/20'
                             }`}
                     >
                         <div className="flex items-center justify-between">
@@ -492,7 +491,7 @@ const Status = () => {
             </section>
 
             {/* Footer */}
-            <MainFooter />
+
         </div>
     )
 }

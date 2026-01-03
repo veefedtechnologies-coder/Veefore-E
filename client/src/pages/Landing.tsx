@@ -14,8 +14,9 @@ import {
 import { SEO, seoConfig } from '../lib/seo-optimization'
 import { MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 import { useIsMobile } from '../hooks/use-is-mobile';
-import { MainNavigation } from '../components/MainNavigation';
 import GlassCard from '../components/GlassCard';
+import { MainNavigation } from '../components/MainNavigation';
+import MainFooter from '../components/MainFooter';
 
 // PERMANENT FIX: All sections now eagerly imported to eliminate async loading flickering
 // React.lazy() with Suspense causes brief fallback flashes when chunks load
@@ -31,7 +32,7 @@ import TargetAudienceSection from '../components/TargetAudienceSection';
 import GrowthEngineSection from '../components/GrowthEngineSection';
 import CreditSystemSection from '../components/CreditSystemSection';
 import BetaLaunchSection from '../components/BetaLaunchSection';
-import MainFooter from '../components/MainFooter';
+
 
 // Visuals for Hero section
 import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals';

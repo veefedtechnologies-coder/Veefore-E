@@ -14,6 +14,8 @@ import { initializeCoreWebVitals } from './lib/core-web-vitals'
 import { initializeComponentModernization } from './lib/component-modernization'
 import { WaitlistProvider } from './context/WaitlistContext'
 import { WaitlistModal } from './components/waitlist/WaitlistModal'
+import { MainNavigation } from './components/MainNavigation'
+import MainFooter from './components/MainFooter'
 
 import Landing from './pages/Landing'
 
@@ -216,8 +218,12 @@ function App() {
               <AuthenticatedApp />
             </React.Suspense>
           ) : isPublicRoute ? (
-            <div className="min-h-screen">
-              {renderPublicPage()}
+            <div className="min-h-screen bg-black text-white">
+              <MainNavigation />
+              <main>
+                {renderPublicPage()}
+              </main>
+              <MainFooter />
             </div>
           ) : (
             <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">

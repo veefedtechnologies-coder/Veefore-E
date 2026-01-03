@@ -6,176 +6,171 @@ interface IphoneMockupProps {
     children: React.ReactNode;
     className?: string;
     isAutoScroll?: boolean;
+    contentScale?: number;
 }
 
-export const IphoneMockup: React.FC<IphoneMockupProps> = ({ children, className = '', isAutoScroll = false }) => {
+export const IphoneMockup: React.FC<IphoneMockupProps> = ({ children, className = '', isAutoScroll = false, contentScale = 1 }) => {
     const containerRef = React.useRef<HTMLDivElement>(null);
     const contentRef = React.useRef<HTMLDivElement>(null);
+    const mockupRef = React.useRef<HTMLDivElement>(null);
     const controls = useAnimation();
     const touchControls = useAnimation();
     const isCancelledRef = React.useRef(false);
+    const isPausedRef = React.useRef(false);
+    const [isInViewport, setIsInViewport] = React.useState(false);
+
+    // Intersection Observer to detect when mockup is in viewport
+    React.useEffect(() => {
+        if (!mockupRef.current) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    setIsInViewport(entry.isIntersecting);
+                    isPausedRef.current = !entry.isIntersecting;
+                });
+            },
+            { threshold: 0.2 } // Trigger when 20% of the element is visible
+        );
+
+        observer.observe(mockupRef.current);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, []);
 
     React.useEffect(() => {
         if (!isAutoScroll) return;
 
-        // Reset cancellation flag on mount
+        // Reset cancellation flag on mount/prop change
         isCancelledRef.current = false;
 
-        // Cancellable delay helper
-        const delay = (ms: number) => new Promise<void>((resolve) => {
-            const timeoutId = setTimeout(() => {
-                if (!isCancelledRef.current) resolve();
-            }, ms);
-            // Store timeout for potential cleanup
-            return () => clearTimeout(timeoutId);
-        });
+        const runAnimationLoop = async () => {
+            if (!containerRef.current || !contentRef.current) return;
 
-        // Small delay to ensure DOM is rendered
-        const timeoutId = setTimeout(async () => {
-            if (!containerRef.current || !contentRef.current || isCancelledRef.current) return;
+            // Wait for layout
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if (isCancelledRef.current) return;
 
             const containerHeight = containerRef.current.offsetHeight;
-            const contentHeight = contentRef.current.offsetHeight;
+            const contentHeight = contentRef.current.offsetHeight * contentScale;
 
-            // Calculate exact scroll distance needed - no extra padding
-            if (contentHeight > containerHeight && !isCancelledRef.current) {
-                // Only scroll exactly as much as the content overflows
-                const scrollAmount = contentHeight - containerHeight;
-                const scrollDuration = Math.max(2.5, scrollAmount / 100); // Natural scroll speed
-                const pauseDuration = 2000; // 2 second pause at top and bottom
+            // Only animate if content overflows
+            if (contentHeight <= containerHeight) return;
 
-                // Combined animation function for perfect sync
-                const runAnimationCycle = async () => {
-                    while (!isCancelledRef.current) {
-                        // === PAUSE AT TOP ===
-                        await delay(pauseDuration);
-                        if (isCancelledRef.current) break;
+            const scrollAmount = contentHeight - containerHeight;
+            const scrollDuration = Math.max(2.5, scrollAmount / 100);
+            const pauseDuration = 2000;
 
-                        // === SCROLL DOWN with touch gesture ===
-                        // Finger enters from bottom-right with elegant slide-in
-                        touchControls.set({ y: 80, x: 30, opacity: 0, scale: 0.3, rotate: 15 });
-                        if (isCancelledRef.current) break;
+            while (!isCancelledRef.current) {
+                // Check visibility before starting a cycle
+                if (!isInViewport) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Low freq check when hidden
+                    continue;
+                }
 
-                        await touchControls.start({
-                            y: 0,
-                            x: 0,
-                            opacity: 1,
-                            scale: 1.15, // Press effect - slightly larger
-                            rotate: 0,
-                            transition: {
-                                duration: 0.4,
-                                ease: [0.34, 1.56, 0.64, 1], // Spring-like bounce
-                                opacity: { duration: 0.2 }
-                            }
-                        });
-                        if (isCancelledRef.current) break;
+                try {
+                    // === PAUSE AT TOP ===
+                    await new Promise(resolve => setTimeout(resolve, pauseDuration));
+                    if (isCancelledRef.current) break;
 
-                        // Brief press hold with subtle pulse
-                        await touchControls.start({
-                            scale: 1.0,
-                            transition: { duration: 0.15 }
-                        });
-                        if (isCancelledRef.current) break;
+                    // Ensure we are still visible before high-cost animation
+                    if (!isInViewport) continue;
 
-                        // Swipe UP gesture (finger moves up = content scrolls down)
-                        const scrollDownPromise = controls.start({
-                            y: -scrollAmount,
-                            transition: { duration: scrollDuration, ease: [0.22, 1, 0.36, 1] }
-                        });
+                    // === TOUCH ENTER (Scroll Down) ===
+                    touchControls.set({ y: 80, x: 30, opacity: 0, scale: 0.3, rotate: 15 });
 
-                        const swipeUpPromise = touchControls.start({
-                            y: -150,
-                            scale: 0.85,
-                            transition: { duration: scrollDuration * 0.5, ease: [0.22, 1, 0.36, 1] }
-                        });
+                    await touchControls.start({
+                        y: 0, x: 0, opacity: 1, scale: 1.15, rotate: 0,
+                        transition: { duration: 0.4, ease: [0.34, 1.56, 0.64, 1], opacity: { duration: 0.2 } }
+                    });
+                    if (isCancelledRef.current) break;
 
-                        await swipeUpPromise;
-                        if (isCancelledRef.current) break;
+                    await touchControls.start({ scale: 1.0, transition: { duration: 0.15 } });
+                    if (isCancelledRef.current) break;
 
-                        // Elegant exit - float up and fade
-                        await touchControls.start({
-                            opacity: 0,
-                            scale: 0.4,
-                            y: -200,
-                            rotate: -10,
-                            transition: { duration: 0.25, ease: "easeOut" }
-                        });
+                    // === SWIPE UP ACTION ===
+                    const scrollDown = controls.start({
+                        y: -scrollAmount,
+                        transition: { duration: scrollDuration, ease: [0.22, 1, 0.36, 1] }
+                    });
 
-                        await scrollDownPromise;
-                        if (isCancelledRef.current) break;
+                    const swipeGesture = touchControls.start({
+                        y: -150, scale: 0.85,
+                        transition: { duration: scrollDuration * 0.5, ease: [0.22, 1, 0.36, 1] }
+                    });
 
-                        // === PAUSE AT BOTTOM ===
-                        await delay(pauseDuration);
-                        if (isCancelledRef.current) break;
+                    await swipeGesture;
+                    if (isCancelledRef.current) break;
 
-                        // === SCROLL UP with touch gesture ===
-                        // Finger enters from top-right with elegant slide-in
-                        touchControls.set({ y: -150, x: 30, opacity: 0, scale: 0.3, rotate: -15 });
-                        if (isCancelledRef.current) break;
+                    // === TOUCH EXIT ===
+                    await touchControls.start({
+                        opacity: 0, scale: 0.4, y: -200, rotate: -10,
+                        transition: { duration: 0.25, ease: "easeOut" }
+                    });
 
-                        await touchControls.start({
-                            y: -80,
-                            x: 0,
-                            opacity: 1,
-                            scale: 1.15,
-                            rotate: 0,
-                            transition: {
-                                duration: 0.4,
-                                ease: [0.34, 1.56, 0.64, 1],
-                                opacity: { duration: 0.2 }
-                            }
-                        });
-                        if (isCancelledRef.current) break;
+                    await scrollDown;
+                    if (isCancelledRef.current) break;
 
-                        // Brief press hold with subtle pulse
-                        await touchControls.start({
-                            scale: 1.0,
-                            transition: { duration: 0.15 }
-                        });
-                        if (isCancelledRef.current) break;
+                    // === PAUSE AT BOTTOM ===
+                    await new Promise(resolve => setTimeout(resolve, pauseDuration));
+                    if (isCancelledRef.current) break;
 
-                        // Swipe DOWN gesture (finger moves down = content scrolls up)
-                        const scrollUpPromise = controls.start({
-                            y: 0,
-                            transition: { duration: scrollDuration, ease: [0.22, 1, 0.36, 1] }
-                        });
+                    if (!isInViewport) continue;
 
-                        const swipeDownPromise = touchControls.start({
-                            y: 70,
-                            scale: 0.85,
-                            transition: { duration: scrollDuration * 0.5, ease: [0.22, 1, 0.36, 1] }
-                        });
+                    // === TOUCH ENTER (Scroll Up) ===
+                    touchControls.set({ y: -150, x: 30, opacity: 0, scale: 0.3, rotate: -15 });
 
-                        await swipeDownPromise;
-                        if (isCancelledRef.current) break;
+                    await touchControls.start({
+                        y: -80, x: 0, opacity: 1, scale: 1.15, rotate: 0,
+                        transition: { duration: 0.4, ease: [0.34, 1.56, 0.64, 1], opacity: { duration: 0.2 } }
+                    });
+                    if (isCancelledRef.current) break;
 
-                        // Elegant exit - float down and fade
-                        await touchControls.start({
-                            opacity: 0,
-                            scale: 0.4,
-                            y: 120,
-                            rotate: 10,
-                            transition: { duration: 0.25, ease: "easeOut" }
-                        });
+                    await touchControls.start({ scale: 1.0, transition: { duration: 0.15 } });
+                    if (isCancelledRef.current) break;
 
-                        await scrollUpPromise;
-                    }
-                };
+                    // === SWIPE DOWN ACTION ===
+                    const scrollUp = controls.start({
+                        y: 0,
+                        transition: { duration: scrollDuration, ease: [0.22, 1, 0.36, 1] }
+                    });
 
-                runAnimationCycle();
+                    const swipeDownGesture = touchControls.start({
+                        y: 70, scale: 0.85,
+                        transition: { duration: scrollDuration * 0.5, ease: [0.22, 1, 0.36, 1] }
+                    });
+
+                    await swipeDownGesture;
+                    if (isCancelledRef.current) break;
+
+                    // === TOUCH EXIT ===
+                    await touchControls.start({
+                        opacity: 0, scale: 0.4, y: 120, rotate: 10,
+                        transition: { duration: 0.25, ease: "easeOut" }
+                    });
+
+                    await scrollUp;
+
+                } catch (e) {
+                    // Animation interruption handling
+                    if (isCancelledRef.current) break;
+                }
             }
-        }, 500); // Wait 500ms for content to render
+        };
+
+        runAnimationLoop();
 
         return () => {
             isCancelledRef.current = true;
-            clearTimeout(timeoutId);
             controls.stop();
             touchControls.stop();
         };
-    }, [isAutoScroll, controls, touchControls]);
+    }, [isAutoScroll, isInViewport, controls, touchControls]);
 
     return (
-        <div className={`relative mx-auto border-gray-900 dark:border-gray-900 bg-gray-900 border-[14px] rounded-[2.5rem] h-[600px] w-[300px] shadow-xl ${className}`}>
+        <div ref={mockupRef} className={`relative mx-auto border-gray-900 dark:border-gray-900 bg-gray-900 border-[14px] rounded-[2.5rem] h-[600px] w-[300px] shadow-xl ${className}`}>
             {/* Physical Side Buttons */}
             <div className="h-[32px] w-[3px] bg-gray-800 absolute -left-[17px] top-[72px] rounded-l-lg"></div>
             <div className="h-[46px] w-[3px] bg-gray-800 absolute -left-[17px] top-[124px] rounded-l-lg"></div>
@@ -203,7 +198,7 @@ export const IphoneMockup: React.FC<IphoneMockupProps> = ({ children, className 
                 {/* Content Container */}
                 <div
                     ref={containerRef}
-                    className="flex-1 w-full relative bg-[#0a0a0a] overflow-hidden"
+                    className="flex-1 w-full relative bg-transparent overflow-hidden"
                 >
                     {isAutoScroll ? (
                         <>

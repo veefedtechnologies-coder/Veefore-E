@@ -140,6 +140,8 @@
 
   html.dark {
     color-scheme: dark;
+    overflow-y: scroll;
+    /* Lock scrollbar to prevent layout shifts */
   }
 
   html.light {
@@ -530,7 +532,7 @@ html {
    ================================================= */
 
 /* RULE #2: Content-visibility for large sections - allows browser to skip off-screen rendering */
-section,
+/* MOVED OFF GENERIC SECTION TAG TO PREVENT JITTER ON DYNAMIC PAGES */
 .landing-section,
 [data-section] {
   content-visibility: auto;
@@ -538,18 +540,15 @@ section,
   contain: layout style paint;
 }
 
-/* RULE #3: GPU Compositing for animated elements - DESKTOP ONLY to prevent mobile layer explosion */
-@media (min-width: 769px) {
-
-  [class*="motion"],
-  [class*="animate-"],
-  .framer-motion,
-  motion,
-  [data-framer-motion] {
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-  }
+/* RULE #3: GPU Compositing for animated elements - SCALED FOR MOBILE STABILITY */
+[data-framer-motion],
+[style*="transform"],
+[style*="opacity"] {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* Ensure we don't create layers for every single child */
+  isolation: isolate;
 }
 
 /* RULE #4: Fast, smooth animation timing - 0.3s with snappy ease-out */
@@ -622,13 +621,8 @@ section,
    ======================================== */
 
 /* Force GPU layer for all motion.div elements on all devices */
-[data-framer-motion],
-[style*="transform"],
-[style*="opacity"] {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
+/* Force GPU layer for all motion.div elements */
+/* Now handled by RULE #3 above */
 
 /* Force GPU layers for gradient orbs and background elements */
 .gradient-orb,

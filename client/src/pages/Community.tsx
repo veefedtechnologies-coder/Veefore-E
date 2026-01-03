@@ -8,8 +8,7 @@ import {
 import { useIsMobile } from '../hooks/use-is-mobile'
 import { SEO } from '../lib/seo-optimization'
 import { Link } from 'wouter'
-import { MainNavigation } from '../components/MainNavigation'
-import MainFooter from '../components/MainFooter'
+
 import { useWaitlist } from '../context/WaitlistContext'
 
 // Mobile-optimized gradient orbs
@@ -258,7 +257,7 @@ const Community = () => {
             </div>
 
             {/* Navigation */}
-            <MainNavigation />
+
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-16 md:pt-36 md:pb-24 px-4 sm:px-6">
@@ -493,7 +492,7 @@ const Community = () => {
             </section>
 
             {/* Footer */}
-            <MainFooter />
+
         </div>
     )
 }
