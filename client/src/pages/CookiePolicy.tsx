@@ -8,8 +8,7 @@ import {
 import { useIsMobile } from '../hooks/use-is-mobile';
 import { SEO } from '../lib/seo-optimization';
 import { Link } from 'wouter';
-import { MainNavigation } from '../components/MainNavigation';
-import MainFooter from '../components/MainFooter';
+
 
 // Gradient Orb Component
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
@@ -179,7 +178,7 @@ const CookiePolicy = () => {
             </div>
 
             {/* Navigation */}
-            <MainNavigation />
+
 
             {/* Hero Section */}
             <section className="relative pt-28 pb-12 md:pt-36 md:pb-16 px-4 sm:px-6">
@@ -449,7 +448,7 @@ const CookiePolicy = () => {
             </section>
 
             {/* Footer */}
-            <MainFooter />
+
         </div>
     );
 };

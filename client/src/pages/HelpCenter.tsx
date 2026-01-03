@@ -8,8 +8,7 @@ import {
 import { useIsMobile } from '../hooks/use-is-mobile'
 import { SEO } from '../lib/seo-optimization'
 import { Link } from 'wouter'
-import { MainNavigation } from '../components/MainNavigation'
-import MainFooter from '../components/MainFooter'
+
 
 // Mobile-optimized gradient orbs
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
@@ -179,7 +178,7 @@ const HelpCenter = () => {
             </div>
 
             {/* Navigation */}
-            <MainNavigation />
+
 
             {/* Hero Section with Search */}
             <section className="relative pt-28 pb-16 md:pt-36 md:pb-24 px-4 sm:px-6">
@@ -479,7 +478,7 @@ const HelpCenter = () => {
             </section>
 
             {/* Footer */}
-            <MainFooter />
+
         </div>
     )
 }

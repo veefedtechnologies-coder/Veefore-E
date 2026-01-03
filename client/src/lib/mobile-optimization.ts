@@ -87,14 +87,14 @@ export class MobileOptimizer {
   initialize(config?: Partial<MobileConfig>): void {
     this.config = { ...DEFAULT_MOBILE_CONFIG, ...config };
     this.deviceInfo = this.detectDevice();
-    
+
     this.setupViewport();
     this.setupTouchOptimization();
     this.setupGestureSupport();
     this.setupOrientationHandling();
     this.setupMobileCSS();
     this.preventZoom();
-    
+
     console.log('📱 P6-4: Mobile optimization system initialized', this.deviceInfo);
   }
 
@@ -106,12 +106,12 @@ export class MobileOptimizer {
     const screenWidth = window.screen.width;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    
+
     // Device type detection
     const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent) ||
-                    (screenWidth <= 768 && 'ontouchstart' in window);
+      (screenWidth <= 768 && 'ontouchstart' in window);
     const isTablet = /ipad|android(?=.*tablet)|tablet/i.test(userAgent) ||
-                    (screenWidth > 768 && screenWidth <= 1024 && 'ontouchstart' in window);
+      (screenWidth > 768 && screenWidth <= 1024 && 'ontouchstart' in window);
     const isDesktop = !isMobile && !isTablet;
 
     // Screen size classification
@@ -143,7 +143,7 @@ export class MobileOptimizer {
    */
   private setupViewport(): void {
     let viewport = document.querySelector('meta[name="viewport"]') as HTMLMetaElement;
-    
+
     if (!viewport) {
       viewport = document.createElement('meta');
       viewport.name = 'viewport';
@@ -196,7 +196,7 @@ export class MobileOptimizer {
         const clickableElement = target.tagName === 'BUTTON' || target.tagName === 'A' || target.getAttribute('role') === 'button'
           ? target
           : target.closest('button, a, [role="button"]') as HTMLElement | null;
-        
+
         if (clickableElement && typeof clickableElement.click === 'function') {
           // Prevent the delayed click
           e.preventDefault();
@@ -214,12 +214,12 @@ export class MobileOptimizer {
    */
   private optimizeTouchTargets(): void {
     const minTouchSize = 44; // 44px minimum touch target (Apple HIG)
-    
+
     document.querySelectorAll('button, a, input[type="button"], input[type="submit"]')
       .forEach((element) => {
         const el = element as HTMLElement;
         const rect = el.getBoundingClientRect();
-        
+
         if (rect.width < minTouchSize || rect.height < minTouchSize) {
           el.style.minWidth = `${minTouchSize}px`;
           el.style.minHeight = `${minTouchSize}px`;
@@ -250,7 +250,7 @@ export class MobileOptimizer {
       if (isGesturing && e.touches.length === 2) {
         const currentDistance = this.getDistance(e.touches[0], e.touches[1]);
         const currentAngle = this.getAngle(e.touches[0], e.touches[1]);
-        
+
         const scale = currentDistance / gestureStartDistance;
         const rotation = currentAngle - gestureStartAngle;
 
@@ -304,7 +304,7 @@ export class MobileOptimizer {
 
       if (distance > minSwipeDistance) {
         let direction: 'up' | 'down' | 'left' | 'right';
-        
+
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
           direction = deltaX > 0 ? 'right' : 'left';
         } else {
@@ -333,7 +333,7 @@ export class MobileOptimizer {
         this.deviceInfo = this.detectDevice();
         document.body.className = document.body.className.replace(/orientation-\w+/, '');
         document.body.classList.add(`orientation-${this.deviceInfo.orientation}`);
-        
+
         // Emit orientation change event
         window.dispatchEvent(new CustomEvent('mobile:orientationchange', {
           detail: { orientation: this.deviceInfo.orientation, deviceInfo: this.deviceInfo }
@@ -466,7 +466,7 @@ export class MobileOptimizer {
   private triggerGesture(gesture: TouchGesture): void {
     // Emit gesture event
     window.dispatchEvent(new CustomEvent('mobile:gesture', { detail: gesture }));
-    
+
     // Call registered handlers
     this.gestureHandlers.forEach(handler => handler(gesture));
   }
@@ -589,10 +589,10 @@ export class MobileOptimizer {
    */
   addResponsiveClasses(): void {
     const { screenSize, isMobile, isTablet, isDesktop, orientation } = this.deviceInfo;
-    
+
     document.body.classList.remove('xs', 'sm', 'md', 'lg', 'xl', 'mobile', 'tablet', 'desktop', 'portrait', 'landscape');
     document.body.classList.add(screenSize, orientation);
-    
+
     if (isMobile) document.body.classList.add('mobile');
     if (isTablet) document.body.classList.add('tablet');
     if (isDesktop) document.body.classList.add('desktop');
@@ -614,7 +614,7 @@ export function useMobile() {
     };
 
     window.addEventListener('mobile:orientationchange', handleOrientationChange as EventListener);
-    
+
     return () => {
       window.removeEventListener('mobile:orientationchange', handleOrientationChange as EventListener);
     };
@@ -641,7 +641,7 @@ export function useGestures() {
     };
 
     window.addEventListener('mobile:gesture', handleGesture as EventListener);
-    
+
     return () => {
       window.removeEventListener('mobile:gesture', handleGesture as EventListener);
     };
@@ -649,9 +649,9 @@ export function useGestures() {
 
   return {
     lastGesture,
-    onGesture: (type: TouchGesture['type'], handler: (gesture: TouchGesture) => void) => 
+    onGesture: (type: TouchGesture['type'], handler: (gesture: TouchGesture) => void) =>
       mobileOptimizer.onGesture(type, handler),
-    offGesture: (type: TouchGesture['type']) => 
+    offGesture: (type: TouchGesture['type']) =>
       mobileOptimizer.offGesture(type)
   };
 }
