@@ -102,8 +102,8 @@ export const getRateLimitRedisClient = (): Redis => {
             // Fail fast settings
             maxRetriesPerRequest: 1,       // Don't retry commands forever
             enableOfflineQueue: false,      // Don't queue commands if disconnected
-            commandTimeout: 1000,           // 1s hard timeout on commands
-            connectTimeout: 1000,           // 1s connection timeout
+            commandTimeout: 2000,           // 2s hard timeout on commands (increased from 1s)
+            connectTimeout: 10000,          // 10s connection timeout (increased from 1s)
             retryStrategy: (times) => {
                 // Retry only a few times with short delay
                 if (times > 3) return null; // Stop retrying after 3 attempts
