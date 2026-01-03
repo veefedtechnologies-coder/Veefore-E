@@ -8,7 +8,7 @@ import {
     User, Mail, Building2, Users, Rocket,
     Globe, Layers, Clock, Target, MessageSquare,
     Briefcase, BarChart3, ShieldCheck, Wallet,
-    ArrowRight, Search, PieChart, Star
+    ArrowRight, Search, PieChart, Star, Loader2, AlertTriangle
 } from 'lucide-react';
 
 // ============================================
@@ -244,6 +244,8 @@ export const WaitlistModal = () => {
     const { isWaitlistOpen, closeWaitlist } = useWaitlist();
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
+    const [networkError, setNetworkError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState<WaitlistFormData>({
         name: '',
@@ -275,17 +277,24 @@ export const WaitlistModal = () => {
 
     const nextStep = async () => {
         console.log('[Waitlist] nextStep called, current step:', step);
+        setIsValidating(true);
+        setNetworkError(null);
+
         try {
             const isValid = await validateStep(step);
             console.log('[Waitlist] validateStep returned:', isValid);
             if (!isValid) {
                 console.log('[Waitlist] Validation failed, not advancing');
+                setIsValidating(false);
                 return;
             }
             setStep(prev => prev + 1);
             console.log('[Waitlist] Advanced to step:', step + 1);
         } catch (error) {
             console.error('[Waitlist] nextStep error:', error);
+            setNetworkError('Connection issue. Please check your internet and try again.');
+        } finally {
+            setIsValidating(false);
         }
     };
 
@@ -348,9 +357,17 @@ export const WaitlistModal = () => {
                         newErrors.email = "Please enter a valid email domain";
                         isValid = false;
                     } else {
-                        // Check if email already exists on waitlist
+                        // Check if email already exists on waitlist (with 5s timeout)
                         try {
-                            const response = await fetch(`/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                            const response = await fetch(
+                                `/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`,
+                                { signal: controller.signal }
+                            );
+
+                            clearTimeout(timeoutId);
 
                             if (response.status === 429) {
                                 newErrors.email = "Too many requests. Please wait a moment and try again.";
@@ -363,8 +380,9 @@ export const WaitlistModal = () => {
                                 }
                             }
                         } catch (error) {
-                            console.error('Error checking email:', error);
-                            // Don't block on network errors, let the final submit handle it
+                            // Re-throw error to be handled by nextStep (shows retry UI)
+                            console.error('[Waitlist] Email check failed:', error);
+                            throw error;
                         }
                     }
                 }
@@ -566,18 +584,47 @@ export const WaitlistModal = () => {
                             required
                         />
 
-                        <motion.button
-                            type="button"
-                            whileHover={{ scale: 1.02, y: -2 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={nextStep}
-                            className="w-full h-12 md:h-14 rounded-xl bg-white text-black font-bold text-sm md:text-base flex items-center justify-center gap-2 relative overflow-hidden group z-10"
-                            style={{ border: 'none', outline: 'none' }}
-                        >
-                            <span className="relative z-10">Start Application</span>
-                            <ArrowRight className="w-4 h-4 md:w-5 md:h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-white via-gray-100 to-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                        </motion.button>
+                        {networkError ? (
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex flex-col md:flex-row items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                <div className="p-2 bg-red-500/10 rounded-full shrink-0">
+                                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                                </div>
+                                <div className="flex-1 text-center md:text-left">
+                                    <p className="text-white text-sm font-medium">Connection Failed</p>
+                                    <p className="text-white/50 text-xs">{networkError}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={nextStep}
+                                    className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors w-full md:w-auto"
+                                >
+                                    Try Again
+                                </button>
+                            </div>
+                        ) : (
+                            <motion.button
+                                type="button"
+                                whileHover={{ scale: 1.02, y: -2 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={nextStep}
+                                disabled={isValidating}
+                                className="w-full h-12 md:h-14 rounded-xl bg-white text-black font-bold text-sm md:text-base flex items-center justify-center gap-2 relative overflow-hidden group z-10 disabled:opacity-70 disabled:pointer-events-none"
+                                style={{ border: 'none', outline: 'none' }}
+                            >
+                                {isValidating ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+                                        <span>Checking...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="relative z-10">Start Application</span>
+                                        <ArrowRight className="w-4 h-4 md:w-5 md:h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
+                                        <div className="absolute inset-0 bg-gradient-to-r from-white via-gray-100 to-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                    </>
+                                )}
+                            </motion.button>
+                        )}
 
                         {/* Trust badges */}
                         <div className="flex items-center justify-center gap-4 md:gap-6 pt-2 md:pt-4">
