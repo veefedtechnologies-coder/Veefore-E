@@ -223,9 +223,12 @@
 }
 
 @keyframes shimmer-slide {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateX(-100%);
   }
+
   50% {
     transform: translateX(100%);
   }
@@ -474,6 +477,7 @@ html.dark .glass {
 }
 
 @media (max-width: 768px) {
+
   /* Reduced blur values on mobile for performance while keeping visual effects */
   .gradient-orb {
     filter: blur(60px);
@@ -491,7 +495,9 @@ html.dark .glass {
     -webkit-backdrop-filter: blur(12px);
   }
 
-  .blur-xl, .blur-2xl, .blur-3xl {
+  .blur-xl,
+  .blur-2xl,
+  .blur-3xl {
     filter: none !important;
   }
 }
@@ -534,6 +540,7 @@ section,
 
 /* RULE #3: GPU Compositing for animated elements - DESKTOP ONLY to prevent mobile layer explosion */
 @media (min-width: 769px) {
+
   [class*="motion"],
   [class*="animate-"],
   .framer-motion,
@@ -607,4 +614,88 @@ section,
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
+}
+
+/* ========================================
+   MOBILE GPU ACCELERATION - PREVENT FLICKERING
+   Keeps all animations but ensures GPU compositing
+   ======================================== */
+
+/* Force GPU layer for all motion.div elements on all devices */
+[data-framer-motion],
+[style*="transform"],
+[style*="opacity"] {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Force GPU layers for gradient orbs and background elements */
+.gradient-orb,
+.fallback-orb,
+[class*="blur-"] {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  isolation: isolate;
+}
+
+/* Ensure sticky elements don't cause reflow */
+.sticky {
+  transform: translateZ(0);
+  contain: layout style;
+}
+
+/* GPU accelerate AnimatePresence height transitions */
+[data-framer-exit],
+[data-framer-enter] {
+  transform: translateZ(0);
+  contain: layout;
+}
+
+/* Prevent layout shifts on sections with lazy loading */
+section {
+  contain: layout style;
+}
+
+/* Ensure smooth scrolling on mobile */
+@supports (overflow: overlay) {
+  :root {
+    overflow: overlay;
+  }
+}
+
+/* ========================================
+   ANIMATION STABILITY - PREVENT RESET
+   ======================================== */
+
+/* Ensure animations preserve their final state */
+[data-framer-motion] {
+  animation-fill-mode: both !important;
+}
+
+/* Prevent scroll-based layout recalculations from affecting animations */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Stabilize touch interactions */
+body {
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent double-tap zoom which can interfere with animations */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* Ensure animated elements don't cause layout shifts when they animate */
+[data-framer-motion][style*="opacity"],
+[data-framer-motion][style*="transform"] {
+  will-change: opacity, transform;
+  contain: layout paint;
 }

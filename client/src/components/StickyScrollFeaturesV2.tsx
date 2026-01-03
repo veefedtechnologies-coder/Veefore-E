@@ -1,11 +1,11 @@
-import { useRef, useState, memo, useMemo, useEffect } from 'react';
-import { motion, useScroll, useSpring, useMotionValueEvent } from 'framer-motion';
+import { useRef, useState, memo, useEffect } from 'react';
+import { motion, useScroll, useSpring, useMotionValueEvent, useTransform } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
-import { GPU_ACCELERATED_STYLES } from '../lib/animation-performance';
+import { GPU_ACCELERATED_STYLES, MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 
 // Lightning fast spring config - low solver overhead
-const springConfig = { stiffness: 80, damping: 20, mass: 1 };
+const springConfig = { stiffness: 200, damping: 30, mass: 1 };
 
 const colorMap = {
     blue: {
@@ -227,7 +227,7 @@ const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
                 ...GPU_ACCELERATED_STYLES,
             }}
         >
-            <div className="scale-[0.6] sm:scale-[0.7] md:scale-[0.8] origin-center -mt-8 sm:-mt-0">
+            <div className="scale-[0.6] sm:scale-[0.7] md:scale-[0.8] origin-center sm:-mt-0">
                 <IphoneMockup className="shadow-2xl">
                     <ScreenContent feature={feature} isMobile={true} />
                 </IphoneMockup>
@@ -251,21 +251,22 @@ const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
 
 interface TextSlideProps {
     feature: Feature;
-    opacity: number;
-    y: number;
+    opacity: any; // Allow MotionValue or number
+    y: any;       // Allow MotionValue or number
 }
 
 // Faster text spring for snappier transitions
-const textSpringConfig = { stiffness: 150, damping: 18, mass: 0.4 };
+const textSpringConfig = { stiffness: 240, damping: 30, mass: 0.5 };
 
 const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     const colors = colorMap[feature.color];
-    const opacityValue = useSpring(opacity, textSpringConfig);
-    const yValue = useSpring(y, textSpringConfig);
+    // Cast to any to bypass strict type checking for motion vs number mix
+    const opacityValue = useSpring(opacity as any, textSpringConfig);
+    const yValue = useSpring(y as any, textSpringConfig);
 
     useEffect(() => {
-        opacityValue.set(opacity);
-        yValue.set(y);
+        if (typeof opacity === 'number') opacityValue.set(opacity as any);
+        if (typeof y === 'number') yValue.set(y as any);
     }, [opacity, y]);
 
     return (
@@ -285,23 +286,29 @@ const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
 
 interface MockupSlideProps {
     feature: Feature;
-    y: number;
-    scale: number;
+    y: any;       // Allow MotionValue or number
+    scale: any;   // Allow MotionValue or number
     isVisible: boolean;
     isStatic?: boolean;
+    opacity?: any; // Allow MotionValue or number
 }
 
 // Faster mockup spring for snappier transitions
-const mockupSpringConfig = { stiffness: 140, damping: 16, mass: 0.4 };
+const mockupSpringConfig = { stiffness: 220, damping: 30, mass: 0.5 };
 
-const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: MockupSlideProps) => {
-    const springY = useSpring(y, mockupSpringConfig);
-    const springScale = useSpring(scale, mockupSpringConfig);
+const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opacity }: MockupSlideProps) => {
+    // Cast to any to bypass strict type checking
+    const springY = useSpring(y as any, mockupSpringConfig);
+    const springScale = useSpring(scale as any, mockupSpringConfig);
+
+    // Only use spring for opacity if it's a number (if it's a MotionValue, use it directly)
+    const springOpacity = useSpring((typeof opacity === 'number' ? opacity : 1), mockupSpringConfig);
 
     useEffect(() => {
-        springY.set(y);
-        springScale.set(scale);
-    }, [y, scale]);
+        if (typeof y === 'number') springY.set(y);
+        if (typeof scale === 'number') springScale.set(scale);
+        if (typeof opacity === 'number') springOpacity.set(opacity);
+    }, [y, scale, opacity]);
 
     if (isStatic) {
         return (
@@ -319,18 +326,24 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false }: Mo
         );
     }
 
-    // FIXED: Never return null - use CSS visibility instead to prevent layout thrashing
+    // Fallback visibility logic if opacity is not provided or is just a number
     const shouldHide = !isVisible && y > 50;
+
+    // Determine final opacity to use: explicit prop (if MotionValue or number), or calculated fallback
+    const finalOpacity = opacity !== undefined
+        ? (typeof opacity === 'number' ? springOpacity : opacity)
+        : (shouldHide ? 0 : 1);
 
     return (
         <motion.div
             style={{
                 y: springY,
                 scale: springScale,
-                ...GPU_ACCELERATED_STYLES,
-                opacity: shouldHide ? 0 : 1,
-                visibility: shouldHide ? 'hidden' : 'visible',
-                pointerEvents: shouldHide ? 'none' : 'auto',
+                ...MOBILE_OPTIMIZED_LAYER,
+                opacity: finalOpacity,
+                // Only hide visibility if purely based on the fallback boolean logic and opacity is 0
+                visibility: (finalOpacity === 0 || (typeof finalOpacity === 'number' && finalOpacity === 0)) ? 'hidden' : 'visible',
+                pointerEvents: (finalOpacity === 0 || (typeof finalOpacity === 'number' && finalOpacity === 0)) ? 'none' : 'auto',
             }}
             className="absolute inset-0 flex items-center justify-center"
         >
@@ -349,149 +362,192 @@ const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKe
 
     return (
         <motion.div
-            style={{ opacity: springOpacity, ...GPU_ACCELERATED_STYLES }}
+            style={{ opacity: springOpacity, ...MOBILE_OPTIMIZED_LAYER }}
             className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`}
         />
     );
 });
 
+const MotionTextSlide = ({ feature, index, progress }: { feature: Feature; index: number; progress: any }) => {
+    const opacity = useTransform(progress, (p: number) => {
+        // Apply snap logic inside transform
+        const snapPoints = [0, 0.33, 0.66, 1];
+        const snapStrength = 0.25;
+        let snapped = p;
+        for (const snap of snapPoints) {
+            const dist = Math.abs(p - snap);
+            if (dist < snapStrength) {
+                const factor = dist / snapStrength;
+                const eased = factor * factor;
+                snapped = snap + (p - snap > 0 ? 1 : -1) * eased * snapStrength;
+            }
+        }
+
+        const i = index;
+        if (i === 0) {
+            let op = mapRange(snapped, 0, 0.28, 1, 1);
+            if (snapped > 0.28) op = mapRange(snapped, 0.28, 0.35, 1, 0);
+            return Math.max(0, Math.min(1, op));
+        } else if (i === 1) {
+            let op = mapRange(snapped, 0.31, 0.38, 0, 1);
+            if (snapped > 0.58) op = mapRange(snapped, 0.58, 0.65, 1, 0);
+            return Math.max(0, Math.min(1, op));
+        } else {
+            const op = mapRange(snapped, 0.62, 0.69, 0, 1);
+            return Math.max(0, Math.min(1, op));
+        }
+    });
+
+    const y = useTransform(progress, (p: number) => {
+        // Apply snap logic
+        const snapPoints = [0, 0.33, 0.66, 1];
+        const snapStrength = 0.15;
+        let snapped = p;
+        for (const snap of snapPoints) {
+            const dist = Math.abs(p - snap);
+            if (dist < snapStrength) {
+                const factor = dist / snapStrength;
+                const eased = factor * factor;
+                snapped = snap + (p - snap > 0 ? 1 : -1) * eased * snapStrength;
+            }
+        }
+
+        const i = index;
+        if (i === 0) {
+            return snapped > 0.28 ? mapRange(snapped, 0.28, 0.35, 0, -40) : 0;
+        } else if (i === 1) {
+            return snapped < 0.38 ? mapRange(snapped, 0.31, 0.38, 40, 0) :
+                snapped > 0.58 ? mapRange(snapped, 0.58, 0.65, 0, -40) : 0;
+        } else {
+            return snapped < 0.69 ? mapRange(snapped, 0.62, 0.69, 40, 0) : 0;
+        }
+    });
+
+    return <TextSlide feature={feature} opacity={opacity} y={y} />;
+};
+
+const MotionMockupSlide = ({ feature, index, progress }: { feature: Feature; index: number; progress: any }) => {
+    const transformValues = useTransform(progress, (p: number) => {
+        // Apply snap logic
+        const snapPoints = [0, 0.33, 0.66, 1];
+        const snapStrength = 0.25;
+        let snapped = p;
+        for (const snap of snapPoints) {
+            const dist = Math.abs(p - snap);
+            if (dist < snapStrength) {
+                const factor = dist / snapStrength;
+                const eased = factor * factor;
+                snapped = snap + (p - snap > 0 ? 1 : -1) * eased * snapStrength;
+            }
+        }
+
+        const i = index;
+        let y = 0;
+        let scale = 1;
+        let isVisible = true;
+        let isStatic = false;
+
+        // Tighter transition windows for sharper mockup changes
+        if (i === 0) {
+            if (snapped < 0.05) {
+                isStatic = true;
+                isVisible = true;
+            } else {
+                y = snapped > 0.28 ? mapRange(snapped, 0.28, 0.35, 0, -100) * (typeof window !== 'undefined' ? window.innerHeight : 800) / 100 : 0;
+                scale = snapped > 0.28 ? mapRange(snapped, 0.28, 0.35, 1, 0.85) : 1;
+                isVisible = snapped < 0.40;
+            }
+        } else if (i === 1) {
+            const enterY = mapRange(snapped, 0.31, 0.38, 100, 0);
+            const exitY = mapRange(snapped, 0.58, 0.65, 0, -100);
+            y = (snapped < 0.38 ? enterY : snapped > 0.58 ? exitY : 0) * (typeof window !== 'undefined' ? window.innerHeight : 800) / 100;
+            scale = snapped < 0.40 ? mapRange(snapped, 0.31, 0.40, 0.85, 1) :
+                snapped > 0.56 ? mapRange(snapped, 0.56, 0.65, 1, 0.85) : 1;
+            isVisible = snapped > 0.28 && snapped < 0.70;
+        } else {
+            y = mapRange(snapped, 0.62, 0.69, 100, 0) * (typeof window !== 'undefined' ? window.innerHeight : 800) / 100;
+            scale = mapRange(snapped, 0.62, 0.72, 0.85, 1);
+            isVisible = snapped > 0.58;
+        }
+
+        return { y, scale: Math.max(0.85, Math.min(1, scale)), isVisible, isStatic };
+    });
+
+    const y = useTransform(transformValues, (v) => v.y);
+    const scale = useTransform(transformValues, (v) => v.scale);
+    const opacity = useTransform(transformValues, (v) => v.isVisible ? 1 : 0);
+    // We can't easily control 'isStatic' or 'isVisible' prop on MockupSlide via motion value without re-render
+    // So we use opacity to hide it and always render
+
+    return <MockupSlide feature={feature} y={y} scale={scale} opacity={opacity} isVisible={true} />;
+};
+
+const MotionAmbientGlow = ({ color, index, progress }: { color: any; index: number; progress: any }) => {
+    const opacity = useTransform(progress, (p: number) => {
+        // Apply snap logic
+        const snapPoints = [0, 0.33, 0.66, 1];
+        const snapStrength = 0.25;
+        let snapped = p;
+        for (const snap of snapPoints) {
+            const dist = Math.abs(p - snap);
+            if (dist < snapStrength) {
+                const factor = dist / snapStrength;
+                const eased = factor * factor;
+                snapped = snap + (p - snap > 0 ? 1 : -1) * eased * snapStrength;
+            }
+        }
+
+        if (index === 0) {
+            let op = mapRange(snapped, 0, 0.1, 0, 0.25);
+            if (snapped > 0.25) op = mapRange(snapped, 0.25, 0.35, 0.25, 0);
+            return Math.max(0, Math.min(0.25, op));
+        } else if (index === 1) {
+            let op = mapRange(snapped, 0.3, 0.4, 0, 0.25);
+            if (snapped > 0.6) op = mapRange(snapped, 0.6, 0.7, 0.25, 0);
+            return Math.max(0, Math.min(0.25, op));
+        } else {
+            return Math.max(0, Math.min(0.25, mapRange(snapped, 0.6, 0.7, 0, 0.25)));
+        }
+    });
+
+    return <AmbientGlow colors={color} opacity={opacity} />;
+};
+
 export default function StickyScrollFeaturesV2() {
     const containerRef = useRef<HTMLElement>(null);
-    const [hasMounted, setHasMounted] = useState(false);
-    const [progress, setProgress] = useState(0);
+    const [activeFeature, setActiveFeature] = useState(0);
+    const lastFeatureRef = useRef(0);
 
     const { scrollYProgress } = useScroll({
         target: containerRef,
         offset: ["start start", "end end"]
     });
 
-    // Snapped progress - creates "resistance" at each feature boundary (Manychat style)
-    const snappedProgress = useMemo(() => {
-        // Define snap zones - content will "stick" near these points
-        const snapPoints = [0, 0.33, 0.66, 1];
-        const snapStrength = 0.12; // Increased for stronger lock / more scroll needed to escape
-
-        // Find nearest snap point and apply resistance
-        for (const snap of snapPoints) {
-            const distToSnap = Math.abs(progress - snap);
-            if (distToSnap < snapStrength) {
-                // Apply easing that makes it harder to leave snap point
-                const factor = distToSnap / snapStrength;
-                const eased = factor * factor; // Quadratic easing for "sticky" feel
-                return snap + (progress - snap > 0 ? 1 : -1) * eased * snapStrength;
-            }
-        }
-        return progress;
-    }, [progress]);
-
-    // Faster spring for snappier response
+    // Spring for smooth scrolling
     const smoothProgress = useSpring(scrollYProgress, {
-        stiffness: 80,
-        damping: 20,
-        mass: 0.6
+        stiffness: 240,
+        damping: 35,
+        mass: 0.8
     });
 
+    // Only update React state when feature changes - dramatically reduces re-renders
     useMotionValueEvent(smoothProgress, "change", (latest) => {
-        // Clamp progress to valid range to handle edge cases on tall screens
-        setProgress(Math.max(0, Math.min(1, latest)));
+        const clamped = Math.max(0, Math.min(1, latest));
+        const newFeature = clamped < 0.33 ? 0 : clamped < 0.66 ? 1 : 2;
+
+        // Only trigger re-render when feature actually changes
+        if (newFeature !== lastFeatureRef.current) {
+            lastFeatureRef.current = newFeature;
+            setActiveFeature(newFeature);
+        }
     });
 
-    useEffect(() => {
-        const timer = setTimeout(() => setHasMounted(true), 300);
-        return () => clearTimeout(timer);
-    }, []);
-
-    const activeFeature = useMemo(() => {
-        if (snappedProgress < 0.33) return 0;
-        if (snappedProgress < 0.66) return 1;
-        return 2;
-    }, [snappedProgress]);
-
-    const isInSection = progress > 0.05 && progress < 0.95;
+    // Snapped progress calculation
     const activeColors = colorMap[features[activeFeature].color];
 
-    // Use snapped progress for text transitions - creates more definitive stops
-    const textSlides = useMemo(() => {
-        const p = snappedProgress;
-        return features.map((feature, i) => {
-            let opacity = 0;
-            let y = 30;
-
-            // Tighter transition windows for sharper changes
-            if (i === 0) {
-                opacity = mapRange(p, 0, 0.28, 1, 1);
-                if (p > 0.28) opacity = mapRange(p, 0.28, 0.35, 1, 0);
-                y = p > 0.28 ? mapRange(p, 0.28, 0.35, 0, -40) : 0;
-                if (p < 0.05) { opacity = 1; y = 0; }
-            } else if (i === 1) {
-                opacity = mapRange(p, 0.31, 0.38, 0, 1);
-                if (p > 0.58) opacity = mapRange(p, 0.58, 0.65, 1, 0);
-                y = p < 0.38 ? mapRange(p, 0.31, 0.38, 40, 0) :
-                    p > 0.58 ? mapRange(p, 0.58, 0.65, 0, -40) : 0;
-            } else {
-                opacity = mapRange(p, 0.62, 0.69, 0, 1);
-                y = p < 0.69 ? mapRange(p, 0.62, 0.69, 40, 0) : 0;
-            }
-
-            return { feature, opacity: Math.max(0, Math.min(1, opacity)), y };
-        });
-    }, [snappedProgress]);
-
-    // Use snapped progress for mockup transitions - creates more definitive stops
-    const mockupSlides = useMemo(() => {
-        const p = snappedProgress;
-        return features.map((feature, i) => {
-            let y = 0;
-            let scale = 1;
-            let isVisible = true;
-            let isStatic = false;
-
-            // Tighter transition windows for sharper mockup changes
-            if (i === 0) {
-                // Always show first mockup at start - critical for iPhone 16 Pro Max
-                if (!hasMounted || p < 0.05) {
-                    y = 0;
-                    scale = 1;
-                    isStatic = true;
-                    isVisible = true;
-                } else {
-                    y = p > 0.28 ? mapRange(p, 0.28, 0.35, 0, -100) * window.innerHeight / 100 : 0;
-                    scale = p > 0.28 ? mapRange(p, 0.28, 0.35, 1, 0.85) : 1;
-                    isVisible = p < 0.40;
-                }
-            } else if (i === 1) {
-                const enterY = mapRange(p, 0.31, 0.38, 100, 0);
-                const exitY = mapRange(p, 0.58, 0.65, 0, -100);
-                y = (p < 0.38 ? enterY : p > 0.58 ? exitY : 0) * window.innerHeight / 100;
-                scale = p < 0.42 ? mapRange(p, 0.31, 0.42, 0.85, 1) :
-                    p > 0.54 ? mapRange(p, 0.54, 0.65, 1, 0.85) : 1;
-                isVisible = p > 0.28 && p < 0.70;
-            } else {
-                y = mapRange(p, 0.62, 0.69, 100, 0) * window.innerHeight / 100;
-                scale = mapRange(p, 0.62, 0.72, 0.85, 1);
-                isVisible = p > 0.58;
-            }
-
-            return { feature, y, scale: Math.max(0.85, Math.min(1, scale)), isVisible, isStatic };
-        });
-    }, [snappedProgress, hasMounted]);
-
-    const ambientOpacities = useMemo(() => {
-        const p = snappedProgress;
-        return features.map((_, i) => {
-            if (i === 0) {
-                let op = mapRange(p, 0, 0.1, 0, 0.25);
-                if (p > 0.25) op = mapRange(p, 0.25, 0.35, 0.25, 0);
-                return Math.max(0, Math.min(0.25, op));
-            } else if (i === 1) {
-                let op = mapRange(p, 0.32, 0.42, 0, 0.25);
-                if (p > 0.54) op = mapRange(p, 0.54, 0.64, 0.25, 0);
-                return Math.max(0, Math.min(0.25, op));
-            } else {
-                return Math.max(0, Math.min(0.25, mapRange(p, 0.62, 0.72, 0, 0.25)));
-            }
-        });
-    }, [snappedProgress]);
+    // Reactive opacity for section elements - smooth fade in/out based on scroll
+    const sectionOpacity = useTransform(smoothProgress, p => (p > 0.05 && p < 0.95 ? 1 : 0));
+    const hintOpacity = useTransform(smoothProgress, p => (p > 0.02 && p < 0.92 ? 1 : 0));
 
     return (
         <section
@@ -510,23 +566,29 @@ export default function StickyScrollFeaturesV2() {
             >
                 <div className="w-full px-4 md:px-16 lg:px-24 relative h-full flex flex-col md:flex-row items-center">
 
-                    <div className={`absolute top-8 md:top-28 left-6 md:left-16 lg:left-24 flex space-x-2 z-50 transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>
+                    <motion.div
+                        style={{ opacity: sectionOpacity }}
+                        className="absolute top-8 md:top-28 left-6 md:left-16 lg:left-24 flex space-x-2 z-50"
+                    >
                         {features.map((_, i) => (
                             <div key={i} className={`h-1 rounded-full transition-all duration-700 ease-out relative overflow-hidden ${activeFeature === i ? 'w-14' : 'w-6'}`}>
                                 <div className="absolute inset-0 bg-white/20 rounded-full" />
                                 <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 origin-left transition-transform duration-700 ease-out ${activeFeature === i ? 'scale-x-100' : 'scale-x-0'}`} />
                             </div>
                         ))}
-                    </div>
+                    </motion.div>
 
                     <div className="w-full md:w-[45%] relative h-[35vh] sm:h-[40vh] md:h-full flex items-center md:items-center justify-start z-20 pb-4 md:pb-0">
-                        {textSlides.map(({ feature, opacity, y }, i) => (
-                            <TextSlide key={i} feature={feature} opacity={opacity} y={y} />
+                        {features.map((feature, i) => (
+                            <MotionTextSlide key={i} feature={feature} index={i} progress={smoothProgress} />
                         ))}
                     </div>
 
                     <div className="flex w-full md:w-[55%] h-[55vh] sm:h-[60vh] md:h-full items-center justify-center relative z-20">
-                        <div className={`absolute -inset-2 md:-inset-8 overflow-visible pointer-events-none transition-opacity duration-500 ${isInSection ? 'opacity-100' : 'opacity-0'}`}>
+                        <motion.div
+                            style={{ opacity: sectionOpacity, ...MOBILE_OPTIMIZED_LAYER }}
+                            className="absolute -inset-2 md:-inset-8 overflow-visible pointer-events-none"
+                        >
                             <div className="absolute inset-0 rounded-3xl transition-all duration-500" style={{ background: activeColors.panelGradient }} />
                             <div className="absolute inset-4 rounded-2xl border-2 transition-all duration-500" style={{ borderColor: activeColors.borderColor, boxShadow: activeColors.boxShadow }} />
                             <div className="absolute inset-0 rounded-3xl opacity-30" style={{ backgroundImage: `linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)`, backgroundSize: '30px 30px' }} />
@@ -543,7 +605,7 @@ export default function StickyScrollFeaturesV2() {
                                 animate={{ scale: [1, 1.2, 1] }}
                                 transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                             />
-                        </div>
+                        </motion.div>
 
                         <div
                             className="relative w-full h-[90%] md:h-[80%] max-w-[700px]"
@@ -554,30 +616,26 @@ export default function StickyScrollFeaturesV2() {
                                 backfaceVisibility: 'hidden',
                             }}
                         >
-                            {mockupSlides.map(({ feature, y, scale, isVisible, isStatic }, i) => (
-                                <MockupSlide key={i} feature={feature} y={y} scale={scale} isVisible={isVisible} isStatic={isStatic} />
+                            {features.map((feature, i) => (
+                                <MotionMockupSlide key={i} feature={feature} index={i} progress={smoothProgress} />
                             ))}
                         </div>
                     </div>
 
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
                         {features.map((feature, i) => (
-                            <AmbientGlow key={i} colors={colorMap[feature.color]} opacity={ambientOpacities[i]} />
+                            <MotionAmbientGlow key={i} color={colorMap[feature.color]} index={i} progress={smoothProgress} />
                         ))}
                     </div>
 
                 </div>
 
-                {progress > 0.02 && progress < 0.92 && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute bottom-4 sm:bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 pointer-events-none scale-75 sm:scale-100"
-                    >
-                        <ScrollHint />
-                    </motion.div>
-                )}
+                <motion.div
+                    style={{ opacity: hintOpacity }}
+                    className="absolute bottom-4 sm:bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 pointer-events-none scale-75 sm:scale-100"
+                >
+                    <ScrollHint />
+                </motion.div>
             </div>
         </section>
     );

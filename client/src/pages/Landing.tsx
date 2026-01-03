@@ -12,40 +12,43 @@ import {
   MessageCircle, Check, DollarSign, Search
 } from 'lucide-react'
 import { SEO, seoConfig } from '../lib/seo-optimization'
+import { MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 import { useIsMobile } from '../hooks/use-is-mobile';
 import { MainNavigation } from '../components/MainNavigation';
 import GlassCard from '../components/GlassCard';
-import { LazySection } from '../components/ui/lazy-section';
 
-// Eager load feature showcases with mockups (need time to load images)
+// PERMANENT FIX: All sections now eagerly imported to eliminate async loading flickering
+// React.lazy() with Suspense causes brief fallback flashes when chunks load
+// Direct imports ensure everything is bundled and renders immediately
+
+// Feature showcases with mockups
 import { CinematicFeatures } from '../components/CinematicFeatures';
 import StickyScrollFeaturesV2 from '../components/StickyScrollFeaturesV2';
 
-// Lazy load other heavy "below-the-fold" sections
-const PricingScrollAnimation = React.lazy(() => import('../components/PricingScrollAnimation').then(module => ({ default: module.PricingScrollAnimation })));
-const TargetAudienceSection = React.lazy(() => import('../components/TargetAudienceSection'));
-const GrowthEngineSection = React.lazy(() => import('../components/GrowthEngineSection'));
-const CreditSystemSection = React.lazy(() => import('../components/CreditSystemSection'));
-const BetaLaunchSection = React.lazy(() => import('../components/BetaLaunchSection'));
-const MainFooter = React.lazy(() => import('../components/MainFooter'));
+// All sections - now eagerly loaded to prevent flickering
+import { PricingScrollAnimation } from '../components/PricingScrollAnimation';
+import TargetAudienceSection from '../components/TargetAudienceSection';
+import GrowthEngineSection from '../components/GrowthEngineSection';
+import CreditSystemSection from '../components/CreditSystemSection';
+import BetaLaunchSection from '../components/BetaLaunchSection';
+import MainFooter from '../components/MainFooter';
 
-// Visuals for Hero section (keep eager as they are above fold)
+// Visuals for Hero section
 import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals';
 
-// Check if device should have reduced animations (low-end mobile, reduced motion preference)
-
-
-
-
+// Only keep 3D component lazy as it's truly optional and heavy (WebGL)
 const Landing3D = React.lazy(() => import('./Landing3D'))
 
-// Mobile background with soft blur effects
+// Mobile background with soft blur effects - GPU accelerated
 const MobileBackground = memo(() => (
-  <div className="absolute inset-0 bg-[#030303] overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent blur-2xl" />
-    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent blur-xl" />
-    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
-    <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" />
+  <div
+    className="absolute inset-0 bg-[#030303] overflow-hidden"
+    style={MOBILE_OPTIMIZED_LAYER}
+  >
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent blur-2xl" style={{ transform: 'translateZ(0)' }} />
+    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent blur-xl" style={{ transform: 'translateZ(0)' }} />
+    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" style={{ transform: 'translateZ(0)' }} />
+    <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" style={{ transform: 'translateZ(0)' }} />
   </div>
 ))
 
@@ -56,7 +59,7 @@ const Landing3DFallback = memo(() => (
   </div>
 ))
 
-// Gradient orbs with blur effects
+// Gradient orbs with blur effects - GPU accelerated
 const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?: string }) => {
   const colors = {
     blue: 'from-blue-500/30 via-blue-600/20 to-transparent',
@@ -66,7 +69,10 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
   }
 
   return (
-    <div className={`gradient-orb bg-gradient-radial ${colors[color as keyof typeof colors]} blur-3xl ${className}`} />
+    <div
+      className={`gradient-orb bg-gradient-radial ${colors[color as keyof typeof colors]} blur-3xl ${className}`}
+      style={MOBILE_OPTIMIZED_LAYER}
+    />
   )
 }
 
@@ -495,61 +501,71 @@ const AnimatedDashboard = memo(() => {
         setActivePage(0)
       }, 100)
 
+      // Move to Engagement (was 3000 -> 1500)
       addTimeout(() => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(1))
-      }, 3000)
+      }, 1500)
 
+      // Click Engagement (was 3600 -> 1800)
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(true)
-      }, 3600)
+      }, 1800)
 
+      // Switch to Engagement (was 3750 -> 1900)
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(1)
-      }, 3750)
+      }, 1900)
 
+      // Move to Hooks (was 7750 -> 3900)
       addTimeout(() => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(3))
-      }, 7750)
+      }, 3900)
 
+      // Click Hooks (was 8350 -> 4200)
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(true)
-      }, 8350)
+      }, 4200)
 
+      // Switch to Hooks (was 8500 -> 4300)
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(2)
-      }, 8500)
+      }, 4300)
 
+      // Move to Dashboard (was 12500 -> 6300)
       addTimeout(() => {
         if (!isMounted) return
         setCursorPos(getCursorPosition(0))
-      }, 12500)
+      }, 6300)
 
+      // Click Dashboard (was 13100 -> 6600)
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(true)
-      }, 13100)
+      }, 6600)
 
+      // Switch to Dashboard (was 13250 -> 6700)
       addTimeout(() => {
         if (!isMounted) return
         setIsClicking(false)
         setActivePage(0)
-      }, 13250)
+      }, 6700)
 
+      // Restart Loop (was 16250 -> 8200)
       addTimeout(() => {
         if (!isMounted) return
         runSequence()
-      }, 16250)
+      }, 8200)
     }
 
-    addTimeout(() => runSequence(), 500)
+    addTimeout(() => runSequence(), 50)
 
     return () => {
       isMounted = false
@@ -634,7 +650,7 @@ const AnimatedDashboard = memo(() => {
                     <div
                       key={item.name}
                       ref={el => { itemRefs.current[i] = el }}
-                      className={`px - 3 py - 2 rounded - lg text - xs border ${isActive ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'text-white/40 border-transparent'} `}
+                      className={`px-3 py-2 rounded-lg text-xs transition-colors ${isActive ? 'bg-blue-500/10 text-blue-400 font-medium' : 'text-white/40'} `}
                     >
                       {item.name}
                     </div>
@@ -673,7 +689,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const { openWaitlist } = useWaitlist()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
-  
+
   // PERF: Defer 3D loading to allow hero text to render first
   const [show3D, setShow3D] = useState(false)
   useEffect(() => {
@@ -757,8 +773,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       border: 'border-purple-500/30'
     }
   ]
-
-
 
   const faqs = [
     {
@@ -964,14 +978,12 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         )}
 
       </section>
-
-      {/* Dashboard Showcase Section */}
       <section className="relative py-8 -mt-20 z-20 w-full overflow-hidden">
         <div className="w-full px-4 md:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 60 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 1.5 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
             className="relative w-full"
           >
             {/* Side Graphics - Left (Faded, beautiful.ai style) - Hidden on mobile */}
@@ -979,7 +991,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 0.4, x: 0 }}
-                transition={{ delay: 2, duration: 1 }}
+                transition={{ delay: 0.3, duration: 0.8 }}
               >
                 <GlassCard className="p-2 lg:p-3 xl:p-4">
                   <div className="flex items-center space-x-2 lg:space-x-3 mb-2 lg:mb-3">
@@ -1006,7 +1018,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 0.35, x: 0 }}
-                transition={{ delay: 2.2, duration: 1 }}
+                transition={{ delay: 0.4, duration: 0.8 }}
               >
                 <GlassCard className="p-2 lg:p-3 xl:p-4">
                   <div className="flex items-center space-x-2 lg:space-x-3 mb-2 lg:mb-3">
@@ -1036,7 +1048,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 0.4, x: 0 }}
-                transition={{ delay: 2.1, duration: 1 }}
+                transition={{ delay: 0.3, duration: 0.8 }}
               >
                 <GlassCard className="p-2 lg:p-3 xl:p-4">
                   <div className="flex items-center space-x-2 lg:space-x-3 mb-1 lg:mb-2">
@@ -1059,7 +1071,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 0.35, x: 0 }}
-                transition={{ delay: 2.3, duration: 1 }}
+                transition={{ delay: 0.4, duration: 0.8 }}
               >
                 <GlassCard className="p-2 lg:p-3 xl:p-4">
                   <div className="flex items-center space-x-2 lg:space-x-3 mb-1 lg:mb-2">
@@ -1084,7 +1096,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 3, duration: 0.5 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
                 className="absolute -bottom-3 sm:-bottom-6 left-0 sm:-left-6 px-2 sm:px-4 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 backdrop-blur-xl z-20"
               >
                 <div className="flex items-center space-x-1.5 sm:space-x-2">
@@ -1096,7 +1108,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 3.2, duration: 0.5 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
                 className="absolute -bottom-3 sm:-bottom-4 right-0 sm:-right-4 px-2 sm:px-4 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 backdrop-blur-xl z-20"
               >
                 <div className="flex items-center space-x-1.5 sm:space-x-2">
@@ -1909,9 +1921,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Who is VeeFore For - Target Audience Section */}
-      <LazySection minHeight="100vh">
-        <TargetAudienceSection />
-      </LazySection>
+      <TargetAudienceSection />
 
       {/* Hero Features - Cinematic Scroll */}
       <section id="features" className="relative bg-black">
@@ -1932,14 +1942,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
 
       {/* Support Features - Growth Engine Section */}
-      <LazySection minHeight="100vh">
-        <GrowthEngineSection />
-      </LazySection>
+      <GrowthEngineSection />
 
       {/* Credit System */}
-      <LazySection minHeight="100vh">
-        <CreditSystemSection />
-      </LazySection>
+      <CreditSystemSection />
 
       {/* VeeFore vs Traditional Tools - "The Evolution" Section */}
       <section className="py-24 relative overflow-hidden">
@@ -2148,18 +2154,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
 
           {/* Desktop View - Scroll Animation */}
-          <LazySection minHeight="120vh">
+          <div className="hidden md:block">
             <PricingScrollAnimation
               pricingPlans={pricingPlans}
             />
-          </LazySection>
+          </div>
         </div>
       </section >
 
       {/* Beta Launch */}
-      <LazySection minHeight="80vh">
-        <BetaLaunchSection />
-      </LazySection>
+      <BetaLaunchSection />
 
       {/* FAQ */}
       <section id="faq" className="py-24 md:py-32 relative">
@@ -2282,9 +2286,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section >
 
       {/* Footer */}
-      <LazySection rootMargin="100px">
-        <MainFooter />
-      </LazySection>
+      <MainFooter />
     </div >
   )
 }

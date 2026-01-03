@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance'
 import { Menu, X, ChevronRight } from 'lucide-react'
 import { Link, useLocation } from 'wouter'
 import { useWaitlist } from '../context/WaitlistContext'
@@ -51,6 +52,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
             initial={{ y: -100 }}
             animate={{ y: 0 }}
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            style={{ willChange: 'transform' }}
             className="fixed top-0 left-0 right-0 z-50"
         >
             <div className={`transition-all duration-300 ${isScrolled ? 'mx-3 sm:mx-4 md:mx-6 lg:mx-auto lg:max-w-5xl mt-2 sm:mt-2 md:mt-3' : ''}`}>
@@ -102,6 +104,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: '100%' }}
                         transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        style={MOBILE_OPTIMIZED_LAYER}
                         className="md:hidden fixed inset-0 z-[60] bg-[#030303] overflow-y-auto"
                     >
                         {/* Mobile Menu Header */}

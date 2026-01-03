@@ -8,23 +8,28 @@ interface LazySectionProps {
   minHeight?: string;
 }
 
-const DefaultFallback = ({ minHeight }: { minHeight: string }) => (
-  <div 
-    className="flex items-center justify-center"
-    style={{ minHeight }}
-  >
-    <div className="w-8 h-8 border-2 border-white/20 border-t-amber-500 rounded-full animate-spin" />
-  </div>
-);
-
-export function LazySection({ 
-  children, 
-  fallback,
+/**
+ * LazySection - SIMPLIFIED: Pure CSS visibility control.
+ * 
+ * CRITICAL RULES TO PREVENT FLICKERING:
+ * 1. Children are ALWAYS rendered immediately - no conditional rendering
+ * 2. Only CSS opacity is used for fade-in effect
+ * 3. No spinners or fallback elements that could cause layout shifts
+ * 4. Uses content-visibility: auto for browser optimization
+ * 
+ * The component only controls opacity to create a fade-in effect when
+ * the section enters the viewport. This prevents:
+ * - Layout thrashing (reflow/repaint)
+ * - Component unmounting/remounting
+ * - Height calculation issues
+ */
+export function LazySection({
+  children,
   rootMargin = '200px',
   threshold = 0,
   minHeight = '50vh'
 }: LazySectionProps) {
-  const [isVisible, setIsVisible] = useState(false);
+  const [hasEntered, setHasEntered] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,8 +40,8 @@ export function LazySection({
       const observer = new IntersectionObserver(
         ([entry]) => {
           if (entry.isIntersecting) {
-            setIsVisible(true);
-            observer.disconnect();
+            setHasEntered(true);
+            observer.disconnect(); // One-time trigger
           }
         },
         { rootMargin, threshold }
@@ -45,23 +50,38 @@ export function LazySection({
       observer.observe(element);
       return () => observer.disconnect();
     } else {
-      setIsVisible(true);
+      // Fallback for browsers without IntersectionObserver
+      setHasEntered(true);
     }
   }, [rootMargin, threshold]);
 
-  const fallbackContent = fallback || <DefaultFallback minHeight={minHeight} />;
-
   return (
-    <div ref={ref}>
-      {isVisible ? (
-        <Suspense fallback={fallbackContent}>
+    <div
+      ref={ref}
+      style={{
+        // Browser-level optimization - skips rendering for off-screen content
+        contentVisibility: 'auto',
+        containIntrinsicSize: `1px ${minHeight}`,
+      }}
+    >
+      {/* ALWAYS render children - only opacity changes */}
+      <div
+        style={{
+          opacity: hasEntered ? 1 : 0,
+          transition: 'opacity 0.5s ease-out',
+          // GPU acceleration for smooth transition
+          transform: 'translateZ(0)',
+          willChange: hasEntered ? 'auto' : 'opacity',
+        }}
+      >
+        <Suspense fallback={null}>
           {children}
         </Suspense>
-      ) : (
-        <div style={{ minHeight }}>{fallbackContent}</div>
-      )}
+      </div>
     </div>
   );
 }
 
 export default LazySection;
+
+

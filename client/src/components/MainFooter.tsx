@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 import { Link, useLocation } from 'wouter';
 import { useWaitlist } from '../context/WaitlistContext';
 import { Twitter, Instagram, Linkedin, ArrowRight, Sparkles, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
@@ -203,8 +205,8 @@ const MainFooter = () => {
         <footer className="relative bg-[#030303] text-white overflow-hidden">
             {/* Background Effects */}
             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[150px]" />
-                <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[150px]" />
+                <motion.div style={MOBILE_OPTIMIZED_LAYER} className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[150px]" />
+                <motion.div style={MOBILE_OPTIMIZED_LAYER} className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[150px]" />
             </div>
 
             {/* Top gradient border */}

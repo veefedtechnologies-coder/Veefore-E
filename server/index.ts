@@ -27,9 +27,9 @@ import auditRoutes from "./routes/audit";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { 
-  initializeRateLimiting, 
-  globalRateLimiter, 
+import {
+  initializeRateLimiting,
+  globalRateLimiter,
   authRateLimiter,
   apiRateLimiter,
   uploadRateLimiter,
@@ -40,20 +40,20 @@ import {
 } from "./middleware/rate-limiting-working";
 import { xssProtectionMiddleware, enhancedXssHeaders } from "./middleware/xss-protection";
 import { cleanupTempFiles } from "./middleware/file-upload-security";
-import { 
-  corsSecurityMiddleware, 
-  strictCorsMiddleware, 
-  apiCorsMiddleware, 
+import {
+  corsSecurityMiddleware,
+  strictCorsMiddleware,
+  apiCorsMiddleware,
   corsMetricsMiddleware,
   corsContentSecurityPolicy,
-  emergencyCorsLockdown 
+  emergencyCorsLockdown
 } from "./middleware/cors-security";
-import { 
-  initializeKeyManagement, 
-  secretsValidationMiddleware, 
-  keyManagementHeaders 
+import {
+  initializeKeyManagement,
+  secretsValidationMiddleware,
+  keyManagementHeaders
 } from "./middleware/key-management";
-import { 
+import {
   initializeSecurityMonitoring,
   correlationIdMiddleware,
   securityLoggingMiddleware,
@@ -77,7 +77,7 @@ let log: (message: string, source?: string) => void;
 const fallbackLog = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
-    minute: "2-digit", 
+    minute: "2-digit",
     second: "2-digit",
     hour12: true,
   });
@@ -135,7 +135,7 @@ app.use((req, res, next) => {
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
     }
-  } catch {}
+  } catch { }
   next();
 });
 
@@ -144,7 +144,7 @@ import { initializeReliabilitySystem, applyMonitoringMiddleware, applyErrorTrack
 import { attachSentryExpressHandlers, attachSentryRequestMiddleware } from './monitoring/sentry-init';
 
 // P5 PERFORMANCE: Initialize comprehensive performance & scalability system
-import { 
+import {
   initializePerformanceSystem,
   applyPerformanceMiddleware,
   createPerformanceEndpoints,
@@ -152,10 +152,10 @@ import {
   performStartupOptimizations
 } from './performance';
 
-  initializeReliabilitySystem(app);
-  initializeSentry();
-  try { attachSentryRequestMiddleware(app); } catch {}
-  try { attachSentryExpressHandlers(app); } catch {}
+initializeReliabilitySystem(app);
+initializeSentry();
+try { attachSentryRequestMiddleware(app); } catch { }
+try { attachSentryExpressHandlers(app); } catch { }
 
 // P4 MONITORING: Apply monitoring middleware early
 applyMonitoringMiddleware(app);
@@ -225,27 +225,27 @@ app.use(helmet({
 
   // P1-2: Enhanced Content Security Policy - Disabled completely for iframe compatibility
   contentSecurityPolicy: isProduction && process.env.ENABLE_CSP === 'true' ? undefined : false,
-  
+
   // P1-2: Enhanced cross-origin policies - Disabled for iframe compatibility
   crossOriginResourcePolicy: false, // Allow all resources for iframe
   crossOriginOpenerPolicy: false, // Allow iframe embedding
   crossOriginEmbedderPolicy: false, // Disable for iframe compatibility
-  
+
   // P1-2: Additional security headers
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  
+
   // P1-2: Permissions Policy - Explicitly disable deprecated features
   // Set empty permissions policy to prevent browser default warnings
-  
+
   // P1-2: DNS prefetch control
   dnsPrefetchControl: { allow: false },
-  
+
   // P1-2: Content type options
   noSniff: true,
-  
+
   // P1-2: Download options (IE8+ security)
   ieNoOpen: true,
-  
+
   // P1-2: Disable X-XSS-Protection (deprecated, CSP is better)
   xssFilter: false
 }));
@@ -254,30 +254,31 @@ app.use(helmet({
 app.use((req: Request, res: Response, next: NextFunction) => {
   // Remove X-Frame-Options to allow iframe embedding
   res.removeHeader('X-Frame-Options');
-  
+
   // Set iframe-friendly headers
   const allowedOrigin = process.env.CORS_ORIGIN || '*';
-  if (isProduction && !process.env.ENABLE_IFRAME_COMPAT) {
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  // P1-5 SECURITY: Respect CORS_ORIGIN if set in production
+  if (isProduction && process.env.CORS_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN);
   } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
-  
+
   // CRITICAL: Set ONLY valid Permissions-Policy features to eliminate warnings
   // Remove deprecated/invalid features that cause "Unrecognized feature" warnings
-  res.setHeader('Permissions-Policy', 
+  res.setHeader('Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), fullscreen=(), payment=(), ' +
     'accelerometer=(), autoplay=(), display-capture=(), encrypted-media=(), ' +
     'gyroscope=(), magnetometer=(), midi=(), picture-in-picture=(), ' +
     'screen-wake-lock=(), sync-xhr=(), usb=(), xr-spatial-tracking=()');
-  
+
   // Support for Replit ?embed=true parameter
   if (req.query.embed === 'true') {
     res.setHeader('Content-Security-Policy', 'frame-ancestors *');
   }
-  
+
   next();
 });
 
@@ -351,7 +352,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for videos
   fileFilter: (req, file, cb) => {
@@ -373,7 +374,7 @@ app.use((req, res, next) => {
     console.log('[BODY DEBUG] Raw body:', req.body);
     console.log('[BODY DEBUG] Content-Type:', req.headers['content-type']);
     console.log('[BODY DEBUG] Content-Length:', req.headers['content-length']);
-    
+
     // Fix double-stringified body issue
     if (req.body && typeof req.body === 'object' && req.body.body && typeof req.body.body === 'string') {
       try {
@@ -438,104 +439,104 @@ app.use((req, res, next) => {
     console.warn('[WARN] Vite modules not available, using fallback:', (error as Error).message);
     log = fallbackLog;
   }
-  
+
   const storage = new MongoStorage();
   await storage.connect();
-  
+
   // Database reset endpoint (development only)
   if (!isProduction) {
-  app.post('/api/admin/reset-database', async (req, res) => {
-    try {
-      console.log('🔄 Starting complete database reset...');
-      
-      // Wait for storage to be connected
-      await storage.connect();
-      
-      let totalDeleted = 0;
-      const resetResults: Array<{ collection: string; deleted: number }> = [];
-      
-      // Clear all data through the storage interface
+    app.post('/api/admin/reset-database', async (req, res) => {
       try {
-        // Clear users
-        const userResult = await storage.clearAllUsers();
-        if (userResult > 0) {
-          console.log(`🗑️  Cleared users: ${userResult} documents`);
-          resetResults.push({ collection: 'users', deleted: userResult });
-          totalDeleted += userResult;
+        console.log('🔄 Starting complete database reset...');
+
+        // Wait for storage to be connected
+        await storage.connect();
+
+        let totalDeleted = 0;
+        const resetResults: Array<{ collection: string; deleted: number }> = [];
+
+        // Clear all data through the storage interface
+        try {
+          // Clear users
+          const userResult = await storage.clearAllUsers();
+          if (userResult > 0) {
+            console.log(`🗑️  Cleared users: ${userResult} documents`);
+            resetResults.push({ collection: 'users', deleted: userResult });
+            totalDeleted += userResult;
+          }
+        } catch (error) {
+          console.log(`⚠️  Error clearing users: ${(error as Error).message}`);
         }
-      } catch (error) {
-        console.log(`⚠️  Error clearing users: ${(error as Error).message}`);
-      }
-      
-      try {
-        // Clear waitlist users
-        const waitlistResult = await storage.clearAllWaitlistUsers();
-        if (waitlistResult > 0) {
-          console.log(`🗑️  Cleared waitlist_users: ${waitlistResult} documents`);
-          resetResults.push({ collection: 'waitlist_users', deleted: waitlistResult });
-          totalDeleted += waitlistResult;
+
+        try {
+          // Clear waitlist users
+          const waitlistResult = await storage.clearAllWaitlistUsers();
+          if (waitlistResult > 0) {
+            console.log(`🗑️  Cleared waitlist_users: ${waitlistResult} documents`);
+            resetResults.push({ collection: 'waitlist_users', deleted: waitlistResult });
+            totalDeleted += waitlistResult;
+          }
+        } catch (error) {
+          console.log(`⚠️  Error clearing waitlist_users: ${(error as Error).message}`);
         }
-      } catch (error) {
-        console.log(`⚠️  Error clearing waitlist_users: ${(error as Error).message}`);
-      }
-      
-      try {
-        // Clear workspaces
-        const workspaceResult = await storage.clearAllWorkspaces();
-        if (workspaceResult > 0) {
-          console.log(`🗑️  Cleared workspaces: ${workspaceResult} documents`);
-          resetResults.push({ collection: 'workspaces', deleted: workspaceResult });
-          totalDeleted += workspaceResult;
+
+        try {
+          // Clear workspaces
+          const workspaceResult = await storage.clearAllWorkspaces();
+          if (workspaceResult > 0) {
+            console.log(`🗑️  Cleared workspaces: ${workspaceResult} documents`);
+            resetResults.push({ collection: 'workspaces', deleted: workspaceResult });
+            totalDeleted += workspaceResult;
+          }
+        } catch (error) {
+          console.log(`⚠️  Error clearing workspaces: ${(error as Error).message}`);
         }
-      } catch (error) {
-        console.log(`⚠️  Error clearing workspaces: ${(error as Error).message}`);
-      }
-      
-      try {
-        // Clear social accounts
-        const socialResult = await storage.clearAllSocialAccounts();
-        if (socialResult > 0) {
-          console.log(`🗑️  Cleared social_accounts: ${socialResult} documents`);
-          resetResults.push({ collection: 'social_accounts', deleted: socialResult });
-          totalDeleted += socialResult;
+
+        try {
+          // Clear social accounts
+          const socialResult = await storage.clearAllSocialAccounts();
+          if (socialResult > 0) {
+            console.log(`🗑️  Cleared social_accounts: ${socialResult} documents`);
+            resetResults.push({ collection: 'social_accounts', deleted: socialResult });
+            totalDeleted += socialResult;
+          }
+        } catch (error) {
+          console.log(`⚠️  Error clearing social_accounts: ${(error as Error).message}`);
         }
-      } catch (error) {
-        console.log(`⚠️  Error clearing social_accounts: ${(error as Error).message}`);
-      }
-      
-      try {
-        // Clear content
-        const contentResult = await storage.clearAllContent();
-        if (contentResult > 0) {
-          console.log(`🗑️  Cleared content: ${contentResult} documents`);
-          resetResults.push({ collection: 'content', deleted: contentResult });
-          totalDeleted += contentResult;
+
+        try {
+          // Clear content
+          const contentResult = await storage.clearAllContent();
+          if (contentResult > 0) {
+            console.log(`🗑️  Cleared content: ${contentResult} documents`);
+            resetResults.push({ collection: 'content', deleted: contentResult });
+            totalDeleted += contentResult;
+          }
+        } catch (error) {
+          console.log(`⚠️  Error clearing content: ${(error as Error).message}`);
         }
+
+        console.log(`✅ DATABASE RESET COMPLETED - Total documents deleted: ${totalDeleted}`);
+
+        res.json({
+          success: true,
+          message: 'Database reset completed successfully',
+          totalDeleted,
+          resetResults,
+          note: 'Fresh database - ready for new accounts'
+        });
+
       } catch (error) {
-        console.log(`⚠️  Error clearing content: ${(error as Error).message}`);
+        console.error('❌ Database reset failed:', error);
+        res.status(500).json({
+          success: false,
+          error: 'Database reset failed',
+          message: (error as Error).message
+        });
       }
-      
-      console.log(`✅ DATABASE RESET COMPLETED - Total documents deleted: ${totalDeleted}`);
-      
-      res.json({
-        success: true,
-        message: 'Database reset completed successfully',
-        totalDeleted,
-        resetResults,
-        note: 'Fresh database - ready for new accounts'
-      });
-      
-    } catch (error) {
-      console.error('❌ Database reset failed:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Database reset failed',
-        message: (error as Error).message
-      });
-    }
-  });
+    });
   }
-  
+
   // Create HTTP server early to pass to registerRoutes
   const { createServer } = await import('http');
   const httpServer = createServer(app);
@@ -545,20 +546,20 @@ app.use((req, res, next) => {
 
   // Start the background scheduler service
   startSchedulerService(storage as any);
-  
+
   // Instagram Smart Polling is now handled in routes.ts with distributed locking
   // This ensures only one instance runs polling when scaling horizontally
   console.log('[SMART POLLING] Instagram polling initialization delegated to routes.ts with leader election');
-  
+
   await registerRoutes(app, storage as any, httpServer, upload);
-  
+
   // Initialize leader election for Instagram polling AFTER routes are registered
   // Use setTimeout to ensure the event loop has processed all pending connections
   setTimeout(async () => {
     try {
       console.log('[STARTUP] Initiating leader election for Instagram polling...');
       console.log(`[STARTUP] MongoDB connection state: ${mongoose.connection.readyState}`);
-      
+
       // Wait for MongoDB to be fully connected if not already
       if (mongoose.connection.readyState !== 1) {
         console.log('[STARTUP] Waiting for MongoDB connection...');
@@ -566,7 +567,7 @@ app.use((req, res, next) => {
           const timeout = setTimeout(() => {
             reject(new Error('MongoDB connection timeout after 30s'));
           }, 30000);
-          
+
           if (mongoose.connection.readyState === 1) {
             clearTimeout(timeout);
             resolve();
@@ -582,7 +583,7 @@ app.use((req, res, next) => {
           }
         });
       }
-      
+
       console.log('[STARTUP] MongoDB connected - starting leader election...');
       await initializeLeaderElection(storage as any);
       console.log('[STARTUP] Leader election completed successfully');
@@ -590,11 +591,11 @@ app.use((req, res, next) => {
       console.error('[STARTUP] Leader election initialization failed:', error);
     }
   }, 1000);
-  
+
   // Register metrics and webhook routes
   app.use('/api', metricsRoutes);
   app.use('/api/webhooks', webhooksRoutes);
-  
+
   // P8 SECURITY: Register advanced security and threat intelligence routes
   app.use('/api/security', securityRoutes);
   if (!(process.env.NODE_ENV === 'production' && process.env.ENABLE_TEST_FIXTURES !== 'true')) {
@@ -603,25 +604,25 @@ app.use((req, res, next) => {
   app.use('/api/cicd', cicdRoutes);
   app.use('/api/production', productionRoutes);
   app.use('/api/audit', auditRoutes);
-  
+
   // P9 INFRASTRUCTURE: Enterprise health check endpoints
   app.use('/health', healthRoutes);
   app.use('/', healthRoutes); // Also available at root for load balancers
-  
+
   // Additional webhook route to match Meta Console configuration
   app.use('/webhook', webhooksRoutes);
-  
+
   const enableMetrics = process.env.ENABLE_PROMETHEUS_METRICS !== 'false';
   if (enableMetrics) {
     createMonitoringEndpoints(app);
   }
-  
+
   // P5 PERFORMANCE: Create performance monitoring endpoints
   createPerformanceEndpoints(app);
-  
+
   // P5 PERFORMANCE: Apply cached routes optimization
   applyCachedRoutes(app);
-  
+
   // P5 PERFORMANCE: Run startup optimizations
   await performStartupOptimizations();
 
@@ -639,7 +640,7 @@ app.use((req, res, next) => {
       console.log('[CLEANUP] Starting Instagram account cleanup...');
       // Use existing storage methods for cleanup
       const result = { totalRemoved: 0, cleanedAccounts: [] };
-      
+
       res.json({
         success: true,
         message: `Cleaned up ${result.totalRemoved} duplicate accounts`,
@@ -659,7 +660,7 @@ app.use((req, res, next) => {
   app.post('/api/instagram/ensure-account', validateRequest({ body: z.object({ instagramAccountId: z.string().min(1), instagramUsername: z.string().min(1), workspaceId: z.string().min(1) }) }), async (req: Request, res: Response) => {
     try {
       const { instagramAccountId, instagramUsername, workspaceId } = req.body;
-      
+
       if (!instagramAccountId || !instagramUsername || !workspaceId) {
         return res.status(400).json({
           success: false,
@@ -673,7 +674,7 @@ app.use((req, res, next) => {
         action: 'skipped',
         message: 'Account management handled by existing storage layer'
       };
-      
+
       res.json(result);
     } catch (error: any) {
       console.error('[ENSURE ACCOUNT] Error:', error);
@@ -699,7 +700,7 @@ app.use((req, res, next) => {
         try {
           const { tokenEncryption } = await import('./security/token-encryption');
           token = tokenEncryption.decryptToken(raw.encryptedAccessToken);
-        } catch {}
+        } catch { }
       }
       if (!token) {
         await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: { tokenStatus: 'missing' } });
@@ -709,7 +710,7 @@ app.use((req, res, next) => {
       try {
         const r = await fetch(`https://graph.instagram.com/me?fields=id&access_token=${token}`);
         valid = r.ok;
-      } catch {}
+      } catch { }
       const expired = raw.expiresAt ? (new Date(raw.expiresAt).getTime() < Date.now()) : false;
       const status = !valid ? (expired ? 'expired' : 'invalid') : 'valid';
       await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: { tokenStatus: status } });
@@ -731,14 +732,16 @@ app.use((req, res, next) => {
         raw = await SocialAccountModel.findOne({ workspaceId, platform: 'instagram' });
       }
       if (!raw) return res.status(404).json({ success: false, message: 'Account not found' });
-      await SocialAccountModel.findByIdAndUpdate(raw._id, { $set: {
-        accessToken: null,
-        refreshToken: null,
-        encryptedAccessToken: null,
-        encryptedRefreshToken: null,
-        tokenStatus: 'expired',
-        updatedAt: new Date()
-      } });
+      await SocialAccountModel.findByIdAndUpdate(raw._id, {
+        $set: {
+          accessToken: null,
+          refreshToken: null,
+          encryptedAccessToken: null,
+          encryptedRefreshToken: null,
+          tokenStatus: 'expired',
+          updatedAt: new Date()
+        }
+      });
       return res.json({ success: true });
     } catch (e: any) {
       return res.status(500).json({ success: false, message: e.message });
@@ -754,14 +757,16 @@ app.use((req, res, next) => {
       const { SocialAccountModel } = await import('./mongodb-storage');
       const ig = await SocialAccountModel.findOne({ workspaceId, platform: 'instagram' });
       if (ig) {
-        await SocialAccountModel.findByIdAndUpdate(ig._id, { $set: {
-          accessToken: null,
-          refreshToken: null,
-          encryptedAccessToken: null,
-          encryptedRefreshToken: null,
-          tokenStatus: 'expired',
-          updatedAt: new Date()
-        } });
+        await SocialAccountModel.findByIdAndUpdate(ig._id, {
+          $set: {
+            accessToken: null,
+            refreshToken: null,
+            encryptedAccessToken: null,
+            encryptedRefreshToken: null,
+            tokenStatus: 'expired',
+            updatedAt: new Date()
+          }
+        });
       }
       const { InstagramOAuthService } = await import('./instagram-oauth');
       const storage = new (await import('./mongodb-storage')).MongoStorage();
@@ -787,7 +792,7 @@ app.use((req, res, next) => {
         try {
           const { tokenEncryption } = await import('./security/token-encryption');
           token = tokenEncryption.decryptToken(raw.encryptedAccessToken);
-        } catch {}
+        } catch { }
       }
       const fetchMod = await import('node-fetch');
       const fetch = (fetchMod as any).default || (fetchMod as any);
@@ -803,7 +808,7 @@ app.use((req, res, next) => {
       }
       let imgResp: any = null;
       if (pic) {
-        try { imgResp = await fetch(pic); } catch {}
+        try { imgResp = await fetch(pic); } catch { }
       }
       if ((!imgResp || !imgResp.ok) && token) {
         const r = await fetch(`https://graph.instagram.com/me?fields=profile_picture_url&access_token=${token}`);
@@ -840,7 +845,7 @@ app.use((req, res, next) => {
         try {
           const { tokenEncryption } = await import('./security/token-encryption');
           token = tokenEncryption.decryptToken(raw.encryptedAccessToken);
-        } catch {}
+        } catch { }
       }
       const fetchMod = await import('node-fetch');
       const fetch = (fetchMod as any).default || (fetchMod as any);
@@ -871,12 +876,12 @@ app.use((req, res, next) => {
         return false;
       };
       if (pic) {
-        try { imgResp = await fetch(pic); } catch {}
+        try { imgResp = await fetch(pic); } catch { }
       }
       if (!imgResp || !imgResp.ok) {
         await tryRefresh();
         if (pic) {
-          try { imgResp = await fetch(pic); } catch {}
+          try { imgResp = await fetch(pic); } catch { }
         }
       }
       if (imgResp && imgResp.ok) {
@@ -898,20 +903,20 @@ app.use((req, res, next) => {
     try {
       // SECURITY: workspaceId is validated by middleware - user has verified access
       const workspaceId = req.workspaceId!;
-      
+
       const { SocialAccountModel } = await import('./mongodb-storage');
-      
+
       // SECURITY: Only query accounts for the validated workspace
-      const accounts = await SocialAccountModel.find({ 
+      const accounts = await SocialAccountModel.find({
         platform: 'instagram',
-        workspaceId: workspaceId 
+        workspaceId: workspaceId
       }).lean();
-      
+
       // Build polling status response - only expose non-sensitive data
       const accountStatuses = accounts.map((acc: any) => {
         const hasValidToken = !!(acc.accessToken || acc.encryptedAccessToken);
         const lastSync = acc.lastSyncAt || acc.updatedAt;
-        
+
         return {
           id: acc._id?.toString() || acc.id,
           username: acc.username,
@@ -920,7 +925,7 @@ app.use((req, res, next) => {
           tokenStatus: acc.tokenStatus || (hasValidToken ? 'valid' : 'missing')
         };
       });
-      
+
       res.json({
         success: true,
         totalAccounts: accountStatuses.length,
@@ -942,20 +947,20 @@ app.use((req, res, next) => {
     try {
       // SECURITY: workspaceId is validated by middleware - user has verified access
       const workspaceId = req.workspaceId!;
-      
+
       const { SocialAccountModel } = await import('./mongodb-storage');
-      
-      const accounts = await SocialAccountModel.find({ 
+
+      const accounts = await SocialAccountModel.find({
         platform: 'instagram',
-        workspaceId: workspaceId 
+        workspaceId: workspaceId
       }).lean();
-      
-      const activeAccounts = accounts.filter((acc: any) => 
+
+      const activeAccounts = accounts.filter((acc: any) =>
         !!(acc.accessToken || acc.encryptedAccessToken)
       );
-      
+
       console.log(`[START POLLING] Workspace ${workspaceId}: ${activeAccounts.length}/${accounts.length} accounts have valid tokens`);
-      
+
       res.json({
         success: true,
         message: 'Hybrid polling system active',
@@ -978,12 +983,12 @@ app.use((req, res, next) => {
     try {
       // SECURITY: workspaceId is validated by middleware - user has verified access
       const workspaceId = req.workspaceId!;
-      
+
       const { SocialAccountModel } = await import('./mongodb-storage');
-      
+
       // SECURITY: Only query accounts for the validated workspace
       const accounts = await SocialAccountModel.find({ workspaceId, platform: 'instagram' }).lean();
-      
+
       // Aggregate metrics from all accounts
       let totalFollowers = 0;
       let totalLikes = 0;
@@ -992,7 +997,7 @@ app.use((req, res, next) => {
       let totalPosts = 0;
       let totalEngagement = 0;
       let accountCount = 0;
-      
+
       for (const acc of accounts) {
         totalFollowers += (acc as any).followersCount || 0;
         totalLikes += (acc as any).totalLikes || 0;
@@ -1002,9 +1007,9 @@ app.use((req, res, next) => {
         totalEngagement += (acc as any).engagementRate || (acc as any).avgEngagement || 0;
         accountCount++;
       }
-      
+
       const avgEngagement = accountCount > 0 ? totalEngagement / accountCount : 0;
-      
+
       res.json({
         success: true,
         data: {
@@ -1029,7 +1034,7 @@ app.use((req, res, next) => {
 
   // Set up WebSocket server for real-time chat streaming
   const { WebSocketServer } = await import('ws');
-  
+
   // Initialize logger for metrics system
   Logger.configure({
     logLevel: process.env.NODE_ENV === 'production' ? 1 : 3, // WARN in prod, DEBUG in dev
@@ -1052,14 +1057,14 @@ app.use((req, res, next) => {
   try {
     // P1-3 SECURITY: Initialize rate limiting with Redis connection
     const { redisConnection, isRedisAvailable } = await import('./queues/metricsQueue');
-    
+
     if (redisConnection && isRedisAvailable()) {
       initializeRateLimiting(redisConnection);
       console.log('🔒 P1-3 SECURITY: Rate limiting system initialized with Redis persistence');
     } else {
       console.log('⚠️ Rate Limiting: Redis not available, using memory-based fallbacks');
     }
-    
+
     // TEMPORARILY DISABLED: MetricsWorker disabled due to Redis quota limits
     // await MetricsWorker.start();
     console.log('⚠️  MetricsWorker: Disabled to prevent Redis quota exceeded errors');
@@ -1069,7 +1074,7 @@ app.use((req, res, next) => {
     console.log('📊 Instagram metrics continue via existing polling system');
     console.log('⚠️ Rate Limiting: Using memory-based fallbacks without Redis persistence');
   }
-  
+
 
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -1097,14 +1102,14 @@ app.use((req, res, next) => {
 
   // CRITICAL FIX: Let Vite handle ALL /src requests - no static file interference
   // Remove static serving that interferes with Vite's module resolution
-  
+
   // Serve only specific static assets from client public directory
   app.use('/favicon.ico', express.static(path.join(process.cwd(), 'client/public/favicon.ico')));
-  
+
   // Handle manifest.json with proper content type and caching
   app.get('/manifest.json', (req, res) => {
     const manifestPath = path.join(process.cwd(), 'client/public/manifest.json');
-    
+
     try {
       if (fs.existsSync(manifestPath)) {
         res.setHeader('Content-Type', 'application/manifest+json');
@@ -1136,9 +1141,9 @@ app.use((req, res, next) => {
       res.status(500).json({ error: 'Failed to load manifest' });
     }
   });
-  
+
   app.use('/browserconfig.xml', express.static(path.join(process.cwd(), 'client/public/browserconfig.xml')));
-  
+
   // NOTE: /assets static serving is now handled BEFORE CORS middleware (see line ~180)
   // This prevents 403 blocks from CORS checks on static files
 
@@ -1148,7 +1153,7 @@ app.use((req, res, next) => {
     // Temporarily disable REPL_ID to prevent cartographer plugin from loading
     const originalReplId = process.env.REPL_ID;
     delete process.env.REPL_ID;
-    
+
     try {
       if (setupVite) {
         await setupVite(app, httpServer);
@@ -1162,21 +1167,21 @@ app.use((req, res, next) => {
       // Custom static serving as fallback
       const distPath = path.join(process.cwd(), 'dist/public');
       app.use(express.static(distPath));
-      
+
       // Handle root route specifically to avoid path-to-regexp issues  
       app.get('/', (_req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
-      
+
       // Handle common frontend routes
       app.get('/dashboard', (_req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
-      
+
       app.get('/login', (_req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
-      
+
       app.get('/signup', (_req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
@@ -1197,7 +1202,7 @@ app.use((req, res, next) => {
       }
     } catch (error) {
       console.error('[PRODUCTION] Static serving failed, using fallback:', error);
-      
+
       // Enhanced fallback static serving for production
       const possiblePaths = [
         path.join(process.cwd(), 'dist/public'),
@@ -1205,19 +1210,19 @@ app.use((req, res, next) => {
         path.join(process.cwd(), 'public'),
         path.join(process.cwd(), 'build')
       ];
-      
+
       let staticPath: string | null = null;
-      
+
       for (const possiblePath of possiblePaths) {
         if (fs.existsSync(possiblePath)) {
           staticPath = possiblePath;
           break;
         }
       }
-      
+
       if (staticPath) {
         console.log('[PRODUCTION] Serving static files from:', staticPath);
-        
+
         // Serve static files with caching
         app.use(express.static(staticPath, {
           maxAge: '1y',
@@ -1232,34 +1237,34 @@ app.use((req, res, next) => {
               res.setHeader('Pragma', 'no-cache');
               res.setHeader('Expires', '0');
             }
-          } catch {}
+          } catch { }
           next();
         });
-        
+
         // Handle SPA routes - serve index.html for all non-API routes
         app.get('*', (req, res, next) => {
           // Skip API routes, source files, and uploaded files
           if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/src') || req.path.startsWith('/node_modules') || req.path.startsWith('/@')) {
             return next();
           }
-          
+
           const indexPath = path.join(staticPath, 'index.html');
           if (fs.existsSync(indexPath)) {
-            try { res.setHeader('Cache-Control', 'no-store'); res.setHeader('Pragma', 'no-cache'); res.setHeader('Expires', '0') } catch {}
+            try { res.setHeader('Cache-Control', 'no-store'); res.setHeader('Pragma', 'no-cache'); res.setHeader('Expires', '0') } catch { }
             res.sendFile(indexPath);
           } else {
             res.status(404).json({ error: 'Application not found' });
           }
         });
-        
+
         console.log('[PRODUCTION] Fallback static serving enabled');
       } else {
         console.error('[PRODUCTION] Build directory not found in any location');
         console.error('[PRODUCTION] Searched paths:', possiblePaths);
-        
+
         app.get('*', (req, res) => {
           if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/src') && !req.path.startsWith('/node_modules') && !req.path.startsWith('/@')) {
-            res.status(503).json({ 
+            res.status(503).json({
               error: 'Application not built for production',
               message: 'Please run build command first',
               searchedPaths: possiblePaths
@@ -1273,19 +1278,19 @@ app.use((req, res, next) => {
   }
 
   const wss = new WebSocketServer({ server: httpServer });
-  
+
   // Add global error handler for WebSocket server
   wss.on('error', (error) => {
     console.error('[WebSocket Server] Error:', error.message);
     // Don't crash the server, just log the error
   });
-  
+
   // Store WebSocket connections by conversation ID
   const wsConnections = new Map<number, Set<any>>();
-  
+
   // Store buffered messages for conversations without active connections
   const messageBuffer = new Map<number, any[]>();
-  
+
   // Helper function to safely send WebSocket messages
   const safeSend = (ws: any, message: any) => {
     try {
@@ -1296,16 +1301,16 @@ app.use((req, res, next) => {
       console.error('[WebSocket] Send error:', error);
     }
   };
-  
+
   wss.on('connection', (ws, req) => {
     console.log('[WebSocket] New client connected for chat streaming');
-    
+
     // Add error handling to prevent crashes
     ws.on('error', (error) => {
       console.error('[WebSocket] Connection error:', error.message);
       // Don't crash the server, just log the error
     });
-    
+
     ws.on('close', (code, reason) => {
       console.log(`[WebSocket] Client disconnected: ${code} ${reason}`);
       // Clean up connections
@@ -1318,12 +1323,12 @@ app.use((req, res, next) => {
         }
       }
     });
-    
+
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message.toString());
         console.log('[WebSocket] Received:', data);
-        
+
         if (data.type === 'subscribe' && data.conversationId) {
           const convId = parseInt(data.conversationId);
           if (!wsConnections.has(convId)) {
@@ -1331,10 +1336,10 @@ app.use((req, res, next) => {
           }
           wsConnections.get(convId)!.add(ws);
           console.log(`[WebSocket] Client subscribed to conversation ${convId}`);
-          
+
           // Send subscription confirmation
           safeSend(ws, { type: 'subscribed', conversationId: convId });
-          
+
           // Send any buffered messages immediately
           const buffered = messageBuffer.get(convId);
           if (buffered && buffered.length > 0) {
@@ -1350,7 +1355,7 @@ app.use((req, res, next) => {
         console.error('[WebSocket] Parse error:', error);
       }
     });
-    
+
     ws.on('close', () => {
       // Remove from all conversations
       for (const [, connections] of wsConnections) {
@@ -1359,12 +1364,12 @@ app.use((req, res, next) => {
       console.log('[WebSocket] Client disconnected');
     });
   });
-  
+
   // Function to broadcast to all clients in a conversation
   (global as any).broadcastToConversation = (conversationId: number, data: any) => {
     const connections = wsConnections.get(conversationId);
     console.log(`[WebSocket] Broadcasting to conversation ${conversationId}, connections: ${connections?.size || 0}`);
-    
+
     if (connections && connections.size > 0) {
       connections.forEach(ws => {
         if (ws.readyState === 1) { // WebSocket.OPEN
@@ -1390,9 +1395,9 @@ app.use((req, res, next) => {
     }
   };
 
-  // ALWAYS serve the API on port 5000
-  const port = 5000;
-  
+  // Use environment port or default to 5000
+  const port = parseInt(process.env.PORT || '5000', 10);
+
   // P9 INFRASTRUCTURE: Enterprise graceful shutdown system
   let gracefulShutdownHandler: any = null;
 
@@ -1407,13 +1412,13 @@ app.use((req, res, next) => {
   logger.startup('HTTPServer', 'starting', { port });
   // Listen on IPv6 to accept both IPv4 and IPv6 loopback (fixes cloudflared ::1 origin)
   httpServer.listen(port, "0.0.0.0", async () => {
-    logger.startup('HTTPServer', 'ready', { 
-      port, 
+    logger.startup('HTTPServer', 'ready', {
+      port,
       externalUrl: `https://${process.env.REPL_SLUG || 'app'}.${process.env.REPL_OWNER || 'user'}.repl.co`
     });
     log(`serving on port ${port} with WebSocket support`);
     Logger.info('Server', `Instagram metrics system initialized and ready`);
-    
+
     // P9 INFRASTRUCTURE: Initialize graceful shutdown after server starts
     gracefulShutdownHandler = initializeGracefulShutdown(httpServer, {
       timeout: 30000,
@@ -1422,9 +1427,9 @@ app.use((req, res, next) => {
         Logger.info('GracefulShutdown', message);
       }
     });
-    
+
     console.log('🔄 P9: Graceful shutdown system initialized');
-    
+
     // P2-2 SECURITY: Initialize token encryption AFTER server starts
     try {
       await initializeTokenEncryption();

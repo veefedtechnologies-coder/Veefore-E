@@ -288,6 +288,8 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0',
+    // Allow ngrok and other external origins
+    cors: true,
     hmr: process.env.REPLIT_DEV_DOMAIN
       ? {
         protocol: 'wss',
@@ -295,5 +297,8 @@ export default defineConfig({
         host: process.env.REPLIT_DEV_DOMAIN
       }
       : { protocol: 'ws' },
+    // Allow all hosts including ngrok tunnels
+    allowedHosts: 'all',
   },
 });
+
