@@ -47,9 +47,11 @@ export class MongoConnectionManager {
       }
 
       const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://localhost:27017/veefore';
-      
+
       if (retryCount === 0) {
-        console.log('[MONGODB] Attempting to connect to:', mongoUri);
+        // P1-7 SECURITY: Mask credentials in logs
+        const maskedUri = mongoUri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+        console.log('[MONGODB] Attempting to connect to:', maskedUri);
       } else {
         console.log(`[MONGODB] Retry attempt ${retryCount}/${MongoConnectionManager.MAX_RETRY_ATTEMPTS}...`);
       }
@@ -58,7 +60,7 @@ export class MongoConnectionManager {
       const serverSelectionTimeout = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '10000', 10);
       const socketTimeout = parseInt(process.env.MONGODB_SOCKET_TIMEOUT || '45000', 10);
       const maxIdleTime = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '30000', 10);
-      
+
       await mongoose.connect(mongoUri, {
         dbName: process.env.MONGODB_DB_NAME || 'veeforedb',
         serverSelectionTimeoutMS: serverSelectionTimeout,
@@ -76,8 +78,8 @@ export class MongoConnectionManager {
       this.isConnected = true;
       this.connectionMetrics.successfulConnections++;
       this.connectionMetrics.lastConnectedAt = new Date();
-      this.connectionMetrics.averageConnectTimeMs = 
-        (this.connectionMetrics.averageConnectTimeMs * (this.connectionMetrics.successfulConnections - 1) + connectTime) / 
+      this.connectionMetrics.averageConnectTimeMs =
+        (this.connectionMetrics.averageConnectTimeMs * (this.connectionMetrics.successfulConnections - 1) + connectTime) /
         this.connectionMetrics.successfulConnections;
 
       console.log(`✅ Connected to MongoDB - ${mongoose.connection.db?.databaseName} database (${connectTime}ms)`);
@@ -89,10 +91,10 @@ export class MongoConnectionManager {
       this.connectionMetrics.lastError = errorMessage;
       this.isConnected = false;
 
-      const isTransient = errorName === 'MongoNetworkError' || 
-                          errorName === 'MongoServerSelectionError' ||
-                          errorMessage?.includes('ECONNREFUSED') ||
-                          errorMessage?.includes('timeout');
+      const isTransient = errorName === 'MongoNetworkError' ||
+        errorName === 'MongoServerSelectionError' ||
+        errorMessage?.includes('ECONNREFUSED') ||
+        errorMessage?.includes('timeout');
 
       if (isTransient && retryCount < MongoConnectionManager.MAX_RETRY_ATTEMPTS) {
         const delay = MongoConnectionManager.BASE_RETRY_DELAY_MS * Math.pow(2, retryCount);
@@ -102,11 +104,11 @@ export class MongoConnectionManager {
       }
 
       console.error('❌ FATAL: MongoDB connection failed after retries:', errorMessage);
-      
+
       if (process.env.NODE_ENV === 'production') {
         throw new Error('MongoDB connection required for production');
       }
-      
+
       console.warn('⚠️ Development mode: Continuing with limited functionality');
     }
   }
