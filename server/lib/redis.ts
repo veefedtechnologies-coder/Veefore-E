@@ -4,6 +4,28 @@ import Redis from 'ioredis';
 let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
 
+const getRedisOptions = (url: string | undefined): any => {
+    if (!url) return {};
+
+    const isTls = url.startsWith('rediss://') || url.includes(':443');
+
+    // Base options
+    const options: any = {
+        family: 4, // Force IPv4 to avoid ENETUNREACH on some platforms
+        keepAlive: 10000,
+        enableReadyCheck: false
+    };
+
+    // Add TLS if detected (Upstash/Vercel KV requires this)
+    if (isTls) {
+        options.tls = {
+            rejectUnauthorized: false // Helpful for some hosted redis providers
+        };
+    }
+
+    return options;
+};
+
 export const getRedisClient = (): Redis => {
     if (!redisClient) {
         // Support standard REDIS_URL or Vercel's KV_URL / STORAGE_REDIS_URL
@@ -15,11 +37,12 @@ export const getRedisClient = (): Redis => {
             console.warn('[REDIS] REDIS_URL (or KV_URL) not set, falling back to localhost default');
         }
 
-        console.log('[REDIS] Connecting to:', redisUrl ? 'External Redis (Vercel/Upstash)' : 'Localhost');
+        console.log('[REDIS] Connecting to:', redisUrl ? 'External Redis' : 'Localhost');
 
+        const baseOptions = getRedisOptions(redisUrl);
         redisClient = new Redis(redisUrl || 'redis://localhost:6379', {
+            ...baseOptions,
             maxRetriesPerRequest: null, // Required for BullMQ
-            enableReadyCheck: false,
             retryStrategy: (times) => {
                 const delay = Math.min(times * 50, 2000);
                 return delay;
@@ -45,9 +68,10 @@ export const getRedisSubscriber = (): Redis => {
             process.env.KV_URL ||
             process.env.STORAGE_REDIS_URL;
 
+        const baseOptions = getRedisOptions(redisUrl);
         redisSubscriber = new Redis(redisUrl || 'redis://localhost:6379', {
+            ...baseOptions,
             maxRetriesPerRequest: null,
-            enableReadyCheck: false,
             retryStrategy: (times) => {
                 const delay = Math.min(times * 50, 2000);
                 return delay;
@@ -72,13 +96,14 @@ export const getRateLimitRedisClient = (): Redis => {
             process.env.KV_URL ||
             process.env.STORAGE_REDIS_URL;
 
+        const baseOptions = getRedisOptions(redisUrl);
         rateLimitClient = new Redis(redisUrl || 'redis://localhost:6379', {
+            ...baseOptions,
             // Fail fast settings
             maxRetriesPerRequest: 1,       // Don't retry commands forever
             enableOfflineQueue: false,      // Don't queue commands if disconnected
             commandTimeout: 1000,           // 1s hard timeout on commands
             connectTimeout: 1000,           // 1s connection timeout
-            enableReadyCheck: false,
             retryStrategy: (times) => {
                 // Retry only a few times with short delay
                 if (times > 3) return null; // Stop retrying after 3 attempts
