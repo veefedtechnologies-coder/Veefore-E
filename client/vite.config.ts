@@ -18,7 +18,6 @@ export default defineConfig({
   server: {
     host: true,
     cors: true,
-    allowedHosts: 'all',
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
@@ -26,6 +25,5 @@ export default defineConfig({
         secure: false,
       }
     }
-  },
-}
+  }
 })
