@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import { QUEUE_NAMES } from '../lib/queue';
-import { getRedisClient } from '../lib/redis';
+import { getRedisClient, getRedisOptions } from '../lib/redis';
 import { emailService } from '../email-service';
 
 // Standard connection for worker (needs to be separate if blocking is used, but for simple jobs shared is okayish 
@@ -12,10 +12,12 @@ const redisUrl = process.env.REDIS_URL ||
     process.env.STORAGE_REDIS_URL ||
     'redis://localhost:6379';
 
+const baseOptions = getRedisOptions(redisUrl);
+
 const workerOptions = {
     connection: {
-        url: redisUrl,
-        // We reuse the basic options logic implicitly or can redefine here
+        url: redisUrl, // This acts as the host/connection string for IORedis
+        ...baseOptions, // Inject family: 4, tls, etc.
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
     },

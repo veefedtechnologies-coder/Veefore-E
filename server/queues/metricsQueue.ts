@@ -1,5 +1,6 @@
 import { Queue, QueueOptions, RepeatOptions } from 'bullmq';
 import IORedis from 'ioredis';
+import { getRedisOptions } from '../lib/redis';
 
 // Redis connection status tracking
 let redisConnection: IORedis | null = null;
@@ -16,7 +17,7 @@ export async function ensureRedisConnected(): Promise<boolean> {
   if (redisDisabledPermanently) return false;
   if (redisAvailable) return true;
   if (!redisConnection) return false;
-  
+
   try {
     // Trigger the lazy connection
     if (redisConnection.status === 'wait') {
@@ -52,18 +53,22 @@ function initializeRedisConnection(): IORedis | null {
     redisDisabledPermanently = true;
     return null;
   }
-  
+
   // If already permanently disabled, don't try again
   if (redisDisabledPermanently) {
     return null;
   }
-  
+
   try {
     console.log('🔧 Initializing Redis connection (single attempt, no retries)...');
-    
+
     // Configuration for Upstash Redis with BullMQ compatibility
+    const baseOptions = getRedisOptions(process.env.REDIS_URL);
+
+    // Merge base options with BullMQ specifics
     // CRITICAL: Disable ALL retries to prevent connection spam
     const redisConfig = {
+      ...baseOptions,
       maxRetriesPerRequest: null, // Required for BullMQ
       connectTimeout: 5000, // Short timeout - fail fast
       commandTimeout: 5000,
@@ -73,10 +78,8 @@ function initializeRedisConnection(): IORedis | null {
       // CRITICAL: Disable all automatic reconnection
       retryStrategy: () => null, // Never retry - return null to stop retrying
       reconnectOnError: () => false, // Never reconnect on error
-      // TLS configuration for Upstash Redis
-      tls: {},
     };
-    
+
     // Create connection with URL and configuration
     const connection = new IORedis(process.env.REDIS_URL, redisConfig);
     console.log('✅ Redis connection created (lazy connect mode)');
@@ -140,26 +143,11 @@ redisConnection = initializeRedisConnection();
 
 // Create connection configuration for BullMQ
 function getRedisConnectionConfig() {
-  if (process.env.REDIS_URL) {
-    return {
-      host: 'placeholder', // BullMQ will use the URL
-      maxRetriesPerRequest: null,
-      connectTimeout: 5000,
-      commandTimeout: 3000,
-      lazyConnect: true,
-      retryDelayOnFailover: 2000,
-      enableOfflineQueue: false,
-      tls: {
-        rejectUnauthorized: false,
-      },
-    };
-  }
-  
+  const redisUrl = process.env.REDIS_URL || process.env.KV_URL || process.env.STORAGE_REDIS_URL;
+  const baseOptions = getRedisOptions(redisUrl);
+
   return {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD,
-    tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
+    ...baseOptions,
     maxRetriesPerRequest: null,
     connectTimeout: 5000,
     commandTimeout: 3000,
@@ -181,7 +169,7 @@ const queueOptions: QueueOptions = redisConnection ? {
       delay: 2000,
     },
   },
-} : {};
+} : {} as any;
 
 // Job data interfaces
 export interface FetchMetricsJobData {
@@ -241,7 +229,7 @@ export const POLLING_INTERVALS = {
 
 // Queue management functions
 export class MetricsQueueManager {
-  
+
   /**
    * Schedule metrics fetch job for a workspace
    */
@@ -436,7 +424,7 @@ export class MetricsQueueManager {
 
     try {
       const jobs = await metricsQueue.getJobs(['waiting', 'delayed', 'active']);
-      
+
       for (const job of jobs) {
         if (job.data.workspaceId === workspaceId) {
           await job.remove();
@@ -460,7 +448,7 @@ export class MetricsQueueManager {
 
     try {
       const jobs = await metricsQueue.getJobs(['waiting', 'delayed', 'active']);
-      
+
       for (const job of jobs) {
         if (job.data.workspaceId === workspaceId && job.data.instagramAccountId === instagramAccountId) {
           await job.remove();
@@ -541,10 +529,10 @@ export class MetricsQueueManager {
     try {
       // Clean completed jobs older than 24 hours
       await metricsQueue.clean(24 * 60 * 60 * 1000, 100, 'completed');
-      
+
       // Clean failed jobs older than 7 days
       await metricsQueue.clean(7 * 24 * 60 * 60 * 1000, 50, 'failed');
-      
+
       console.log('🧹 Cleaned up old queue jobs');
     } catch (error) {
       console.error(`🚨 Failed to cleanup old jobs:`, error);

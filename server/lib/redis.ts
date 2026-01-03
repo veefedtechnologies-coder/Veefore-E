@@ -4,7 +4,7 @@ import Redis from 'ioredis';
 let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
 
-const getRedisOptions = (url: string | undefined): any => {
+export const getRedisOptions = (url: string | undefined): any => {
     if (!url) return {};
 
     const isTls = url.startsWith('rediss://') || url.includes(':443');
@@ -100,16 +100,16 @@ export const getRateLimitRedisClient = (): Redis => {
         rateLimitClient = new Redis(redisUrl || 'redis://localhost:6379', {
             ...baseOptions,
             // Fail fast settings
-            maxRetriesPerRequest: 1,       // Don't retry commands forever
+            maxRetriesPerRequest: 0,       // Don't retry commands
             enableOfflineQueue: false,      // Don't queue commands if disconnected
-            commandTimeout: 2000,           // 2s hard timeout on commands (increased from 1s)
-            connectTimeout: 10000,          // 10s connection timeout (increased from 1s)
-            retryStrategy: (times) => {
-                // Retry only a few times with short delay
-                if (times > 3) return null; // Stop retrying after 3 attempts
-                return Math.min(times * 50, 200);
-            }
+            commandTimeout: 1000,           // 1s hard timeout on commands
+            connectTimeout: 5000,           // 5s connection timeout (relaxed from 2s for remote Redis)
+            retryStrategy: null,           // Never retry connection automatically
         });
+
+        // Debug: access private property or just log the config to verify
+        const maskedUrl = redisUrl ? redisUrl.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@') : 'localhost';
+        console.log(`[REDIS-RL] Initializing with: ${maskedUrl}, timeout: 5000ms`);
 
         rateLimitClient.on('error', (err) => {
             // Suppress critical errors to prevent crash, just log warning

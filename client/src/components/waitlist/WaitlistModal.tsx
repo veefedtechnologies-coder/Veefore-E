@@ -360,7 +360,7 @@ export const WaitlistModal = () => {
                         // Check if email already exists on waitlist (with 5s timeout)
                         try {
                             const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 5000);
+                            const timeoutId = setTimeout(() => controller.abort(), 15000);
 
                             const response = await fetch(
                                 `/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`,

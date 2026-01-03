@@ -58,7 +58,13 @@ async function getRateLimitInfo(key: string, windowMs: number, maxRequests: numb
       blocked
     };
   } catch (error) {
-    console.error('❌ Rate limit Redis error:', error);
+    // Fail open - suppress scary stack traces for connection tracking
+    const msg = (error as Error).message;
+    if (msg.includes('Stream isn\'t writeable') || msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT')) {
+      console.warn(`⚠️  Rate Limiting: Redis unavailable, failing open (allowing request). Error: ${msg}`);
+    } else {
+      console.error('❌ Rate limit Redis error:', error);
+    }
     // Fail open - allow request if Redis is down
     return { requests: 1, resetTime: Date.now() + windowMs, blocked: false };
   }
