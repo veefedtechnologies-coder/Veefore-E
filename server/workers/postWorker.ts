@@ -8,8 +8,15 @@ export class PostWorker {
 
   static start(storage: any): void {
     this.storage = storage;
-    
+
     console.log('[POST_WORKER] Starting post publishing worker...');
+
+    // Extra safety check: specifically check for REDIS_URL env var
+    // This prevents falling back to localhost defaults which causes timeouts
+    if (!process.env.REDIS_URL && !process.env.KV_URL) {
+      console.log('[POST_WORKER] No REDIS_URL configured. Worker permanently disabled.');
+      return;
+    }
 
     if (!isRedisAvailable() || !redisConnection) {
       console.log('[POST_WORKER] Redis unavailable, worker will not start. Using in-memory fallback.');
@@ -39,7 +46,7 @@ export class PostWorker {
 
   static async stop(): Promise<void> {
     console.log('[POST_WORKER] Stopping post publishing worker...');
-    
+
     try {
       if (this.worker) {
         await this.worker.close();
@@ -53,7 +60,7 @@ export class PostWorker {
 
   private static async processPublishJob(job: Job<ScheduledPostJobData>): Promise<any> {
     const { contentId, workspaceId, platform, title } = job.data;
-    
+
     console.log(`[POST_WORKER] Processing publish job for content ${contentId} (workspace: ${workspaceId})`);
 
     try {
@@ -62,7 +69,7 @@ export class PostWorker {
       }
 
       const content = await this.storage.getContent(contentId);
-      
+
       if (!content) {
         console.log(`[POST_WORKER] Content ${contentId} not found, skipping`);
         return { status: 'skipped', reason: 'Content not found' };
@@ -84,7 +91,7 @@ export class PostWorker {
       }
 
       const instagramAccount = await this.storage.getSocialAccountByPlatform(workspaceId, 'instagram');
-      
+
       if (!instagramAccount || !instagramAccount.accessToken) {
         console.error(`[POST_WORKER] No Instagram account found for workspace ${workspaceId}`);
         await this.updateContentStatus(contentId, 'failed', 'No Instagram account connected');
@@ -99,9 +106,9 @@ export class PostWorker {
 
       const caption = `${content.title}\n\n${content.description || ''}`;
       const mediaUrl = content.contentData.mediaUrl;
-      
+
       let contentType: 'video' | 'photo' | 'reel' | 'story' = 'photo';
-      
+
       if (content.type === 'story') {
         contentType = 'story';
       } else if (content.type === 'reel') {
@@ -109,36 +116,36 @@ export class PostWorker {
       } else if (content.type === 'video') {
         contentType = 'video';
       } else {
-        const isVideo = mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i) || 
-                       mediaUrl?.includes('video');
+        const isVideo = mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i) ||
+          mediaUrl?.includes('video');
         contentType = isVideo ? 'video' : 'photo';
       }
-      
+
       console.log(`[POST_WORKER] Publishing ${contentType} content to Instagram`);
-      
+
       const { InstagramDirectPublisher } = await import('../instagram-direct-publisher');
-      
+
       const directResult = await InstagramDirectPublisher.publishContent(
         instagramAccount.accessToken,
         mediaUrl,
         caption,
         contentType
       );
-      
+
       if (directResult.success) {
         console.log(`[POST_WORKER] ✅ Successfully published content ${contentId} (postId: ${directResult.id})`);
         await this.updateContentStatus(contentId, 'published', '', directResult.id);
         return { status: 'success', postId: directResult.id, approach: directResult.approach };
       } else {
         console.error(`[POST_WORKER] ❌ Publishing failed for content ${contentId}: ${directResult.error}`);
-        
+
         const attemptsMade = job.attemptsMade;
         const maxAttempts = job.opts?.attempts || 3;
-        
+
         if (attemptsMade >= maxAttempts - 1) {
           await this.updateContentStatus(contentId, 'failed', directResult.error || 'Publishing failed');
         }
-        
+
         throw new Error(directResult.error || 'Publishing failed');
       }
 
@@ -149,9 +156,9 @@ export class PostWorker {
   }
 
   private static async updateContentStatus(
-    contentId: number, 
-    status: string, 
-    error?: string, 
+    contentId: number,
+    status: string,
+    error?: string,
     instagramPostId?: string
   ): Promise<void> {
     try {
