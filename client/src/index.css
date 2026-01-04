@@ -157,8 +157,8 @@
   }
 
   html.dark body {
-    background-color: rgb(17 24 39);
-    /* gray-900 */
+    background-color: rgb(0 0 0);
+    /* Pure black to match waitlist/landing pages */
     color: rgb(249 250 251);
     /* gray-50 */
   }

@@ -15,7 +15,7 @@ const verifyFirebaseToken = async (req: Request, res: Response, next: NextFuncti
     }
 
     const token = authHeader.split(' ')[1]
-    
+
     if (!firebaseAdmin) {
       return res.status(500).json({ error: 'Firebase Admin not initialized' })
     }
@@ -37,7 +37,7 @@ router.post('/send-verification', verifyFirebaseToken, async (req: Request, res:
       return res.status(401).json({ error: 'Authentication required' });
     }
     const firebaseUid = req.user.uid
-    
+
     // Get user from database
     const user = await storage.getUserByFirebaseUid(firebaseUid)
     if (!user) {
@@ -59,10 +59,10 @@ router.post('/send-verification', verifyFirebaseToken, async (req: Request, res:
     await emailService.sendVerificationEmail(user.email, verificationCode)
 
     console.log(`[EMAIL VERIFICATION] Code sent to ${user.email} (${verificationCode})`)
-    
-    res.json({ 
-      success: true, 
-      message: 'Verification code sent to your email' 
+
+    res.json({
+      success: true,
+      message: 'Verification code sent to your email'
     })
   } catch (error: any) {
     console.error('[EMAIL VERIFICATION] Error sending code:', error)
@@ -112,10 +112,10 @@ router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (
     })
 
     console.log(`[EMAIL VERIFICATION] Email verified for user ${user.email}`)
-    
-    res.json({ 
-      success: true, 
-      message: 'Email verified successfully' 
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully'
     })
   } catch (error: any) {
     console.error('[EMAIL VERIFICATION] Error verifying code:', error)
@@ -126,22 +126,22 @@ router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (
 // Complete user signup with early access details
 router.post('/signup', async (req, res) => {
   try {
-    const { 
-      fullName, 
-      email, 
-      interestedFeatures = [], 
-      useCases = [], 
-      currentPlatforms = [], 
-      monthlyContent, 
-      teamSize, 
-      industry 
+    const {
+      fullName,
+      email,
+      interestedFeatures = [],
+      useCases = [],
+      currentPlatforms = [],
+      monthlyContent,
+      teamSize,
+      industry
     } = req.body
 
     console.log(`[EARLY ACCESS SIGNUP] Processing signup for ${email} with early access data`)
 
     // Get existing user or create new one (assuming they've been verified)
     let user = await storage.getUserByEmail(email)
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found. Please verify your email first.' })
     }
@@ -187,7 +187,7 @@ router.post('/signup', async (req, res) => {
 router.post('/register', async (req, res) => {
   try {
     const { idToken, email, displayName } = req.body
-    
+
     if (!firebaseAdmin) {
       return res.status(500).json({ error: 'Firebase Admin not initialized' })
     }
@@ -195,20 +195,59 @@ router.post('/register', async (req, res) => {
     // Verify the Firebase ID token
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken)
     const uid = decodedToken.uid
+    const userEmail = email || decodedToken.email
 
-    // Check if user already exists in MongoDB
+    // ============================================
+    // EARLY ACCESS VALIDATION - Server-side gating
+    // ============================================
+    if (userEmail) {
+      const { waitlistUserRepository } = await import('./repositories/WaitlistUserRepository')
+      const waitlistUser = await waitlistUserRepository.findByEmail(userEmail.toLowerCase())
+
+      if (!waitlistUser || waitlistUser.status !== 'early_access') {
+        console.log(`[EARLY ACCESS] Access denied for ${userEmail} - Status: ${waitlistUser?.status || 'not found'}`)
+        return res.status(403).json({
+          error: 'ACCESS_DENIED',
+          code: 'EARLY_ACCESS_REQUIRED',
+          message: 'Your account is not approved for early access yet. Please join our waitlist first.',
+          hasWaitlistEntry: !!waitlistUser,
+          waitlistStatus: waitlistUser?.status || null
+        })
+      }
+      console.log(`[EARLY ACCESS] Access granted for ${userEmail}`)
+    }
+    // ============================================
+
+    // Check if user already exists in MongoDB by Firebase UID
     let user = await storage.getUserByFirebaseId(uid)
-    
+
     if (!user) {
-      // Create new user in MongoDB
-      user = await storage.createUser({
-        firebaseId: uid,
-        email: email || decodedToken.email,
-        displayName: displayName || decodedToken.name || 'User',
-        profilePictureUrl: decodedToken.picture || '',
-        createdAt: new Date(),
-        lastLoginAt: new Date()
-      })
+      // If not found by UID, check by email (handling early access pre-creation)
+      if (userEmail) {
+        user = await storage.getUserByEmail(userEmail)
+
+        if (user) {
+          // Update existing user with actual Firebase UID
+          // We need to access the raw repository or add a specific method for this
+          // For now using updateUser assuming it handles partial updates
+          await storage.updateUser(user.id, { firebaseUid: uid })
+          // Refresh user object
+          user = await storage.getUser(user.id) as any
+        }
+      }
+
+      // If still not found, create new user
+      if (!user) {
+        user = await storage.createUser({
+          firebaseUid: uid,
+          email: userEmail,
+          displayName: displayName || decodedToken.name || 'User',
+          avatar: decodedToken.picture || '',
+          status: 'early_access',
+          createdAt: new Date(),
+          lastLoginAt: new Date()
+        } as any)
+      }
     } else {
       // Update last login
       await storage.updateUserLastLogin(uid)
@@ -217,10 +256,10 @@ router.post('/register', async (req, res) => {
     res.json({
       success: true,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         displayName: user.displayName,
-        profilePictureUrl: user.profilePictureUrl
+        profilePictureUrl: (user as any).avatar || (user as any).profilePictureUrl
       }
     })
   } catch (error) {
@@ -234,7 +273,7 @@ router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
   try {
     const uid = req.user!.uid!
     const user = await storage.getUserByFirebaseId(uid)
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
@@ -270,7 +309,7 @@ router.put('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
   try {
     const uid = req.user!.uid!
     const { displayName, profilePictureUrl } = req.body
-    
+
     const updatedUser = await storage.updateUser(uid, {
       displayName,
       profilePictureUrl

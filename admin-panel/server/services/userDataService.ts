@@ -20,7 +20,7 @@ export const connectToMainApp = async () => {
       const mainAppUri = mongoUri.replace('/veefore', '/veeforedb');
       mainAppConnection = await mongoose.createConnection(mainAppUri);
     }
-    
+
     console.log('✅ Connected to veeforedb database for user data');
     return mainAppConnection;
   } catch (error) {
@@ -85,10 +85,10 @@ const MainAppUserSchema = new mongoose.Schema({
 
 export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, filter: any = {}) => {
   const connection = await connectToMainApp();
-  const User = connection.model('User', MainAppUserSchema, 'users');
-  
+  const User = (connection.models.User || connection.model('User', MainAppUserSchema, 'users')) as mongoose.Model<any>;
+
   // Also connect to waitlist users collection
-  const WaitlistUser = connection.model('WaitlistUser', new mongoose.Schema({
+  const WaitlistUser = (connection.models.WaitlistUser || connection.model('WaitlistUser', new mongoose.Schema({
     name: String,
     email: String,
     referralCode: String,
@@ -104,8 +104,8 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
     createdAt: Date,
     updatedAt: Date,
     metadata: mongoose.Schema.Types.Mixed
-  }), 'waitlistusers');
-  
+  }), 'waitlistusers')) as mongoose.Model<any>;
+
   const pageNum = parseInt(page.toString());
   const limitNum = parseInt(pageSize.toString());
   const skip = (pageNum - 1) * limitNum;
@@ -119,7 +119,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
   console.log('🔍 Querying users with filter:', queryFilter);
   console.log('🔍 Sort:', { createdAt: -1 });
   console.log('🔍 Skip:', skip, 'Limit:', limitNum);
-  
+
   const [users, total] = await Promise.all([
     User.find(queryFilter)
       .sort({ createdAt: -1 })
@@ -131,14 +131,14 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
 
   console.log('🔍 Query results - Users found:', users.length, 'Total:', total);
 
-      // Transform users to match admin panel format with real data from veeforedb
-    const transformedUsers = await Promise.all(users.map(async user => {
+  // Transform users to match admin panel format with real data from veeforedb
+  const transformedUsers = await Promise.all(users.map(async user => {
     // Extract real user data from veeforedb
     const plan = user.plan || 'Free';
     const status = (user as any).waitlistStatus || (user as any).earlyAccessStatus || user.status || 'waitlisted';
     const credits = user.credits || 0;
     const isEmailVerified = user.isEmailVerified || false;
-    
+
     // Fetch waitlist questionnaire data
     let waitlistQuestionnaire = null;
     try {
@@ -153,7 +153,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
     const isOnboarded = user.isOnboarded || false;
     const createdAt = user.createdAt;
     const updatedAt = user.updatedAt;
-    
+
     // Get last login/activity data for time-based status
     const lastActivityAt = user.lastLoginAt || (user as any).lastLogin || (user as any).lastActiveAt || updatedAt;
     const daysSinceLastActivity = Math.floor((Date.now() - new Date(lastActivityAt).getTime()) / (1000 * 60 * 60 * 24));
@@ -169,7 +169,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
     // Determine user status for admin panel based on real data and activity
     let userStatus = 'inactive';
     let statusReason = '';
-    
+
     // First check if user is banned or suspended
     if ((user as any).isBanned || user.status === 'banned' || user.status === 'suspended') {
       userStatus = 'banned';
@@ -251,7 +251,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
       userStatus = 'inactive';
       statusReason = 'Inactive user';
     }
-    
+
     // Determine subscription status
     let subscriptionStatus = 'inactive';
     if (status === 'launched' || status === 'early_access') subscriptionStatus = 'active';
@@ -276,8 +276,8 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
     // Calculate engagement score based on real data
     const daysSinceCreated = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
     const daysSinceUpdated = Math.floor((Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24));
-    const engagementScore = Math.min(100, Math.max(0, 
-      (socialConnections * 15) + 
+    const engagementScore = Math.min(100, Math.max(0,
+      (socialConnections * 15) +
       (credits / 50) + // More credits = more engagement
       (totalReferrals * 10) + // Referrals show engagement
       (isEmailVerified ? 20 : 0) + // Verified users are more engaged
@@ -288,12 +288,12 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
     ));
 
     // Use real last login data from database
-    const lastLoginFormatted = lastActivityAt ? 
-      new Date(lastActivityAt).toLocaleDateString() : 
+    const lastLoginFormatted = lastActivityAt ?
+      new Date(lastActivityAt).toLocaleDateString() :
       (daysSinceUpdated < 1 ? 'Today' :
-       daysSinceUpdated < 7 ? `${daysSinceUpdated} days ago` :
-       daysSinceUpdated < 30 ? `${Math.floor(daysSinceUpdated / 7)} weeks ago` :
-       'Over a month ago');
+        daysSinceUpdated < 7 ? `${daysSinceUpdated} days ago` :
+          daysSinceUpdated < 30 ? `${Math.floor(daysSinceUpdated / 7)} weeks ago` :
+            'Over a month ago');
 
     // Get REAL social media data from socialaccounts collection
     const db = connection.db;
@@ -313,13 +313,13 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         updatedAt: user.updatedAt
       };
     }
-    
+
     let socialAccounts: any[] = [];
     let userWorkspace: any = null;
-    
+
     // Find ALL workspaces that this user has access to
     let userWorkspaces: any[] = [];
-    
+
     // First, try to find workspaces by the user's workspaceId
     if (user.workspaceId) {
       try {
@@ -340,7 +340,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         console.log('Error finding workspace by ID:', error);
       }
     }
-    
+
     // Also find workspaces by user ID (in case user is a member of multiple workspaces)
     try {
       const workspacesByUserId = await db.collection('workspaces').find({
@@ -350,7 +350,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
           { 'teamMembers.userId': user._id.toString() }
         ]
       }).toArray();
-      
+
       // Add unique workspaces (avoid duplicates)
       workspacesByUserId.forEach(workspace => {
         if (!userWorkspaces.find(w => w._id.toString() === workspace._id.toString())) {
@@ -360,7 +360,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
     } catch (error) {
       console.log('Error finding workspaces by user ID:', error);
     }
-    
+
     // If still no workspaces found, create a default one
     if (userWorkspaces.length === 0) {
       userWorkspaces = [{
@@ -372,10 +372,10 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         updatedAt: user.updatedAt
       }];
     }
-    
+
     // Set the primary workspace (first one found)
     userWorkspace = userWorkspaces[0];
-    
+
     // Now find ALL social accounts across ALL workspaces
     if (userWorkspaces.length > 0) {
       try {
@@ -386,11 +386,11 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
             { workspaceId: { $in: workspaceIds.map(id => id.toString()) } }
           ]
         }).toArray();
-        
+
         // Add workspace information to each social account
         socialAccounts = socialAccounts.map(account => {
-          const workspace = userWorkspaces.find(w => 
-            w._id.toString() === account.workspaceId || 
+          const workspace = userWorkspaces.find(w =>
+            w._id.toString() === account.workspaceId ||
             w._id.toString() === account.workspaceId?.toString()
           );
           return {
@@ -406,7 +406,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         console.log('Error finding social accounts by workspace IDs:', error);
       }
     }
-    
+
     // If still no accounts found, try to find by user's Instagram username
     if (socialAccounts.length === 0 && user.instagramUsername) {
       const cleanUsername = user.instagramUsername.replace('@', '').replace('_ig', '');
@@ -414,13 +414,13 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         username: cleanUsername
       }).toArray();
     }
-    
+
     // Use the workspace we already found
     const workspace = userWorkspace;
-    
+
     // Build social media object from real socialaccounts data with workspace mapping
     const activeAccounts = (socialAccounts || []).filter((account: any) => account && account.isActive);
-    
+
     // Group accounts by platform for easy access
     const accountsByPlatform = activeAccounts.reduce((acc: any, account: any) => {
       if (!acc[account.platform]) {
@@ -429,28 +429,28 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
       acc[account.platform].push(account);
       return acc;
     }, {});
-    
+
     // Get all Instagram accounts with workspace info
     const instagramAccounts = accountsByPlatform.instagram || [];
     const twitterAccounts = accountsByPlatform.twitter || [];
     const linkedinAccounts = accountsByPlatform.linkedin || [];
     const tiktokAccounts = accountsByPlatform.tiktok || [];
     const youtubeAccounts = accountsByPlatform.youtube || [];
-    
+
     const socialMedia = {
       // Show all workspaces
       workspaces: userWorkspaces.map(workspace => ({
         id: workspace._id,
         name: workspace.name || 'Unknown Workspace',
         description: workspace.description || '',
-        socialAccountsCount: activeAccounts.filter(account => 
+        socialAccountsCount: activeAccounts.filter(account =>
           account.workspace && account.workspace.id.toString() === workspace._id.toString()
         ).length,
         connectedPlatforms: activeAccounts
           .filter(account => account.workspace && account.workspace.id.toString() === workspace._id.toString())
           .map(account => account.platform)
       })),
-      
+
       // Show all Instagram accounts with workspace mapping
       instagramAccounts: instagramAccounts.map((account: any) => ({
         username: account.username,
@@ -463,7 +463,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: account.createdAt,
         workspace: account.workspace || null
       })),
-      
+
       // Show all Twitter accounts with workspace mapping
       twitterAccounts: twitterAccounts.map((account: any) => ({
         username: account.username,
@@ -476,7 +476,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: account.createdAt,
         workspace: account.workspace || null
       })),
-      
+
       // Show all LinkedIn accounts with workspace mapping
       linkedinAccounts: linkedinAccounts.map((account: any) => ({
         username: account.username,
@@ -489,7 +489,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: account.createdAt,
         workspace: account.workspace || null
       })),
-      
+
       // Show all TikTok accounts with workspace mapping
       tiktokAccounts: tiktokAccounts.map((account: any) => ({
         username: account.username,
@@ -502,7 +502,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: account.createdAt,
         workspace: account.workspace || null
       })),
-      
+
       // Show all YouTube accounts with workspace mapping
       youtubeAccounts: youtubeAccounts.map((account: any) => ({
         username: account.username,
@@ -515,7 +515,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: account.createdAt,
         workspace: account.workspace || null
       })),
-      
+
       // Legacy format for backward compatibility (show first account of each platform)
       platforms: activeAccounts.reduce((acc: any, account: any) => {
         if (!acc[account.platform]) {
@@ -532,7 +532,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         }
         return acc;
       }, {}),
-      
+
       // Legacy single account format (first account of each platform)
       instagram: instagramAccounts[0] ? {
         username: instagramAccounts[0].username,
@@ -545,7 +545,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: instagramAccounts[0].createdAt,
         workspace: instagramAccounts[0].workspace || null
       } : null,
-      
+
       twitter: twitterAccounts[0] ? {
         username: twitterAccounts[0].username,
         handle: twitterAccounts[0].username,
@@ -557,7 +557,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: twitterAccounts[0].createdAt,
         workspace: twitterAccounts[0].workspace || null
       } : null,
-      
+
       linkedin: linkedinAccounts[0] ? {
         username: linkedinAccounts[0].username,
         handle: linkedinAccounts[0].username,
@@ -569,7 +569,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: linkedinAccounts[0].createdAt,
         workspace: linkedinAccounts[0].workspace || null
       } : null,
-      
+
       tiktok: tiktokAccounts[0] ? {
         username: tiktokAccounts[0].username,
         handle: tiktokAccounts[0].username,
@@ -581,7 +581,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: tiktokAccounts[0].createdAt,
         workspace: tiktokAccounts[0].workspace || null
       } : null,
-      
+
       youtube: youtubeAccounts[0] ? {
         username: youtubeAccounts[0].username,
         handle: youtubeAccounts[0].username,
@@ -593,7 +593,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         connectedAt: youtubeAccounts[0].createdAt,
         workspace: youtubeAccounts[0].workspace || null
       } : null,
-      
+
       totalConnections: activeAccounts.length,
       totalWorkspaces: userWorkspaces.length,
       summary: `${activeAccounts.length} connected account${activeAccounts.length !== 1 ? 's' : ''} across ${userWorkspaces.length} workspace${userWorkspaces.length !== 1 ? 's' : ''}`
@@ -663,26 +663,26 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
       lastLoginFormatted: lastLoginFormatted,
       loginCount: loginCount,
       dailyLoginStreak: dailyLoginStreak,
-      
+
       // App Usage Insights
       dailyUsageTime: (user as any).dailyUsageTime || null,
       avgSessionDuration: (user as any).avgSessionDuration || null,
       totalSessions: (user as any).totalSessions || null,
       usageFrequency: (user as any).usageFrequency || (daysSinceLastActivity <= 7 ? 'Daily' : daysSinceLastActivity <= 30 ? 'Weekly' : 'Monthly'),
-      
+
       // Referral Information
       referredBy: user.referredBy || null,
-      
+
       // Onboarding Journey - Use real data from database
       waitlistJoinedAt: user.createdAt, // When they first signed up
       waitlistPosition: (user as any).waitlistPosition || null,
       waitlistStatus: user.status || 'waitlisted',
       hasUsedWaitlistBonus: user.hasUsedWaitlistBonus || false,
-      
+
       // Extract onboarding data from preferences object
       businessType: preferences.businessType || (preferences.businessName ? 'business' : 'N/A'),
       experienceLevel: preferences.experienceLevel || 'N/A',
-      primaryObjective: preferences.primaryObjective || (preferences.goals?.primary ? 
+      primaryObjective: preferences.primaryObjective || (preferences.goals?.primary ?
         preferences.goals.primary.replace('-', ' ').replace(/\b\w/g, (l: any) => l.toUpperCase()) : 'N/A'),
       contentStyle: preferences.contentStyle || preferences.brandTone || 'N/A',
       postingFrequency: preferences.postingFrequency || 'N/A',
@@ -693,14 +693,14 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
       targetAudience: preferences.targetAudience || preferences.description || 'N/A',
       goals: preferences.goals ? Object.entries(preferences.goals).map(([key, value]) => `${key}: ${value}`) : [],
       socialPlatforms: preferences.socialPlatforms || [],
-      
+
       // Waitlist questionnaire data - extract from real waitlist questionnaire data
       teamSize: waitlistQuestionnaire?.teamSize || null,
       currentTools: waitlistQuestionnaire?.currentTools || [],
       primaryGoal: waitlistQuestionnaire?.primaryGoal || null,
       contentTypes: waitlistQuestionnaire?.contentTypes || [],
       urgency: waitlistQuestionnaire?.urgency || null,
-      
+
       // Post-signup onboarding data (from onboardingData field)
       fullName: (user.onboardingData as any)?.userProfile?.fullName || preferences.fullName || (user as any).fullName || null,
       role: (user.onboardingData as any)?.userProfile?.role || preferences.role || (user as any).role || null,
@@ -734,7 +734,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         maxTeamMembers: workspace.maxTeamMembers || 1,
         createdAt: workspace.createdAt,
         updatedAt: workspace.updatedAt,
-        socialAccountsCount: activeAccounts.filter(account => 
+        socialAccountsCount: activeAccounts.filter(account =>
           account.workspace && account.workspace.id.toString() === workspace._id.toString()
         ).length,
         connectedPlatforms: activeAccounts
@@ -755,7 +755,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         socialAccountsCount: 0,
         connectedPlatforms: []
       },
-      
+
       // Show all workspaces with detailed information
       workspaces: userWorkspaces.map(workspace => ({
         id: workspace._id,
@@ -769,7 +769,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
         maxTeamMembers: workspace.maxTeamMembers || 1,
         createdAt: workspace.createdAt,
         updatedAt: workspace.updatedAt,
-        socialAccountsCount: activeAccounts.filter(account => 
+        socialAccountsCount: activeAccounts.filter(account =>
           account.workspace && account.workspace.id.toString() === workspace._id.toString()
         ).length,
         connectedPlatforms: activeAccounts
@@ -793,7 +793,7 @@ export const getMainAppUsers = async (page: number = 1, pageSize: number = 10, f
       createdAtFormatted: new Date(createdAt).toLocaleDateString(),
       updatedAt: updatedAt
     };
-    }));
+  }));
 
   return {
     users: transformedUsers,

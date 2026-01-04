@@ -1,11 +1,14 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Play } from 'lucide-react';
 import { useWaitlist } from "../../../context/WaitlistContext";
+import { useLocation } from "wouter";
+import { useEarlyAccessCheck } from "../../../hooks/useEarlyAccessCheck";
 
 export const HeroSection = React.memo(() => {
     const { openWaitlist } = useWaitlist();
+    const { hasEarlyAccess } = useEarlyAccessCheck();
+    const [, setLocation] = useLocation();
 
     return (
         <section className="relative pt-28 pb-16 md:pt-40 md:pb-24 px-4 sm:px-6">
@@ -48,8 +51,11 @@ export const HeroSection = React.memo(() => {
                     transition={{ duration: 0.6, delay: 0.3 }}
                     className="flex flex-col sm:flex-row gap-4 justify-center"
                 >
-                    <button onClick={openWaitlist} className="inline-flex items-center justify-center px-8 py-4 rounded-full bg-white text-black font-semibold hover:bg-white/90 transition-colors group cursor-pointer">
-                        Join Waitlist
+                    <button
+                        onClick={() => hasEarlyAccess ? setLocation('/signup') : openWaitlist()}
+                        className="inline-flex items-center justify-center px-8 py-4 rounded-full bg-white text-black font-semibold hover:bg-white/90 transition-colors group cursor-pointer"
+                    >
+                        {hasEarlyAccess ? "Get Started" : "Join Waitlist"}
                         <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                     </button>
                     <button className="inline-flex items-center justify-center px-8 py-4 rounded-full border border-white/20 text-white font-medium hover:bg-white/5 transition-colors gap-2">
