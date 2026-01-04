@@ -104,7 +104,14 @@ export const getRateLimitRedisClient = (): Redis => {
             enableOfflineQueue: false,      // Don't queue commands if disconnected
             commandTimeout: 1000,           // 1s hard timeout on commands
             connectTimeout: 5000,           // 5s connection timeout (relaxed from 2s for remote Redis)
-            retryStrategy: null,           // Never retry connection automatically
+            retryStrategy: (times) => {
+                // Reconnect with exponential backoff, max 2s delay
+                const delay = Math.min(times * 100, 2000);
+                if (times === 1) {
+                    console.log('[REDIS-RL] Connection lost. Attempting to reconnect...');
+                }
+                return delay;
+            },
         });
 
         // Debug: access private property or just log the config to verify
