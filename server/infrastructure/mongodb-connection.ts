@@ -57,7 +57,7 @@ export class MongoConnectionManager {
       }
 
       const poolSize = parseInt(process.env.MONGODB_POOL_SIZE || '50', 10);
-      const serverSelectionTimeout = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '10000', 10);
+      const serverSelectionTimeout = parseInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT || '30000', 10);
       const socketTimeout = parseInt(process.env.MONGODB_SOCKET_TIMEOUT || '45000', 10);
       const maxIdleTime = parseInt(process.env.MONGODB_MAX_IDLE_TIME || '30000', 10);
 
@@ -71,7 +71,7 @@ export class MongoConnectionManager {
         maxIdleTimeMS: maxIdleTime,
         retryWrites: true,
         retryReads: true,
-        connectTimeoutMS: parseInt(process.env.MONGODB_CONNECT_TIMEOUT || '10000', 10),
+        connectTimeoutMS: parseInt(process.env.MONGODB_CONNECT_TIMEOUT || '30000', 10),
       });
 
       const connectTime = Date.now() - startTime;

@@ -255,10 +255,83 @@ export const WaitlistModal = () => {
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isDuplicate, setIsDuplicate] = useState(false);
+
+    // PERSISTENCE CONSTANTS
+    const STORAGE_KEY = 'veefore_waitlist_modal_progress';
+    const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+    // Load saved state on open
+    useEffect(() => {
+        if (!isWaitlistOpen) return;
+
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+
+        try {
+            const parsed = JSON.parse(saved);
+            const age = Date.now() - (parsed.timestamp || 0);
+
+            // Expired?
+            if (age > CACHE_DURATION) {
+                localStorage.removeItem(STORAGE_KEY);
+                return;
+            }
+
+            // Valid cache found
+            if (parsed.formData) {
+                if (parsed.formData.email && parsed.step > 1) {
+                    fetch(`/api/early-access/check-email?email=${encodeURIComponent(parsed.formData.email)}&reason=restore`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.exists) {
+                                localStorage.removeItem(STORAGE_KEY);
+                                setFormData({ name: '', email: '', orgType: null, painPoints: '' });
+                                setStep(1);
+                                toast({
+                                    title: "Welcome Back! 👋",
+                                    description: "You're already on the waitlist! Draft cleared.",
+                                });
+                            } else {
+                                setFormData(parsed.formData);
+                                setStep(parsed.step);
+                                toast({
+                                    title: "Progress Restored",
+                                    description: "Resumed your session.",
+                                });
+                            }
+                        })
+                        .catch(() => {
+                            setFormData(parsed.formData);
+                            setStep(parsed.step);
+                        });
+                } else {
+                    setFormData(parsed.formData);
+                    if (parsed.step) setStep(parsed.step);
+                }
+            }
+        } catch (e) {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    }, [isWaitlistOpen, toast]);
+
+    // Save state on change
+    useEffect(() => {
+        if (!isWaitlistOpen || isSubmitting || step === 5) return;
+        if (!formData.name && !formData.email) return;
+
+        const state = {
+            formData,
+            step,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }, [formData, step, isSubmitting, isWaitlistOpen]);
 
     useEffect(() => {
         if (isWaitlistOpen) {
-            setStep(1);
+            // Logic handled in persistence effect above
+            // setStep(1); // REMOVED: This was resetting step every time
             setErrors({});
         }
     }, [isWaitlistOpen]);
@@ -459,11 +532,9 @@ export const WaitlistModal = () => {
             }
 
             if (response.status === 409) {
-                toast({
-                    title: "Already Registered",
-                    description: "This email is already on the waitlist. Check your inbox for updates!",
-                    variant: "destructive"
-                });
+                localStorage.removeItem(STORAGE_KEY);
+                setIsDuplicate(true);
+                setStep(5);
                 return;
             }
 
@@ -498,6 +569,7 @@ export const WaitlistModal = () => {
             const data = await response.json();
 
             if (data.success !== false) {
+                localStorage.removeItem(STORAGE_KEY);
                 setStep(5);
             } else {
                 toast({
@@ -803,16 +875,35 @@ export const WaitlistModal = () => {
                             initial={{ scale: 0, rotate: -180 }}
                             animate={{ scale: 1, rotate: 0 }}
                             transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                            className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/30"
+                            className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center shadow-lg ${isDuplicate ? 'bg-indigo-500/20 shadow-indigo-500/30' : 'bg-gradient-to-br from-green-400 to-emerald-500 shadow-green-500/30'}`}
                         >
-                            <Check className="w-12 h-12 text-white" strokeWidth={3} />
+                            {isDuplicate ? (
+                                <span className="text-4xl">✨</span>
+                            ) : (
+                                <Check className="w-12 h-12 text-white" strokeWidth={3} />
+                            )}
                         </motion.div>
-                        <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-3xl font-bold text-white mb-2">
-                            You're on the list! 🎉
-                        </motion.h2>
-                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="text-white/50 mb-8 max-w-xs mx-auto">
-                            We'll reach out to <span className="text-indigo-400 font-medium">{formData.email}</span> with your exclusive invite.
-                        </motion.p>
+
+                        {isDuplicate ? (
+                            <>
+                                <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-3xl font-bold text-white mb-2">
+                                    You're on the list! 🚀
+                                </motion.h2>
+                                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="text-white/50 mb-8 max-w-xs mx-auto">
+                                    Good news - <span className="text-indigo-400 font-medium">{formData.email}</span> is already saved. We'll be in touch soon!
+                                </motion.p>
+                            </>
+                        ) : (
+                            <>
+                                <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-3xl font-bold text-white mb-2">
+                                    You're on the list! 🎉
+                                </motion.h2>
+                                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="text-white/50 mb-8 max-w-xs mx-auto">
+                                    We'll reach out to <span className="text-indigo-400 font-medium">{formData.email}</span> with your exclusive invite.
+                                </motion.p>
+                            </>
+                        )}
+
                         <motion.button
                             type="button"
                             initial={{ opacity: 0, y: 20 }}

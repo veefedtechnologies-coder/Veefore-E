@@ -29,28 +29,97 @@ export const initializeRateLimiting = (redis: Redis) => {
   console.log('🔒 P1-3 SECURITY: Rate limiting system initialized with Redis persistence');
 };
 
+
+// Fallback: In-memory rate limiting store
+const localRateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Cleanup interval for local store (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of localRateLimitStore.entries()) {
+    if (now > value.resetTime) {
+      localRateLimitStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 /**
- * Get rate limit info from Redis
+ * Get rate limit info from Redis (with in-memory fallback)
  */
 async function getRateLimitInfo(key: string, windowMs: number, maxRequests: number): Promise<RateLimitInfo> {
-  if (!redisClient) {
-    return { requests: 1, resetTime: Date.now() + windowMs, blocked: false };
+  const startTimer = Date.now();
+  // FAST PATH: If Redis is not ready, switch to In-Memory immediately
+  // This prevents 1-second logic timeouts from stacking up (e.g. 8 checks = 8s delay)
+  if (!redisClient || redisClient.status !== 'ready') {
+    const now = Date.now();
+    let record = localRateLimitStore.get(key);
+
+    // Clean expired
+    if (record && now > record.resetTime) {
+      localRateLimitStore.delete(key);
+      record = undefined;
+    }
+
+    if (!record) {
+      record = { count: 1, resetTime: now + windowMs };
+      localRateLimitStore.set(key, record);
+    } else {
+      record.count++;
+    }
+
+    // Defensive programming: limit memory growth
+    if (localRateLimitStore.size > 10000) localRateLimitStore.clear();
+
+    if (redisClient) {
+      // Log once per minute to avoid spamming
+      const logKey = `redis_down_log:${Math.floor(now / 60000)}`;
+      if (!localRateLimitStore.has(logKey)) {
+        console.warn(`⚠️  Rate Limiting: Redis connection unstable (${redisClient.status}). Switched to local fallback.`);
+        localRateLimitStore.set(logKey, { count: 1, resetTime: now + 60000 });
+      }
+    }
+
+    // VERIFICATION LOG: Show that we are using local memory
+    console.log(`[RATE-LIMIT] ⚠️  Fallback: ${key} | Count: ${record.count}/${maxRequests}`);
+
+    return {
+      requests: record.count,
+      resetTime: record.resetTime,
+      blocked: record.count > maxRequests
+    };
   }
 
   try {
+    const startTimer = Date.now();
     const now = Date.now();
     const windowStart = now - windowMs;
 
-    // Clean old entries and count current requests
-    await redisClient.zremrangebyscore(key, 0, windowStart);
-    const current = await redisClient.zcard(key);
+    // OPTIMIZATION: Pipeline 4 commands into 1 round-trip
+    // This reduces network latency impact by 4x
+    const pipeline = redisClient.pipeline();
+    pipeline.zremrangebyscore(key, 0, windowStart);
+    pipeline.zcard(key);
+    pipeline.zadd(key, now, `${now}-${Math.random()}`);
+    pipeline.expire(key, Math.ceil(windowMs / 1000));
 
-    // Add current request
-    await redisClient.zadd(key, now, `${now}-${Math.random()}`);
-    await redisClient.expire(key, Math.ceil(windowMs / 1000));
+    const results = await pipeline.exec();
 
+    // Check for pipeline errors
+    if (!results) throw new Error("Redis pipeline failed");
+
+    // results is [[err, res], [err, res], ...]
+    // result[1] is zcard count
+    const zcardResult = results[1];
+    if (zcardResult[0]) throw zcardResult[0]; // Throw if zcard had error
+
+    const current = zcardResult[1] as number;
     const requests = current + 1;
     const blocked = requests > maxRequests;
+
+    const duration = Date.now() - startTimer;
+
+    // VERIFICATION LOG: Show redis success + timing
+    console.log(`[RATE-LIMIT] ✅ Redis: ${key} | Count: ${requests}/${maxRequests} | Time: ${duration}ms`);
 
     return {
       requests,
@@ -58,14 +127,14 @@ async function getRateLimitInfo(key: string, windowMs: number, maxRequests: numb
       blocked
     };
   } catch (error) {
-    // Fail open - suppress scary stack traces for connection tracking
+    // Fail safe - logic error catch
     const msg = (error as Error).message;
-    if (msg.includes('Stream isn\'t writeable') || msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT')) {
+    if (msg.includes('Stream isn\'t writeable') || msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT') || msg.includes('Connection is closed')) {
       console.warn(`⚠️  Rate Limiting: Redis unavailable, failing open (allowing request). Error: ${msg}`);
     } else {
       console.error('❌ Rate limit Redis error:', error);
     }
-    // Fail open - allow request if Redis is down
+    // Fail open - allow request if Redis errors unexpectedly
     return { requests: 1, resetTime: Date.now() + windowMs, blocked: false };
   }
 }

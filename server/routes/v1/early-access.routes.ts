@@ -106,6 +106,12 @@ router.get('/check-email', apiRateLimiter, async (req: Request, res: Response) =
 
         // Validate email parameter
         const emailParam = req.query.email;
+        const reason = req.query.reason;
+
+        if (reason === 'restore') {
+            console.log(`[WAITLIST] ♻️  Validating session restore for: ${emailParam}`);
+        }
+
         if (typeof emailParam !== 'string') {
             return res.status(400).json({ error: "Email is required" });
         }
@@ -141,7 +147,7 @@ router.post('/join', apiRateLimiter, async (req: Request, res: Response) => {
         // Check for duplicate email (using sanitized email)
         const existingUser = await waitlistUserRepository.findByEmail(validatedData.email);
         if (existingUser) {
-            return res.status(400).json({
+            return res.status(409).json({
                 error: "This email is already on the waitlist. We'll be in touch soon!"
             });
         }

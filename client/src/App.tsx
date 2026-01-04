@@ -13,7 +13,7 @@ import { initializeSEO } from './lib/seo-optimization'
 import { initializeCoreWebVitals } from './lib/core-web-vitals'
 import { initializeComponentModernization } from './lib/component-modernization'
 import { WaitlistProvider } from './context/WaitlistContext'
-import { WaitlistModal } from './components/waitlist/WaitlistModal'
+// import { WaitlistModal } from './components/waitlist/WaitlistModal'
 import { MainNavigation } from './components/MainNavigation'
 import MainFooter from './components/MainFooter'
 
@@ -45,6 +45,7 @@ const Community = React.lazy(() => import('./pages/Community'))
 const Status = React.lazy(() => import('./pages/Status'))
 const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
 const CookieConsentBanner = React.lazy(() => import('./components/CookieConsentBanner'))
+const WaitlistPage = React.lazy(() => import('./pages/WaitlistPage'))
 
 const publicRoutes = [
   '/', '/features', '/pricing', '/changelog', '/about', '/blog', '/careers',
@@ -199,6 +200,8 @@ function App() {
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><RobotHeroLanding /></React.Suspense>
       case '/landing':
         return <Landing onNavigate={handleNavigate} />
+      case '/waitlist':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><WaitlistPage /></React.Suspense>
       default:
         return null
     }
@@ -208,7 +211,7 @@ function App() {
     <P6Provider>
       <WaitlistProvider>
         <>
-          <WaitlistModal />
+
           <React.Suspense fallback={null}>
             <CookieConsentBanner />
           </React.Suspense>
@@ -218,13 +221,20 @@ function App() {
               <AuthenticatedApp />
             </React.Suspense>
           ) : isPublicRoute ? (
-            <div className="min-h-screen bg-black text-white">
-              <MainNavigation />
-              <main>
-                {renderPublicPage()}
-              </main>
-              <MainFooter />
-            </div>
+            effectiveLocation === '/waitlist' ? (
+              // Waitlist page renders without header/footer
+              <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                <WaitlistPage />
+              </React.Suspense>
+            ) : (
+              <div className="min-h-screen bg-black text-white">
+                <MainNavigation />
+                <main>
+                  {renderPublicPage()}
+                </main>
+                <MainFooter />
+              </div>
+            )
           ) : (
             <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">
               <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">

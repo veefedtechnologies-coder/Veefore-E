@@ -43,12 +43,12 @@ class DistributedLockService {
 
   private checkCircuitBreaker(): boolean {
     if (!this.circuitBreaker.isOpen) return true;
-    
+
     if (this.circuitBreaker.nextRetryAt && new Date() >= this.circuitBreaker.nextRetryAt) {
       console.log('[DISTRIBUTED LOCK] Circuit breaker half-open, allowing retry...');
       return true;
     }
-    
+
     console.log('[DISTRIBUTED LOCK] Circuit breaker OPEN - skipping lock attempt');
     return false;
   }
@@ -68,7 +68,7 @@ class DistributedLockService {
   private recordFailure(): void {
     this.circuitBreaker.failures++;
     this.circuitBreaker.lastFailure = new Date();
-    
+
     if (this.circuitBreaker.failures >= DistributedLockService.CIRCUIT_BREAKER_THRESHOLD) {
       this.circuitBreaker.isOpen = true;
       this.circuitBreaker.nextRetryAt = new Date(
@@ -86,9 +86,9 @@ class DistributedLockService {
   }
 
   private generateInstanceId(): string {
-    return process.env.REPL_ID || 
-           process.env.INSTANCE_ID || 
-           `${process.pid}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    return process.env.REPL_ID ||
+      process.env.INSTANCE_ID ||
+      `${process.pid}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
   }
 
   private async getLockCollection(): Promise<mongoose.mongo.Collection<LockDocument> | null> {
@@ -99,7 +99,13 @@ class DistributedLockService {
       }
       return mongoose.connection.db.collection<LockDocument>('instance_locks');
     } catch (error) {
-      console.error('[DISTRIBUTED LOCK] Failed to get lock collection:', error);
+      // Check for timeout errors and suppress full stack trace to avoid console noise
+      const msg = (error as Error).message;
+      if (msg.includes('timed out') || msg.includes('MongoServerSelectionError')) {
+        console.warn(`[DISTRIBUTED LOCK] ⚠️  DB Not Ready: ${msg}`);
+      } else {
+        console.error('[DISTRIBUTED LOCK] Failed to get lock collection:', error);
+      }
       return null;
     }
   }
@@ -140,16 +146,16 @@ class DistributedLockService {
       }
 
       const result = await collection.updateOne(
-        { 
+        {
           _id: lockName as any,
           $or: [
             { expiresAt: { $lt: now } },
             { instanceId: { $exists: false } }
           ]
         },
-        { 
-          $set: { 
-            instanceId: this.instanceId, 
+        {
+          $set: {
+            instanceId: this.instanceId,
             acquiredAt: now,
             expiresAt: expiresAt,
             renewedAt: now
@@ -251,7 +257,7 @@ class DistributedLockService {
 
   async releaseAllLocks(): Promise<void> {
     console.log(`[DISTRIBUTED LOCK] Releasing all locks for instance ${this.instanceId}...`);
-    
+
     for (const lockName of this.acquiredLocks) {
       await this.releaseLock(lockName);
     }
@@ -314,31 +320,33 @@ export async function releaseInstagramPollingLocks(): Promise<void> {
 }
 
 export async function waitForMongoDBAndAcquireLock(
-  lockName: string, 
+  lockName: string,
   maxRetries: number = 30,
   retryInterval: number = 2000
 ): Promise<boolean> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     if (mongoose.connection.readyState !== 1) {
-      console.log(`[DISTRIBUTED LOCK] Waiting for MongoDB connection... (attempt ${attempt}/${maxRetries})`);
+      if (attempt % 5 === 0 || attempt === 1) {
+        console.log(`[DISTRIBUTED LOCK] Waiting for MongoDB connection... (attempt ${attempt}/${maxRetries})`);
+      }
       await new Promise(resolve => setTimeout(resolve, retryInterval));
       continue;
     }
-    
+
     const acquired = await distributedLock.acquireLock(lockName, {
       ttlMs: 5 * 60 * 1000,
       renewIntervalMs: 2 * 60 * 1000
     });
-    
+
     if (acquired) {
       console.log(`[DISTRIBUTED LOCK] ✅ This instance is the LEADER for '${lockName}'`);
       return true;
     }
-    
+
     console.log(`[DISTRIBUTED LOCK] Lock '${lockName}' held by another instance - this instance is a FOLLOWER`);
     return false;
   }
-  
+
   console.warn('[DISTRIBUTED LOCK] MongoDB connection timeout - this instance will be a FOLLOWER (no polling)');
   return false;
 }

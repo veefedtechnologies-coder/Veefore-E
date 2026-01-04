@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 
 interface WaitlistContextType {
     isWaitlistOpen: boolean;
@@ -10,17 +11,18 @@ const WaitlistContext = createContext<WaitlistContextType | undefined>(undefined
 
 export const WaitlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
+    const [, setLocation] = useLocation();
 
     // Helper to handle external links/parameters opening the waitlist
     useEffect(() => {
         // Check for 'open-waitlist' query param
         const params = new URLSearchParams(window.location.search);
         if (params.get('action') === 'join-waitlist' || window.location.hash === '#beta-signup') {
-            setIsWaitlistOpen(true);
+            setLocation('/waitlist');
         }
-    }, []);
+    }, [setLocation]);
 
-    const openWaitlist = () => setIsWaitlistOpen(true);
+    const openWaitlist = () => setLocation('/waitlist');
     const closeWaitlist = () => setIsWaitlistOpen(false);
 
     return (
