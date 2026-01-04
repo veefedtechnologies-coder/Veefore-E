@@ -54,8 +54,8 @@ export interface IUser extends Document {
 }
 
 export const UserSchema = new Schema<IUser>({
-  firebaseUid: { type: String, unique: true, sparse: true },
-  email: { type: String, required: true, unique: true },
+  firebaseUid: { type: String },
+  email: { type: String, required: true },
   username: { type: String, required: true, unique: true },
   displayName: String,
   avatar: String,
@@ -63,7 +63,7 @@ export const UserSchema = new Schema<IUser>({
   plan: { type: String, default: 'Free' },
   stripeCustomerId: String,
   stripeSubscriptionId: String,
-  referralCode: { type: String, unique: true },
+  referralCode: { type: String },
   totalReferrals: { type: Number, default: 0 },
   totalEarned: { type: Number, default: 0 },
   referredBy: String,
