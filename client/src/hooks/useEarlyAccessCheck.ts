@@ -66,6 +66,38 @@ export function useEarlyAccessCheck() {
             // Re-verify in background
             checkStatus(cachedEmail);
         }
+
+        // Parse and update state from storage
+        const syncFromStorage = () => {
+            const email = localStorage.getItem('veefore_early_access_email');
+            const status = localStorage.getItem('veefore_early_access_status');
+
+            if (email && status === 'approved') {
+                setStatus({
+                    hasEarlyAccess: true,
+                    status: 'early_access',
+                    email
+                });
+            } else if (!email) {
+                // Logged out / cleared
+                setStatus({ hasEarlyAccess: false, status: null });
+            }
+        };
+
+        // Listen for storage events (changes from other tabs)
+        window.addEventListener('storage', syncFromStorage);
+
+        // Also re-check on focus to ensure consistency
+        const onFocus = () => {
+            const email = localStorage.getItem('veefore_early_access_email');
+            if (email) checkStatus(email);
+        };
+        window.addEventListener('focus', onFocus);
+
+        return () => {
+            window.removeEventListener('storage', syncFromStorage);
+            window.removeEventListener('focus', onFocus);
+        };
     }, [checkStatus]);
 
     const clearEarlyAccess = useCallback(() => {
