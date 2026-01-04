@@ -15,17 +15,17 @@ export class SchedulerService {
 
   async start() {
     console.log('[SCHEDULER] Starting background scheduler service');
-    
+
     // Try to connect to Redis and start the worker
     const redisConnected = await ensureRedisConnected();
     if (redisConnected) {
       console.log('[SCHEDULER] Redis available - starting BullMQ post worker');
-      PostWorker.start(this.storage);
+      await PostWorker.start(this.storage);
       this.workerStarted = true;
     } else {
       console.log('[SCHEDULER] Redis unavailable - using in-memory fallback scheduler');
     }
-    
+
     this.checkInterval = setInterval(() => {
       this.processScheduledContent();
     }, 60000);
@@ -38,11 +38,11 @@ export class SchedulerService {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
-    
+
     if (PostWorker.isRunning()) {
       PostWorker.stop();
     }
-    
+
     console.log('[SCHEDULER] Stopped background scheduler service');
   }
 
@@ -52,11 +52,11 @@ export class SchedulerService {
       console.log(`[SCHEDULER] Queue scheduling unavailable for content ${content.id}, using in-memory fallback`);
       return { success: false, error: 'Queue scheduler unavailable' };
     }
-    
+
     // Start worker if not already running (late Redis connection)
     if (!this.workerStarted && !PostWorker.isRunning()) {
       console.log('[SCHEDULER] Late Redis connection detected - starting BullMQ post worker');
-      PostWorker.start(this.storage);
+      await PostWorker.start(this.storage);
       this.workerStarted = true;
     }
 
@@ -65,7 +65,7 @@ export class SchedulerService {
     }
 
     const scheduledAt = new Date(content.scheduledAt);
-    
+
     const result = await PostSchedulerManager.schedulePost(
       content.id,
       scheduledAt,
@@ -105,10 +105,10 @@ export class SchedulerService {
     try {
       const currentTime = new Date();
       console.log(`[SCHEDULER] Checking for scheduled content to publish at ${currentTime.toISOString()}`);
-      
+
       const allScheduledContent = await this.getAllScheduledContent();
       console.log(`[SCHEDULER] Found ${allScheduledContent.length} total scheduled items`);
-      
+
       allScheduledContent.forEach((content: any, index: number) => {
         console.log(`[SCHEDULER] Item ${index + 1}:`, {
           id: content.id,
@@ -119,12 +119,12 @@ export class SchedulerService {
           shouldPublish: content.scheduledAt && content.status === 'scheduled' && new Date(content.scheduledAt) <= currentTime
         });
       });
-      
+
       const contentToPublish = allScheduledContent.filter((content: any) => {
         if (!content.scheduledAt || content.status !== 'scheduled') {
           return false;
         }
-        
+
         const scheduledTime = new Date(content.scheduledAt);
         return scheduledTime <= currentTime;
       });
@@ -139,7 +139,7 @@ export class SchedulerService {
             continue;
           }
         }
-        
+
         await this.publishScheduledContent(content);
       }
     } catch (error) {
@@ -190,7 +190,7 @@ export class SchedulerService {
         return;
       }
       console.log(`[SCHEDULER] Publishing scheduled content: ${content.title} (ID: ${content.id})`);
-      
+
       if (content.platform !== 'instagram') {
         console.log(`[SCHEDULER] Platform ${content.platform} not supported yet`);
         return;
@@ -199,7 +199,7 @@ export class SchedulerService {
       console.log(`[SCHEDULER] Looking for Instagram account for workspace: ${content.workspaceId} (type: ${typeof content.workspaceId})`);
       const workspaceId = content.workspaceId.toString();
       const instagramAccount = await this.storage.getSocialAccountByPlatform(workspaceId, 'instagram');
-      
+
       if (!instagramAccount || !instagramAccount.accessToken) {
         console.error(`[SCHEDULER] No Instagram account found for workspace ${content.workspaceId}`);
         await this.updateContentStatus(content.id, 'failed', 'No Instagram account connected');
@@ -214,11 +214,11 @@ export class SchedulerService {
 
       const caption = `${content.title}\n\n${content.description || ''}`;
       const mediaUrl = content.contentData.mediaUrl;
-      
+
       console.log(`[SCHEDULER] Publishing ${content.type || 'post'} content to Instagram`);
-      
+
       let contentType: 'video' | 'photo' | 'reel' | 'story' = 'photo';
-      
+
       if (content.type === 'story') {
         contentType = 'story';
       } else if (content.type === 'reel') {
@@ -226,15 +226,15 @@ export class SchedulerService {
       } else if (content.type === 'video') {
         contentType = 'video';
       } else {
-        const isVideo = mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i) || 
-                       mediaUrl?.includes('video');
+        const isVideo = mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i) ||
+          mediaUrl?.includes('video');
         contentType = isVideo ? 'video' : 'photo';
       }
-      
+
       console.log(`[SCHEDULER] Detected content type: ${contentType} for URL: ${mediaUrl}`);
-      
+
       const { InstagramDirectPublisher } = await import('./instagram-direct-publisher');
-      
+
       console.log(`[SCHEDULER] Using direct publisher for permission-compatible publishing`);
       const directResult = await InstagramDirectPublisher.publishContent(
         instagramAccount.accessToken,
@@ -242,11 +242,11 @@ export class SchedulerService {
         caption,
         contentType
       );
-      
+
       if (directResult.success) {
         console.log(`[SCHEDULER] ✓ Publishing succeeded using ${directResult.approach}: ${directResult.id}`);
         console.log(`[SCHEDULER] Successfully published ${content.type || 'post'} content ${content.id} to Instagram:`, directResult.id);
-        
+
         await this.updateContentStatus(content.id, 'published', '', directResult.id);
       } else {
         console.error(`[SCHEDULER] ✗ Publishing failed with ${directResult.approach}: ${directResult.error}`);
@@ -289,7 +289,7 @@ export class SchedulerService {
         updates.instagramPostId = instagramPostId;
       }
 
-      await this.storage.updateContent(contentId, updates);
+      await this.storage.updateContent(contentId.toString(), updates);
       console.log(`[SCHEDULER] Updated content ${contentId} status to ${status}`);
     } catch (error) {
       console.error(`[SCHEDULER] Error updating content ${contentId} status:`, error);
@@ -303,7 +303,7 @@ export function startSchedulerService(storage: IStorage) {
   if (schedulerService) {
     schedulerService.stop();
   }
-  
+
   schedulerService = new SchedulerService(storage);
   schedulerService.start();
   return schedulerService;
