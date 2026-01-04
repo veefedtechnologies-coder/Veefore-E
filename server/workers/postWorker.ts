@@ -28,10 +28,29 @@ export class PostWorker {
       // Reusing the shared redisConnection causes timeouts because BullMQ needs exclusion
       const { getRedisOptions } = await import('../lib/redis');
       const redisUrl = process.env.REDIS_URL || process.env.KV_URL || process.env.STORAGE_REDIS_URL;
-      const connectionOptions = {
+
+      let connectionConfig: any = {
         ...getRedisOptions(redisUrl),
         maxRetriesPerRequest: null,
       };
+
+      if (redisUrl) {
+        try {
+          // Manually parse URL because passing it as part of options object doesn't work for BullMQ
+          // BullMQ expects { connection: { host, port, password } } or { connection: RedisInstance }
+          const url = new URL(redisUrl);
+          connectionConfig.host = url.hostname;
+          connectionConfig.port = parseInt(url.port || '6379');
+          connectionConfig.username = url.username;
+          connectionConfig.password = url.password;
+
+          if (url.protocol === 'rediss:') {
+            connectionConfig.tls = { rejectUnauthorized: false };
+          }
+        } catch (e) {
+          console.error('[POST_WORKER] Failed to parse Redis URL, falling back to basic options', e);
+        }
+      }
 
       this.worker = new Worker(
         'post-scheduler',
@@ -39,7 +58,7 @@ export class PostWorker {
           return this.processPublishJob(job);
         },
         {
-          connection: connectionOptions,
+          connection: connectionConfig,
           concurrency: 3,
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 50 },
