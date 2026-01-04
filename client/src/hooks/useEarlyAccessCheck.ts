@@ -40,6 +40,9 @@ export function useEarlyAccessCheck() {
                 }
             }
 
+            // Dispatch custom event for SAME-TAB synchronization
+            window.dispatchEvent(new Event('veefore:auth_update'));
+
             setStatus(newStatus);
             return newStatus;
         } catch (error) {
@@ -86,6 +89,8 @@ export function useEarlyAccessCheck() {
 
         // Listen for storage events (changes from other tabs)
         window.addEventListener('storage', syncFromStorage);
+        // Listen for custom event (changes from SAME tab)
+        window.addEventListener('veefore:auth_update', syncFromStorage);
 
         // Also re-check on focus to ensure consistency
         const onFocus = () => {
@@ -96,6 +101,7 @@ export function useEarlyAccessCheck() {
 
         return () => {
             window.removeEventListener('storage', syncFromStorage);
+            window.removeEventListener('veefore:auth_update', syncFromStorage);
             window.removeEventListener('focus', onFocus);
         };
     }, [checkStatus]);
@@ -103,6 +109,7 @@ export function useEarlyAccessCheck() {
     const clearEarlyAccess = useCallback(() => {
         localStorage.removeItem('veefore_early_access_email');
         localStorage.removeItem('veefore_early_access_status');
+        window.dispatchEvent(new Event('veefore:auth_update'));
         setStatus({ hasEarlyAccess: false, status: null });
     }, []);
 
