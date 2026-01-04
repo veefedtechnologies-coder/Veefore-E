@@ -97,18 +97,18 @@ const CookieConsentBanner: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.2 }}
-                className="fixed bottom-0 left-0 right-0 z-[9999]"
+                className="fixed bottom-4 left-4 right-4 z-[9999] sm:bottom-5 sm:left-5 sm:right-5 md:bottom-6 md:left-6 md:right-6"
             >
-                <div className="bg-[#0a0a0a]/98 backdrop-blur-xl border-t border-white/10">
+                <div className="bg-[#0a0a0a]/98 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
                     <div className="h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
 
-                    <div className="px-3 py-2.5 sm:px-4 sm:py-2.5 lg:px-6 lg:py-2.5">
+                    <div className="px-4 py-3 sm:px-5 sm:py-4 lg:px-6 lg:py-4">
                         {/* Single row on desktop, stacked on mobile */}
-                        <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 lg:gap-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-5">
                             {/* Text with icon */}
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <Cookie className="w-4 h-4 text-blue-400 shrink-0" />
-                                <p className="text-xs sm:text-sm text-white/70">
+                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                <Cookie className="w-5 h-5 text-blue-400 shrink-0" />
+                                <p className="text-sm sm:text-base text-white/70">
                                     <span className="font-medium text-white/90">We value your privacy.</span>
                                     <span className="hidden sm:inline"> We use cookies to personalize content, analyze traffic, and improve your experience.</span>
                                     <span className="sm:hidden"> Cookies help us improve your experience.</span>
@@ -118,19 +118,19 @@ const CookieConsentBanner: React.FC = () => {
                             </div>
 
                             {/* Buttons - always horizontal, slim on mobile */}
-                            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                                 <button
                                     onClick={() => setShowPreferences(!showPreferences)}
-                                    className="flex items-center gap-0.5 sm:gap-1 px-2 py-[5px] sm:px-3 sm:py-1.5 rounded bg-white/5 border border-white/10 text-white/50 hover:text-white text-[10px] sm:text-xs transition-all"
+                                    className="flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:text-white text-xs sm:text-sm transition-all"
                                 >
                                     <span className="hidden sm:inline">Customize</span>
                                     <span className="sm:hidden">Options</span>
-                                    {showPreferences ? <ChevronUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
+                                    {showPreferences ? <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                                 </button>
 
                                 <button
                                     onClick={handleEssentialOnly}
-                                    className="px-2 py-[5px] sm:px-3 sm:py-1.5 rounded bg-white/5 border border-white/10 text-white/60 hover:text-white text-[10px] sm:text-xs font-medium transition-all"
+                                    className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:text-white text-xs sm:text-sm font-medium transition-all"
                                 >
                                     <span className="hidden sm:inline">Essential Only</span>
                                     <span className="sm:hidden">Essential</span>
@@ -138,9 +138,9 @@ const CookieConsentBanner: React.FC = () => {
 
                                 <button
                                     onClick={handleAcceptAll}
-                                    className="flex items-center gap-0.5 sm:gap-1 px-2 py-[5px] sm:px-3 sm:py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-medium transition-all"
+                                    className="flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-medium transition-all"
                                 >
-                                    <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                    <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     <span className="hidden sm:inline">Accept All</span>
                                     <span className="sm:hidden">Accept</span>
                                 </button>

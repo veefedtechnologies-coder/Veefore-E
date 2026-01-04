@@ -4,6 +4,7 @@ import { MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance'
 import { Menu, X, ChevronRight } from 'lucide-react'
 import { Link, useLocation } from 'wouter'
 import { useWaitlist } from '../context/WaitlistContext'
+import { useEarlyAccessCheck } from '../hooks/useEarlyAccessCheck'
 
 interface MainNavigationProps {
     onNavigate?: (page: string) => void
@@ -14,6 +15,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [location, setLocation] = useLocation()
     const { openWaitlist } = useWaitlist()
+    const { hasEarlyAccess } = useEarlyAccessCheck()
 
     // Handle scroll effect
     useEffect(() => {
@@ -47,6 +49,17 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
 
     const isHome = location === '/' || location === '/landing'
 
+    const handleActionClick = () => {
+        if (hasEarlyAccess) {
+            setLocation('/signin')
+        } else {
+            openWaitlist()
+        }
+        setMobileMenuOpen(false)
+    }
+
+    const actionLabel = hasEarlyAccess ? "Sign In" : "Join Waitlist"
+
     return (
         <>
             <motion.nav
@@ -58,17 +71,17 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
             >
                 <div className={`pointer-events-auto transition-all duration-300 ${isScrolled
                     ? 'mx-3 sm:mx-4 md:mx-6 lg:mx-auto lg:max-w-5xl mt-2 sm:mt-2 md:mt-3'
-                    : 'mx-4 sm:mx-8 md:mx-12 mt-4 sm:mt-6 md:mt-8'
+                    : 'mx-3 sm:mx-4 md:mx-8 lg:mx-12 mt-3 sm:mt-2 md:mt-0'
                     }`}>
                     <div className={`mx-auto px-3 sm:px-4 md:px-6 transition-all duration-300 ${isScrolled
                         ? 'py-2 sm:py-3 md:py-4 max-w-5xl bg-black/70 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-white/10'
-                        : 'py-4 sm:py-6 max-w-7xl bg-transparent'
+                        : 'py-3 sm:py-4 md:py-5 max-w-7xl bg-transparent'
                         }`}>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                             {/* Logo */}
-                            <div className="flex items-center gap-1 group cursor-pointer" onClick={() => setLocation('/')}>
-                                <img src="/veefore.svg" alt="Veefore" className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 object-contain" />
-                                <span className="text-lg sm:text-xl md:text-2xl font-bold -ml-1.5 tracking-tight group-hover:text-white/90 transition-colors">eefore</span>
+                            <div className="flex items-center gap-0.5 sm:gap-1 group cursor-pointer" onClick={() => setLocation('/')}>
+                                <img src="/veefore.svg" alt="Veefore" className="w-9 h-9 sm:w-10 sm:h-10 md:w-10 md:h-10 object-contain" />
+                                <span className="text-xl sm:text-xl md:text-2xl font-bold -ml-1 tracking-tight group-hover:text-white/90 transition-colors">eefore</span>
                             </div>
 
                             {/* Desktop Nav */}
@@ -81,21 +94,43 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
 
                             {/* CTA Buttons */}
                             <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
+                                {hasEarlyAccess && (
+                                    <button
+                                        onClick={() => setLocation('/signin')}
+                                        className="text-xs lg:text-sm font-medium text-white/70 hover:text-white transition-colors cursor-pointer"
+                                    >
+                                        Sign In
+                                    </button>
+                                )}
                                 <button
-                                    onClick={openWaitlist}
+                                    onClick={() => hasEarlyAccess ? setLocation('/signup') : openWaitlist()}
                                     className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium rounded-full bg-white text-black hover:bg-white/90 transition-colors cursor-pointer"
                                 >
-                                    Join Waitlist
+                                    {hasEarlyAccess ? "Sign Up" : "Join Waitlist"}
                                 </button>
                             </div>
 
-                            {/* Mobile Menu Button */}
-                            <button
-                                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                                className="md:hidden p-1.5 sm:p-2 rounded-lg hover:bg-white/10 pointer-events-auto"
-                            >
-                                {mobileMenuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
-                            </button>
+                            {/* Mobile: Show Join Waitlist when NOT scrolled, Menu button when scrolled */}
+                            <div className="md:hidden flex items-center">
+                                {!isScrolled ? (
+                                    <>
+
+                                        <button
+                                            onClick={() => hasEarlyAccess ? setLocation('/signup') : openWaitlist()}
+                                            className="px-4 py-2 text-sm font-semibold rounded-full bg-white text-black hover:bg-white/90 transition-colors cursor-pointer"
+                                        >
+                                            {hasEarlyAccess ? "Sign Up" : "Join Waitlist"}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button
+                                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                                        className="p-2 rounded-lg hover:bg-white/10 pointer-events-auto"
+                                    >
+                                        {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -130,12 +165,29 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
                         <div className="px-6 py-8 flex flex-col min-h-[calc(100vh-80px)]">
                             {/* Primary Actions */}
                             <div className="flex flex-col space-y-4 mb-8">
-                                <button
-                                    onClick={() => { setMobileMenuOpen(false); openWaitlist(); }}
-                                    className="w-full py-4 rounded-full bg-white text-black font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:bg-white/90 active:scale-[0.98] transition-all duration-300"
-                                >
-                                    Join Waitlist
-                                </button>
+                                {hasEarlyAccess ? (
+                                    <>
+                                        <button
+                                            onClick={() => { setLocation('/signup'); setMobileMenuOpen(false); }}
+                                            className="w-full py-4 rounded-full bg-white text-black font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:bg-white/90 active:scale-[0.98] transition-all duration-300"
+                                        >
+                                            Sign Up
+                                        </button>
+                                        <button
+                                            onClick={() => { setLocation('/signin'); setMobileMenuOpen(false); }}
+                                            className="w-full py-4 rounded-full bg-white/5 border border-white/10 text-white font-bold text-lg hover:bg-white/10 active:scale-[0.98] transition-all duration-300"
+                                        >
+                                            Sign In
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button
+                                        onClick={handleActionClick}
+                                        className="w-full py-4 rounded-full bg-white text-black font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:bg-white/90 active:scale-[0.98] transition-all duration-300"
+                                    >
+                                        {actionLabel}
+                                    </button>
+                                )}
                             </div>
 
                             {/* Navigation Links as Cards */}

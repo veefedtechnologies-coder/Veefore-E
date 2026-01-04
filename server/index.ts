@@ -304,7 +304,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // P1-3 SECURITY: Apply global rate limiting to all requests
 // P1-3 SECURITY: Apply global rate limiting only to API routes, not static assets
 app.use('/api', globalRateLimiter);
-app.use('/api', aiRateLimiter);
 
 // P1-5 SECURITY: API-specific CORS protection with enhanced validation
 app.use('/api', apiCorsMiddleware);

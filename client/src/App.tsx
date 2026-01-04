@@ -13,6 +13,7 @@ import { initializeSEO } from './lib/seo-optimization'
 import { initializeCoreWebVitals } from './lib/core-web-vitals'
 import { initializeComponentModernization } from './lib/component-modernization'
 import { WaitlistProvider } from './context/WaitlistContext'
+import { useEarlyAccessCheck } from './hooks/useEarlyAccessCheck'
 // import { WaitlistModal } from './components/waitlist/WaitlistModal'
 import { MainNavigation } from './components/MainNavigation'
 import MainFooter from './components/MainFooter'
@@ -138,11 +139,27 @@ function App() {
     effectiveLocation === route || effectiveLocation.startsWith(route + '/')
   ), [effectiveLocation])
 
+  const { hasEarlyAccess, isLoading: earlyAccessLoading } = useEarlyAccessCheck()
+
   useEffect(() => {
+    // PROTECTED ROUTE CHECK
     if (!loading && !user && isProtectedRoute) {
       setLocation('/signin')
     }
-  }, [loading, user, isProtectedRoute, setLocation])
+
+    // EARLY ACCESS GATING (UX Only)
+    // 1. If trying to access signin/signup but NOT approved -> Go to waitlist
+    if (!loading && !user && !earlyAccessLoading && !hasEarlyAccess) {
+      if (effectiveLocation === '/signin' || effectiveLocation === '/signup') {
+        setLocation('/waitlist')
+      }
+    }
+
+    // 2. If visiting waitlist but ALREADY approved -> Go to signup
+    if (!loading && !earlyAccessLoading && hasEarlyAccess && effectiveLocation === '/waitlist') {
+      setLocation('/signup')
+    }
+  }, [loading, user, isProtectedRoute, setLocation, hasEarlyAccess, earlyAccessLoading, effectiveLocation])
 
   if (loading && !isPublicRoute) {
     return <LoadingSpinner type="dashboard" />

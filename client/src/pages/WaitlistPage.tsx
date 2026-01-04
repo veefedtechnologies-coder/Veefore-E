@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import {
-    ChevronRight, Check, ChevronDown,
+    ChevronRight, Check, ChevronDown, ArrowLeft,
     User, Mail, Building2, Users, Rocket,
     Globe, Layers, Clock, Target,
     Briefcase, BarChart3, ShieldCheck, Wallet,
@@ -209,7 +209,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
                     autoComplete={autoComplete}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    className="w-full h-11 pl-10 pr-3 rounded-md text-white text-sm transition-all placeholder:text-white/30 bg-white/5 border border-white/10 focus:border-white/30 focus:bg-white/[0.08] outline-none"
+                    className="w-full h-11 pl-10 pr-3 rounded-md text-white text-base transition-all placeholder:text-white/30 bg-white/5 border border-white/10 focus:border-white/30 focus:bg-white/[0.08] outline-none"
                 />
             </div>
             {error && (
@@ -505,6 +505,8 @@ export default function WaitlistPage() {
             if (response.status === 409) {
                 console.log('[WaitlistPage] 409 Duplicate detected. switching to duplicate view.');
                 localStorage.removeItem(STORAGE_KEY);
+                // Store email for early access check mechanism
+                localStorage.setItem('veefore_early_access_email', formData.email.trim().toLowerCase());
                 setIsDuplicate(true);
                 setStep(5);
                 return;
@@ -525,6 +527,8 @@ export default function WaitlistPage() {
             const data = await response.json();
             if (data.success !== false) {
                 localStorage.removeItem(STORAGE_KEY); // Clear cache on success
+                // Store email for early access check mechanism
+                localStorage.setItem('veefore_early_access_email', formData.email.trim().toLowerCase());
                 setStep(5);
             } else {
                 toast({
@@ -549,9 +553,9 @@ export default function WaitlistPage() {
         switch (step) {
             case 1:
                 return (
-                    <div className="space-y-5">
-                        <div className="mb-8">
-                            <h2 className="text-2xl font-bold text-white mb-2">Get Early Access</h2>
+                    <div className="space-y-3">
+                        <div className="mb-4">
+                            <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Get Early Access</h2>
                             <p className="text-white/50 text-sm">Be first to automate your social growth with AI</p>
                         </div>
                         <CustomInput label="Full Name" name="name" value={formData.name} onChange={(v) => handleInputChange('name', v)} icon={User} placeholder="Your Full Name" autoFocus autoComplete="name" error={errors.name} required />
@@ -561,11 +565,11 @@ export default function WaitlistPage() {
                             type="button"
                             onClick={nextStep}
                             disabled={isValidating}
-                            className="w-full h-11 mt-2 rounded-md bg-[#2563eb] text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-[#1d4ed8] transition-colors disabled:opacity-70"
+                            className="w-full h-11 rounded-md bg-[#2563eb] text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-[#1d4ed8] transition-colors disabled:opacity-70"
                         >
                             {isValidating ? <><Loader2 className="w-5 h-5 animate-spin" /> Checking...</> : "Start Application"}
                         </button>
-                        <p className="text-center text-white/40 text-sm mt-6">
+                        <p className="text-center text-white/40 text-sm mt-3">
                             Already have an account? <span className="text-white hover:underline cursor-pointer" onClick={() => setLocation('/signin')}>Sign in</span>
                         </p>
                     </div>
@@ -722,15 +726,80 @@ export default function WaitlistPage() {
     };
 
     return (
-        <div className="flex min-h-screen w-full bg-black">
-            {/* Left Side - Content (narrower) */}
-            <div className="w-full lg:w-[45%] flex flex-col justify-center pl-8 pr-6 md:pl-16 md:pr-12 lg:pl-24 lg:pr-16 xl:pl-28 xl:pr-20 py-12 relative z-10">
-                <div className="absolute top-8 left-8 md:left-16 lg:left-24 xl:left-28 flex items-center gap-2 cursor-pointer" onClick={() => setLocation('/')}>
-                    <img src="/veefore.svg" alt="Veefore" className="w-8 h-8" />
-                    <span className="text-xl font-bold text-white">Veefore</span>
+        <div className="fixed inset-0 flex w-full bg-black overflow-hidden lg:relative lg:min-h-screen">
+            {/* Mobile-only atmospheric background */}
+            <div className="lg:hidden absolute inset-0 pointer-events-none">
+                {/* Gradient background for mobile */}
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/40 via-black to-blue-950/30" />
+
+                {/* Animated floating orbs - mobile only */}
+                <motion.div
+                    className="absolute top-20 right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl"
+                    animate={{
+                        y: [0, -20, 0],
+                        opacity: [0.2, 0.4, 0.2],
+                    }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div
+                    className="absolute top-1/3 left-0 w-40 h-40 bg-blue-500/15 rounded-full blur-3xl"
+                    animate={{
+                        x: [0, 20, 0],
+                        opacity: [0.15, 0.3, 0.15],
+                    }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div
+                    className="absolute bottom-40 right-0 w-36 h-36 bg-purple-500/20 rounded-full blur-3xl"
+                    animate={{
+                        y: [0, 15, 0],
+                        opacity: [0.2, 0.35, 0.2],
+                    }}
+                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div
+                    className="absolute bottom-20 left-10 w-24 h-24 bg-cyan-500/15 rounded-full blur-2xl"
+                    animate={{
+                        scale: [1, 1.2, 1],
+                        opacity: [0.15, 0.25, 0.15],
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                />
+
+                {/* Subtle grid pattern */}
+                <div
+                    className="absolute inset-0 opacity-[0.03]"
+                    style={{
+                        backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                                         linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+                        backgroundSize: '40px 40px'
+                    }}
+                />
+
+                {/* Top gradient fade */}
+                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black via-black/50 to-transparent" />
+            </div>
+
+            {/* Left Side - Content */}
+            <div className="w-full lg:w-[45%] flex flex-col px-5 sm:px-6 md:px-12 lg:pl-24 lg:pr-16 xl:pl-28 xl:pr-20 relative z-10 lg:justify-center lg:min-h-screen">
+                {/* Header with back button and logo - flow-based on mobile, absolute on desktop */}
+                <div className="pt-4 pb-3 sm:pt-6 sm:pb-6 lg:absolute lg:top-8 lg:left-24 xl:left-28 lg:pb-0 lg:pt-0 flex items-center gap-3 sm:gap-4">
+                    {/* Back button */}
+                    <button
+                        onClick={() => setLocation('/')}
+                        className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all"
+                        aria-label="Go back to home"
+                    >
+                        <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white/70" />
+                    </button>
+                    {/* Logo */}
+                    <div className="flex items-center cursor-pointer" onClick={() => setLocation('/')}>
+                        <img src="/veefore.svg" alt="V" className="w-8 h-8 sm:w-9 sm:h-9" />
+                        <span className="text-xl sm:text-2xl font-bold text-white -ml-1">eefore</span>
+                    </div>
                 </div>
 
-                <div className="w-full max-w-sm">
+                <div className="w-full max-w-sm mx-auto lg:mx-0 flex-1 lg:flex-none flex flex-col justify-center">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={step}
@@ -744,10 +813,11 @@ export default function WaitlistPage() {
                     </AnimatePresence>
                 </div>
 
-                <div className="absolute bottom-8 left-8 lg:left-12 flex gap-6 text-xs text-white/30">
-                    <a href="/terms" className="hover:text-white transition-colors">Terms</a>
-                    <a href="/privacy" className="hover:text-white transition-colors">Privacy</a>
-                    <a href="/security" className="hover:text-white transition-colors">Security</a>
+                {/* Footer - flow-based on mobile, absolute on desktop */}
+                <div className="pt-3 pb-3 sm:pt-6 sm:pb-6 lg:absolute lg:bottom-8 lg:left-12 lg:pt-0 lg:pb-0 flex gap-5 sm:gap-6 text-xs text-white/30">
+                    <span onClick={() => setLocation('/terms-of-service')} className="hover:text-white transition-colors cursor-pointer">Terms</span>
+                    <span onClick={() => setLocation('/privacy-policy')} className="hover:text-white transition-colors cursor-pointer">Privacy</span>
+                    <span onClick={() => setLocation('/security')} className="hover:text-white transition-colors cursor-pointer">Security</span>
                 </div>
             </div>
 

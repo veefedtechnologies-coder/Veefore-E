@@ -135,6 +135,31 @@ router.get('/check-email', apiRateLimiter, async (req: Request, res: Response) =
     }
 });
 
+// Check early access status (for frontend UX)
+router.get('/status', apiRateLimiter, async (req: Request, res: Response) => {
+    try {
+        const emailParam = req.query.email;
+        if (typeof emailParam !== 'string') {
+            return res.status(400).json({ error: "Email is required" });
+        }
+
+        const email = sanitizeEmail(emailParam);
+        if (!email) {
+            return res.status(400).json({ error: "Invalid email format" });
+        }
+
+        const user = await waitlistUserRepository.findByEmail(email);
+
+        res.json({
+            hasEarlyAccess: user?.status === 'early_access',
+            status: user?.status || null
+        });
+    } catch (error) {
+        console.error('[WAITLIST] Error checking status:', error);
+        res.status(500).json({ error: "Failed to check status" });
+    }
+});
+
 // Join the waitlist
 router.post('/join', apiRateLimiter, async (req: Request, res: Response) => {
     try {

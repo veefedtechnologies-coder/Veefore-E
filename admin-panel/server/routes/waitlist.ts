@@ -34,7 +34,7 @@ const MainAppUserSchema = new mongoose.Schema({
   plan: { type: String, default: 'Free' },
   stripeCustomerId: String,
   stripeSubscriptionId: String,
-  referralCode: { type: String, unique: true },
+  referralCode: { type: String, unique: true, sparse: true },
   totalReferrals: { type: Number, default: 0 },
   totalEarned: { type: Number, default: 0 },
   referredBy: String,
@@ -317,8 +317,8 @@ router.get('/waitlist-users/:id', async (req, res) => {
 router.post('/waitlist-users/:id/approve', async (req, res) => {
   try {
     const connection = await connectToMainApp();
-    const WaitlistUser = connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers');
-    const User = connection.model('User', MainAppUserSchema, 'users');
+    const WaitlistUser = (connection.models.WaitlistUser || connection.model('WaitlistUser', WaitlistUserSchema, 'waitlistusers')) as mongoose.Model<any>;
+    const User = (connection.models.User || connection.model('User', MainAppUserSchema, 'users')) as mongoose.Model<any>;
 
     const { id } = req.params;
     const { adminNotes } = req.body;
@@ -337,7 +337,12 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
 
     if (!mainUser) {
       // Create new user in main collection
+      // Generate a temporary unique firebaseUid to satisfy unique index
+      // This will be updated when the user actually signs up/logs in via Firebase
+      const tempFirebaseUid = `temp_approved_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+
       const newUser = new User({
+        firebaseUid: tempFirebaseUid,
         email: waitlistUser.email,
         username: waitlistUser.email.split('@')[0] + '_' + Date.now(),
         displayName: waitlistUser.name,
@@ -357,7 +362,13 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
         }
       });
 
-      mainUser = await newUser.save();
+      // Wrap in try-catch specifically for save to capture validation errors
+      try {
+        mainUser = await newUser.save();
+      } catch (saveError) {
+        console.error('Error saving new user:', saveError);
+        throw saveError; // Re-throw to be caught by outer catch
+      }
     } else {
       // Update existing user
       await User.findByIdAndUpdate(mainUser._id, {
@@ -384,7 +395,6 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
       }
     });
 
-    // TODO: Send approval email here
     console.log(`[WAITLIST] User ${waitlistUser.email} approved for early access`);
 
     res.json({
@@ -392,17 +402,18 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
       message: 'User approved for early access successfully',
       data: {
         waitlistUserId: id,
-        mainUserId: mainUser._id.toString(),
+        mainUserId: mainUser._id ? mainUser._id.toString() : 'existing',
         email: waitlistUser.email,
         status: 'early_access'
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error approving waitlist user:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to approve waitlist user'
+      error: error.message || 'Failed to approve waitlist user',
+      details: error.errors || error // detailed validation errors
     });
   }
 });
