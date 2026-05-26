@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, User, setPersistence, browserLocalPersistence, getRedirectResult } from 'firebase/auth'
+import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, User, setPersistence, browserLocalPersistence, getRedirectResult, sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth'
 
 // Firebase configuration
 const firebaseConfig = {
@@ -18,8 +18,8 @@ console.log('🔥 Firebase Config:', {
 })
 
 // Check if we have proper Firebase configuration (not using demo fallback values)
-const hasValidConfig = firebaseConfig.apiKey !== 'demo-api-key' && 
-                      firebaseConfig.appId !== 'demo-app-id'
+const hasValidConfig = firebaseConfig.apiKey !== 'demo-api-key' &&
+  firebaseConfig.appId !== 'demo-app-id'
 
 if (!hasValidConfig) {
   console.warn('⚠️ Firebase environment variables not set. Using demo values. Please set VITE_FIREBASE_* variables.')
@@ -69,13 +69,16 @@ googleProvider.setCustomParameters({
 console.log('🔥 Google Provider Created:', googleProvider)
 
 // Export all auth functions
-export { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithPopup, 
+export {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
-  getRedirectResult
+  getRedirectResult,
+  sendPasswordResetEmail,
+  confirmPasswordReset,
+  verifyPasswordResetCode
 }
 
 export type { User }

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import { AppError, ValidationError } from '../errors';
 import { logger } from '../config/logger';
 import { isProduction } from '../config/env';
+import { ZodError } from 'zod';
 
 export const errorHandler: ErrorRequestHandler = (
   err: Error,
@@ -11,6 +12,22 @@ export const errorHandler: ErrorRequestHandler = (
 ) => {
   if (res.headersSent) {
     return next(err);
+  }
+
+  if (err instanceof ZodError) {
+    const response = {
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        errors: err.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message,
+          code: e.code
+        }))
+      }
+    };
+    return res.status(400).json(response);
   }
 
   if (err instanceof AppError) {
@@ -45,6 +62,9 @@ export const errorHandler: ErrorRequestHandler = (
     path: req.path,
     method: req.method,
     body: req.body,
+    errorName: err.name,
+    constructorName: err.constructor.name,
+    stack: err.stack
   });
 
   const response: any = {

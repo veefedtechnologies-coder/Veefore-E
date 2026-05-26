@@ -5,41 +5,59 @@ import {
   Admin, AdminSession, Notification, Popup, AppSetting, AuditLog, FeedbackMessage,
   CreativeBrief, ContentRepurpose, CompetitorAnalysis,
   WaitlistUser
-} from "@shared/schema";
+} from "../domain/types";
 import { tokenEncryption, EncryptedToken } from '../security/token-encryption';
 
 export function decryptStoredToken(encryptedToken: any): string | null {
   if (!encryptedToken) {
     return null;
   }
-  
+
   try {
     let tokenData: EncryptedToken;
-    
+
     if (typeof encryptedToken === 'string') {
       try {
         tokenData = JSON.parse(encryptedToken);
       } catch (parseError) {
-        return null;
+        // P2-FIX: If not JSON, it might be plain text
+        return encryptedToken;
       }
-    } else if (typeof encryptedToken === 'object') {
+    } else if (typeof encryptedToken === 'object' && encryptedToken !== null) {
       tokenData = encryptedToken;
     } else {
       return null;
     }
-    
-    if (!tokenData.encryptedData || !tokenData.iv || !tokenData.salt || !tokenData.tag) {
+
+    // P2-FIX: Robust validation of EncryptedToken fields
+    if (!tokenData || typeof tokenData !== 'object') return null;
+
+    const { encryptedData, iv, salt, tag } = tokenData;
+
+    if (typeof encryptedData !== 'string' || typeof iv !== 'string' || typeof salt !== 'string' || typeof tag !== 'string') {
+      console.warn('⚠️ [P2-FIX] decryptStoredToken received malformed metadata:', {
+        hasData: !!encryptedData,
+        hasIv: !!iv,
+        hasSalt: !!salt,
+        hasTag: !!tag
+      });
+
+      // Legacy fallback: if it looks like plain text but was passed as object
+      if (typeof encryptedData === 'string' && !iv) {
+        return encryptedData;
+      }
       return null;
     }
-    
+
     const decryptedToken = tokenEncryption.decryptToken(tokenData);
-    
+
     if (!decryptedToken || decryptedToken.trim().length === 0) {
       return null;
     }
-    
+
     return decryptedToken;
   } catch (error: any) {
+    console.error('🚨 [P2-FIX] Token decryption in converter failed:', error.message);
     return null;
   }
 }
@@ -48,7 +66,7 @@ export function encryptAndStoreToken(plainToken: string | null): EncryptedToken 
   if (!plainToken || typeof plainToken !== 'string') {
     return null;
   }
-  
+
   try {
     return tokenEncryption.encryptToken(plainToken);
   } catch (error) {
@@ -63,15 +81,20 @@ export function getAccessTokenFromAccount(account: any): string | null {
       if (decryptedToken) {
         return decryptedToken;
       }
+      // P4-FIX: If encryption exists but failed to decrypt, 
+      // DO NOT fall back to plain accessToken as it's likely stale/expired.
+      console.warn('⚠️ [SECURITY] Token decryption failed for account with encrypted data. Skipping stale fallback.');
+      return null;
     } catch (error: any) {
-      // Fall through to plain text check
+      console.error('⚠️ [SECURITY] Error in getAccessTokenFromAccount:', error.message);
+      return null;
     }
   }
-  
+
   if (account.accessToken) {
     return account.accessToken;
   }
-  
+
   return null;
 }
 
@@ -82,11 +105,11 @@ export function getRefreshTokenFromAccount(account: any): string | null {
       return decryptedToken;
     }
   }
-  
+
   if (account.refreshToken) {
     return account.refreshToken;
   }
-  
+
   return null;
 }
 
@@ -120,6 +143,30 @@ export function convertUser(mongoUser: any): User {
     isEmailVerified: mongoUser.isEmailVerified || false,
     emailVerificationCode: mongoUser.emailVerificationCode || null,
     emailVerificationExpiry: mongoUser.emailVerificationExpiry || null,
+    workspaceId: mongoUser.workspaceId || null,
+    planStatus: mongoUser.planStatus || 'active',
+    status: mongoUser.status || 'waitlisted',
+    hasUsedWaitlistBonus: mongoUser.hasUsedWaitlistBonus || false,
+    hasClaimedWelcomeBonus: mongoUser.hasClaimedWelcomeBonus || false,
+    welcomeBonusClaimedAt: mongoUser.welcomeBonusClaimedAt || null,
+    onboardingStep: mongoUser.onboardingStep || 1,
+    onboardingData: mongoUser.onboardingData || {},
+    instagramToken: mongoUser.instagramToken || null,
+    instagramRefreshToken: mongoUser.instagramRefreshToken || null,
+    instagramTokenExpiry: mongoUser.instagramTokenExpiry || null,
+    instagramAccountId: mongoUser.instagramAccountId || null,
+    instagramUsername: mongoUser.instagramUsername || null,
+    tokenStatus: mongoUser.tokenStatus || 'active',
+    dailyLoginStreak: mongoUser.dailyLoginStreak || 0,
+    lastLoginAt: mongoUser.lastLoginAt || null,
+    feedbackSubmittedAt: mongoUser.feedbackSubmittedAt || null,
+    lastApiCallTimestamp: mongoUser.lastApiCallTimestamp || null,
+    rateLimitResetAt: mongoUser.rateLimitResetAt || null,
+    apiCallCount: mongoUser.apiCallCount || 0,
+    // planStatus handled above
+    // hasUsedWaitlistBonus handled above
+    goals: mongoUser.goals || [],
+    socialPlatforms: mongoUser.socialPlatforms || [],
     createdAt: mongoUser.createdAt,
     updatedAt: mongoUser.updatedAt
   };
@@ -151,6 +198,13 @@ export function convertAnalytics(mongoAnalytics: any): Analytics {
     platform: mongoAnalytics.platform,
     date: mongoAnalytics.date,
     metrics: metrics,
+    views: mongoAnalytics.views ?? 0,
+    likes: mongoAnalytics.likes ?? 0,
+    comments: mongoAnalytics.comments ?? 0,
+    shares: mongoAnalytics.shares ?? 0,
+    followers: mongoAnalytics.followers ?? 0,
+    engagement: mongoAnalytics.engagement ?? 0,
+    reach: mongoAnalytics.reach ?? 0,
     createdAt: mongoAnalytics.createdAt || new Date()
   };
 }
@@ -192,8 +246,8 @@ export function convertSocialAccount(mongoAccount: any): SocialAccount {
     username: mongoAccount.username,
     accountId: mongoAccount.accountId || null,
     pageId: mongoAccount.pageId || null,
-    hasAccessToken: hasToken,
-    hasRefreshToken: getRefreshTokenFromAccount(mongoAccount) !== null,
+    // hasAccessToken: hasToken, // Not in SocialAccount interface
+    // hasRefreshToken: getRefreshTokenFromAccount(mongoAccount) !== null, // Not in SocialAccount interface
     tokenStatus: mongoAccount.tokenStatus ?? normalizedTokenStatus,
     expiresAt: mongoAccount.expiresAt || null,
     isActive: mongoAccount.isActive !== false,
@@ -203,11 +257,6 @@ export function convertSocialAccount(mongoAccount: any): SocialAccount {
     biography: mongoAccount.biography ?? null,
     website: mongoAccount.website ?? null,
     profilePictureUrl: mongoAccount.profilePictureUrl ?? null,
-    subscriberCount: mongoAccount.subscriberCount ?? null,
-    videoCount: mongoAccount.videoCount ?? null,
-    viewCount: mongoAccount.viewCount ?? null,
-    channelDescription: mongoAccount.channelDescription ?? null,
-    channelThumbnail: mongoAccount.channelThumbnail ?? null,
     accountType: mongoAccount.accountType ?? null,
     isBusinessAccount: mongoAccount.isBusinessAccount ?? null,
     isVerified: mongoAccount.isVerified ?? null,
@@ -217,15 +266,10 @@ export function convertSocialAccount(mongoAccount: any): SocialAccount {
     engagementRate: mongoAccount.engagementRate ?? null,
     totalLikes: mongoAccount.totalLikes ?? 0,
     totalComments: mongoAccount.totalComments ?? 0,
+    totalReach: mongoAccount.totalReach ?? 0,
+    avgEngagement: mongoAccount.avgEngagement ?? null,
     totalShares: mongoAccount.totalShares ?? 0,
     totalSaves: mongoAccount.totalSaves ?? 0,
-    postsAnalyzed: mongoAccount.postsAnalyzed ?? null,
-    totalReach: mongoAccount.totalReach ?? null,
-    avgEngagement: mongoAccount.avgEngagement ?? null,
-    accountLevelReach: mongoAccount.accountLevelReach ?? null,
-    postLevelReach: mongoAccount.postLevelReach ?? null,
-    reachSource: mongoAccount.reachSource ?? null,
-    reachByPeriod: mongoAccount.reachByPeriod ?? null,
     lastSyncAt: mongoAccount.lastSyncAt ?? null,
     createdAt: mongoAccount.createdAt || new Date(),
     updatedAt: mongoAccount.updatedAt || new Date()
@@ -255,7 +299,7 @@ export function convertSubscription(doc: any): Subscription {
     subscriptionId: doc.subscriptionId || null,
     currentPeriodStart: doc.currentPeriodStart || null,
     currentPeriodEnd: doc.currentPeriodEnd || null,
-    trialEnd: doc.trialEnd || null,
+    // trialEnd: doc.trialEnd || null, // Not in Subscription interface
     monthlyCredits: doc.monthlyCredits || null,
     extraCredits: doc.extraCredits || null,
     autoRenew: doc.autoRenew || null,
@@ -285,7 +329,7 @@ export function convertPayment(doc: any): Payment {
 export function convertSuggestion(doc: any): Suggestion {
   return {
     id: doc._id?.toString() || doc.id,
-    workspaceId: parseInt(doc.workspaceId),
+    workspaceId: doc.workspaceId.toString(),
     type: doc.type,
     data: doc.data || null,
     confidence: doc.confidence || null,
@@ -312,13 +356,13 @@ export function convertAddon(doc: any): Addon {
 
 export function convertWorkspaceMember(doc: any): WorkspaceMember {
   return {
-    id: parseInt(doc._id?.toString() || doc.id || "0"),
-    userId: parseInt(doc.userId?.toString() || "0"),
-    workspaceId: parseInt(doc.workspaceId?.toString() || "0"),
+    id: doc._id?.toString() || doc.id || "",
+    userId: doc.userId?.toString() || "",
+    workspaceId: doc.workspaceId?.toString() || "",
     role: doc.role || "Viewer",
     status: doc.status || "active",
     permissions: doc.permissions || {},
-    invitedBy: doc.invitedBy ? parseInt(doc.invitedBy.toString()) : null,
+    invitedBy: doc.invitedBy ? doc.invitedBy.toString() : undefined,
     joinedAt: doc.joinedAt || new Date(),
     createdAt: doc.createdAt || new Date(),
     updatedAt: doc.updatedAt || new Date()
@@ -328,7 +372,7 @@ export function convertWorkspaceMember(doc: any): WorkspaceMember {
 export function convertTeamInvitation(doc: any): TeamInvitation {
   return {
     id: doc._id?.toString() || doc.id,
-    workspaceId: parseInt(doc.workspaceId),
+    workspaceId: doc.workspaceId.toString(),
     email: doc.email,
     role: doc.role,
     status: doc.status || null,
@@ -344,7 +388,7 @@ export function convertTeamInvitation(doc: any): TeamInvitation {
 export function convertContentRecommendation(doc: any): ContentRecommendation {
   return {
     id: doc._id?.toString() || doc.id,
-    workspaceId: parseInt(doc.workspaceId),
+    workspaceId: doc.workspaceId.toString(),
     type: doc.type,
     title: doc.title,
     description: doc.description || null,
@@ -365,8 +409,8 @@ export function convertContentRecommendation(doc: any): ContentRecommendation {
 export function convertUserContentHistory(doc: any): UserContentHistory {
   return {
     id: doc._id?.toString() || doc.id,
-    userId: parseInt(doc.userId),
-    workspaceId: parseInt(doc.workspaceId),
+    userId: doc.userId.toString(),
+    workspaceId: doc.workspaceId.toString(),
     action: doc.action,
     recommendationId: doc.recommendationId || null,
     metadata: doc.metadata || {},
@@ -515,9 +559,9 @@ export function convertFeedbackMessage(mongoMessage: any): any {
 
 export function convertCreativeBrief(doc: any): CreativeBrief {
   return {
-    id: parseInt(doc._id.toString()),
-    workspaceId: parseInt(doc.workspaceId),
-    userId: parseInt(doc.userId),
+    id: doc._id.toString(),
+    workspaceId: doc.workspaceId.toString(),
+    userId: doc.userId.toString(),
     title: doc.title,
     targetAudience: doc.targetAudience,
     platforms: doc.platforms,
@@ -541,10 +585,10 @@ export function convertCreativeBrief(doc: any): CreativeBrief {
 
 export function convertContentRepurpose(doc: any): ContentRepurpose {
   return {
-    id: parseInt(doc._id.toString()),
-    workspaceId: parseInt(doc.workspaceId),
-    userId: parseInt(doc.userId),
-    originalContentId: doc.originalContentId ? parseInt(doc.originalContentId) : null,
+    id: doc._id.toString(),
+    workspaceId: doc.workspaceId.toString(),
+    userId: doc.userId.toString(),
+    originalContentId: doc.originalContentId ? doc.originalContentId.toString() : null,
     sourceLanguage: doc.sourceLanguage,
     targetLanguage: doc.targetLanguage,
     sourceContent: doc.sourceContent,
@@ -563,9 +607,9 @@ export function convertContentRepurpose(doc: any): ContentRepurpose {
 
 export function convertCompetitorAnalysis(doc: any): CompetitorAnalysis {
   return {
-    id: parseInt(doc._id.toString()),
-    workspaceId: parseInt(doc.workspaceId),
-    userId: parseInt(doc.userId),
+    id: doc._id.toString(),
+    workspaceId: doc.workspaceId.toString(),
+    userId: doc.userId.toString(),
     competitorUsername: doc.competitorUsername,
     platform: doc.platform,
     analysisType: doc.analysisType,
@@ -604,5 +648,57 @@ export function convertWaitlistUser(mongoUser: any): WaitlistUser {
     createdAt: mongoUser.createdAt,
     updatedAt: mongoUser.updatedAt,
     metadata: mongoUser.metadata || {}
+  };
+}
+
+export function convertChatConversation(doc: any): any {
+  return {
+    id: doc._id.toString(),
+    userId: doc.userId.toString(),
+    workspaceId: doc.workspaceId ? doc.workspaceId.toString() : undefined,
+    title: doc.title,
+    lastMessageAt: doc.lastMessageAt || doc.createdAt,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt
+  };
+}
+
+export function convertChatMessage(doc: any): any {
+  return {
+    id: doc._id.toString(),
+    conversationId: doc.conversationId.toString(),
+    role: doc.role,
+    content: doc.content,
+    metadata: doc.metadata,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt
+  };
+}
+
+export function convertConversationContext(doc: any): any {
+  return {
+    id: doc._id.toString(),
+    conversationId: doc.conversationId,
+    contextType: doc.contextType,
+    key: doc.key,
+    value: doc.value,
+    confidence: doc.confidence,
+    source: doc.source,
+    expiresAt: doc.expiresAt,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt
+  };
+}
+
+/**
+ * INTERNAL USE ONLY: Convert social account including decrypted tokens
+ * strictly for backend services (like auto-sync). never expose to client API.
+ */
+export function convertSocialAccountWithDecryptedTokens(mongoAccount: any): SocialAccount {
+  const base = convertSocialAccount(mongoAccount);
+  return {
+    ...base,
+    accessToken: getAccessTokenFromAccount(mongoAccount) || undefined,
+    refreshToken: getRefreshTokenFromAccount(mongoAccount) || undefined,
   };
 }

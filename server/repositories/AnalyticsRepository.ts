@@ -36,29 +36,48 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     days?: number
   ): Promise<IAnalytics[]> {
     const filter: any = { workspaceId };
-    
+
     if (platform) {
       filter.platform = platform;
     }
-    
+
     if (days) {
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - days);
       filter.date = { $gte: daysAgo };
     }
-    
+
     return this.findAll(filter);
   }
 
   async findByWorkspaceAndDateRange(
     workspaceId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    platforms?: string[],
+    accountIds?: string[]
   ): Promise<IAnalytics[]> {
-    return this.findAll({
-      workspaceId,
+    const query: any = {
       date: { $gte: startDate, $lte: endDate }
-    });
+    };
+
+    if (accountIds && accountIds.length > 0) {
+      // Strict snapshot isolation: fetch by globally unique accountId across all workspaces
+      query.accountId = { $in: accountIds };
+    } else {
+      query.workspaceId = workspaceId.toString();
+    }
+
+    if (platforms && platforms.length > 0) {
+      query.platform = { $in: platforms };
+    }
+
+    if (accountIds && accountIds.length > 0) {
+      // Strict snapshot isolation: only include the matched accountIds
+      query.accountId = { $in: accountIds };
+    }
+
+    return this.model.find(query).sort({ date: 1 }).exec();
   }
 
   async findByPlatformAndDateRange(
@@ -81,7 +100,7 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
         .findOne({ workspaceId })
         .sort({ date: -1 })
         .exec();
-      
+
       logger.db.query('findLatestByWorkspace', this.entityName, Date.now() - startTime, { workspaceId });
       return result;
     } catch (error) {
@@ -97,7 +116,7 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
         .findOne({ workspaceId, platform })
         .sort({ date: -1 })
         .exec();
-      
+
       logger.db.query('findLatestByPlatform', this.entityName, Date.now() - startTime, { workspaceId, platform });
       return result;
     } catch (error) {
@@ -106,24 +125,54 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     }
   }
 
+  async findOneBeforeDate(workspaceId: string, date: Date, platform?: string, accountId?: string): Promise<IAnalytics | null> {
+    const startOfDay = new Date(date);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const query: any = {
+      date: { $lt: startOfDay }
+    };
+
+    if (accountId) {
+      query.accountId = accountId;
+    } else {
+      query.workspaceId = workspaceId.toString();
+    }
+
+    if (platform) {
+      query.platform = platform;
+    }
+
+    return this.model.findOne(query).sort({ date: -1 }).exec();
+  }
+
   async getOrCreateForDate(
     workspaceId: string,
     platform: string,
-    date: Date
+    date: Date,
+    accountId?: string
   ): Promise<IAnalytics> {
     const startTime = Date.now();
     const dateOnly = new Date(date.toISOString().split('T')[0]);
-    
+
     try {
-      let analytics = await this.findOne({
-        workspaceId,
+      const queryParams: any = {
         platform,
         date: dateOnly
-      });
+      };
+      
+      if (accountId) {
+        queryParams.accountId = accountId;
+      } else {
+        queryParams.workspaceId = workspaceId;
+      }
+
+      let analytics = await this.findOne(queryParams);
 
       if (!analytics) {
         analytics = await this.create({
           workspaceId,
+          accountId,
           platform,
           date: dateOnly,
           metrics: {},
@@ -153,23 +202,65 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
       comments?: number;
       shares?: number;
       followers?: number;
-      engagement?: number;
+      posts?: number;
       reach?: number;
+      reachDay?: number;
+      reachWeek?: number;
+      reachDays28?: number;
+      engagement?: number;
       customMetrics?: Record<string, any>;
+      audienceCity?: Record<string, number>;
+      audienceCountry?: Record<string, number>;
+      audienceGenderAge?: Record<string, number>;
+      audienceActiveTime?: Record<string, number>;
     }
   ): Promise<IAnalytics | null> {
-    const updateData: any = {};
-    
-    if (metrics.views !== undefined) updateData.views = metrics.views;
-    if (metrics.likes !== undefined) updateData.likes = metrics.likes;
-    if (metrics.comments !== undefined) updateData.comments = metrics.comments;
-    if (metrics.shares !== undefined) updateData.shares = metrics.shares;
-    if (metrics.followers !== undefined) updateData.followers = metrics.followers;
-    if (metrics.engagement !== undefined) updateData.engagement = metrics.engagement;
-    if (metrics.reach !== undefined) updateData.reach = metrics.reach;
-    if (metrics.customMetrics) updateData.metrics = metrics.customMetrics;
+    const startTime = Date.now();
+    try {
+      const { followers, posts, ...liveMetrics } = metrics;
+      
+      const updateData: any = { ...liveMetrics };
+      if (metrics.customMetrics) {
+        updateData.metrics = metrics.customMetrics;
+        delete updateData.customMetrics;
+      }
 
-    return this.updateById(analyticsId, updateData);
+      // Build the update operation:
+      // - Always update live metrics (engagement, reach, likes, etc.) with $set
+      // - Only set followers and posts ONCE (when baseline is 0) using $min trick or conditional
+      const updateOp: any = { $set: updateData };
+
+      // Use $set with a filter on followers=0 to only set baseline when not yet established
+      // We do this in two steps: first update all live metrics, then conditionally set baseline
+      const result = await this.model.findOneAndUpdate(
+        { _id: analyticsId },
+        { $set: updateData },
+        { new: true }
+      ).exec();
+
+      // Now conditionally set followers and posts ONLY if they are currently 0
+      if (result && (followers !== undefined || posts !== undefined)) {
+        const baselineSet: any = {};
+        if (followers !== undefined && result.followers === 0) baselineSet.followers = followers;
+        if (posts !== undefined && result.posts === 0) baselineSet.posts = posts;
+        
+        if (Object.keys(baselineSet).length > 0) {
+          await this.model.findOneAndUpdate(
+            { _id: analyticsId, $or: [{ followers: 0 }, { posts: 0 }] },
+            { $set: baselineSet },
+            { new: true }
+          ).exec();
+          return this.model.findById(analyticsId).exec();
+        }
+      }
+
+
+      logger.db.query('updateMetrics', this.entityName, Date.now() - startTime, { analyticsId });
+      return result;
+    } catch (error) {
+      logger.db.error('updateMetrics', error, { entityName: this.entityName, analyticsId });
+      throw new DatabaseError('Failed to update metrics', error as Error);
+    }
   }
 
   async incrementMetrics(
@@ -192,7 +283,7 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
           { new: true }
         )
         .exec();
-      
+
       logger.db.query('incrementMetrics', this.entityName, Date.now() - startTime, { analyticsId });
       return result;
     } catch (error) {
@@ -205,7 +296,7 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     workspaceId: string,
     startDate: Date,
     endDate: Date,
-    platform?: string
+    platforms?: string[]
   ): Promise<{
     totalViews: number;
     totalLikes: number;
@@ -214,19 +305,23 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     avgEngagement: number;
     totalReach: number;
     latestFollowers: number;
+    startFollowers: number;
+    totalPosts: number;
   }> {
     const startTime = Date.now();
-    try {
-      const match: any = {
-        workspaceId,
-        date: { $gte: startDate, $lte: endDate }
-      };
-      if (platform) {
-        match.platform = platform;
-      }
+    const match: any = {
+      workspaceId: workspaceId.toString(),
+      date: { $gte: startDate, $lte: endDate }
+    };
+    if (platforms && platforms.length > 0) {
+      match.platform = { $in: platforms };
+    }
+    logger.info(`[DEBUG] getAggregatedMetrics: matching workspaceId=${workspaceId.toString()}, range=${startDate} to ${endDate}, platforms=${platforms?.join(',') || 'ALL'}`);
 
+    try {
       const result = await this.model.aggregate([
         { $match: match },
+        { $sort: { date: 1 } },
         {
           $group: {
             _id: null,
@@ -235,23 +330,106 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
             totalComments: { $sum: '$comments' },
             totalShares: { $sum: '$shares' },
             avgEngagement: { $avg: '$engagement' },
-            totalReach: { $sum: '$reach' },
-            latestFollowers: { $last: '$followers' }
+            sumDailyReach: { $sum: '$reachDay' },
+            latestWeekReach: { $last: '$reachWeek' },
+            latestMonthReach: { $last: '$reachDays28' },
+            startReachSnapshot: { $first: '$reach' },
+            endReachSnapshot: { $last: '$reach' },
+            latestFollowers: { $last: '$followers' },
+            totalPosts: { $sum: '$posts' },
+            startFollowers: { $first: '$followers' },
+            totalPostsSnapshot: { $last: '$metrics.posts' },
+            engagementSnapshot: { $last: '$engagement' }
           }
-        }
+        },
+        {
+          $project: {
+            totalViews: 1,
+            totalLikes: 1,
+            totalComments: 1,
+            totalShares: 1,
+            avgEngagement: 1,
+            latestFollowers: 1,
+            totalPosts: 1,
+            startFollowers: 1,
+            totalPostsSnapshot: 1,
+            engagementSnapshot: 1,
+            sumDailyReach: 1,
+            startReachSnapshot: 1,
+            endReachSnapshot: 1,
+            totalReach: {
+              $let: {
+                vars: {
+                  diffDays: { $divide: [{ $subtract: [endDate, startDate] }, 86400000] }
+                },
+                in: {
+                  $cond: [
+                    { $lte: ['$$diffDays', 1.5] },
+                    '$sumDailyReach',
+                    {
+                      $cond: [
+                        { $lte: ['$$diffDays', 7.5] },
+                        { $ifNull: ['$latestWeekReach', 0] },
+                        {
+                          $cond: [
+                            { $lte: ['$$diffDays', 31] },
+                            { $ifNull: ['$latestMonthReach', 0] },
+                            // For 90D+, use the media-aggregated total reach (endReachSnapshot)
+                            // instead of capping at the 28-day API snapshot.
+                            { $ifNull: ['$endReachSnapshot', 0] }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
       ]).exec();
 
-      logger.db.query('getAggregatedMetrics', this.entityName, Date.now() - startTime, { workspaceId, startDate, endDate, platform });
-      
-      return result[0] || {
-        totalViews: 0,
-        totalLikes: 0,
-        totalComments: 0,
-        totalShares: 0,
-        avgEngagement: 0,
-        totalReach: 0,
-        latestFollowers: 0
-      };
+      logger.info(`[DEBUG] getAggregatedMetrics: matched ${result.length} groups. Result: ${JSON.stringify(result[0] || 'NONE')}`);
+
+      if (!result.length) {
+        return {
+          totalViews: 0,
+          totalLikes: 0,
+          totalComments: 0,
+          totalShares: 0,
+          avgEngagement: 0,
+          totalReach: 0,
+          latestFollowers: 0,
+          startFollowers: 0,
+          totalPosts: 0
+        };
+      }
+
+      const aggregated = result[0];
+
+      // P2-FIX: Calculate period-accurate engagement rate from sums
+      // (Total Engagements in period / Latest Follower Count) * 100
+      if (aggregated.latestFollowers > 0) {
+        const totalEngagements = (aggregated.totalLikes || 0) + (aggregated.totalComments || 0) + (aggregated.totalShares || 0);
+        const calculatedER = (totalEngagements / aggregated.latestFollowers) * 100;
+
+        // Use the sum-based growth if it exists, otherwise fall back to the authentic sync snapshot
+        if (calculatedER > 0) {
+          aggregated.avgEngagement = calculatedER;
+        } else {
+          aggregated.avgEngagement = aggregated.engagementSnapshot || 0;
+        }
+      } else {
+        aggregated.avgEngagement = 0;
+      }
+
+      // P4-FIX: Post count fallback for long-term views
+      if (aggregated.totalPosts === 0 && aggregated.totalPostsSnapshot > 0) {
+        aggregated.totalPosts = aggregated.totalPostsSnapshot;
+      }
+
+      logger.db.query('getAggregatedMetrics', this.entityName, Date.now() - startTime, { workspaceId, startDate, endDate, platforms });
+      return aggregated;
     } catch (error) {
       logger.db.error('getAggregatedMetrics', error, { entityName: this.entityName, workspaceId });
       throw new DatabaseError('Failed to get aggregated metrics', error as Error);
@@ -262,7 +440,7 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     workspaceId: string,
     startDate: Date,
     endDate: Date,
-    platform?: string
+    platforms?: string[]
   ): Promise<Array<{
     date: Date;
     views: number;
@@ -276,11 +454,11 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     const startTime = Date.now();
     try {
       const match: any = {
-        workspaceId,
+        workspaceId: workspaceId.toString(),
         date: { $gte: startDate, $lte: endDate }
       };
-      if (platform) {
-        match.platform = platform;
+      if (platforms && platforms.length > 0) {
+        match.platform = { $in: platforms };
       }
 
       const result = await this.model.aggregate([
@@ -300,8 +478,8 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
         { $sort: { _id: 1 } }
       ]).exec();
 
-      logger.db.query('getDailyMetrics', this.entityName, Date.now() - startTime, { workspaceId, startDate, endDate, platform });
-      
+      logger.db.query('getDailyMetrics', this.entityName, Date.now() - startTime, { workspaceId, startDate, endDate, platforms });
+
       return result.map((item: any) => ({
         date: new Date(item._id),
         views: item.views,
@@ -331,17 +509,20 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
-    const midDate = new Date();
-    midDate.setDate(midDate.getDate() - Math.floor(days / 2));
+
+    // PREVIOUS PERIOD for comparison (Current window vs Previous window)
+    const prevEndDate = new Date(startDate);
+    const prevStartDate = new Date(startDate);
+    prevStartDate.setDate(prevStartDate.getDate() - days);
 
     try {
-      const [firstHalf, secondHalf] = await Promise.all([
+      const [previousPeriod, currentPeriod] = await Promise.all([
         this.model.aggregate([
           {
             $match: {
-              workspaceId,
+              workspaceId: workspaceId.toString(),
               platform,
-              date: { $gte: startDate, $lt: midDate }
+              date: { $gte: prevStartDate, $lt: prevEndDate }
             }
           },
           {
@@ -356,9 +537,9 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
         this.model.aggregate([
           {
             $match: {
-              workspaceId,
+              workspaceId: workspaceId.toString(),
               platform,
-              date: { $gte: midDate, $lte: endDate }
+              date: { $gte: startDate, $lte: endDate }
             }
           },
           {
@@ -372,11 +553,11 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
         ]).exec()
       ]);
 
-      const first = firstHalf[0] || { avgFollowers: 0, avgEngagement: 0, avgViews: 0 };
-      const second = secondHalf[0] || { avgFollowers: 0, avgEngagement: 0, avgViews: 0 };
+      const first = previousPeriod[0] || { avgFollowers: 0, avgEngagement: 0, avgViews: 0 };
+      const second = currentPeriod[0] || { avgFollowers: 0, avgEngagement: 0, avgViews: 0 };
 
       const calculateGrowth = (oldVal: number, newVal: number): number => {
-        if (oldVal === 0) return newVal > 0 ? 100 : 0;
+        if (oldVal === 0) return 0;
         return ((newVal - oldVal) / oldVal) * 100;
       };
 
@@ -396,11 +577,57 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
   async deleteOldAnalytics(workspaceId: string, olderThanDays: number): Promise<number> {
     const threshold = new Date();
     threshold.setDate(threshold.getDate() - olderThanDays);
-    
+
     return this.deleteMany({
       workspaceId,
       date: { $lt: threshold }
     });
+  }
+
+  async getPlatformSummary(workspaceId: string): Promise<Array<{
+    platform: string;
+    followers: number;
+    engagementRate: number;
+    reach: number;
+  }>> {
+    const startTime = Date.now();
+    try {
+      // Get the latest analytics record for each platform in this workspace
+      const result = await this.model.aggregate([
+        { $match: { workspaceId: workspaceId.toString() } },
+        { $sort: { date: -1 } },
+        {
+          $group: {
+            _id: '$platform',
+            followers: { $first: '$followers' },
+            engagement: { $first: '$engagement' },
+            reach: { $first: '$reach' },
+            views: { $first: '$views' }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            platform: '$_id',
+            followers: 1,
+            reach: 1,
+            engagementRate: {
+              $cond: [
+                { $gt: ['$reach', 0] },
+                { $multiply: [{ $divide: ['$engagement', '$reach'] }, 100] },
+                0
+              ]
+            }
+          }
+        }
+      ]).exec();
+
+      logger.db.query('getPlatformSummary', this.entityName, Date.now() - startTime, { workspaceId });
+      return result;
+    } catch (error) {
+      logger.db.error('getPlatformSummary', error, { entityName: this.entityName, workspaceId });
+      throw new DatabaseError('Failed to get platform summary', error as Error);
+    }
   }
 }
 

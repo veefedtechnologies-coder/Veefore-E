@@ -22,7 +22,7 @@ import {
   InsertAdmin, InsertAdminSession, InsertNotification, InsertPopup, InsertAppSetting, InsertAuditLog, InsertFeedbackMessage,
   InsertCreativeBrief, InsertContentRepurpose, InsertCompetitorAnalysis,
   WaitlistUser, InsertWaitlistUser
-} from "@shared/schema";
+} from "./domain/types";
 import {
   convertUser,
   convertWorkspace,
@@ -48,10 +48,14 @@ import {
   convertAuditLog,
   convertFeedbackMessage,
   convertCreativeBrief,
+  convertConversationContext,
   convertContentRepurpose,
   convertCompetitorAnalysis,
   convertWaitlistUser,
-  generateReferralCode
+  generateReferralCode,
+  convertChatConversation,
+  convertChatMessage,
+  convertSocialAccountWithDecryptedTokens
 } from './storage/converters';
 
 import { connectionManager } from './infrastructure/mongodb-connection';
@@ -117,9 +121,9 @@ export class MongoStorage implements IStorage {
   }
 
   // User operations - delegating to userRepository
-  async getUser(id: number | string): Promise<User | undefined> {
+  async getUser(id: string): Promise<User | undefined> {
     await connectionManager.ensureConnected();
-    const user = await userRepository.findById(id.toString());
+    const user = await userRepository.findById(id);
     return user ? convertUser(user) : undefined;
   }
 
@@ -139,7 +143,7 @@ export class MongoStorage implements IStorage {
     await connectionManager.ensureConnected();
     const user = await userRepository.findByFirebaseUid(firebaseId);
     if (user) {
-      await userRepository.updateById(user._id.toString(), { lastLoginAt: new Date() });
+      await userRepository.updateById((user as any)._id.toString(), { lastLoginAt: new Date() });
     }
   }
 
@@ -163,136 +167,171 @@ export class MongoStorage implements IStorage {
 
   async createUser(userData: InsertUser): Promise<User> {
     await connectionManager.ensureConnected();
-    const savedUser = await userRepository.createWithDefaultWorkspace(userData);
+    const savedUser = await userRepository.createWithDefaultWorkspace(userData as any);
     return convertUser(savedUser);
   }
 
-  async updateUser(id: number | string, updates: Partial<User>): Promise<User> {
+  async updateUser(id: string, updates: Partial<User>): Promise<User> {
     await connectionManager.ensureConnected();
-    const user = await userRepository.updateById(id.toString(), updates);
-    if (!user) {
-      throw new Error('User not found');
-    }
-    return convertUser(user);
+    const updated = await userRepository.updateById(id, updates);
+    if (!updated) throw new Error("User not found");
+    return convertUser(updated);
   }
 
-  async updateUserCredits(id: number | string, credits: number): Promise<User> {
+  async updateUserCredits(id: string, credits: number): Promise<User> {
     return this.updateUser(id, { credits });
   }
 
-  async getUserCredits(userId: number | string): Promise<number> {
+  async getUserCredits(userId: string): Promise<number> {
     const user = await this.getUser(userId);
     return user ? user.credits : 0;
   }
 
-  async updateUserStripeInfo(id: number | string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User> {
+  async updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User> {
     return this.updateUser(id, { stripeCustomerId, stripeSubscriptionId });
   }
 
+  async hasClaimedWelcomeBonus(userId: string): Promise<boolean> {
+    await connectionManager.ensureConnected();
+    const user = await userRepository.findById(userId);
+    return user ? !!(user as any).hasClaimedWelcomeBonus : false;
+  }
+
+  async claimWelcomeBonus(userId: string): Promise<void> {
+    await connectionManager.ensureConnected();
+    await userRepository.updateById(userId, {
+      hasClaimedWelcomeBonus: true,
+      welcomeBonusClaimedAt: new Date()
+    } as any);
+  }
+
   // Workspace operations - delegating to workspaceRepository
-  async getWorkspace(id: number | string): Promise<Workspace | undefined> {
+  async getWorkspace(id: string): Promise<Workspace | undefined> {
     await connectionManager.ensureConnected();
-    
-    // Handle invalid IDs
-    if (!id || id === 'undefined' || id === 'null') {
+    if (!ObjectId.isValid(id)) {
       return undefined;
     }
-    
-    try {
-      const idString = id.toString();
-      
-      // Only accept valid 24-character ObjectIds
-      if (idString.length !== 24) {
-        return undefined;
-      }
-      
-      const workspace = await workspaceRepository.findById(idString);
-      return workspace ? convertWorkspace(workspace) : undefined;
-      
-    } catch (objectIdError) {
-      return undefined;
-    }
-  }
-
-  async getWorkspacesByUserId(userId: number | string): Promise<Workspace[]> {
-    await connectionManager.ensureConnected();
-    const workspaces = await workspaceRepository.findByUserId(userId.toString());
-    return workspaces.map(ws => convertWorkspace(ws));
-  }
-
-  async getDefaultWorkspace(userId: number | string): Promise<Workspace | undefined> {
-    await connectionManager.ensureConnected();
-    
-    // Try to find default workspace first
-    let workspace = await workspaceRepository.findDefaultByUserId(userId.toString());
-    
-    // If no default workspace, get the first workspace for this user
-    if (!workspace) {
-      const workspaces = await workspaceRepository.findByUserId(userId.toString());
-      workspace = workspaces.length > 0 ? workspaces[0] : null;
-    }
-    
+    const workspace = await workspaceRepository.findById(id);
     return workspace ? convertWorkspace(workspace) : undefined;
   }
 
-  async createWorkspace(workspaceData: InsertWorkspace): Promise<Workspace> {
+  async getWorkspacesByUserId(userId: string): Promise<Workspace[]> {
     await connectionManager.ensureConnected();
-    const workspace = await workspaceRepository.createWithDefaults(workspaceData);
-    return convertWorkspace(workspace);
+    const query = mongoose.Types.ObjectId.isValid(userId)
+      ? { $or: [{ userId: userId }, { userId: new mongoose.Types.ObjectId(userId) }] }
+      : { userId: userId };
+    const result = await workspaceMemberRepository.findMany(query as any);
+    const memberships = result.data || [];
+    console.log(`[DEBUG] getWorkspacesByUserId: Found ${memberships.length} memberships for user ${userId}`);
+
+    const memberWorkspaceIds = memberships.map((m: any) => m.workspaceId.toString());
+
+    // ALSO fetch workspaces owned by the user directly (fallback/implicit membership)
+    let ownedWorkspaces: any[] = [];
+    try {
+      const ownedResult = await workspaceRepository.findMany(query as any); // Use same query as it checks both string/ObjectId
+      ownedWorkspaces = ownedResult.data || [];
+      console.log(`[DEBUG] getWorkspacesByUserId: Found ${ownedWorkspaces.length} owned workspaces directly`);
+    } catch (err) {
+      console.error(`[DEBUG] Failed to fetch owned workspaces:`, err);
+    }
+
+    const ownedWorkspaceIds = ownedWorkspaces.map((w: any) => w._id.toString());
+
+    // Combine IDs
+    const allWorkspaceIds = [...new Set([...memberWorkspaceIds, ...ownedWorkspaceIds])];
+    console.log(`[DEBUG] getWorkspacesByUserId: Combined WorkspaceIDs: ${allWorkspaceIds.join(', ')}`);
+
+    // Manual findByIds implementation since repo lacks it - Optimized with Promise.allSettled
+    const workspacePromises = allWorkspaceIds.map(async (id: string) => {
+      if (!ObjectId.isValid(id)) return null;
+      try {
+        return await workspaceRepository.findById(id);
+      } catch (err) {
+        console.error(`Failed to fetch workspace ${id} for user ${userId}:`, err);
+        return null;
+      }
+    });
+
+    const results = await Promise.all(workspacePromises);
+    const workspaces = results.filter((w: any) => w !== null);
+
+    console.log(`[DEBUG] getWorkspacesByUserId: Resolved ${workspaces.length} valid workspaces`);
+
+    return workspaces.map(convertWorkspace);
   }
 
-  async updateWorkspace(id: number | string, updates: Partial<Workspace>): Promise<Workspace> {
+  async getDefaultWorkspace(userId: string): Promise<Workspace | undefined> {
     await connectionManager.ensureConnected();
-    const workspace = await workspaceRepository.updateById(id.toString(), updates);
-    if (!workspace) throw new Error('Workspace not found');
-    return convertWorkspace(workspace);
+
+    // Try to find default workspace first
+    let workspace = await workspaceRepository.findDefaultByUserId(userId);
+
+    // If no default workspace, get the first workspace for this user
+    if (!workspace) {
+      const workspaces = await workspaceRepository.findByUserId(userId);
+      workspace = workspaces.length > 0 ? workspaces[0] : null;
+    }
+
+    return workspace ? convertWorkspace(workspace) : undefined;
   }
 
-  async updateWorkspaceCredits(id: number | string, credits: number): Promise<void> {
+  async createWorkspace(workspace: InsertWorkspace): Promise<Workspace> {
     await connectionManager.ensureConnected();
-    
-    const result = await workspaceRepository.updateById(id.toString(), { credits });
-    
+    const newWorkspace = await workspaceRepository.createWithDefaults(workspace);
+    return convertWorkspace(newWorkspace);
+  }
+
+  async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace> {
+    await connectionManager.ensureConnected();
+    const updated = await workspaceRepository.updateById(id, updates);
+    if (!updated) throw new Error("Workspace not found");
+    return convertWorkspace(updated);
+  }
+
+  async updateWorkspaceCredits(id: string, credits: number): Promise<void> {
+    await connectionManager.ensureConnected();
+    const result = await workspaceRepository.updateById(id, { credits });
     if (!result) {
       throw new Error('Workspace not found for credit update');
     }
   }
 
-  async deleteWorkspace(id: number | string): Promise<void> {
+  async deleteWorkspace(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    const ws = await workspaceRepository.findById(id.toString());
+    const ws = await workspaceRepository.findById(id);
     if (!ws) throw new Error('Workspace not found');
     if (ws.isDefault === true) {
       throw new Error('Default workspace cannot be deleted');
     }
-    await workspaceRepository.deleteById(id.toString());
+    await workspaceRepository.deleteById(id);
   }
 
-  async setDefaultWorkspace(userId: number | string, workspaceId: number | string): Promise<void> {
+  async setDefaultWorkspace(userId: string, workspaceId: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await workspaceRepository.unsetDefaultForUser(userId.toString());
-    await workspaceRepository.updateById(workspaceId.toString(), { isDefault: true });
+    await workspaceRepository.unsetDefaultForUser(userId);
+    await workspaceRepository.updateById(workspaceId, { isDefault: true });
   }
 
 
 
   // Social account operations - delegating to socialAccountRepository
-  async getSocialAccount(id: number | string): Promise<SocialAccount | undefined> {
+  async getSocialAccount(id: string): Promise<SocialAccount | undefined> {
     await connectionManager.ensureConnected();
-    const account = await socialAccountRepository.findById(id.toString());
+    const account = await socialAccountRepository.findById(id);
     return account ? convertSocialAccount(account) : undefined;
   }
 
-  async getSocialAccountByWorkspaceAndPlatform(workspaceId: number, platform: string): Promise<SocialAccount | undefined> {
+  async getSocialAccountByWorkspaceAndPlatform(workspaceId: string, platform: string): Promise<SocialAccount | undefined> {
     await connectionManager.ensureConnected();
-    const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId.toString(), platform as any);
+    const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId, platform as any);
     return account ? convertSocialAccount(account) : undefined;
   }
 
-  async getSocialAccountsByWorkspace(workspaceId: string | number): Promise<SocialAccount[]> {
+  async getSocialAccountsByWorkspace(workspaceId: string): Promise<SocialAccount[]> {
     await connectionManager.ensureConnected();
-    const accounts = await socialAccountRepository.findByWorkspaceWithTolerantLookup(workspaceId.toString());
-    return accounts.map(account => convertSocialAccount(account));
+    const accounts = await socialAccountRepository.findByWorkspaceWithTolerantLookup(workspaceId);
+    return accounts.map(convertSocialAccount);
   }
 
   /**
@@ -302,20 +341,19 @@ export class MongoStorage implements IStorage {
    */
   async getSocialAccountsWithTokensInternal(workspaceId: string): Promise<SocialAccount[]> {
     await connectionManager.ensureConnected();
-    return socialAccountRepository.findActiveWithDecryptedTokens(workspaceId);
+    const accounts = await socialAccountRepository.findByWorkspaceId(workspaceId);
+    return accounts.map(convertSocialAccountWithDecryptedTokens);
   }
 
   async getAllSocialAccounts(): Promise<SocialAccount[]> {
     await connectionManager.ensureConnected();
-    const accounts = await socialAccountRepository.findAll({ isActive: true });
-    return accounts.map(account => convertSocialAccount(account));
+    const accounts = await socialAccountRepository.findAll();
+    return accounts.map(convertSocialAccount);
   }
 
-
-
-  async getSocialAccountByPlatform(workspaceId: number | string, platform: string): Promise<SocialAccount | undefined> {
+  async getSocialAccountByPlatform(workspaceId: string, platform: string): Promise<SocialAccount | undefined> {
     await connectionManager.ensureConnected();
-    const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId.toString(), platform as any);
+    const account = await socialAccountRepository.findByWorkspaceAndPlatform(workspaceId, platform as any);
     return account ? convertSocialAccount(account) : undefined;
   }
 
@@ -325,56 +363,64 @@ export class MongoStorage implements IStorage {
     return account ? convertSocialAccount(account) : undefined;
   }
 
-  async getSocialConnections(userId: number | string): Promise<SocialAccount[]> {
+  async getSocialConnections(userId: string): Promise<SocialAccount[]> {
     await connectionManager.ensureConnected();
     const userWorkspaces = await this.getWorkspacesByUserId(userId);
-    const workspaceIds = userWorkspaces.map(w => w.id.toString());
+    const workspaceIds = userWorkspaces.map(w => w.id);
     const accounts = await socialAccountRepository.findByWorkspaceIds(workspaceIds);
-    return accounts.map(account => convertSocialAccount(account));
+    return accounts.map(convertSocialAccount);
   }
 
   async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
     await connectionManager.ensureConnected();
-    const newAccount = await socialAccountRepository.createWithEncryptedTokens(account);
+    const newAccount = await socialAccountRepository.createWithEncryptedTokens(account as any);
     return convertSocialAccount(newAccount);
   }
 
-  async updateSocialAccount(id: number | string, updates: Partial<SocialAccount>): Promise<SocialAccount> {
+  async updateSocialAccount(id: string, updates: Partial<SocialAccount>): Promise<SocialAccount> {
     await connectionManager.ensureConnected();
-    const updatedAccount = await socialAccountRepository.updateWithEncryptedTokens(id.toString(), updates);
+    const updatedAccount = await socialAccountRepository.updateWithEncryptedTokens(id, updates as any);
     return convertSocialAccount(updatedAccount);
   }
 
-  async deleteSocialAccount(id: number | string): Promise<void> {
+  async deleteSocialAccount(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    
-    const deleted = await socialAccountRepository.deleteById(id.toString());
-    
+    const deleted = await socialAccountRepository.deleteById(id);
     if (!deleted) {
       throw new Error(`Social account with id ${id} not found`);
     }
   }
 
-  // Content operations - delegating to contentRepository
-  async getContent(id: number): Promise<Content | undefined> {
+  async updateYouTubePlatformData(workspaceId: string, data: any): Promise<void> {
     await connectionManager.ensureConnected();
-    const content = await contentRepository.findById(id.toString());
+    const accounts = await socialAccountRepository.findByWorkspaceId(workspaceId);
+    const youtubeAccount = accounts.find((acc: any) => acc.platform === 'youtube');
+    if (youtubeAccount) {
+      await socialAccountRepository.updateById((youtubeAccount as any)._id.toString(), {
+        ...data,
+        updatedAt: new Date()
+      });
+    }
+  }
+
+  // Content operations - delegating to contentRepository
+  async getContent(id: string): Promise<Content | undefined> {
+    await connectionManager.ensureConnected();
+    const content = await contentRepository.findById(id);
     return content ? convertContent(content) : undefined;
   }
 
-  async getContentByWorkspace(workspaceId: number, limit?: number): Promise<Content[]> {
+  async getContentByWorkspace(workspaceId: string, limit?: number): Promise<Content[]> {
     await connectionManager.ensureConnected();
-    const contents = await contentRepository.findByWorkspaceId(
-      workspaceId.toString(),
-      limit ? { limit, sortBy: 'createdAt', sortOrder: 'desc' } : { sortBy: 'createdAt', sortOrder: 'desc' }
-    );
-    return contents.map(content => convertContent(content));
+    const result = await contentRepository.findByWorkspaceId(workspaceId, { limit });
+    const items = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return items.map(convertContent);
   }
 
-  async getScheduledContent(workspaceId?: number): Promise<Content[]> {
+  async getScheduledContent(workspaceId?: string): Promise<Content[]> {
     await connectionManager.ensureConnected();
-    const contents = await contentRepository.findScheduledContent(workspaceId?.toString());
-    return contents.map(content => convertContent(content));
+    const contents = await contentRepository.findScheduledContent(workspaceId);
+    return contents.map(convertContent);
   }
 
   async createContent(content: InsertContent): Promise<Content> {
@@ -383,47 +429,40 @@ export class MongoStorage implements IStorage {
     return convertContent(saved);
   }
 
-  async updateContent(id: number, updates: Partial<Content>): Promise<Content> {
+  async updateContent(id: string, updates: Partial<Content>): Promise<Content> {
     await connectionManager.ensureConnected();
-    const content = await contentRepository.updateById(id.toString(), updates);
-    if (!content) throw new Error('Content not found');
-    return convertContent(content);
+    const updated = await contentRepository.updateById(id, updates);
+    if (!updated) throw new Error("Content not found");
+    return convertContent(updated);
   }
 
-  async createPost(postData: InsertContent & { content?: string; media?: string[]; hashtags?: string; firstComment?: string; location?: string; accounts?: string[] }): Promise<Content & { content?: string; media?: string[]; hashtags?: string; firstComment?: string; location?: string; accounts?: string[] }> {
+  async deleteContent(id: string): Promise<void> {
+    await connectionManager.ensureConnected();
+    const deleted = await contentRepository.deleteById(id);
+    if (!deleted) throw new Error(`Content with id ${id} not found`);
+  }
+
+  async createPost(postData: any): Promise<any> {
     await connectionManager.ensureConnected();
     const saved = await contentRepository.createPostWithDefaults(postData);
     return {
-      id: saved._id.toString(),
-      workspaceId: saved.workspaceId,
+      ...convertContent(saved),
       content: (saved as any).content,
       media: (saved as any).media || [],
       hashtags: (saved as any).hashtags || '',
       firstComment: (saved as any).firstComment || '',
       location: (saved as any).location || '',
       accounts: (saved as any).accounts || [],
-      status: saved.status,
+      status: (saved as any).status || 'draft',
       publishedAt: (saved as any).publishedAt,
-      createdAt: saved.createdAt,
-      updatedAt: saved.updatedAt
     };
   }
 
-  async deleteContent(id: number | string): Promise<void> {
-    await connectionManager.ensureConnected();
-    
-    const deleted = await contentRepository.deleteById(id.toString());
-    
-    if (!deleted) {
-      throw new Error(`Content with id ${id} not found`);
-    }
-  }
-
   // Analytics operations - delegating to analyticsRepository
-  async getAnalytics(workspaceId: number | string, platform?: string, days?: number): Promise<Analytics[]> {
+  async getAnalytics(workspaceId: string, platform?: string, days?: number): Promise<Analytics[]> {
     await connectionManager.ensureConnected();
-    const analyticsData = await analyticsRepository.findByWorkspaceWithDaysFilter(workspaceId.toString(), platform, days);
-    return analyticsData.map(doc => convertAnalytics(doc));
+    const analyticsData = await analyticsRepository.findByWorkspaceWithDaysFilter(workspaceId, platform, days);
+    return analyticsData.map(convertAnalytics);
   }
 
   async createAnalytics(analytics: InsertAnalytics): Promise<Analytics> {
@@ -432,54 +471,61 @@ export class MongoStorage implements IStorage {
     return convertAnalytics(analyticsDoc);
   }
 
-  async getLatestAnalytics(workspaceId: number, platform: string): Promise<Analytics | undefined> {
+  async updateAnalytics(id: string, updates: Partial<Analytics>): Promise<Analytics> {
     await connectionManager.ensureConnected();
-    const analytics = await analyticsRepository.findLatestByPlatform(workspaceId.toString(), platform);
+    const updated = await analyticsRepository.updateById(id, updates);
+    if (!updated) throw new Error(`Analytics record with id ${id} not found`);
+    return convertAnalytics(updated);
+  }
+
+  async getLatestAnalytics(workspaceId: string, platform: string): Promise<Analytics | undefined> {
+    await connectionManager.ensureConnected();
+    const analytics = await analyticsRepository.findLatestByPlatform(workspaceId, platform);
     return analytics ? convertAnalytics(analytics) : undefined;
   }
 
-  async getAutomationRules(workspaceId: number | string): Promise<AutomationRule[]> {
+  // Automation rules
+  async getAutomationRule(id: string): Promise<AutomationRule | undefined> {
     await connectionManager.ensureConnected();
-    return automationRuleRepository.findByWorkspaceIdFormatted(workspaceId.toString());
+    const rule = await automationRuleRepository.findById(id);
+    return rule ? automationRuleRepository.formatAutomationRule(rule) as any : undefined;
+  }
+
+  async getAutomationRules(workspaceId: string): Promise<AutomationRule[]> {
+    await connectionManager.ensureConnected();
+    const rules = await automationRuleRepository.findByWorkspaceIdFormatted(workspaceId);
+    return rules as any;
   }
 
   async getActiveAutomationRules(): Promise<AutomationRule[]> {
     await connectionManager.ensureConnected();
-    return automationRuleRepository.findActiveRulesFormatted();
+    const rules = await automationRuleRepository.findActiveRulesFormatted();
+    return rules as any;
   }
 
   async getAutomationRulesByType(type: string): Promise<AutomationRule[]> {
     await connectionManager.ensureConnected();
-    return automationRuleRepository.findByTypeFormatted(type);
+    const rules = await automationRuleRepository.findByTypeFormatted(type);
+    return rules as any;
   }
 
   async createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule> {
     await connectionManager.ensureConnected();
-    return automationRuleRepository.createWithDefaults(rule);
+    return automationRuleRepository.createWithDefaults(rule) as any;
   }
 
   async updateAutomationRule(id: string, updates: Partial<AutomationRule>): Promise<AutomationRule> {
     await connectionManager.ensureConnected();
-    return automationRuleRepository.updateWithCleanup(id, updates);
+    return automationRuleRepository.updateWithCleanup(id, updates) as any;
   }
 
   async deleteAutomationRule(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    try {
-      const deleted = await automationRuleRepository.deleteById(id);
-      
-      if (!deleted) {
-        throw new Error('Automation rule not found');
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to delete automation rule: ${errorMessage}`);
-    }
+    const deleted = await automationRuleRepository.deleteById(id);
+    if (!deleted) throw new Error('Automation rule not found');
   }
 
   // Conversation Management Methods
-
-
 
 
 
@@ -488,19 +534,20 @@ export class MongoStorage implements IStorage {
     await dmConversationRepository.clearWorkspaceData(workspaceId);
   }
 
-  async getSuggestions(workspaceId: number, type?: string): Promise<Suggestion[]> {
+  async getSuggestions(workspaceId: string, type?: string): Promise<Suggestion[]> {
     await connectionManager.ensureConnected();
-    
-    const suggestions = await suggestionRepository.findByWorkspaceId(workspaceId.toString());
-    
-    const filtered = type ? suggestions.filter(s => s.type === type) : suggestions;
-    
-    return filtered.map(doc => convertSuggestion(doc));
+
+    const suggestionsRaw = await suggestionRepository.findByWorkspaceId(workspaceId);
+    const suggestions = Array.isArray(suggestionsRaw) ? suggestionsRaw : (suggestionsRaw as any).items || (suggestionsRaw as any).data || [];
+
+    const filtered = type ? suggestions.filter((s: any) => s.type === type) : suggestions;
+
+    return filtered.map((doc: any) => convertSuggestion(doc));
   }
 
-  async getValidSuggestions(workspaceId: number): Promise<Suggestion[]> {
+  async getValidSuggestions(workspaceId: string): Promise<Suggestion[]> {
     await connectionManager.ensureConnected();
-    const suggestions = await suggestionRepository.findValidByWorkspace(workspaceId.toString());
+    const suggestions = await suggestionRepository.findValidByWorkspace(workspaceId);
     return suggestions.map(doc => convertSuggestion(doc));
   }
 
@@ -510,29 +557,29 @@ export class MongoStorage implements IStorage {
     return convertSuggestion(saved);
   }
 
-  async markSuggestionUsed(id: number): Promise<Suggestion> {
+  async markSuggestionUsed(id: string): Promise<Suggestion> {
     await connectionManager.ensureConnected();
-    
-    const updated = await suggestionRepository.markAsUsed(id.toString());
-    
+
+    const updated = await suggestionRepository.markAsUsed(id);
+
     if (!updated) {
       throw new Error('Suggestion not found');
     }
-    
+
     return convertSuggestion(updated);
   }
 
-  async clearSuggestionsByWorkspace(workspaceId: string | number): Promise<void> {
+  async clearSuggestionsByWorkspace(workspaceId: string): Promise<void> {
     await connectionManager.ensureConnected();
-    
-    await suggestionRepository.deleteMany({ workspaceId: workspaceId.toString() });
+
+    await suggestionRepository.deleteMany({ workspaceId });
   }
 
-  async getCreditTransactions(userId: number, limit = 50): Promise<CreditTransaction[]> {
+  async getCreditTransactions(userId: string, limit = 50): Promise<CreditTransaction[]> {
     await connectionManager.ensureConnected();
-    
+
     try {
-      const transactions = await creditTransactionRepository.getRecentTransactions(userId.toString(), limit);
+      const transactions = await creditTransactionRepository.getRecentTransactions(userId, limit);
       return transactions.map(transaction => convertCreditTransaction(transaction));
     } catch (error) {
       return [];
@@ -545,11 +592,11 @@ export class MongoStorage implements IStorage {
     return convertCreditTransaction(created);
   }
 
-  async getReferrals(referrerId: number): Promise<Referral[]> {
+  async getReferrals(referrerId: string): Promise<Referral[]> {
     return [];
   }
 
-  async getReferralStats(userId: number): Promise<{ totalReferrals: number; activePaid: number; totalEarned: number }> {
+  async getReferralStats(userId: string): Promise<{ totalReferrals: number; activePaid: number; totalEarned: number }> {
     return { totalReferrals: 0, activePaid: 0, totalEarned: 0 };
   }
 
@@ -557,7 +604,7 @@ export class MongoStorage implements IStorage {
     throw new Error('Not implemented');
   }
 
-  async confirmReferral(id: number): Promise<Referral> {
+  async confirmReferral(id: string): Promise<Referral> {
     throw new Error('Not implemented');
   }
 
@@ -566,9 +613,9 @@ export class MongoStorage implements IStorage {
   }
 
   // Subscription operations - delegating to subscriptionRepository
-  async getSubscription(userId: number): Promise<Subscription | undefined> {
+  async getSubscription(userId: string): Promise<Subscription | undefined> {
     await connectionManager.ensureConnected();
-    const subscription = await subscriptionRepository.findByUserId(userId.toString());
+    const subscription = await subscriptionRepository.findByUserId(userId);
     return subscription ? convertSubscription(subscription) : undefined;
   }
 
@@ -578,19 +625,19 @@ export class MongoStorage implements IStorage {
     return convertSubscription(subscription);
   }
 
-  async updateSubscriptionStatus(userId: number, status: string, canceledAt?: Date): Promise<Subscription> {
+  async updateSubscriptionStatus(userId: string, status: string, canceledAt?: Date): Promise<Subscription> {
     await connectionManager.ensureConnected();
     const subscription = await subscriptionRepository.updateOne(
-      { userId: userId.toString() },
+      { userId },
       { status, canceledAt }
     );
     if (!subscription) throw new Error('Subscription not found');
     return convertSubscription(subscription);
   }
 
-  async getActiveSubscription(userId: number): Promise<Subscription | undefined> {
+  async getActiveSubscription(userId: string): Promise<Subscription | undefined> {
     await connectionManager.ensureConnected();
-    const subscription = await subscriptionRepository.findActiveByUserId(userId.toString());
+    const subscription = await subscriptionRepository.findActiveByUserId(userId);
     return subscription ? convertSubscription(subscription) : undefined;
   }
 
@@ -601,25 +648,24 @@ export class MongoStorage implements IStorage {
     return convertPayment(payment);
   }
 
-  async getPaymentsByUser(userId: number): Promise<Payment[]> {
+  async getPaymentsByUser(userId: string): Promise<Payment[]> {
     await connectionManager.ensureConnected();
-    const result = await paymentRepository.findByUserId(userId.toString());
+    const result = await paymentRepository.findByUserId(userId);
     return result.data.map(payment => convertPayment(payment));
   }
 
   // Addon operations - delegating to addonRepository
-  async getUserAddons(userId: number | string): Promise<Addon[]> {
+  async getUserAddons(userId: string): Promise<Addon[]> {
     await connectionManager.ensureConnected();
-    const addons = await addonRepository.findActiveByUserId(userId.toString());
+    const addons = await addonRepository.findActiveByUserId(userId);
     return addons.map(addon => convertAddon(addon));
   }
 
-  async getActiveAddonsByUser(userId: number | string): Promise<Addon[]> {
+  async getActiveAddonsByUser(userId: string): Promise<Addon[]> {
     await connectionManager.ensureConnected();
-    
-    const userIdStr = userId.toString();
-    const addons = await addonRepository.findActiveByUserId(userIdStr);
-    
+
+    const addons = await addonRepository.findActiveByUserId(userId);
+
     return addons.map(addon => convertAddon(addon));
   }
 
@@ -629,18 +675,20 @@ export class MongoStorage implements IStorage {
     return convertAddon(savedAddon);
   }
 
-  async getSuggestionsByWorkspace(workspaceId: string | number): Promise<Suggestion[]> {
+  async getSuggestionsByWorkspace(workspaceId: string): Promise<Suggestion[]> {
     await connectionManager.ensureConnected();
-    const suggestions = await suggestionRepository.findByWorkspaceId(
-      workspaceId.toString(),
+    const result = await suggestionRepository.findByWorkspaceId(
+      workspaceId,
       { sortBy: 'createdAt', sortOrder: 'desc' }
     );
-    return suggestions.map(doc => convertSuggestion(doc));
+    const suggestions = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return suggestions.map((doc: any) => convertSuggestion(doc));
   }
 
-  async getAnalyticsByWorkspace(workspaceId: string | number): Promise<Analytics[]> {
+  async getAnalyticsByWorkspace(workspaceId: string): Promise<Analytics[]> {
     await connectionManager.ensureConnected();
-    const analytics = await analyticsRepository.findByWorkspaceId(workspaceId.toString());
+    const result = await analyticsRepository.findByWorkspaceId(workspaceId);
+    const analytics = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
     return analytics.map(convertAnalytics);
   }
 
@@ -651,75 +699,73 @@ export class MongoStorage implements IStorage {
     return workspace ? convertWorkspace(workspace) : undefined;
   }
 
-  async getWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<WorkspaceMember | undefined> {
+  async getWorkspaceMember(workspaceId: string, userId: string): Promise<WorkspaceMember | undefined> {
     await connectionManager.ensureConnected();
     const member = await workspaceMemberRepository.findByWorkspaceAndUser(
-      workspaceId.toString(),
-      userId.toString()
+      workspaceId,
+      userId
     );
     return member ? convertWorkspaceMember(member) : undefined;
   }
 
-  async getWorkspaceMembers(workspaceId: number | string): Promise<(WorkspaceMember & { user: User })[]> {
+  async getWorkspaceMembers(workspaceId: string): Promise<(WorkspaceMember & { user: User })[]> {
     await connectionManager.ensureConnected();
-    
-    const membersWithUsers = await workspaceMemberRepository.getMembersWithOwnerFallback(workspaceId.toString());
-    
+    const membersWithUsers = await workspaceMemberRepository.getMembersWithOwnerFallback(workspaceId);
+
     if (membersWithUsers.length > 0) {
       return membersWithUsers.map(({ member, user }) => ({
         ...convertWorkspaceMember(member),
         user: convertUser(user!)
       }));
     }
-    
-    const fallback = await workspaceMemberRepository.getOwnerAsFallbackMember(workspaceId.toString());
-    return fallback ? [{ ...fallback, user: convertUser(fallback.user) } as WorkspaceMember & { user: User }] : [];
+
+    const fallback = await workspaceMemberRepository.getOwnerAsFallbackMember(workspaceId);
+    return fallback ? [{ ...fallback, user: convertUser(fallback.user) } as any as WorkspaceMember & { user: User }] : [];
   }
 
   async addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember> {
     await connectionManager.ensureConnected();
-    const newMember = await workspaceMemberRepository.createWithDefaults(member);
+    const newMember = await workspaceMemberRepository.createWithDefaults(member as any);
     return convertWorkspaceMember(newMember);
   }
 
-  async updateWorkspaceMember(workspaceId: number | string, userId: number | string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember> {
+  async updateWorkspaceMember(workspaceId: string, userId: string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember> {
     await connectionManager.ensureConnected();
-    const updatedMember = await workspaceMemberRepository.updateByWorkspaceAndUser(workspaceId.toString(), userId.toString(), updates);
+    const updatedMember = await workspaceMemberRepository.updateByWorkspaceAndUser(workspaceId, userId, updates as any);
     if (!updatedMember) throw new Error(`Workspace member not found`);
     return convertWorkspaceMember(updatedMember);
   }
 
-  async removeWorkspaceMember(workspaceId: number | string, userId: number | string): Promise<void> {
+  async removeWorkspaceMember(workspaceId: string, userId: string): Promise<void> {
     await connectionManager.ensureConnected();
     const member = await workspaceMemberRepository.findByWorkspaceAndUser(
-      workspaceId.toString(),
-      userId.toString()
+      workspaceId,
+      userId
     );
     if (member) {
-      await workspaceMemberRepository.deleteById(member._id.toString());
+      await workspaceMemberRepository.deleteById((member as any)._id.toString());
     }
   }
 
   async createTeamInvitation(invitation: InsertTeamInvitation): Promise<TeamInvitation> {
     await connectionManager.ensureConnected();
-    const newInvitation = await teamInvitationRepository.createWithDefaults(invitation);
+    const newInvitation = await teamInvitationRepository.createWithDefaults(invitation as any);
     return convertTeamInvitation(newInvitation);
   }
 
-  async getWorkspaceInvitations(workspaceId: number): Promise<TeamInvitation[]> {
+  async getWorkspaceInvitations(workspaceId: string): Promise<TeamInvitation[]> {
     await connectionManager.ensureConnected();
-    
-    const invitations = await teamInvitationRepository.findPendingByWorkspace(
-      workspaceId.toString(),
+    const result = await teamInvitationRepository.findPendingByWorkspace(
+      workspaceId,
       { sortBy: 'createdAt', sortOrder: 'desc' }
     );
-    
-    return invitations.map(doc => convertTeamInvitation(doc));
+    const invitations = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return invitations.map((doc: any) => convertTeamInvitation(doc));
   }
 
-  async getTeamInvitation(id: number): Promise<TeamInvitation | undefined> {
+  async getTeamInvitation(id: string): Promise<TeamInvitation | undefined> {
     await connectionManager.ensureConnected();
-    const invitation = await teamInvitationRepository.findOne({ id });
+    const invitation = await teamInvitationRepository.findById(id);
     return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
@@ -729,77 +775,60 @@ export class MongoStorage implements IStorage {
     return invitation ? convertTeamInvitation(invitation) : undefined;
   }
 
-  async getTeamInvitations(workspaceId: number | string, status?: string): Promise<TeamInvitation[]> {
+  async getTeamInvitations(workspaceId: string, status?: string): Promise<TeamInvitation[]> {
     await connectionManager.ensureConnected();
-    
     const options = { sortBy: 'createdAt' as const, sortOrder: 'desc' as const };
     let invitations;
-    
     if (status) {
       invitations = await teamInvitationRepository.findMany(
-        { workspaceId: workspaceId.toString(), status },
+        { workspaceId, status },
         options
       );
     } else {
       invitations = await teamInvitationRepository.findByWorkspaceId(
-        workspaceId.toString(),
+        workspaceId,
         options
       );
     }
-    
-    return invitations.map(convertTeamInvitation);
+    const items = Array.isArray(invitations) ? invitations : (invitations as any).items || (invitations as any).data || [];
+    return items.map(convertTeamInvitation);
   }
 
-  async updateTeamInvitation(id: number, updates: Partial<TeamInvitation>): Promise<TeamInvitation> {
+  async updateTeamInvitation(id: string, updates: Partial<TeamInvitation>): Promise<TeamInvitation> {
     await connectionManager.ensureConnected();
-    
-    const invitation = await teamInvitationRepository.findOne({ id });
-    
-    if (!invitation) {
-      throw new Error(`Team invitation with id ${id} not found`);
-    }
-    
-    const updatedInvitation = await teamInvitationRepository.updateById(
-      invitation._id.toString(),
-      updates
-    );
-    
+    const updatedInvitation = await teamInvitationRepository.updateById(id, updates);
     if (!updatedInvitation) {
       throw new Error(`Team invitation with id ${id} not found`);
     }
-    
     return convertTeamInvitation(updatedInvitation);
   }
 
   // Content recommendation operations
-  async getContentRecommendation(id: number): Promise<ContentRecommendation | undefined> {
+  async getContentRecommendation(id: string): Promise<ContentRecommendation | undefined> {
     await connectionManager.ensureConnected();
-    const recommendation = await contentRecommendationRepository.findById(id.toString());
+    const recommendation = await contentRecommendationRepository.findById(id);
     return recommendation ? convertContentRecommendation(recommendation) : undefined;
   }
 
-  async getContentRecommendations(workspaceId: number, type?: string, limit?: number): Promise<ContentRecommendation[]> {
+  async getContentRecommendations(workspaceId: string, type?: string, limit?: number): Promise<ContentRecommendation[]> {
     await connectionManager.ensureConnected();
-    
     const options: { sortBy: 'createdAt'; sortOrder: 'desc'; limit?: number } = { sortBy: 'createdAt', sortOrder: 'desc' };
-    if (limit) {
-      options.limit = limit;
-    }
-    
+    if (limit) options.limit = limit;
+
     let recommendations;
     if (type) {
       recommendations = await contentRecommendationRepository.findMany(
-        { workspaceId: workspaceId.toString(), isActive: true, type },
+        { workspaceId, isActive: true, type },
         options
       );
     } else {
       recommendations = await contentRecommendationRepository.findActiveByWorkspace(
-        workspaceId.toString(),
+        workspaceId,
         options
       );
     }
-    
-    return recommendations.map(rec => convertContentRecommendation(rec));
+    const items = Array.isArray(recommendations) ? recommendations : (recommendations as any).items || (recommendations as any).data || [];
+    return items.map((rec: any) => convertContentRecommendation(rec));
   }
 
   async createContentRecommendation(insertRecommendation: InsertContentRecommendation): Promise<ContentRecommendation> {
@@ -808,33 +837,27 @@ export class MongoStorage implements IStorage {
     return convertContentRecommendation(saved);
   }
 
-  async updateContentRecommendation(id: number, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation> {
+  async updateContentRecommendation(id: string, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation> {
     await connectionManager.ensureConnected();
-    const updated = await contentRecommendationRepository.updateById(
-      id.toString(),
-      updates
-    );
-    if (!updated) {
-      throw new Error(`Content recommendation ${id} not found`);
-    }
+    const updated = await contentRecommendationRepository.updateById(id, updates);
+    if (!updated) throw new Error(`Content recommendation ${id} not found`);
     return convertContentRecommendation(updated);
   }
 
-  async deleteContentRecommendation(id: number): Promise<void> {
+  async deleteContentRecommendation(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    const deleted = await contentRecommendationRepository.deleteById(id.toString());
-    if (!deleted) {
-      throw new Error(`Content recommendation ${id} not found`);
-    }
+    const deleted = await contentRecommendationRepository.deleteById(id);
+    if (!deleted) throw new Error(`Content recommendation ${id} not found`);
   }
 
-  async getUserContentHistory(userId: number, workspaceId: number): Promise<UserContentHistory[]> {
+  async getUserContentHistory(userId: string, workspaceId: string): Promise<UserContentHistory[]> {
     await connectionManager.ensureConnected();
-    const history = await userContentHistoryRepository.findMany(
-      { userId: userId.toString(), workspaceId: workspaceId.toString() },
+    const result = await userContentHistoryRepository.findMany(
+      { userId, workspaceId },
       { sortBy: 'createdAt', sortOrder: 'desc' }
     );
-    return history.map(h => convertUserContentHistory(h));
+    const history = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return history.map((h: any) => convertUserContentHistory(h));
   }
 
   async createUserContentHistory(insertHistory: InsertUserContentHistory): Promise<UserContentHistory> {
@@ -844,7 +867,7 @@ export class MongoStorage implements IStorage {
   }
 
   // Pricing and plan operations - delegating to pricing-config module
-  async getPricingData(): Promise<{ plans: typeof SUBSCRIPTION_PLANS; creditPackages: typeof CREDIT_PACKAGES; addons: typeof ADDONS }> {
+  async getPricingData(): Promise<any> {
     return {
       plans: SUBSCRIPTION_PLANS,
       creditPackages: CREDIT_PACKAGES,
@@ -852,36 +875,20 @@ export class MongoStorage implements IStorage {
     };
   }
 
-  async updateUserSubscription(userId: number | string, planId: string): Promise<User> {
+  async updateUserSubscription(userId: string, planId: string): Promise<User> {
     await connectionManager.ensureConnected();
-    
-    // Get plan credits from pricing config
-    const plan = SUBSCRIPTION_PLANS[planId];
-    
-    if (!plan) {
-      throw new Error(`Invalid plan ID: ${planId}`);
-    }
-    
-    // Use repository method that handles both _id and id field lookups
-    const updatedUser = await userRepository.updateSubscription(userId.toString(), planId, plan.credits);
-    
-    if (!updatedUser) {
-      throw new Error(`User with id ${userId} not found or failed to update subscription`);
-    }
-    
+    const plan = SUBSCRIPTION_PLANS[planId as keyof typeof SUBSCRIPTION_PLANS];
+    if (!plan) throw new Error(`Invalid plan ID: ${planId}`);
+
+    const updatedUser = await userRepository.updateSubscription(userId, planId, plan.credits);
+    if (!updatedUser) throw new Error(`User with id ${userId} not found or failed to update subscription`);
     return convertUser(updatedUser);
   }
 
-  async addCreditsToUser(userId: number | string, credits: number): Promise<User> {
+  async addCreditsToUser(userId: string, credits: number): Promise<User> {
     await connectionManager.ensureConnected();
-    
-    // Use repository method that handles both _id and id field lookups atomically
-    const updatedUser = await userRepository.addCreditsAtomic(userId.toString(), credits);
-    
-    if (!updatedUser) {
-      throw new Error(`User with id ${userId} not found or failed to update credits`);
-    }
-    
+    const updatedUser = await userRepository.addCreditsAtomic(userId, credits);
+    if (!updatedUser) throw new Error(`User with id ${userId} not found or failed to update credits`);
     return convertUser(updatedUser);
   }
 
@@ -900,59 +907,35 @@ export class MongoStorage implements IStorage {
 
   async createDmMessage(data: InsertDmMessage): Promise<DmMessage> {
     await connectionManager.ensureConnected();
-    const message = await dmMessageRepository.create(data);
+    const message = await dmMessageRepository.create(data as any);
     return convertDmMessage(message);
   }
 
-  async updateConversationLastMessage(conversationId: string | number): Promise<void> {
+  async updateConversationLastMessage(conversationId: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await dmConversationRepository.incrementMessageCount(conversationId.toString());
+    await dmConversationRepository.incrementMessageCount(conversationId);
   }
 
-  async getDmMessages(conversationId: number | string, limit: number = 10): Promise<DmMessage[]> {
+  async getDmMessages(conversationId: string, limit: number = 10): Promise<DmMessage[]> {
     await connectionManager.ensureConnected();
-    return dmMessageRepository.findMessagesForConversation(conversationId, limit);
+    const messages = await dmMessageRepository.findMessagesForConversation(conversationId, limit);
+    return messages.map((m: any) => convertDmMessage(m));
   }
 
-  async getConversationContext(conversationId: number): Promise<ConversationContext[]> {
+  async getConversationContext(conversationId: string): Promise<ConversationContext[]> {
     await connectionManager.ensureConnected();
-    
-    const contexts = await conversationContextRepository.findActiveContexts(conversationId.toString());
-    
-    return contexts.map(ctx => ({
-      id: parseInt(ctx._id.toString().slice(-8), 16),
-      conversationId: ctx.conversationId,
-      contextType: ctx.contextType,
-      contextValue: ctx.contextValue,
-      confidence: ctx.confidence ?? 0,
-      source: ctx.source ?? 'ai',
-      expiresAt: ctx.expiresAt ?? null,
-      createdAt: ctx.createdAt,
-      updatedAt: ctx.updatedAt
-    }));
+    const contexts = await conversationContextRepository.findActiveContexts(conversationId);
+    return contexts.map(convertConversationContext);
   }
 
-  async createConversationContext(data: InsertConversationContext): Promise<ConversationContext> {
+  async createConversationContext(data: any): Promise<any> {
     await connectionManager.ensureConnected();
-    
     const saved = await conversationContextRepository.create(data);
-    
-    return {
-      id: parseInt(saved._id.toString().slice(-8), 16),
-      conversationId: saved.conversationId,
-      contextType: saved.contextType,
-      contextValue: saved.contextValue,
-      confidence: saved.confidence ?? 0,
-      source: saved.source ?? 'ai',
-      expiresAt: saved.expiresAt ?? null,
-      createdAt: saved.createdAt,
-      updatedAt: saved.updatedAt
-    };
+    return convertConversationContext(saved);
   }
 
   async cleanupExpiredContext(cutoffDate: Date): Promise<void> {
     await connectionManager.ensureConnected();
-    
     await conversationContextRepository.deleteMany({
       expiresAt: { $lt: cutoffDate }
     });
@@ -980,14 +963,15 @@ export class MongoStorage implements IStorage {
 
   async getAutomationRulesByTrigger(triggerType: string): Promise<AutomationRule[]> {
     await connectionManager.ensureConnected();
-    return automationRuleRepository.findByGlobalTriggerTypeFormatted(triggerType);
+    const rules = await automationRuleRepository.findByGlobalTriggerTypeFormatted(triggerType);
+    return rules as any;
   }
 
   // Admin operations - delegating to adminRepository
-  async getAdmin(id: number): Promise<Admin | undefined> {
+  async getAdmin(id: string): Promise<Admin | undefined> {
     await connectionManager.ensureConnected();
     try {
-      const admin = await adminRepository.findById(id.toString());
+      const admin = await adminRepository.findById(id);
       return admin ? convertAdmin(admin) : undefined;
     } catch (error) {
       return undefined;
@@ -1018,43 +1002,44 @@ export class MongoStorage implements IStorage {
       email: admin.email,
       username: admin.username,
       password: admin.password,
-      role: admin.role || 'admin',
-      isActive: true
+      role: admin.role as any,
     });
     return convertAdmin(savedAdmin);
   }
 
-  async updateAdmin(id: number, updates: Partial<Admin>): Promise<Admin> {
+  async updateAdmin(id: string, updates: Partial<Admin>): Promise<Admin> {
     await connectionManager.ensureConnected();
-    const admin = await adminRepository.updateById(id.toString(), updates);
-    if (!admin) throw new Error('Admin not found');
-    return convertAdmin(admin);
+    const updatedAdmin = await adminRepository.updateById(id, updates);
+    if (!updatedAdmin) throw new Error(`Admin with id ${id} not found`);
+    return convertAdmin(updatedAdmin);
   }
 
-  async deleteAdmin(id: number): Promise<void> {
+  async deleteAdmin(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await adminRepository.deactivateAdmin(id.toString());
+    await adminRepository.deleteById(id);
   }
 
-  async getAdminUsers(options: {
-    page: number;
-    limit: number;
-    search?: string;
-    role?: 'admin' | 'superadmin';
-    status?: 'active' | 'inactive';
-  }): Promise<{ admins: Admin[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
+  async getAdminUsers(page: number = 1, limit: number = 10, search?: string): Promise<{ admins: Admin[]; total: number }> {
     await connectionManager.ensureConnected();
-    
-    const result = await adminRepository.findWithPaginationAndFilters(options);
-    
+
+    const result = await adminRepository.findWithPaginationAndFilters({ page, limit, search });
+
+    const items = (result as any).admins || (result as any).users || (result as any).items || (result as any).data || [];
     return {
-      admins: result.admins.map(admin => convertAdmin(admin)),
-      pagination: {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        pages: result.totalPages
-      }
+      admins: items.map((admin: any) => convertAdmin(admin)),
+      total: result.total
+    };
+  }
+
+  async getAdminContent(page: number = 1, limit: number = 10, search?: string): Promise<{ content: Content[]; total: number }> {
+    await connectionManager.ensureConnected();
+    const result = await contentRepository.findWithPagination({ page, limit }, search ? { title: { $regex: search, $options: 'i' } } : {});
+    const items = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    const total = (result as any).total || items.length;
+
+    return {
+      content: items.map((doc: any) => convertContent(doc)),
+      total
     };
   }
 
@@ -1068,12 +1053,13 @@ export class MongoStorage implements IStorage {
     const savedSession = await adminSessionRepository.createWithDefaults({
       adminId: session.adminId,
       token: session.token,
-      ipAddress: session.ipAddress,
-      userAgent: session.userAgent,
-      expiresAt: session.expiresAt
-    });
+      expiresAt: session.expiresAt,
+      ipAddress: (session as any).ipAddress,
+      userAgent: (session as any).userAgent
+    } as any);
     return convertAdminSession(savedSession);
   }
+
 
   async getAdminSession(token: string): Promise<AdminSession | undefined> {
     await connectionManager.ensureConnected();
@@ -1100,27 +1086,28 @@ export class MongoStorage implements IStorage {
   // Notification operations - delegating to notificationRepository
   async createNotification(notification: InsertNotification): Promise<Notification> {
     await connectionManager.ensureConnected();
-    
+
     const notificationData = {
       userId: notification.userId || null,
       title: notification.title,
       message: notification.message,
       type: notification.type || 'info',
-      targetUsers: Array.isArray(notification.targetUsers) ? notification.targetUsers : [notification.targetUsers || 'all'],
-      scheduledFor: notification.scheduledFor || null,
-      sentAt: notification.scheduledFor ? null : new Date(),
+      targetUsers: (notification as any).targetUsers || ['all'],
+      scheduledFor: (notification as any).scheduledFor || null,
+      sentAt: (notification as any).scheduledFor ? null : new Date(),
       isRead: false
     };
-    
-    const savedNotification = await notificationRepository.createWithDefaults(notificationData);
+
+    const savedNotification = await notificationRepository.createWithDefaults(notificationData as any);
     return convertNotification(savedNotification);
   }
 
   async getUserNotifications(userId: string): Promise<Notification[]> {
     await connectionManager.ensureConnected();
-    
-    const notifications = await notificationRepository.findActiveNotifications({ limit: 50 });
-    return notifications.map(notification => convertNotification(notification));
+
+    const result = await notificationRepository.findActiveNotifications({ limit: 50 });
+    const notifications = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return notifications.map((notification: any) => convertNotification(notification));
   }
 
   async markNotificationAsRead(notificationId: string, userId: string): Promise<void> {
@@ -1128,60 +1115,71 @@ export class MongoStorage implements IStorage {
     await notificationRepository.markAsRead(notificationId);
   }
 
-  async getNotifications(userId?: number): Promise<Notification[]> {
+  async getNotifications(userId?: string): Promise<Notification[]> {
     await connectionManager.ensureConnected();
-    const notifications = userId 
-      ? await notificationRepository.findByUserId(userId)
-      : await notificationRepository.findAll({});
-    return notifications.map(notif => convertNotification(notif));
+    let result;
+    if (userId) {
+      result = await notificationRepository.findByUserId(userId);
+    } else {
+      result = await notificationRepository.findAll({});
+    }
+    const notifications = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return notifications.map((notif: any) => convertNotification(notif));
   }
 
-  async updateNotification(id: number, updates: Partial<Notification>): Promise<Notification> {
+  async updateNotification(id: string, updates: Partial<Notification>): Promise<Notification> {
     await connectionManager.ensureConnected();
-    const notification = await notificationRepository.updateById(id.toString(), updates);
+    const notification = await notificationRepository.updateById(id, updates);
     if (!notification) throw new Error('Notification not found');
     return convertNotification(notification);
   }
 
-  async deleteNotification(id: number): Promise<void> {
+
+
+
+
+
+
+  async deleteNotification(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await notificationRepository.deleteById(id.toString());
+    await notificationRepository.deleteById(id);
   }
 
-  async markNotificationRead(id: number): Promise<void> {
+  async markNotificationRead(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await notificationRepository.markAsRead(id.toString());
+    await notificationRepository.markAsRead(id);
   }
 
   // Popup operations - delegating to popupRepository
   async createPopup(popup: InsertPopup): Promise<Popup> {
     await connectionManager.ensureConnected();
-    const savedPopup = await popupRepository.createWithDefaults(popup);
+    const savedPopup = await popupRepository.createWithDefaults(popup as any);
     return convertPopup(savedPopup);
   }
 
   async getActivePopups(): Promise<Popup[]> {
     await connectionManager.ensureConnected();
-    const popups = await popupRepository.findActivePopups();
-    return popups.map(popup => convertPopup(popup));
+    const result = await popupRepository.findActivePopups();
+    const popups = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return popups.map((popup: any) => convertPopup(popup));
   }
 
-  async getPopup(id: number): Promise<Popup | undefined> {
+  async getPopup(id: string): Promise<Popup | undefined> {
     await connectionManager.ensureConnected();
-    const popup = await popupRepository.findById(id.toString());
+    const popup = await popupRepository.findById(id);
     return popup ? convertPopup(popup) : undefined;
   }
 
-  async updatePopup(id: number, updates: Partial<Popup>): Promise<Popup> {
+  async updatePopup(id: string, updates: Partial<Popup>): Promise<Popup> {
     await connectionManager.ensureConnected();
-    const popup = await popupRepository.updateById(id.toString(), updates);
+    const popup = await popupRepository.updateById(id, updates);
     if (!popup) throw new Error('Popup not found');
     return convertPopup(popup);
   }
 
-  async deletePopup(id: number): Promise<void> {
+  async deletePopup(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await popupRepository.deleteById(id.toString());
+    await popupRepository.deleteById(id);
   }
 
   // App settings operations - delegating to appSettingRepository
@@ -1199,17 +1197,19 @@ export class MongoStorage implements IStorage {
 
   async getAllAppSettings(): Promise<AppSetting[]> {
     await connectionManager.ensureConnected();
-    const settings = await appSettingRepository.findAll({});
-    return settings.map(setting => convertAppSetting(setting));
+    const result = await appSettingRepository.findAll({});
+    const settings = Array.isArray(result) ? result : (result as any).items;
+    return settings.map((setting: any) => convertAppSetting(setting));
   }
 
   async getPublicAppSettings(): Promise<AppSetting[]> {
     await connectionManager.ensureConnected();
-    const settings = await appSettingRepository.findPublicSettings();
-    return settings.map(setting => convertAppSetting(setting));
+    const result = await appSettingRepository.findPublicSettings();
+    const settings = Array.isArray(result) ? result : (result as any).items;
+    return settings.map((setting: any) => convertAppSetting(setting));
   }
 
-  async updateAppSetting(key: string, value: string, updatedBy?: number): Promise<AppSetting> {
+  async updateAppSetting(key: string, value: string, updatedBy?: string): Promise<AppSetting> {
     await connectionManager.ensureConnected();
     const setting = await appSettingRepository.upsertSetting(key, value, { updatedBy });
     return convertAppSetting(setting);
@@ -1219,72 +1219,85 @@ export class MongoStorage implements IStorage {
     await connectionManager.ensureConnected();
     const setting = await appSettingRepository.findByKey(key);
     if (setting) {
-      await appSettingRepository.deleteById(setting._id.toString());
+      await appSettingRepository.deleteById((setting as any)._id.toString());
     }
   }
 
   // Audit log operations - delegating to auditLogRepository
-  async createAuditLog(log: InsertAuditLog & { actorType?: string; actorId?: string }): Promise<AuditLog> {
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
     await connectionManager.ensureConnected();
-    
-    const enrichedLog = { ...log };
-    if (!enrichedLog.actorType) {
-      enrichedLog.actorType = enrichedLog.adminId ? 'admin' : 'system';
-    }
-    if (!enrichedLog.actorId) {
-      enrichedLog.actorId = enrichedLog.adminId ? String(enrichedLog.adminId) : 'system';
-    }
-    
-    const savedLog = await auditLogRepository.createWithDefaults(enrichedLog);
+    const savedLog = await auditLogRepository.createWithDefaults(log);
     return convertAuditLog(savedLog);
   }
 
-  async getAuditLogs(limit?: number, adminId?: number): Promise<AuditLog[]> {
+  async updatePopup(type: string, updates: Partial<Popup>): Promise<Popup | undefined> {
     await connectionManager.ensureConnected();
-    const logs = adminId 
-      ? await auditLogRepository.findByActorId(String(adminId), { limit: limit || 100 })
-      : await auditLogRepository.getRecentAuditLogs(limit || 100);
-    return logs.map(log => convertAuditLog(log));
+    const popup = await popupRepository.findByType(type);
+    if (popup) {
+      await popupRepository.updateById((popup as any)._id.toString(), {
+        ...updates,
+        delay: updates.delay ? Number(updates.delay) : undefined
+      } as any);
+      const updated = await popupRepository.findById((popup as any)._id.toString());
+      return updated ? convertPopup(updated) : undefined;
+    }
+    return undefined;
+  }
+
+  async getAuditLogs(limit?: number, adminId?: string): Promise<AuditLog[]> {
+    await connectionManager.ensureConnected();
+    let result;
+    if (adminId) {
+      result = await auditLogRepository.findByActorId(adminId, { limit: limit || 100 });
+    } else {
+      result = await auditLogRepository.getRecentAuditLogs(limit || 100);
+    }
+    const logs = Array.isArray(result) ? result : (result as any).items || (result as any).data;
+    return logs.map((log: any) => convertAuditLog(log));
   }
 
   // Feedback operations - delegating to feedbackMessageRepository
   async createFeedbackMessage(feedback: InsertFeedbackMessage): Promise<FeedbackMessage> {
     await connectionManager.ensureConnected();
-    const savedFeedback = await feedbackMessageRepository.createWithDefaults(feedback);
+    const savedFeedback = await feedbackMessageRepository.createWithDefaults(feedback as any);
     return convertFeedbackMessage(savedFeedback);
   }
 
   async getFeedbackMessages(status?: string): Promise<FeedbackMessage[]> {
     await connectionManager.ensureConnected();
-    const messages = status 
-      ? await feedbackMessageRepository.findByStatus(status)
-      : await feedbackMessageRepository.findAll({});
-    return messages.map(msg => convertFeedbackMessage(msg));
+    let result;
+    if (status) {
+      result = await feedbackMessageRepository.findByStatus(status);
+    } else {
+      result = await feedbackMessageRepository.findAll({});
+    }
+    const messages = Array.isArray(result) ? result : (result as any).items || (result as any).data;
+    return messages.map((msg: any) => convertFeedbackMessage(msg));
   }
 
-  async updateFeedbackMessage(id: number, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage> {
+  async updateFeedbackMessage(id: string, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage> {
     await connectionManager.ensureConnected();
-    const message = await feedbackMessageRepository.updateById(id.toString(), updates);
+    const message = await feedbackMessageRepository.updateById(id, updates);
     if (!message) throw new Error('Feedback message not found');
     return convertFeedbackMessage(message);
   }
 
-  async deleteFeedbackMessage(id: number): Promise<void> {
+  async deleteFeedbackMessage(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await feedbackMessageRepository.deleteById(id.toString());
+    await feedbackMessageRepository.deleteById(id);
   }
 
-  // Missing automation log methods
-  async getAutomationLogs(limit?: number): Promise<AutomationRule[]> {
+  // Automation log operations
+  async getAutomationLogs(workspaceId: string, options?: { limit?: number; type?: string }): Promise<any[]> {
     await connectionManager.ensureConnected();
-    // Return empty array for now as automation logs schema not defined
+    // Return empty array for now as automation logs schema not defined or repository not ready
     return [];
   }
 
-  async createAutomationLog(log: InsertAutomationRule): Promise<AutomationRule> {
+  async createAutomationLog(log: any): Promise<any> {
     await connectionManager.ensureConnected();
-    // Return the log object for now as automation logs schema not defined
-    return { id: Date.now(), workspaceId: log.workspaceId, name: log.name, ...log, createdAt: new Date() } as AutomationRule;
+    // Return the log object for now
+    return { id: Date.now().toString(), ...log, createdAt: new Date() };
   }
 
   // Get all users method for cleanup operations
@@ -1297,7 +1310,7 @@ export class MongoStorage implements IStorage {
   // Admin stats method
   async getAdminStats(): Promise<{ totalUsers: number; totalWorkspaces: number; totalContent: number; totalCreditsUsed: number; revenueThisMonth: number; activeUsers: number }> {
     await connectionManager.ensureConnected();
-    
+
     const [userCount, workspaceCount, contentCount] = await Promise.all([
       userRepository.countAll(),
       workspaceRepository.countAll(),
@@ -1331,20 +1344,20 @@ export class MongoStorage implements IStorage {
   }
 
   // Create unverified user for email verification flow
-  async createUnverifiedUser(data: { 
-    email: string; 
-    firstName: string; 
-    emailVerificationCode: string; 
-    emailVerificationExpiry: Date; 
-    isEmailVerified: boolean 
+  async createUnverifiedUser(data: {
+    email: string;
+    firstName: string;
+    emailVerificationCode: string;
+    emailVerificationExpiry: Date;
+    isEmailVerified: boolean
   }): Promise<User> {
     await connectionManager.ensureConnected();
-    
+
     const userData = {
       email: data.email,
       displayName: data.firstName,
       username: data.email.split('@')[0] + '_' + Date.now(), // Generate unique username
-      firebaseUid: 'email_' + Date.now() + '_' + Math.random().toString(36).substring(7), // Temporary UID for manual signup
+      firebaseUid: 'email_' + Date.now() + '_' + Math.random().toString(36).substring(7) as string, // Temporary UID for manual signup
       isEmailVerified: data.isEmailVerified,
       emailVerificationCode: data.emailVerificationCode,
       emailVerificationExpiry: data.emailVerificationExpiry,
@@ -1353,257 +1366,206 @@ export class MongoStorage implements IStorage {
       referralCode: generateReferralCode()
     };
 
-    const savedUser = await userRepository.createWithDefaults(userData);
+    const savedUser = await userRepository.createWithDefaults(userData as any);
     return convertUser(savedUser);
   }
 
   // Email verification helper methods
-  async updateUserEmailVerification(id: number | string, token: string, expires: Date): Promise<User> {
+  async updateUserEmailVerification(id: string, token: string, expires: Date): Promise<User> {
     await connectionManager.ensureConnected();
-    
-    const user = await userRepository.updateEmailVerificationData(id.toString(), token, expires);
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
+    const user = await userRepository.updateEmailVerificationData(id, token, expires);
+    if (!user) throw new Error('User not found');
     return convertUser(user);
   }
 
-  async updateYouTubeWorkspaceData(updates: Partial<SocialAccount>): Promise<SocialAccount | null> {
+  async verifyUserEmail(id: string, data: { password?: string; firstName?: string; lastName?: string; firebaseUid?: string }): Promise<User> {
     await connectionManager.ensureConnected();
-    return socialAccountRepository.updateYouTubePlatformData(updates);
-  }
 
-  async verifyUserEmail(id: number | string, data: { password?: string; firstName?: string; lastName?: string; firebaseUid?: string }): Promise<User> {
-    await connectionManager.ensureConnected();
-    
     const additionalData: { displayName?: string; passwordHash?: string; firebaseUid?: string } = {};
     if (data.firstName) additionalData.displayName = data.firstName;
     if (data.password) additionalData.passwordHash = data.password; // Should be hashed before calling this
     if (data.firebaseUid) additionalData.firebaseUid = data.firebaseUid;
 
-    const user = await userRepository.markEmailVerified(id.toString(), additionalData);
-
-    if (!user) {
-      throw new Error('User not found');
-    }
+    const user = await userRepository.markEmailVerified(id, additionalData);
+    if (!user) throw new Error('User not found');
 
     return convertUser(user);
   }
 
-  // THUMBNAIL GENERATION SYSTEM METHODS
-
-  // Thumbnail Projects - delegating to thumbnailProjectRepository
-  async createThumbnailProject(data: InsertThumbnailProject): Promise<ThumbnailProject> {
-    await connectionManager.ensureConnected();
-    const project = await thumbnailProjectRepository.createWithDefaults(data);
-    return thumbnailProjectRepository.convertToOutput(project);
-  }
-
-  async getThumbnailProject(projectId: number): Promise<ThumbnailProject | null> {
-    await connectionManager.ensureConnected();
-    const project = await thumbnailProjectRepository.findById(projectId.toString());
-    if (!project) return null;
-    return thumbnailProjectRepository.convertToOutput(project);
-  }
-
-  async updateThumbnailProject(projectId: number, updates: Partial<ThumbnailProject>): Promise<void> {
-    await connectionManager.ensureConnected();
-    await thumbnailProjectRepository.updateById(projectId.toString(), updates);
-  }
-
-  async getThumbnailProjects(workspaceId: number): Promise<ThumbnailProject[]> {
-    await connectionManager.ensureConnected();
-    const result = await thumbnailProjectRepository.findByWorkspaceId(workspaceId.toString());
-    return result.data.map(project => thumbnailProjectRepository.convertToOutput(project));
-  }
-
-  // Thumbnail Strategies - delegating to thumbnailStrategyRepository
-  async createThumbnailStrategy(data: InsertThumbnailStrategy): Promise<ThumbnailStrategy> {
-    await connectionManager.ensureConnected();
-    const strategy = await thumbnailStrategyRepository.createWithDefaults(data);
-    return thumbnailStrategyRepository.convertToOutput(strategy);
-  }
-
-  async getThumbnailStrategy(projectId: number): Promise<ThumbnailStrategy | null> {
-    await connectionManager.ensureConnected();
-    const strategy = await thumbnailStrategyRepository.findByProjectId(projectId.toString());
-    if (!strategy) return null;
-    return thumbnailStrategyRepository.convertToOutput(strategy);
-  }
-
-  // Thumbnail Variants - delegating to thumbnailVariantRepository
+  // Thumbnail Operations - delegating to thumbnailVariantRepository etc.
   async createThumbnailVariant(data: InsertThumbnailVariant): Promise<ThumbnailVariant> {
     await connectionManager.ensureConnected();
-    const variant = await thumbnailVariantRepository.createWithDefaults(data);
+    const variant = await thumbnailVariantRepository.createWithDefaults(data as any);
     return thumbnailVariantRepository.convertToOutput(variant);
   }
 
-  async getThumbnailVariant(variantId: number): Promise<ThumbnailVariant | null> {
+  async getThumbnailVariant(variantId: string): Promise<ThumbnailVariant | null> {
     await connectionManager.ensureConnected();
-    const variant = await thumbnailVariantRepository.findById(variantId.toString());
+    const variant = await thumbnailVariantRepository.findById(variantId);
     if (!variant) return null;
     return thumbnailVariantRepository.convertToOutput(variant);
   }
 
-  async getThumbnailVariants(projectId: number): Promise<ThumbnailVariant[]> {
+  async getThumbnailVariants(projectId: string): Promise<ThumbnailVariant[]> {
     await connectionManager.ensureConnected();
-    const variants = await thumbnailVariantRepository.findByProjectId(projectId.toString());
+    const variants = await thumbnailVariantRepository.findByProjectId(projectId);
     return variants.map(variant => thumbnailVariantRepository.convertToOutput(variant));
   }
 
   // Canvas Editor Sessions - delegating to canvasEditorSessionRepository
   async createCanvasEditorSession(data: InsertCanvasEditorSession): Promise<CanvasEditorSession> {
     await connectionManager.ensureConnected();
-    const session = await canvasEditorSessionRepository.createWithDefaults(data);
+    const session = await canvasEditorSessionRepository.createWithDefaults(data as any);
     return canvasEditorSessionRepository.convertToOutput(session);
   }
 
-  async getCanvasEditorSession(sessionId: number): Promise<CanvasEditorSession | null> {
+  async getCanvasEditorSession(sessionId: string): Promise<CanvasEditorSession | null> {
     await connectionManager.ensureConnected();
-    const session = await canvasEditorSessionRepository.findById(sessionId.toString());
+    const session = await canvasEditorSessionRepository.findById(sessionId);
     if (!session) return null;
     return canvasEditorSessionRepository.convertToOutput(session);
   }
 
-  async updateCanvasEditorSession(sessionId: number, updates: Partial<CanvasEditorSession>): Promise<void> {
+  async updateCanvasEditorSession(sessionId: string, updates: Partial<CanvasEditorSession>): Promise<void> {
     await connectionManager.ensureConnected();
-    await canvasEditorSessionRepository.updateById(sessionId.toString(), { ...updates, lastSaved: new Date() });
+    await canvasEditorSessionRepository.updateById(sessionId, { ...updates, lastSaved: new Date() } as any);
   }
 
   // Thumbnail Exports - delegating to thumbnailExportRepository
   async createThumbnailExport(data: InsertThumbnailExport): Promise<ThumbnailExport> {
     await connectionManager.ensureConnected();
-    const exportDoc = await thumbnailExportRepository.createWithDefaults(data);
+    const exportDoc = await thumbnailExportRepository.createWithDefaults(data as any);
     return thumbnailExportRepository.convertToOutput(exportDoc);
   }
 
-  async getThumbnailExports(sessionId: number): Promise<ThumbnailExport[]> {
+  async getThumbnailExports(sessionId: string): Promise<ThumbnailExport[]> {
     await connectionManager.ensureConnected();
-    const exports = await thumbnailExportRepository.findBySessionId(sessionId.toString());
+    const exports = await thumbnailExportRepository.findBySessionId(sessionId);
     return exports.map(exp => thumbnailExportRepository.convertToOutput(exp));
   }
 
-  async incrementExportDownload(exportId: number): Promise<void> {
+  async incrementExportDownload(exportId: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await thumbnailExportRepository.incrementDownloadCount(exportId.toString());
+    await thumbnailExportRepository.incrementDownloadCount(exportId);
   }
 
-  // AI Features CRUD operations
-  
-  // Creative Brief operations - delegating to creativeBriefRepository
+  // AI Features Operations
+
+  // Creative Brief
   async createCreativeBrief(brief: InsertCreativeBrief): Promise<CreativeBrief> {
     await connectionManager.ensureConnected();
-    const saved = await creativeBriefRepository.create(brief);
-    return convertCreativeBrief(saved);
+    const result = await creativeBriefRepository.createWithDefaults(brief as any);
+    return convertCreativeBrief(result);
   }
 
-  async getCreativeBrief(id: number): Promise<CreativeBrief | undefined> {
+  async getCreativeBrief(id: string): Promise<CreativeBrief | undefined> {
     await connectionManager.ensureConnected();
-    const brief = await creativeBriefRepository.findById(id.toString());
-    return brief ? convertCreativeBrief(brief) : undefined;
+    const result = await creativeBriefRepository.findById(id);
+    return result ? convertCreativeBrief(result) : undefined;
   }
 
-  async getCreativeBriefsByWorkspace(workspaceId: number): Promise<CreativeBrief[]> {
+  async getCreativeBriefsByWorkspace(workspaceId: string): Promise<CreativeBrief[]> {
     await connectionManager.ensureConnected();
-    const result = await creativeBriefRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
-    const briefs = result.data || [];
-    return briefs.map(brief => convertCreativeBrief(brief));
+    const result = await creativeBriefRepository.findByWorkspaceId(workspaceId);
+    const items = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return items.map((item: any) => convertCreativeBrief(item));
   }
 
-  async updateCreativeBrief(id: number, updates: Partial<CreativeBrief>): Promise<CreativeBrief> {
+  async updateCreativeBrief(id: string, updates: Partial<CreativeBrief>): Promise<CreativeBrief> {
     await connectionManager.ensureConnected();
-    const updated = await creativeBriefRepository.updateById(id.toString(), updates);
-    if (!updated) throw new Error('Creative brief not found');
-    return convertCreativeBrief(updated);
+    const result = await creativeBriefRepository.updateById(id, updates as any);
+    if (!result) throw new Error('Creative brief not found');
+    return convertCreativeBrief(result);
   }
 
-  async deleteCreativeBrief(id: number): Promise<void> {
+  async deleteCreativeBrief(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await creativeBriefRepository.deleteById(id.toString());
+    await creativeBriefRepository.deleteById(id);
   }
 
-  // Content Repurpose operations - delegating to contentRepurposeRepository
+  // Content Repurpose
   async createContentRepurpose(repurpose: InsertContentRepurpose): Promise<ContentRepurpose> {
     await connectionManager.ensureConnected();
-    const saved = await contentRepurposeRepository.create(repurpose);
-    return convertContentRepurpose(saved);
+    const result = await contentRepurposeRepository.createWithDefaults(repurpose as any);
+    return convertContentRepurpose(result);
   }
 
-  async getContentRepurpose(id: number): Promise<ContentRepurpose | undefined> {
+  async getContentRepurpose(id: string): Promise<ContentRepurpose | undefined> {
     await connectionManager.ensureConnected();
-    const repurpose = await contentRepurposeRepository.findById(id.toString());
-    return repurpose ? convertContentRepurpose(repurpose) : undefined;
+    const result = await contentRepurposeRepository.findById(id);
+    return result ? convertContentRepurpose(result) : undefined;
   }
 
-  async getContentRepurposesByWorkspace(workspaceId: number): Promise<ContentRepurpose[]> {
+  async getContentRepurposesByWorkspace(workspaceId: string): Promise<ContentRepurpose[]> {
     await connectionManager.ensureConnected();
-    const result = await contentRepurposeRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
-    const repurposes = result.data || [];
-    return repurposes.map(repurpose => convertContentRepurpose(repurpose));
+    const result = await contentRepurposeRepository.findByWorkspaceId(workspaceId);
+    const items = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return items.map((item: any) => convertContentRepurpose(item));
   }
 
-  async updateContentRepurpose(id: number, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose> {
+  async updateContentRepurpose(id: string, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose> {
     await connectionManager.ensureConnected();
-    const updated = await contentRepurposeRepository.updateById(id.toString(), updates);
-    if (!updated) throw new Error('Content repurpose not found');
-    return convertContentRepurpose(updated);
+    const result = await contentRepurposeRepository.updateById(id, updates as any);
+    if (!result) throw new Error('Content repurpose not found');
+    return convertContentRepurpose(result);
   }
 
-  async deleteContentRepurpose(id: number): Promise<void> {
+  async deleteContentRepurpose(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await contentRepurposeRepository.deleteById(id.toString());
+    await contentRepurposeRepository.deleteById(id);
   }
 
-  // Competitor Analysis operations - delegating to competitorAnalysisRepository
+  // Competitor Analysis
   async createCompetitorAnalysis(analysis: InsertCompetitorAnalysis): Promise<CompetitorAnalysis> {
     await connectionManager.ensureConnected();
-    const saved = await competitorAnalysisRepository.create(analysis);
-    return convertCompetitorAnalysis(saved);
+    const result = await competitorAnalysisRepository.createWithDefaults(analysis as any);
+    return convertCompetitorAnalysis(result);
   }
 
-  async getCompetitorAnalysis(id: number): Promise<CompetitorAnalysis | undefined> {
+  async getCompetitorAnalysis(id: string): Promise<CompetitorAnalysis | undefined> {
     await connectionManager.ensureConnected();
-    const analysis = await competitorAnalysisRepository.findById(id.toString());
-    return analysis ? convertCompetitorAnalysis(analysis) : undefined;
+    const result = await competitorAnalysisRepository.findById(id);
+    return result ? convertCompetitorAnalysis(result) : undefined;
   }
 
-  async getCompetitorAnalysesByWorkspace(workspaceId: number): Promise<CompetitorAnalysis[]> {
+  async getCompetitorAnalysesByWorkspace(workspaceId: string): Promise<CompetitorAnalysis[]> {
     await connectionManager.ensureConnected();
-    const result = await competitorAnalysisRepository.findByWorkspaceId(workspaceId.toString(), { sortBy: 'createdAt', sortOrder: 'desc' });
-    const analyses = result.data || [];
-    return analyses.map(analysis => convertCompetitorAnalysis(analysis));
+    const result = await competitorAnalysisRepository.findByWorkspaceId(workspaceId);
+    const items = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return items.map((item: any) => convertCompetitorAnalysis(item));
   }
 
-  async updateCompetitorAnalysis(id: number, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis> {
+  async updateCompetitorAnalysis(id: string, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis> {
     await connectionManager.ensureConnected();
-    const updated = await competitorAnalysisRepository.updateById(id.toString(), updates);
-    if (!updated) throw new Error('Competitor analysis not found');
-    return convertCompetitorAnalysis(updated);
+    const result = await competitorAnalysisRepository.updateById(id, updates as any);
+    if (!result) throw new Error('Competitor analysis not found');
+    return convertCompetitorAnalysis(result);
   }
 
-  async deleteCompetitorAnalysis(id: number): Promise<void> {
+  async deleteCompetitorAnalysis(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    await competitorAnalysisRepository.deleteById(id.toString());
+    await competitorAnalysisRepository.deleteById(id);
   }
 
-  // Feature usage tracking methods
-  async getFeatureUsage(userId: number | string): Promise<Array<{
-    id: string;
-    userId: string;
-    featureId: string;
-    usageCount: number;
-    lastUsed: Date;
-    metadata: Record<string, unknown>;
-    createdAt: Date;
-    updatedAt: Date;
-  }>> {
+  // Feature usage tracking
+  async trackFeatureUsage(userId: string, featureId: string, metadata?: any): Promise<void> {
     await connectionManager.ensureConnected();
     try {
-      const result = await featureUsageRepository.findByUserId(userId.toString());
-      const docs = result.data || [];
-      return docs.map(doc => ({
+      const updated = await featureUsageRepository.incrementUsage(userId, featureId);
+      if (updated && metadata) {
+        await featureUsageRepository.updateById((updated as any)._id.toString(), { metadata });
+      }
+    } catch (error) {
+      // Non-critical
+    }
+  }
+
+  async getFeatureUsage(userId: string): Promise<any[]> {
+    await connectionManager.ensureConnected();
+    try {
+      const result = await featureUsageRepository.findByUserId(userId);
+      const items = Array.isArray(result) ? result : (result as any).data || [];
+      return items.map((doc: any) => ({
         id: doc._id.toString(),
         userId: doc.userId,
         featureId: doc.featureId,
@@ -1613,50 +1575,38 @@ export class MongoStorage implements IStorage {
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt
       }));
-    } catch (error: unknown) {
+    } catch (error) {
       return [];
     }
   }
 
-  async trackFeatureUsage(userId: number | string, featureId: string, usage: Record<string, unknown> | null): Promise<void> {
+  // Waitlist Management
+  async createWaitlistUser(data: InsertWaitlistUser): Promise<WaitlistUser> {
     await connectionManager.ensureConnected();
-    try {
-      const updated = await featureUsageRepository.incrementUsage(userId.toString(), featureId);
-      if (updated && usage) {
-        await featureUsageRepository.updateById(updated._id.toString(), { metadata: usage });
-      }
-    } catch (error: unknown) {
-      // Silently fail - feature usage tracking is non-critical
-    }
-  }
 
-  // Waitlist Management Methods - delegating to waitlistUserRepository
-  async createWaitlistUser(insertWaitlistUser: InsertWaitlistUser): Promise<WaitlistUser> {
-    await connectionManager.ensureConnected();
-    
     const referralCode = generateReferralCode();
-    
     let referredByUserId = null;
-    if (insertWaitlistUser.referredBy) {
-      const referrer = await waitlistUserRepository.findByReferralCode(insertWaitlistUser.referredBy);
+
+    if (data.referredBy) {
+      const referrer = await waitlistUserRepository.findByReferralCode(data.referredBy);
       if (referrer) {
-        referredByUserId = referrer._id;
-        await waitlistUserRepository.incrementReferralCount(referrer._id.toString());
+        referredByUserId = (referrer as any)._id;
+        await waitlistUserRepository.incrementReferralCount((referrer as any)._id.toString());
       }
     }
-    
+
     const savedUser = await waitlistUserRepository.createWithDefaults({
-      ...insertWaitlistUser,
+      ...data,
       referralCode,
       referredBy: referredByUserId
-    });
-    
+    } as any);
+
     return convertWaitlistUser(savedUser);
   }
 
-  async getWaitlistUser(id: number | string): Promise<WaitlistUser | undefined> {
+  async getWaitlistUser(id: string): Promise<WaitlistUser | undefined> {
     await connectionManager.ensureConnected();
-    const user = await waitlistUserRepository.findById(id.toString());
+    const user = await waitlistUserRepository.findById(id);
     return user ? convertWaitlistUser(user) : undefined;
   }
 
@@ -1672,38 +1622,32 @@ export class MongoStorage implements IStorage {
     return user ? convertWaitlistUser(user) : undefined;
   }
 
-  async updateWaitlistUser(id: number | string, updates: Partial<WaitlistUser>): Promise<WaitlistUser> {
+  async updateWaitlistUser(id: string, updates: Partial<WaitlistUser>): Promise<WaitlistUser> {
     await connectionManager.ensureConnected();
-    const user = await waitlistUserRepository.updateById(id.toString(), updates);
+    const user = await waitlistUserRepository.updateById(id, updates as any);
     if (!user) throw new Error('Waitlist user not found');
     return convertWaitlistUser(user);
   }
 
   async getAllWaitlistUsers(): Promise<WaitlistUser[]> {
     await connectionManager.ensureConnected();
-    const users = await waitlistUserRepository.findAll({});
-    return users.map(user => convertWaitlistUser(user));
+    const result = await waitlistUserRepository.findAll({});
+    const items = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return items.map((user: any) => convertWaitlistUser(user));
   }
 
-  async getWaitlistStats(): Promise<{ 
-    totalUsers: number; 
-    todaySignups: number; 
-    totalReferrals: number; 
-    averageReferrals: number;
-    statusBreakdown: { [key: string]: number };
-  }> {
+  async getWaitlistStats(): Promise<any> {
     await connectionManager.ensureConnected();
-    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const [total, todayCount, stats, statusBreakdown] = await Promise.all([
       waitlistUserRepository.countAll(),
       waitlistUserRepository.countSince(today),
       waitlistUserRepository.getStats(),
       waitlistUserRepository.getStatusBreakdown()
     ]);
-    
+
     return {
       totalUsers: total,
       todaySignups: todayCount,
@@ -1713,17 +1657,25 @@ export class MongoStorage implements IStorage {
     };
   }
 
-  async promoteWaitlistUser(id: number | string): Promise<{ 
-    user: User; 
-    workspace: Workspace; 
+  async promoteWaitlistUser(id: string): Promise<{
+    user: User;
+    workspace: Workspace;
     discountCode: string;
     trialDays: number;
   }> {
     await connectionManager.ensureConnected();
-    return waitlistUserRepository.promoteToUser(id.toString());
+    return waitlistUserRepository.promoteToUser(id) as any;
   }
 
-  // Database reset methods for fresh starts
+  async deleteWaitlistUser(id: string): Promise<void> {
+    await connectionManager.ensureConnected();
+    const deleted = await waitlistUserRepository.deleteById(id);
+    if (!deleted) {
+      throw new Error('Waitlist user not found');
+    }
+  }
+
+  // Database Reset Operations
   async clearAllUsers(): Promise<number> {
     await connectionManager.ensureConnected();
     return await userRepository.deleteMany({});
@@ -1732,14 +1684,6 @@ export class MongoStorage implements IStorage {
   async clearAllWaitlistUsers(): Promise<number> {
     await connectionManager.ensureConnected();
     return await waitlistUserRepository.deleteMany({});
-  }
-
-  async deleteWaitlistUser(id: number | string): Promise<void> {
-    await connectionManager.ensureConnected();
-    const deleted = await waitlistUserRepository.deleteById(id.toString());
-    if (!deleted) {
-      throw new Error('Waitlist user not found');
-    }
   }
 
   async clearAllWorkspaces(): Promise<number> {
@@ -1760,96 +1704,74 @@ export class MongoStorage implements IStorage {
   // VeeGPT Chat Methods - delegating to chatConversationRepository and chatMessageRepository
   async getChatConversations(userId: string, workspaceId?: string): Promise<ChatConversation[]> {
     await connectionManager.ensureConnected();
-    return chatConversationRepository.findByUserSorted(userId, workspaceId);
+    const result = await chatConversationRepository.findByUserSorted(userId, workspaceId || undefined);
+    const conversations = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return conversations.map((doc: any) => convertChatConversation(doc));
+  }
+
+  async getChatConversation(id: string): Promise<ChatConversation | undefined> {
+    await connectionManager.ensureConnected();
+    const conversation = await chatConversationRepository.findById(id);
+    return conversation ? convertChatConversation(conversation) : undefined;
   }
 
   async createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation> {
     await connectionManager.ensureConnected();
-    return chatConversationRepository.createWithDefaults({
+    const saved = await chatConversationRepository.createWithDefaults({
       userId: conversation.userId.toString(),
       workspaceId: conversation.workspaceId.toString(),
       title: conversation.title
     });
+    return convertChatConversation(saved);
   }
 
-  async getChatMessages(conversationId: number): Promise<ChatMessage[]> {
+  async getChatMessage(id: string): Promise<ChatMessage | undefined> {
     await connectionManager.ensureConnected();
-    const messages = await chatMessageRepository.findByConversationId(conversationId);
-    return messages.map(doc => ({
-      id: doc.id,
-      conversationId: doc.conversationId,
-      role: doc.role,
-      content: doc.content,
-      tokensUsed: doc.tokensUsed,
-      createdAt: doc.createdAt
-    }));
+    const message = await chatMessageRepository.findById(id);
+    return message ? convertChatMessage(message) : undefined;
+  }
+
+  async getChatMessages(conversationId: string): Promise<ChatMessage[]> {
+    await connectionManager.ensureConnected();
+    const result = await chatMessageRepository.findByConversationId(conversationId as any);
+    const messages = Array.isArray(result) ? result : (result as any).items || (result as any).data || [];
+    return messages.map((doc: any) => convertChatMessage(doc));
   }
 
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     await connectionManager.ensureConnected();
-    
-    const numericId = Date.now() % 1000000000 + Math.floor(Math.random() * 1000);
-    
+
     const saved = await chatMessageRepository.createWithDefaults({
       ...message,
-      id: numericId
-    });
-    return {
-      id: saved.id,
-      conversationId: saved.conversationId,
-      role: saved.role,
-      content: saved.content,
-      tokensUsed: saved.tokensUsed,
-      createdAt: saved.createdAt
-    };
+      conversationId: message.conversationId.toString() // Ensure conversationId is string
+    } as any);
+    return convertChatMessage(saved);
   }
 
-  async updateChatMessage(id: number, updates: Partial<ChatMessage>): Promise<ChatMessage> {
+  async updateChatMessage(id: string, updates: Partial<ChatMessage>): Promise<ChatMessage> {
     await connectionManager.ensureConnected();
-    const updated = await chatMessageRepository.updateById(id.toString(), updates);
+    const updated = await chatMessageRepository.updateById(id, updates as any);
     if (!updated) throw new Error('Message not found');
-    return {
-      id: updated.id,
-      conversationId: updated.conversationId,
-      role: updated.role,
-      content: updated.content,
-      tokensUsed: updated.tokensUsed,
-      createdAt: updated.createdAt
-    };
+    return convertChatMessage(updated);
   }
 
-  async updateChatConversation(id: string | number, updates: Partial<ChatConversation>): Promise<ChatConversation> {
+  async updateChatConversation(id: string, updates: Partial<ChatConversation>): Promise<ChatConversation> {
     await connectionManager.ensureConnected();
-    
-    // Validate ObjectId format if id is a string
-    if (typeof id === 'string' && !mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid conversation id format');
-    }
-    
-    const updated = await chatConversationRepository.updateById(id.toString(), updates);
+    const updated = await chatConversationRepository.updateById(id, updates as any);
     if (!updated) throw new Error('Conversation not found');
-    return {
-      id: updated.id,
-      userId: updated.userId,
-      workspaceId: updated.workspaceId,
-      title: updated.title,
-      messageCount: updated.messageCount,
-      lastMessageAt: updated.lastMessageAt,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt
-    };
+    return convertChatConversation(updated);
   }
 
-  async deleteChatConversation(id: string | number): Promise<void> {
+  async deleteChatConversation(id: string): Promise<void> {
     await connectionManager.ensureConnected();
-    
-    // Validate ObjectId format if id is a string
-    if (typeof id === 'string' && !mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid conversation id format');
+
+    // Delete associated messages first
+    await chatMessageRepository.deleteMessagesByConversationId(id);
+    // Then delete the conversation
+    const deleted = await chatConversationRepository.deleteById(id);
+    if (!deleted) {
+      throw new Error('Conversation not found');
     }
-    
-    await chatMessageRepository.deleteMessagesByConversationId(Number(id));
-    await chatConversationRepository.deleteById(id.toString());
   }
 }
 

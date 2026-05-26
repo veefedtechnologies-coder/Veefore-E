@@ -23,6 +23,7 @@ const SocialAccounts = React.lazy(() => import('./components/dashboard/social-ac
 const InstagramWebhookListener = React.lazy(() => import('./components/dashboard/instagram-webhook-listener'))
 const ScheduledPostsSection = React.lazy(() => import('./components/dashboard/scheduled-posts-section').then(m => ({ default: m.ScheduledPostsSection })))
 const DraftsSection = React.lazy(() => import('./components/dashboard/drafts-section').then(m => ({ default: m.DraftsSection })))
+const BestTimeWidget = React.lazy(() => import('./components/dashboard/best-time-widget').then(m => ({ default: m.BestTimeWidget })))
 const CalendarView = React.lazy(() => import('./components/calendar/calendar-view').then(m => ({ default: m.CalendarView })))
 const AnalyticsDashboard = React.lazy(() => import('./components/analytics/analytics-dashboard').then(m => ({ default: m.AnalyticsDashboard })))
 const CreatePost = React.lazy(() => import('./components/create/create-post').then(m => ({ default: m.CreatePost })))
@@ -35,13 +36,14 @@ const VideoGeneratorAdvanced = React.lazy(() => import('./pages/VideoGeneratorAd
 const AdminPanel = React.lazy(() => import('./pages/AdminPanel'))
 const Settings = React.lazy(() => import('./pages/Settings'))
 const SecurityDashboard = React.lazy(() => import('./pages/SecurityDashboard'))
+const BestTimeDetail = React.lazy(() => import('./pages/BestTimeDetail'))
 const TestFixtures = React.lazy(() => import('./pages/TestFixtures'))
 const EncryptionHealth = React.lazy(() => import('./pages/EncryptionHealth'))
 const Tabs = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.Tabs })))
 const TabsContent = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsContent })))
 const TabsList = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsList })))
 const TabsTrigger = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsTrigger })))
-const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'))
+// OnboardingFlow removed - onboarding now happens inline during signup
 const AccountNotFoundBanner = React.lazy(() => import('./components/AccountNotFoundBanner'))
 const SectionErrorBoundary = React.lazy(() => import('./components/ErrorBoundary').then(m => ({ default: m.SectionErrorBoundary })))
 const WorkspaceCreationOverlay = React.lazy(() => import('./components/WorkspaceCreationOverlay'))
@@ -71,9 +73,50 @@ const normalizeWorkspaces = (workspaces: any): NormalizedWorkspace[] => {
   return rawWorkspaces.map(normalizeWorkspace);
 };
 
+const DashboardLayout = ({ 
+  children, 
+  isCreateDropdownOpen, 
+  setIsCreateDropdownOpen,
+  handleCreateOptionSelect
+}: { 
+  children: React.ReactNode,
+  isCreateDropdownOpen: boolean,
+  setIsCreateDropdownOpen: (open: boolean) => void,
+  handleCreateOptionSelect: () => void
+}) => (
+  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+    <div className="h-screen overflow-y-auto">
+      <React.Suspense fallback={null}>
+        <Sidebar
+          className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+          isCreateDropdownOpen={isCreateDropdownOpen}
+          setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+        />
+      </React.Suspense>
+    </div>
+    <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <React.Suspense fallback={null}>
+        <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
+      </React.Suspense>
+      {isCreateDropdownOpen && (
+        <React.Suspense fallback={null}>
+          <CreateDropdown
+            isOpen={isCreateDropdownOpen}
+            onClose={() => setIsCreateDropdownOpen(false)}
+            onOptionSelect={handleCreateOptionSelect}
+          />
+        </React.Suspense>
+      )}
+      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+        {children}
+      </main>
+    </div>
+  </div>
+)
+
 export default function AuthenticatedApp() {
   const [isCreateDropdownOpen, setIsCreateDropdownOpen] = useState(false)
-  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false)
+  // Onboarding modal removed - now inline during signup
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
@@ -110,7 +153,7 @@ export default function AuthenticatedApp() {
     staleTime: 5 * 60 * 1000,
     retry: 3,
   })
-  
+
   const workspaces = normalizeWorkspaces(workspacesRaw)
   const [enforceHang, setEnforceHang] = useState(false)
   const needEnforce = userData && !userData.isOnboarded && Array.isArray(workspaces) && workspaces.length === 0
@@ -135,9 +178,7 @@ export default function AuthenticatedApp() {
         if (location === '/signin' || location === '/signup' || location === '/onboarding') {
           setLocation('/')
         }
-        if (isOnboardingModalOpen) {
-          setIsOnboardingModalOpen(false)
-        }
+
         if (!userData.isOnboarded && hasWorkspaces) {
           queryClient.invalidateQueries({ queryKey: ['/api/user'] })
         }
@@ -145,52 +186,21 @@ export default function AuthenticatedApp() {
           queryClient.invalidateQueries({ queryKey: ['/api/user'] })
         }
       } else if (user && userData && !userData.isOnboarded && workspacesLoaded && !hasWorkspaces) {
-        if (!isOnboardingModalOpen) {
-          setIsOnboardingModalOpen(true)
-        }
-        if (location === '/signin' || location === '/signup') {
-          setLocation('/')
+        // User is authenticated but hasn't completed onboarding - redirect to signup to complete it
+        // Check both wouter location and actual URL to account for query params
+        const currentUrl = window.location.pathname
+        if (!currentUrl.startsWith('/signup')) {
+          console.log('[ONBOARDING] User not onboarded, redirecting to signup to complete onboarding')
+          window.location.href = '/signup?resume=true'
           return
         }
       }
     }
-  }, [user, loading, userData, userDataLoading, location, setLocation, isOnboardingModalOpen, workspaces, workspacesLoading])
+  }, [user, loading, userData, userDataLoading, location, setLocation, workspaces, workspacesLoading])
 
   const handleCreateOptionSelect = () => {
     setIsCreateDropdownOpen(false)
   }
-
-  const DashboardLayout = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-      <div className="h-screen overflow-y-auto">
-        <React.Suspense fallback={null}>
-          <Sidebar
-            className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-            isCreateDropdownOpen={isCreateDropdownOpen}
-            setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-          />
-        </React.Suspense>
-      </div>
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <React.Suspense fallback={null}>
-          <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
-        </React.Suspense>
-        {isCreateDropdownOpen && (
-          <React.Suspense fallback={null}>
-            <CreateDropdown
-              isOpen={isCreateDropdownOpen}
-              onClose={() => setIsCreateDropdownOpen(false)}
-              onOptionSelect={handleCreateOptionSelect}
-            />
-          </React.Suspense>
-        )}
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-          {children}
-        </main>
-      </div>
-    </div>
-  )
-
   return (
     <RealtimeProvider>
       <Switch location={location}>
@@ -206,7 +216,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/plan">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <div className="space-y-6">
                 <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
                   <Tabs defaultValue="calendar" className="w-full">
@@ -246,7 +256,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/create">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<SkeletonPageLoader type="default" />}>
                 <InstagramWebhookListener />
                 <CreatePost />
@@ -257,7 +267,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/analytics">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
                 <InstagramWebhookListener />
                 <AnalyticsDashboard />
@@ -268,7 +278,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/inbox">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <div className="text-center py-12">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Inbox 2.0</h3>
                 <p className="text-gray-600 dark:text-gray-400">Manage your social media conversations here.</p>
@@ -311,7 +321,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/workspaces">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<SkeletonPageLoader type="workspaces" />}>
                 <Workspaces />
               </React.Suspense>
@@ -321,7 +331,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/profile">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<SkeletonPageLoader type="profile" />}>
                 <Profile />
               </React.Suspense>
@@ -331,7 +341,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/integration">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
                 <InstagramWebhookListener />
                 <Integration />
@@ -342,7 +352,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/integrations">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
                 <InstagramWebhookListener />
                 <Integration />
@@ -452,9 +462,49 @@ export default function AuthenticatedApp() {
           </ProtectedRoute>
         </Route>
 
+        <Route path="/best-time">
+          <ProtectedRoute>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
+              <div className="h-screen overflow-y-auto">
+                <React.Suspense fallback={null}>
+                  <Sidebar
+                    className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                    isCreateDropdownOpen={isCreateDropdownOpen}
+                    setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                  />
+                </React.Suspense>
+              </div>
+              <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                <React.Suspense fallback={null}>
+                  <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
+                </React.Suspense>
+                {isCreateDropdownOpen && (
+                  <React.Suspense fallback={null}>
+                    <CreateDropdown
+                      isOpen={isCreateDropdownOpen}
+                      onClose={() => setIsCreateDropdownOpen(false)}
+                      onOptionSelect={(option) => {
+                        setIsCreateDropdownOpen(false)
+                        if (option === 'post') setLocation('/create')
+                        if (option === 'automation') setLocation('/automation')
+                        if (option === 'video') setLocation('/video-generator')
+                      }}
+                    />
+                  </React.Suspense>
+                )}
+                <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                  <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
+                    <BestTimeDetail />
+                  </React.Suspense>
+                </main>
+              </div>
+            </div>
+          </ProtectedRoute>
+        </Route>
+
         <Route path="/test-fixtures">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<LoadingSpinner type="default" />}>
                 <TestFixtures />
               </React.Suspense>
@@ -464,7 +514,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/encryption-health">
           <ProtectedRoute>
-            <DashboardLayout>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<LoadingSpinner type="security" />}>
                 <EncryptionHealth />
               </React.Suspense>
@@ -533,6 +583,9 @@ export default function AuthenticatedApp() {
                         </SectionErrorBoundary>
                       </div>
                       <div className="space-y-6">
+                        <SectionErrorBoundary sectionName="Best Time to Post">
+                          <BestTimeWidget />
+                        </SectionErrorBoundary>
                         <SectionErrorBoundary sectionName="Recommendations">
                           <Recommendations />
                         </SectionErrorBoundary>
@@ -547,41 +600,7 @@ export default function AuthenticatedApp() {
                   </React.Suspense>
                 </main>
               </div>
-              {userData && !userData.isOnboarded &&
-                localStorage.getItem('isOnboarded') !== 'true' &&
-                !(Array.isArray(workspaces) && workspaces.length > 0) && (
-                  <React.Suspense fallback={null}>
-                    <OnboardingFlow
-                      open={isOnboardingModalOpen}
-                      userData={userData}
-                      onComplete={async (onboardingData) => {
-                        try {
-                          const response = await fetch('/api/user/complete-onboarding', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${await user?.getIdToken()}`
-                            },
-                            body: JSON.stringify({ preferences: onboardingData })
-                          })
-                          if (response.ok) {
-                            setIsOnboardingModalOpen(false)
-                            localStorage.setItem('isOnboarded', 'true')
-                            queryClient.invalidateQueries({ queryKey: ['/api/user'] })
-                            queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })
-                            setTimeout(() => {
-                              setIsWalkthroughOpen(true)
-                            }, 500)
-                          } else {
-                                throw new Error(`Failed to complete onboarding: ${response.status}`)
-                          }
-                        } catch (error) {
-                          throw error
-                        }
-                      }}
-                    />
-                  </React.Suspense>
-                )}
+              {/* OnboardingFlow modal removed - onboarding now happens inline during signup */}
             </div>
           ) : userDataLoading ? (
             <LoadingSpinner type="dashboard" />

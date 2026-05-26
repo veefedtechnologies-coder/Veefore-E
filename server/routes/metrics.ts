@@ -1,16 +1,19 @@
 import express from 'express';
+import { SocialAccount } from '@shared/schema';
+import Metrics from '../models/Metrics';
+import { MetricsQueueManager } from '../queues/metricsQueue';
 
 // Define minimal interfaces for MVP
 interface IMetrics {
   workspaceId: string;
   instagramAccountId: string;
   instagramUsername: string;
-  followers?: number;
-  likes?: number;
-  comments?: number;
-  reach?: number;
-  impressions?: number;
-  engagementRate?: number;
+  followers: number;
+  likes: number;
+  comments: number;
+  reach: number;
+  impressions: number;
+  engagementRate: number;
   lastUpdated: Date;
   fetchedAt: Date;
   dataStatus: string;
@@ -22,7 +25,7 @@ const router = express.Router();
  * GET /api/workspaces/:workspaceId/metrics
  * Returns cached metrics instantly and schedules background refresh
  */
-router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
+router.get('/workspaces/:workspaceId/metrics', async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId } = req.params;
     const { refresh = 'false', period = 'day', days = '7', checkForUpdates = 'false' } = req.query;
@@ -34,7 +37,7 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
       // Check if there have been any recent webhook events or database updates
       // For now, we'll simulate checking for updates by looking at recent activity
       const hasUpdates = Math.random() > 0.7; // Simulate 30% chance of updates
-      
+
       return res.json({
         hasUpdates,
         lastChecked: new Date(),
@@ -46,15 +49,14 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
     const { MongoStorage } = await import('../mongodb-storage');
     const storage = new MongoStorage();
     await storage.connect();
-    
-    // Get all users and filter for this workspace with Instagram tokens
-    const allUsers = await storage.getAllUsers();
-    const instagramUsers = allUsers.filter(user => 
-      user.workspaceId === workspaceId && 
-      user.instagramToken
+
+    // Get social accounts for this workspace
+    const socialAccounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+    const instagramAccounts = socialAccounts.filter(acc =>
+      acc.platform === 'instagram'
     );
 
-    if (instagramUsers.length === 0) {
+    if (instagramAccounts.length === 0) {
       return res.status(200).json({
         metrics: [],
         summary: {
@@ -72,34 +74,38 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
     }
 
     // Get cached metrics for all accounts
-    const accountIds = instagramUsers.map(user => user.instagramAccountId).filter(Boolean);
-    
+    const accountIds = instagramAccounts.map(acc => acc.accountId).filter(Boolean);
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(days as string));
 
-    // MVP: Return sample metrics data since Metrics model is not ready
-    const metricsData: IMetrics[] = instagramUsers.map(user => ({
-      workspaceId,
-      instagramAccountId: user.instagramAccountId || 'unknown',
-      instagramUsername: user.instagramUsername || 'unknown',
-      followers: Math.floor(Math.random() * 10000) + 1000,
-      likes: Math.floor(Math.random() * 500) + 50,
-      comments: Math.floor(Math.random() * 100) + 10,
-      reach: Math.floor(Math.random() * 5000) + 500,
-      impressions: Math.floor(Math.random() * 8000) + 1000,
-      engagementRate: Math.round((Math.random() * 5 + 1) * 100) / 100,
-      lastUpdated: new Date(),
-      fetchedAt: new Date(),
-      dataStatus: 'active'
-    }));
+    // Use actual account data for metrics
+    const metricsData: IMetrics[] = instagramAccounts.map(acc => {
+      // P2-FIX: Use real data from social account if available
+      // If data is missing but account is active, we can show temporary zero or simulated data if it helps MVP
+      return {
+        workspaceId,
+        instagramAccountId: acc.accountId || 'unknown',
+        instagramUsername: acc.username || 'unknown',
+        followers: acc.followersCount || 0,
+        likes: acc.totalLikes || 0,
+        comments: acc.totalComments || 0,
+        reach: acc.totalReach || 0,
+        impressions: acc.totalImpressions || 0,
+        engagementRate: acc.avgEngagement || 0,
+        lastUpdated: acc.updatedAt || new Date(),
+        fetchedAt: acc.lastSyncAt || new Date(),
+        dataStatus: acc.tokenStatus === 'valid' ? 'active' : 'stale'
+      };
+    });
 
     // Group metrics by account and get latest for each
     const latestMetricsByAccount = new Map<string, IMetrics>();
-    
+
     for (const metric of metricsData) {
       const accountId = metric.instagramAccountId;
-      if (!latestMetricsByAccount.has(accountId) || 
-          metric.fetchedAt > latestMetricsByAccount.get(accountId)!.fetchedAt) {
+      if (!latestMetricsByAccount.has(accountId) ||
+        metric.fetchedAt > latestMetricsByAccount.get(accountId)!.fetchedAt) {
         latestMetricsByAccount.set(accountId, metric);
       }
     }
@@ -114,12 +120,12 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
         acc.totalComments += metrics.comments || 0;
         acc.totalReach += metrics.reach || 0;
         acc.totalImpressions += metrics.impressions || 0;
-        
+
         if (metrics.engagementRate) {
           acc.engagementRateSum += metrics.engagementRate;
           acc.engagementRateCount++;
         }
-        
+
         return acc;
       },
       {
@@ -155,7 +161,7 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
     const yesterdayStart = new Date();
     yesterdayStart.setDate(yesterdayStart.getDate() - 1);
     yesterdayStart.setHours(0, 0, 0, 0);
-    
+
     const yesterdayEnd = new Date(yesterdayStart);
     yesterdayEnd.setHours(23, 59, 59, 999);
 
@@ -167,7 +173,7 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
     });
 
     const yesterdaySummary = yesterdayMetrics.reduce(
-      (acc, metrics) => {
+      (acc: any, metrics: any) => {
         acc.totalFollowers += metrics.followers || 0;
         acc.totalLikes += metrics.likes || 0;
         acc.totalComments += metrics.comments || 0;
@@ -189,17 +195,17 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
 
     // Schedule background refresh if requested or if data is stale
     const shouldScheduleRefresh = refresh === 'true' || hasStaleData(latestMetrics);
-    
+
     if (shouldScheduleRefresh) {
       console.log(`🔄 Scheduling background metrics refresh for workspace ${workspaceId}`);
-      
-      for (const user of instagramUsers) {
-        if (user.instagramAccountId && user.instagramToken) {
+
+      for (const acc of instagramAccounts) {
+        if (acc.accountId && acc.hasAccessToken) {
           await MetricsQueueManager.scheduleMetricsFetch(
             workspaceId,
-            user.userId,
-            user.instagramAccountId,
-            user.instagramToken,
+            'system', // Use system as default user ID for auto-refresh
+            acc.accountId,
+            '', // Token will be retrieved by queue if not provided
             'all',
             { priority: refresh === 'true' ? 5 : 15 } // Higher priority for manual refresh
           );
@@ -208,7 +214,7 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
     }
 
     // Get last update time
-    const lastUpdated = latestMetrics.length > 0 
+    const lastUpdated = latestMetrics.length > 0
       ? new Date(Math.max(...latestMetrics.map(m => m.lastUpdated.getTime())))
       : new Date();
 
@@ -231,7 +237,7 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
 
   } catch (error) {
     console.error('🚨 Error fetching workspace metrics:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch metrics'
     });
@@ -242,26 +248,25 @@ router.get('/workspaces/:workspaceId/metrics', async (req, res) => {
  * GET /api/workspaces/:workspaceId/metrics/account/:accountId
  * Get detailed metrics for a specific Instagram account
  */
-router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req, res) => {
+router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId, accountId } = req.params;
     const { period = 'day', limit = '30' } = req.query;
 
     console.log(`📊 Fetching account metrics: ${accountId} in workspace ${workspaceId}`);
 
-    // Validate workspace and account access
-    // Use storage system to find user
+    // Get social accounts for this workspace
     const { MongoStorage } = await import('../mongodb-storage');
     const storage = new MongoStorage();
     await storage.connect();
-    const users = await storage.getAllUsers();
-    const user = users.find(u => 
-      u.workspaceId === workspaceId && 
-      u.instagramAccountId === accountId &&
-      u.instagramToken
+
+    const socialAccounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+    const account = socialAccounts.find((acc: SocialAccount) =>
+      acc.platform === 'instagram' &&
+      acc.accountId === accountId
     );
 
-    if (!user) {
+    if (!account) {
       return res.status(404).json({ error: 'Account not found in this workspace' });
     }
 
@@ -269,13 +274,13 @@ router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req, re
     const metrics: IMetrics[] = Array.from({ length: Math.min(parseInt(limit as string), 10) }, (_, i) => ({
       workspaceId,
       instagramAccountId: accountId,
-      instagramUsername: user.instagramUsername || 'unknown',
-      followers: Math.floor(Math.random() * 10000) + 1000 - (i * 50),
+      instagramUsername: account.username || 'unknown',
+      followers: (account.followersCount || 1000) - (i * 50),
       likes: Math.floor(Math.random() * 500) + 50,
       comments: Math.floor(Math.random() * 100) + 10,
-      reach: Math.floor(Math.random() * 5000) + 500,
-      impressions: Math.floor(Math.random() * 8000) + 1000,
-      engagementRate: Math.round((Math.random() * 5 + 1) * 100) / 100,
+      reach: account.totalReach || 0,
+      impressions: account.totalImpressions || 0,
+      engagementRate: account.avgEngagement || 0,
       lastUpdated: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
       fetchedAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
       dataStatus: 'active'
@@ -283,7 +288,7 @@ router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req, re
 
     if (metrics.length === 0) {
       // MVP: Log that refresh would be scheduled
-      if (user.instagramToken) {
+      if (account.hasAccessToken) {
         console.log(`📊 Would schedule metrics fetch for account ${accountId} (MVP mode)`);
       }
 
@@ -297,14 +302,14 @@ router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req, re
     // Calculate trends
     const latest = metrics[0];
     const previous = metrics[1];
-    
+
     const trends = previous ? {
-      followers: latest.followers - previous.followers,
-      likes: latest.likes - previous.likes,
-      comments: latest.comments - previous.comments,
-      reach: latest.reach - previous.reach,
-      impressions: latest.impressions - previous.impressions,
-      engagementRate: latest.engagementRate - previous.engagementRate,
+      followers: (latest.followers || 0) - (previous.followers || 0),
+      likes: (latest.likes || 0) - (previous.likes || 0),
+      comments: (latest.comments || 0) - (previous.comments || 0),
+      reach: (latest.reach || 0) - (previous.reach || 0),
+      impressions: (latest.impressions || 0) - (previous.impressions || 0),
+      engagementRate: (latest.engagementRate || 0) - (previous.engagementRate || 0),
     } : null;
 
     res.json({
@@ -320,7 +325,7 @@ router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req, re
 
   } catch (error) {
     console.error('🚨 Error fetching account metrics:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch account metrics'
     });
@@ -331,7 +336,7 @@ router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req, re
  * POST /api/workspaces/:workspaceId/metrics/refresh
  * Force refresh metrics for all accounts in workspace
  */
-router.post('/workspaces/:workspaceId/metrics/refresh', async (req, res) => {
+router.post('/workspaces/:workspaceId/metrics/refresh', async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId } = req.params;
     const { accounts } = req.body; // Optional: specific account IDs to refresh
@@ -343,34 +348,35 @@ router.post('/workspaces/:workspaceId/metrics/refresh', async (req, res) => {
       return res.status(404).json({ error: 'Invalid workspace ID' });
     }
 
-    // Get Instagram accounts to refresh
+    // Get social accounts for this workspace
     const { MongoStorage } = await import('../mongodb-storage');
     const storage = new MongoStorage();
     await storage.connect();
-    const allUsers = await storage.getAllUsers();
-    let instagramUsers = allUsers.filter(user => 
-      user.workspaceId === workspaceId && user.instagramToken
+
+    const socialAccounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+    let instagramAccounts = socialAccounts.filter((acc: SocialAccount) =>
+      acc.platform === 'instagram'
     );
-    
+
     if (accounts && Array.isArray(accounts)) {
-      instagramUsers = instagramUsers.filter(user => 
-        accounts.includes(user.instagramAccountId)
+      instagramAccounts = instagramAccounts.filter((acc: SocialAccount) =>
+        accounts.includes(acc.accountId)
       );
     }
 
-    if (instagramUsers.length === 0) {
+    if (instagramAccounts.length === 0) {
       return res.status(400).json({ error: 'No Instagram accounts found to refresh' });
     }
 
     // MVP: Log scheduled jobs without actual queue processing
     const scheduledJobs: Array<{ accountId: string; username: string }> = [];
-    for (const user of instagramUsers) {
-      if (user.instagramAccountId && user.instagramToken) {
-        console.log(`📊 Would schedule refresh for account ${user.instagramAccountId} (MVP mode)`);
-        
+    for (const acc of instagramAccounts) {
+      if (acc.accountId && acc.hasAccessToken) {
+        console.log(`📊 Would schedule refresh for account ${acc.accountId} (MVP mode)`);
+
         scheduledJobs.push({
-          accountId: user.instagramAccountId,
-          username: user.instagramUsername || 'unknown'
+          accountId: acc.accountId,
+          username: acc.username || 'unknown'
         });
       }
     }
@@ -383,7 +389,7 @@ router.post('/workspaces/:workspaceId/metrics/refresh', async (req, res) => {
 
   } catch (error) {
     console.error('🚨 Error scheduling metrics refresh:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to schedule refresh'
     });
@@ -394,24 +400,25 @@ router.post('/workspaces/:workspaceId/metrics/refresh', async (req, res) => {
  * GET /api/workspaces/:workspaceId/metrics/status
  * Get refresh status and token statistics
  */
-router.get('/workspaces/:workspaceId/metrics/status', async (req, res) => {
+router.get('/workspaces/:workspaceId/metrics/status', async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId } = req.params;
 
-    // Get users for this workspace
+    // Get social accounts for this workspace
     const { MongoStorage } = await import('../mongodb-storage');
     const storage = new MongoStorage();
     await storage.connect();
-    const allUsers = await storage.getAllUsers();
-    const instagramUsers = allUsers.filter(user => 
-      user.workspaceId === workspaceId && user.instagramToken
+
+    const socialAccounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+    const instagramAccounts = socialAccounts.filter((acc: SocialAccount) =>
+      acc.platform === 'instagram'
     );
 
     // MVP: Return sample token and queue statistics
     const tokenStats = {
-      totalTokens: instagramUsers.length,
-      activeTokens: instagramUsers.filter(u => u.tokenStatus === 'active').length,
-      rateLimitedTokens: 0,
+      totalTokens: instagramAccounts.length,
+      activeTokens: instagramAccounts.filter((acc: SocialAccount) => acc.tokenStatus === 'active' || acc.tokenStatus === 'valid').length,
+      rateLimitedTokens: instagramAccounts.filter((acc: SocialAccount) => acc.tokenStatus === 'rate_limited').length,
       lastRotation: new Date()
     };
 
@@ -434,7 +441,7 @@ router.get('/workspaces/:workspaceId/metrics/status', async (req, res) => {
 
   } catch (error) {
     console.error('🚨 Error fetching metrics status:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch status'
     });
@@ -454,10 +461,10 @@ function calculatePercentageChange(current: number, previous: number): number {
  */
 function hasStaleData(metrics: IMetrics[]): boolean {
   if (metrics.length === 0) return true;
-  
+
   const now = new Date();
   const staleTreshold = 30 * 60 * 1000; // 30 minutes
-  
+
   return metrics.some(metric => {
     const ageInMs = now.getTime() - metric.lastUpdated.getTime();
     return ageInMs > staleTreshold;

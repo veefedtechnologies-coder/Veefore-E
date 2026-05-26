@@ -17,7 +17,7 @@ const PaginationQuery = z.object({
 });
 
 const PlatformQuery = z.object({
-  platform: z.string().min(1),
+  platform: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });
@@ -64,18 +64,24 @@ export class AnalyticsController extends BaseController {
   });
 
   getByPlatform = this.wrapAsync(async (
-    req: TypedRequest<{ workspaceId: string }, {}, { platform: string; page?: string; limit?: string }>,
+    req: TypedRequest<{ workspaceId: string }, {}, { platform?: string; page?: string; limit?: string }>,
     res: Response
   ) => {
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
     const { platform, page, limit } = PlatformQuery.parse(req.query);
-    const result = await analyticsService.getAnalyticsByPlatform(workspaceId, platform, page, limit);
-    this.sendPaginated(res, result.data, {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: result.totalPages,
-    });
+
+    if (platform) {
+      const result = await analyticsService.getAnalyticsByPlatform(workspaceId, platform, page, limit);
+      this.sendPaginated(res, result.data, {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      });
+    } else {
+      const summary = await analyticsService.getPlatformMetrics(workspaceId);
+      this.sendSuccess(res, summary);
+    }
   });
 
   getDateRange = this.wrapAsync(async (
@@ -99,6 +105,7 @@ export class AnalyticsController extends BaseController {
   ) => {
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
     const { days } = PerformanceSummaryQuery.parse(req.query);
+
     const summary = await analyticsService.getPerformanceSummary(workspaceId, days);
     this.sendSuccess(res, summary);
   });

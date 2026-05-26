@@ -29,33 +29,33 @@ export const SECRETS_INVENTORY: SecretConfig[] = [
   // Database & Storage
   { name: 'DATABASE_URL', required: true, category: 'database', description: 'MongoDB connection string' },
   { name: 'REDIS_URL', required: true, category: 'database', description: 'Redis connection for rate limiting and caching' },
-  
+
   // Authentication & OAuth
   { name: 'FIREBASE_SERVICE_ACCOUNT', required: process.env.NODE_ENV === 'production', category: 'oauth', description: 'Firebase admin service account JSON' },
   { name: 'INSTAGRAM_CLIENT_ID', required: process.env.NODE_ENV === 'production', category: 'oauth', description: 'Instagram OAuth client ID' },
   { name: 'INSTAGRAM_CLIENT_SECRET', required: process.env.NODE_ENV === 'production', encrypted: true, rotatable: true, category: 'oauth', description: 'Instagram OAuth client secret' },
   { name: 'YOUTUBE_API_KEY', required: false, encrypted: true, rotatable: true, category: 'api', description: 'YouTube Data API key' },
-  
+
   // AI Services
   { name: 'OPENAI_API_KEY', required: true, encrypted: true, rotatable: true, category: 'api', description: 'OpenAI API key for AI features' },
   { name: 'ANTHROPIC_API_KEY', required: false, encrypted: true, rotatable: true, category: 'api', description: 'Anthropic Claude API key' },
   { name: 'GOOGLE_GENAI_API_KEY', required: false, encrypted: true, rotatable: true, category: 'api', description: 'Google Generative AI API key' },
   { name: 'ELEVENLABS_API_KEY', required: false, encrypted: true, rotatable: true, category: 'api', description: 'ElevenLabs voice generation API' },
   { name: 'REPLICATE_API_TOKEN', required: false, encrypted: true, rotatable: true, category: 'api', description: 'Replicate AI model API token' },
-  
+
   // Payment Processing
   { name: 'STRIPE_SECRET_KEY', required: true, encrypted: true, rotatable: true, category: 'payment', description: 'Stripe payment processing secret key' },
   { name: 'STRIPE_WEBHOOK_SECRET', required: true, encrypted: true, rotatable: true, category: 'payment', description: 'Stripe webhook endpoint secret' },
   { name: 'RAZORPAY_KEY_ID', required: false, category: 'payment', description: 'Razorpay payment gateway key ID' },
   { name: 'RAZORPAY_KEY_SECRET', required: false, encrypted: true, rotatable: true, category: 'payment', description: 'Razorpay payment gateway secret' },
-  
+
   // Email Services
   { name: 'SENDGRID_API_KEY', required: true, encrypted: true, rotatable: true, category: 'email', description: 'SendGrid email delivery API key' },
-  
+
   // Encryption & Security
   { name: 'TOKEN_ENCRYPTION_KEY', required: process.env.NODE_ENV === 'production', encrypted: true, rotatable: true, category: 'encryption', description: 'AES-256-GCM key for token encryption' },
   { name: 'JWT_SECRET', required: false, encrypted: true, rotatable: true, category: 'encryption', description: 'JWT signing secret' },
-  
+
   // Application Configuration
   { name: 'NODE_ENV', required: true, category: 'api', description: 'Node.js environment (development/production)' },
   { name: 'REPLIT_DEV_DOMAIN', required: false, category: 'api', description: 'Replit development domain for CORS' },
@@ -76,12 +76,12 @@ export function auditEnvironmentVariables(): {
   const present: string[] = [];
   const warnings: string[] = [];
   const recommendations: string[] = [];
-  
+
   console.log('🔍 P1-6.1: Starting comprehensive environment variable audit...');
-  
+
   for (const secret of SECRETS_INVENTORY) {
     const value = process.env[secret.name];
-    
+
     if (secret.required && !value) {
       missing.push(secret.name);
       // Only log missing secrets on first audit or every 5 minutes
@@ -90,12 +90,12 @@ export function auditEnvironmentVariables(): {
       }
     } else if (value) {
       present.push(secret.name);
-      
+
       // Security validation
       if (secret.encrypted && secret.name.includes('SECRET') && value.length < 32) {
         warnings.push(`${secret.name}: Secret appears too short for production security`);
       }
-      
+
       if (secret.rotatable && !secret.name.includes('_ROTATED_')) {
         recommendations.push(`${secret.name}: Consider implementing automatic rotation`);
       }
@@ -106,37 +106,37 @@ export function auditEnvironmentVariables(): {
       }
     }
   }
-  
+
   // Check for unknown environment variables that might contain secrets
   const knownSecrets = new Set(SECRETS_INVENTORY.map(s => s.name));
-  const suspiciousEnvVars = Object.keys(process.env).filter(key => 
+  const suspiciousEnvVars = Object.keys(process.env).filter(key =>
     (key.includes('KEY') || key.includes('SECRET') || key.includes('TOKEN') || key.includes('PASSWORD')) &&
     !knownSecrets.has(key)
   );
-  
+
   if (suspiciousEnvVars.length > 0) {
     warnings.push(`Unknown secret-like environment variables detected: ${suspiciousEnvVars.join(', ')}`);
   }
-  
+
   // Rate limited audit logging to prevent console spam
   if (Date.now() - lastAuditLog > 300000) { // Only log every 5 minutes
     console.log(`🔍 SECRETS AUDIT: ${present.length} present, ${missing.length} missing`);
-    
+
     if (missing.length > 0) {
       console.warn(`🚨 MISSING SECRETS: ${missing.join(', ')}`);
     }
-    
+
     if (warnings.length > 0) {
       console.warn(`🚨 KEY MANAGEMENT WARNINGS:\n  - ${warnings.join('\n  - ')}`);
     }
-    
+
     if (recommendations.length > 0) {
       console.log(`💡 KEY MANAGEMENT RECOMMENDATIONS:\n  - ${recommendations.join('\n  - ')}`);
     }
-    
+
     lastAuditLog = Date.now();
   }
-  
+
   return { missing, present, warnings, recommendations };
 }
 
@@ -145,7 +145,7 @@ export function auditEnvironmentVariables(): {
  */
 export class SecureTokenManager {
   private encryptionKey: Buffer;
-  
+
   constructor() {
     const key = process.env.TOKEN_ENCRYPTION_KEY;
     if (!key) {
@@ -156,12 +156,12 @@ export class SecureTokenManager {
       this.encryptionKey = randomBytes(32);
     } else {
       // Use provided key or derive from string
-      this.encryptionKey = key.length === 64 
+      this.encryptionKey = key.length === 64
         ? Buffer.from(key, 'hex')
         : createHash('sha256').update(key).digest();
     }
   }
-  
+
   /**
    * P1-6.2: Encrypt sensitive tokens with AES-256-GCM
    */
@@ -177,11 +177,11 @@ export class SecureTokenManager {
       const iv = randomBytes(16);
       const cipher = createCipher('aes-256-gcm', this.encryptionKey);
       cipher.setAAD(iv);
-      
+
       let encrypted = cipher.update(token, 'utf8', 'hex');
       encrypted += cipher.final('hex');
       const authTag = cipher.getAuthTag();
-      
+
       return {
         encryptedToken: encrypted,
         iv: iv.toString('hex'),
@@ -194,7 +194,7 @@ export class SecureTokenManager {
       throw new Error('Failed to encrypt token');
     }
   }
-  
+
   /**
    * P1-6.2: Decrypt tokens with integrity verification
    */
@@ -204,24 +204,37 @@ export class SecureTokenManager {
     authTag: string;
   }): Promise<string> {
     try {
+      if (!encryptedData || typeof encryptedData !== 'object') {
+        throw new Error('Invalid encrypted data object');
+      }
+
+      // P2-FIX: Guard Buffer.from against non-string inputs
+      if (typeof encryptedData.iv !== 'string' || typeof encryptedData.authTag !== 'string') {
+        console.warn('⚠️ [P2-FIX] SecureTokenManager.decryptToken received invalid metadata:', {
+          hasIv: typeof encryptedData.iv,
+          hasAuthTag: typeof encryptedData.authTag
+        });
+        throw new Error('Invalid token metadata: iv and authTag must be strings');
+      }
+
       const { createDecipher } = await import('crypto');
       const iv = Buffer.from(encryptedData.iv, 'hex');
       const authTag = Buffer.from(encryptedData.authTag, 'hex');
-      
+
       const decipher = createDecipher('aes-256-gcm', this.encryptionKey);
       decipher.setAAD(iv);
       decipher.setAuthTag(authTag);
-      
+
       let decrypted = decipher.update(encryptedData.encryptedToken, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
-      
+
       return decrypted;
     } catch (error) {
-      console.error('❌ TOKEN DECRYPTION ERROR:', error);
+      console.error('❌ TOKEN DECRYPTION ERROR:', error instanceof Error ? error.message : error);
       throw new Error('Failed to decrypt token - data may be corrupted');
     }
   }
-  
+
   /**
    * P1-6.2: Check if token needs rotation based on age
    */
@@ -237,11 +250,11 @@ export class SecureTokenManager {
  */
 export class KeyRotationManager {
   private tokenManager: SecureTokenManager;
-  
+
   constructor() {
     this.tokenManager = new SecureTokenManager();
   }
-  
+
   /**
    * P1-6.3: Schedule automatic key rotation
    */
@@ -250,18 +263,18 @@ export class KeyRotationManager {
     setInterval(async () => {
       await this.performRotationCheck();
     }, 24 * 60 * 60 * 1000);
-    
+
     console.log('🔄 KEY ROTATION: Automatic rotation scheduler initialized');
   }
-  
+
   /**
    * P1-6.3: Check which keys need rotation
    */
   private async performRotationCheck() {
     console.log('🔄 KEY ROTATION: Performing rotation check...');
-    
+
     const rotatableSecrets = SECRETS_INVENTORY.filter(s => s.rotatable);
-    
+
     for (const secret of rotatableSecrets) {
       const value = process.env[secret.name];
       if (value && this.shouldRotateSecret(secret.name)) {
@@ -270,21 +283,21 @@ export class KeyRotationManager {
       }
     }
   }
-  
+
   /**
    * P1-6.3: Determine if a secret needs rotation
    */
   private shouldRotateSecret(secretName: string): boolean {
     const rotationKey = `${secretName}_LAST_ROTATED`;
     const lastRotated = process.env[rotationKey];
-    
+
     if (!lastRotated) {
       return true; // Never rotated
     }
-    
+
     const lastRotatedDate = new Date(lastRotated);
     const daysSinceRotation = (Date.now() - lastRotatedDate.getTime()) / (1000 * 60 * 60 * 24);
-    
+
     // Different rotation intervals by category
     const rotationIntervals: Record<string, number> = {
       'oauth': 90,      // 3 months
@@ -295,31 +308,31 @@ export class KeyRotationManager {
       'database': 90,   // 3 months
       'storage': 180    // 6 months
     };
-    
+
     const secret = SECRETS_INVENTORY.find(s => s.name === secretName);
     const interval = secret ? rotationIntervals[secret.category] || 90 : 90;
-    
+
     return daysSinceRotation > interval;
   }
-  
+
   /**
    * P1-6.3: Rotate a specific secret
    */
   private async rotateSecret(secretName: string, category: string) {
     console.log(`🔄 KEY ROTATION: Rotating ${secretName}...`);
-    
+
     try {
       // Log rotation event for audit trail
       console.log(`🔄 KEY ROTATION: ${secretName} rotation initiated at ${new Date().toISOString()}`);
-      
+
       // For now, log the rotation requirement - actual rotation would need service-specific logic
       console.warn(`🔄 KEY ROTATION: Manual rotation required for ${secretName} (${category})`);
-      
+
       // In production, this would trigger service-specific rotation logic:
       // - OAuth tokens: Refresh using refresh tokens
       // - API keys: Generate new keys via service APIs
       // - Encryption keys: Generate new keys and re-encrypt data
-      
+
     } catch (error) {
       console.error(`❌ KEY ROTATION ERROR for ${secretName}:`, error);
     }
@@ -333,12 +346,12 @@ export function secretsValidationMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
     // Add secrets audit info to request for monitoring
     req.secretsAudit = auditEnvironmentVariables();
-    
+
     // Warn about missing critical secrets
     if (req.secretsAudit.missing.length > 0) {
       console.warn(`🚨 SECRETS: ${req.secretsAudit.missing.length} required secrets missing`);
     }
-    
+
     next();
   };
 }
@@ -353,7 +366,7 @@ export function keyManagementHeaders() {
     res.header('Pragma', 'no-cache');
     res.header('Expires', '0');
     res.header('X-Key-Management', 'protected');
-    
+
     next();
   };
 }
@@ -363,30 +376,30 @@ export function keyManagementHeaders() {
  */
 export function initializeKeyManagement() {
   console.log('🔐 P1-6: Initializing comprehensive key management system...');
-  
+
   // Perform initial audit
   const audit = auditEnvironmentVariables();
-  
+
   // Initialize token manager
   const tokenManager = new SecureTokenManager();
-  
+
   // Initialize rotation manager
   const rotationManager = new KeyRotationManager();
   rotationManager.initializeKeyRotation();
-  
+
   // Report status
   console.log('🔐 KEY MANAGEMENT: System initialized successfully');
   console.log(`🔐 SECRETS STATUS: ${audit.present.length} present, ${audit.missing.length} missing`);
-  
+
   if (audit.warnings.length > 0) {
     console.warn('🚨 KEY MANAGEMENT WARNINGS:');
     audit.warnings.forEach(warning => console.warn(`  - ${warning}`));
   }
-  
+
   if (audit.recommendations.length > 0) {
     console.log('💡 KEY MANAGEMENT RECOMMENDATIONS:');
     audit.recommendations.forEach(rec => console.log(`  - ${rec}`));
   }
-  
+
   return { audit, tokenManager, rotationManager };
 }

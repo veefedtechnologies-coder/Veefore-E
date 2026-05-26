@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ErrorModal } from '@/components/ui/error-modal'
-import { 
-  Instagram, 
-  Facebook, 
-  Twitter, 
-  Linkedin, 
-  Youtube, 
+import {
+  Instagram,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Youtube,
   Video,
   Plus,
   Check,
@@ -34,7 +34,7 @@ import { useCurrentWorkspace } from '../components/WorkspaceSwitcher'
 
 interface SocialAccount {
   id: string
-  platform: 'instagram' | 'facebook' | 'twitter' | 'linkedin' | 'youtube' | 'tiktok'
+  platform: 'instagram' | 'instagram_advanced' | 'facebook' | 'twitter' | 'linkedin' | 'youtube' | 'tiktok'
   username: string
   displayName?: string
   followers?: number
@@ -55,8 +55,8 @@ const platformConfig = {
     bgColor: 'bg-gradient-to-br from-pink-50 to-rose-50',
     borderColor: 'border-pink-200',
     textColor: 'text-pink-700',
-    description: 'Connect your Instagram Business account to schedule posts, stories, and reels',
-    features: ['Auto-posting', 'Stories & Reels', 'Analytics', 'DM Management'],
+    description: 'Connect your Instagram Professional account for scheduling and full demographic insights',
+    features: ['Auto-posting', 'Stories & Reels', 'Audience Demographics', 'DM Management'],
     pricing: 'Free'
   },
   facebook: {
@@ -119,7 +119,7 @@ const platformConfig = {
 export default function Integration() {
   return (
     <>
-      <SEO 
+      <SEO
         {...seoConfig.analytics}
         structuredData={generateStructuredData.softwareApplication()}
       />
@@ -180,20 +180,20 @@ function IntegrationContent() {
     const success = urlParams.get('success')
     const connected = urlParams.get('connected')
     const error = urlParams.get('error')
-    
+
     // Only process if there are OAuth parameters
     if (!success && !connected && !error) return
-    
+
     setIsProcessingOAuth(true)
-    
+
     if (success === 'true' || connected === 'instagram' || connected === 'youtube') {
       console.log('✅ OAuth callback success detected, triggering IMMEDIATE data refresh...')
-      
+
       // Clean up URL parameters first to prevent double execution
       const cleanUrl = window.location.pathname
       window.history.replaceState({}, '', cleanUrl)
       const username = urlParams.get('username')
-      
+
       // ✅ IMMEDIATE REFETCH - Force fetch fresh data right now (not background)
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] }),
@@ -225,16 +225,16 @@ function IntegrationContent() {
       })
     } else if (error) {
       console.log('OAuth callback error detected:', error)
-      
+
       // Clean up URL parameters first (don't invalidate queries for errors)
       const cleanUrl = window.location.pathname
       window.history.replaceState({}, '', cleanUrl)
-      
+
       // Handle specific error messages with modal
       let errorTitle = "Connection Failed"
       let errorDescription = "Failed to connect your social media account."
       let errorType: 'error' | 'warning' | 'constraint' = 'error'
-      
+
       if (error.includes('already connected') || error.includes('another workspace')) {
         errorTitle = "Account Already Connected"
         errorDescription = decodeURIComponent(error)
@@ -250,14 +250,14 @@ function IntegrationContent() {
       } else {
         errorDescription = decodeURIComponent(error)
       }
-      
+
       setErrorModal({
         isOpen: true,
         title: errorTitle,
         message: errorDescription,
         type: errorType
       })
-      
+
       // Don't trigger loading state for errors
       setIsProcessingOAuth(false)
     }
@@ -291,9 +291,9 @@ function IntegrationContent() {
     return <SkeletonPageLoader type="integration" />
   }
 
-  console.log('Integration state:', { 
-    isLoading, 
-    connectedAccounts: connectedAccounts?.length || 0, 
+  console.log('Integration state:', {
+    isLoading,
+    connectedAccounts: connectedAccounts?.length || 0,
     workspaces: workspaces?.length || 0,
     currentWorkspace: currentWorkspace?.id || 'none'
   });
@@ -332,12 +332,16 @@ function IntegrationContent() {
     try {
       setConnectingPlatform(platform)
       handleOptimisticConnect(platform) // Show immediate feedback
-      
+
       if (platform === 'instagram') {
         // Use secure reconnect/start which validates workspace ownership and cleans tokens
+        // Always use advanced flow (Facebook Login) to ensure Demographics insights are available
         const response = await apiRequest(`/api/instagram/reconnect/start`, {
           method: 'POST',
-          body: JSON.stringify({ workspaceId: currentWorkspace.id })
+          body: JSON.stringify({
+            workspaceId: currentWorkspace.id,
+            flow: 'advanced'
+          })
         })
         const url = (response as any).url || (response as any).authUrl
         if (url) {
@@ -357,7 +361,7 @@ function IntegrationContent() {
         await apiRequest(`/api/social-accounts/connect/${platform}`, {
           method: 'POST'
         })
-        
+
         // Success - no modal needed for success messages
         queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] })
         setConnectingPlatform(null)
@@ -464,11 +468,13 @@ function IntegrationContent() {
   }
 
   const isAccountConnected = (platform: string) => {
-    return Array.isArray(connectedAccounts) && connectedAccounts.some((account: SocialAccount) => account.platform === platform)
+    const lookupId = platform === 'instagram_advanced' ? 'instagram' : platform;
+    return Array.isArray(connectedAccounts) && connectedAccounts.some((account: SocialAccount) => account.platform === lookupId)
   }
 
   const getConnectedAccount = (platform: string) => {
-    return Array.isArray(connectedAccounts) ? connectedAccounts.find((account: SocialAccount) => account.platform === platform) : undefined
+    const lookupId = platform === 'instagram_advanced' ? 'instagram' : platform;
+    return Array.isArray(connectedAccounts) ? connectedAccounts.find((account: SocialAccount) => account.platform === lookupId) : undefined
   }
 
   const formatFollowersCount = (count: number | undefined) => {
@@ -534,20 +540,20 @@ function IntegrationContent() {
             <>
               <div className="mb-4 p-3 bg-white/60 dark:bg-gray-700/60 rounded-lg border border-gray-200 dark:border-gray-600">
                 <div className="flex items-center space-x-3">
-                  {connectedAccount.profilePicture && (
-                    <img 
-                      src={connectedAccount.profilePicture} 
+                  {(connectedAccount.profilePicture || connectedAccount.profilePictureUrl) && (
+                    <img
+                      src={connectedAccount.profilePicture || connectedAccount.profilePictureUrl}
                       alt={connectedAccount.displayName || connectedAccount.username}
                       className="w-10 h-10 rounded-full border-2 border-white dark:border-gray-600 shadow-sm"
                     />
                   )}
                   <div>
                     <p className="font-semibold text-gray-900 dark:text-gray-100">@{connectedAccount.username}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{formatFollowersCount(connectedAccount.followers)} followers</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{formatFollowersCount(connectedAccount.followers || connectedAccount.followersCount)} followers</p>
                   </div>
                 </div>
                 <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Last synced: {connectedAccount.lastSync ? new Date(connectedAccount.lastSync).toLocaleDateString() : 'Never'}
+                  Last synced: {(connectedAccount.lastSync || connectedAccount.lastSyncAt) ? new Date(connectedAccount.lastSync || connectedAccount.lastSyncAt).toLocaleDateString() : 'Never'}
                 </div>
               </div>
 
@@ -558,18 +564,18 @@ function IntegrationContent() {
                 const isInvalid = (!hasAccessToken || connectedAccount.tokenStatus === 'expired' || connectedAccount.tokenStatus === 'invalid' || connectedAccount.tokenStatus === 'missing')
                 return isInvalid && !oauthSuccess
               })() && (
-                <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-600 rounded-lg">
-                  <div className="flex items-start space-x-2">
-                    <RefreshCw className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">Reconnection Required</p>
-                      <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
-                        Your access token has expired or is missing. Please reconnect to continue using analytics and posting features.
-                      </p>
+                  <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-600 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <RefreshCw className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">Reconnection Required</p>
+                        <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                          Your access token has expired or is missing. Please reconnect to continue using analytics and posting features.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </>
           )}
 
@@ -754,7 +760,7 @@ function IntegrationContent() {
                 <SkeletonIntegrationCard />
               </>
             ) : (
-              Object.keys(platformConfig).map((platform) => 
+              Object.keys(platformConfig).map((platform) =>
                 renderPlatformCard(platform as keyof typeof platformConfig)
               )
             )}
@@ -791,11 +797,11 @@ function IntegrationContent() {
                         <p className="text-sm text-gray-600 dark:text-gray-400">@{account.username}</p>
                       </div>
                     </div>
-                    
+
                     {account.profilePictureUrl && (
                       <div className="flex items-center space-x-3 mb-4">
-                        <img 
-                          src={account.profilePictureUrl} 
+                        <img
+                          src={account.profilePictureUrl}
                           alt={`${account.username} profile`}
                           className="w-10 h-10 rounded-full object-cover"
                         />
@@ -846,7 +852,7 @@ function IntegrationContent() {
                     Convert Personal to Business Token
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    If you have a personal Instagram account connected, convert it to a business account 
+                    If you have a personal Instagram account connected, convert it to a business account
                     to unlock advanced features like analytics and scheduling.
                   </p>
                   <div className="space-y-3">
@@ -863,7 +869,7 @@ function IntegrationContent() {
                       <span className="text-sm text-gray-700 dark:text-gray-300">Story Insights</span>
                     </div>
                   </div>
-                  <Button 
+                  <Button
                     onClick={handleTokenConversion}
                     disabled={tokenConversionMutation.isPending}
                     className="mt-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white"
@@ -950,7 +956,7 @@ function IntegrationContent() {
       </div>
 
       {/* Error Modal */}
-      <ErrorModal 
+      <ErrorModal
         isOpen={errorModal.isOpen}
         onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
         title={errorModal.title}

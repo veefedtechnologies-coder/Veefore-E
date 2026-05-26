@@ -14,6 +14,7 @@ import billingRoutes from './billing.routes';
 import webhooksRoutes from './webhooks.routes';
 import healthRoutes from './health.routes';
 import activityRoutes from './activity.routes';
+import socialAuthRoutes from './social-auth.routes';
 
 export { default as authRoutes } from './auth.routes';
 export { default as userRoutes } from './user.routes';
@@ -40,6 +41,7 @@ export function mountV1Routes(app: Application, basePath: string = '/api/v1'): v
   app.use(`${basePath}/content`, contentRoutes);
   app.use(`${basePath}/analytics`, analyticsRoutes);
   app.use(`${basePath}/social-accounts`, socialAccountRoutes);
+  app.use(`${basePath}/social-auth`, socialAuthRoutes);
   app.use(`${basePath}/scheduler`, schedulerRoutes);
   app.use(`${basePath}/ai`, aiRoutes);
   app.use(`${basePath}/thumbnails`, thumbnailsRoutes);
@@ -59,6 +61,7 @@ v1Router.use('/workspaces', workspaceRoutes);
 v1Router.use('/content', contentRoutes);
 v1Router.use('/analytics', analyticsRoutes);
 v1Router.use('/social-accounts', socialAccountRoutes);
+v1Router.use('/social-auth', socialAuthRoutes);
 v1Router.use('/scheduler', schedulerRoutes);
 v1Router.use('/ai', aiRoutes);
 v1Router.use('/thumbnails', thumbnailsRoutes);

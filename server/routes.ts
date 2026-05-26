@@ -26,6 +26,19 @@ export { initializeLeaderElection } from './infrastructure/leader-election';
 export async function registerRoutes(app: Express, storage: IStorage, httpServer: Server, _upload?: multer.Multer): Promise<void> {
   const mediaUpload = createMediaUpload();
 
+  app.post('/api/upload', mediaUpload.single('file'), (req: Request, res: Response) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    res.json({
+      success: true,
+      url: `/uploads/${req.file.filename}`,
+      originalName: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+  });
+
   app.use('/api', defaultWorkspaceEnforcer(storage));
 
   app.use('/api/ai', aiRateLimiter);
@@ -34,6 +47,7 @@ export async function registerRoutes(app: Express, storage: IStorage, httpServer
   app.use('/api/early-access', earlyAccessRoutes);
 
   mountV1Routes(app, '/api');
+  mountV1Routes(app, '/api/v1');
 
   createCopilotRoutes(app, storage);
 
@@ -56,4 +70,66 @@ export async function registerRoutes(app: Express, storage: IStorage, httpServer
 
   setupVideoWebSocket(httpServer);
   console.log('[WS] Video WebSocket server initialized on /ws/video');
+
+
+  app.get('/api/debug-db', async (req: Request, res: Response) => {
+    try {
+      const { default: mongoose } = await import('mongoose');
+      const { SocialAccountModel } = await import('./models/Social/SocialAccount');
+      const { ContentModel } = await import('./models/Content/Content');
+
+      const collections = await mongoose.connection.db?.listCollections().toArray();
+      const accounts = await SocialAccountModel.find({});
+      const contentCount = await ContentModel.countDocuments();
+      const publishedCount = await ContentModel.countDocuments({ status: 'published' });
+
+      const sampleContent = await ContentModel.find({ platform: 'instagram' }).limit(5).select('workspaceId status contentData.id');
+
+      res.json({
+        dbName: mongoose.connection.name,
+        collections: (collections || []).map((c: any) => c.name),
+        accountCount: accounts.length,
+        accounts: accounts.map((a: any) => ({
+          id: a._id,
+          platform: a.platform,
+          workspaceId: a.workspaceId,
+          user: a.username
+        })),
+        contentCount,
+        publishedCount,
+        sampleContent: sampleContent.map((c: any) => ({
+          id: c._id,
+          mediaId: c.contentData?.id,
+          workspaceId: c.workspaceId,
+          status: c.status
+        })),
+        mongoConnectionString: process.env.MONGODB_URI ? 'Set' : 'Unset'
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+
+  app.get('/api/debug-force-sync', async (req: Request, res: Response) => {
+    try {
+      const { SocialAccountModel } = await import('./models/Social/SocialAccount');
+      const { socialAccountService } = await import('./services/SocialAccountService');
+
+      const accounts = await SocialAccountModel.find({ platform: 'instagram' });
+      const results = [];
+      for (const acc of accounts) {
+        console.log(`Force syncing ${acc.username}...`);
+        try {
+          await socialAccountService.syncAccount((acc as any)._id.toString());
+          results.push({ user: acc.username, status: 'synced' });
+        } catch (e: any) {
+          results.push({ user: acc.username, error: e.message });
+        }
+      }
+      res.json({ results });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 }

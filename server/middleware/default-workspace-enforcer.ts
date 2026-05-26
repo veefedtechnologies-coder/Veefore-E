@@ -9,6 +9,7 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
       const path = req.path || ''
       const skip = (
         path.startsWith('/user') ||
+        path.includes('social-auth') ||
         (path.startsWith('/social-accounts') && req.method === 'GET') ||
         req.method === 'HEAD' || req.method === 'OPTIONS'
       )
@@ -30,10 +31,10 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
       if (Array.isArray(workspaces) && workspaces.length > 0) {
         const defaults = workspaces.filter((w: any) => w.isDefault === true)
         if (defaults.length !== 1) {
-          try { await withTimeout(storage.setDefaultWorkspace(userId, workspaces[0].id), 2000) } catch {}
+          try { await withTimeout(storage.setDefaultWorkspace(userId, workspaces[0].id), 2000) } catch { }
         }
         let defaultWs: any
-        try { defaultWs = await withTimeout(storage.getDefaultWorkspace(userId), 2000) } catch {}
+        try { defaultWs = await withTimeout(storage.getDefaultWorkspace(userId), 2000) } catch { }
         if (defaultWs) {
           req.workspaceId = defaultWs.id
         }
@@ -44,7 +45,7 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
       if (workspaces === null) return next()
 
       let user: any
-      try { user = await withTimeout(storage.getUser(userId), 2000) } catch {}
+      try { user = await withTimeout(storage.getUser(userId), 2000) } catch { }
       const name = user?.displayName ? `${user.displayName}'s Workspace` : 'My Workspace'
 
       try {

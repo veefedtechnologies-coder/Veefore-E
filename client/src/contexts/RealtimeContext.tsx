@@ -4,7 +4,7 @@ import { auth } from '@/lib/firebase'
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
 
-export type RealtimeEventType = 
+export type RealtimeEventType =
   | 'analytics:update'
   | 'social-account:update'
   | 'content:update'
@@ -37,9 +37,16 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
   const socketRef = useRef<Socket | null>(null)
 
   const getSocketUrl = useCallback(() => {
+    // VITE_API_BASE_URL takes precedence if set
     const envUrl = (import.meta as any).env?.VITE_API_BASE_URL
-    if (envUrl) return envUrl as string
-    return window.location.origin
+    if (envUrl) {
+      console.log('[Realtime] Using VITE_API_BASE_URL:', envUrl)
+      return envUrl as string
+    }
+    // Use current page origin - this works for both localhost and ngrok
+    const origin = window.location.origin
+    console.log('[Realtime] Using window.location.origin:', origin)
+    return origin
   }, [])
 
   const connectSocket = useCallback(async () => {
@@ -50,7 +57,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
 
     try {
       setConnectionStatus('connecting')
-      
+
       let authToken: string | null = null
       const user = auth.currentUser
       if (user) {
@@ -81,7 +88,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
       newSocket.on('disconnect', (reason) => {
         console.log('[Realtime] Disconnected:', reason)
         setConnectionStatus('disconnected')
-        
+
         if (reason !== 'io client disconnect') {
           scheduleReconnect()
         }

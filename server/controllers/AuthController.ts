@@ -7,7 +7,8 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import { storage } from '../mongodb-storage';
 import { emailService } from '../email-service';
-import { firebaseAdmin } from '../firebase-admin';
+import { getFirebaseAdmin } from '../firebase-admin';
+import { getRedisClient } from '../lib/redis';
 
 const LinkFirebaseSchema = z.object({
   email: z.string().email(),
@@ -38,7 +39,7 @@ export class AuthController extends BaseController {
     if (!userId) {
       return this.sendError(res, new ValidationError('User not authenticated'));
     }
-    
+
     const user = await userService.getUserById(userId);
     this.sendSuccess(res, user);
   });
@@ -80,9 +81,9 @@ export class AuthController extends BaseController {
     res: Response
   ) => {
     const input = LinkFirebaseSchema.parse(req.body);
-    
+
     let user = await userService.getUserByEmail(input.email);
-    
+
     if (!user) {
       user = await userService.createUser({
         email: input.email,
@@ -104,6 +105,61 @@ export class AuthController extends BaseController {
         displayName: user.displayName,
         isOnboarded: user.isOnboarded,
       },
+    });
+  });
+
+  // Check if email already exists (for pre-signup validation)
+  checkEmailExists = this.wrapAsync(async (
+    req: TypedRequest<ParamsDictionary, any, ParsedQs>,
+    res: Response
+  ) => {
+    const email = req.query.email as string | undefined;
+
+    if (!email) {
+      return this.sendError(res, new ValidationError('Email is required'));
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return this.sendError(res, new ValidationError('Invalid email format'));
+    }
+
+    const existingUser = await storage.getUserByEmail(trimmedEmail);
+
+    if (existingUser && existingUser.isEmailVerified && existingUser.isOnboarded) {
+      // User fully exists - should sign in
+      return this.sendSuccess(res, {
+        exists: true,
+        shouldSignIn: true,
+        message: 'An account with this email already exists. Please sign in instead.'
+      });
+    }
+
+    if (existingUser && existingUser.isEmailVerified && !existingUser.isOnboarded) {
+      // User verified but not onboarded - can continue signup
+      return this.sendSuccess(res, {
+        exists: false,
+        partialUser: true,
+        message: 'Email is verified but onboarding is incomplete. You can continue setup.'
+      });
+    }
+
+    if (existingUser && !existingUser.isEmailVerified) {
+      // Unverified user - can resend verification
+      return this.sendSuccess(res, {
+        exists: false,
+        unverified: true,
+        message: 'Email is registered but not verified. A new verification code will be sent.'
+      });
+    }
+
+    // No user found
+    this.sendSuccess(res, {
+      exists: false,
+      message: 'Email is available'
     });
   });
 
@@ -157,55 +213,58 @@ export class AuthController extends BaseController {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return this.sendError(res, new ValidationError('No token provided'));
     }
-    
+
     const token = authHeader.split(' ')[1];
-    
-    if (!firebaseAdmin) {
-      console.error('[AUTH] Firebase Admin not initialized - cannot verify tokens');
-      return this.sendError(res, new ValidationError('Authentication service unavailable'));
+
+    const adminApp = getFirebaseAdmin();
+    if (!adminApp) {
+      return res.status(500).json({
+        success: false,
+        error: 'Firebase Admin not initialized',
+      });
     }
-    
+
     let decoded: any;
     try {
-      decoded = await firebaseAdmin.auth().verifyIdToken(token);
+      decoded = await adminApp.auth().verifyIdToken(token);
     } catch (error) {
       console.error('[AUTH] Firebase token verification failed:', error);
       return this.sendError(res, new ValidationError('Invalid or expired token'));
     }
-    
+
     const uid = decoded.uid || decoded.user_id || decoded.sub;
     const email = decoded.email;
-    
+
     if (!uid || !email) {
       return this.sendError(res, new ValidationError('Missing uid or email'));
     }
-    
+
     const existingByUid = await storage.getUserByFirebaseUid(uid);
     if (existingByUid && existingByUid.email !== email) {
       return this.sendError(res, new ConflictError('UID already associated with another account'));
     }
-    
+
     let user = await storage.getUserByEmail(email);
     if (!user) {
       return this.sendError(res, new NotFoundError('User', email));
     }
-    
+
     user = await storage.updateUser(user.id, { firebaseUid: uid });
     const workspaces = await storage.getWorkspacesByUserId(user.id);
-    
+
     let workspaceCreated: any = null;
     if (!Array.isArray(workspaces) || workspaces.length === 0) {
-      workspaceCreated = await storage.createWorkspace({ 
-        name: 'My Workspace', 
-        userId: user.id, 
-        isDefault: true 
+      workspaceCreated = await storage.createWorkspace({
+        name: 'My Workspace',
+        userId: user.id,
+        isDefault: true
       });
     }
-    
-    this.sendSuccess(res, { 
-      user, 
-      workspaceCreated, 
-      workspaces 
+
+    this.sendSuccess(res, {
+      user,
+      workspaceCreated,
+      workspaces
     });
   });
 
@@ -222,7 +281,7 @@ export class AuthController extends BaseController {
     if (existingUser && existingUser.isEmailVerified && existingUser.isOnboarded) {
       return this.sendError(res, new ConflictError('User already exists and is fully set up. Please sign in instead.'));
     }
-    
+
     if (existingUser && existingUser.isEmailVerified && !existingUser.isOnboarded) {
       console.log(`[EMAIL VERIFICATION] User ${email} is verified but not onboarded - allowing to proceed`);
     }
@@ -242,11 +301,20 @@ export class AuthController extends BaseController {
       });
     }
 
+    // P1 SECURITY: Store OTP in Redis for fast access and expiry
+    try {
+      const redis = getRedisClient();
+      await redis.setex(`otp:${email}`, 900, otp); // 15 minutes TTL
+      console.log(`[REDIS] Cached OTP for ${email}`);
+    } catch (redisError) {
+      console.warn('[REDIS] Failed to cache OTP:', redisError);
+    }
+
     await emailService.sendVerificationEmail(email, otp, firstName);
 
     console.log(`[EMAIL VERIFICATION] Sent verification email to ${email} with OTP: ${otp}`);
 
-    this.sendSuccess(res, { 
+    this.sendSuccess(res, {
       message: 'Verification email sent successfully',
       developmentOtp: process.env.NODE_ENV === 'development' ? otp : undefined
     });
@@ -265,7 +333,7 @@ export class AuthController extends BaseController {
     if (existingUser && existingUser.isEmailVerified && existingUser.isOnboarded) {
       return this.sendError(res, new ConflictError('User already exists and is fully set up. Please sign in instead.'));
     }
-    
+
     if (existingUser && existingUser.isEmailVerified && !existingUser.isOnboarded) {
       console.log(`[EMAIL VERIFICATION] User ${email} is verified but not onboarded - allowing to proceed`);
     }
@@ -285,16 +353,26 @@ export class AuthController extends BaseController {
       });
     }
 
+    // P1 SECURITY: Store OTP in Redis for fast access and expiry
+    try {
+      const redis = getRedisClient();
+      await redis.setex(`otp:${email}`, 900, otp); // 15 minutes TTL
+      console.log(`[REDIS] Cached OTP for ${email}`);
+    } catch (redisError) {
+      console.warn('[REDIS] Failed to cache OTP:', redisError);
+    }
+
+
     const emailSent = await emailService.sendVerificationEmail(email, otp, firstName);
-    
+
     if (!emailSent) {
       console.error('[EMAIL] Failed to send verification email to:', email);
       return this.sendError(res, new Error('Failed to send verification email'));
     }
 
-    console.log(`[EMAIL] Verification email sent to ${email} with OTP: ${otp}`);
-    
-    this.sendSuccess(res, { 
+    console.log(`[EMAIL] Verification email sent to ${email} with OTP: ${otp} `);
+
+    this.sendSuccess(res, {
       message: 'Verification email sent successfully',
       email: email,
       developmentOtp: process.env.NODE_ENV !== 'production' ? otp : undefined
@@ -321,7 +399,7 @@ export class AuthController extends BaseController {
 
     if (user.isEmailVerified && !user.isOnboarded) {
       console.log(`[EMAIL VERIFICATION] User ${email} is verified but not onboarded - proceeding to onboarding`);
-      return this.sendSuccess(res, { 
+      return this.sendSuccess(res, {
         message: 'Email verified successfully',
         user: {
           id: user.id,
@@ -334,13 +412,33 @@ export class AuthController extends BaseController {
       });
     }
 
-    if (user.emailVerificationCode !== code) {
-      console.log(`[EMAIL VERIFICATION] Invalid code. Expected: ${user.emailVerificationCode}, Got: ${code}`);
-      return this.sendError(res, new ValidationError('Invalid verification code'));
+    let isValidOtp = false;
+
+    // Check Redis first
+    try {
+      const redis = getRedisClient();
+      const cachedOtp = await redis.get(`otp:${email}`);
+      if (cachedOtp === code) {
+        isValidOtp = true;
+        await redis.del(`otp:${email}`); // Invalidate after use
+      }
+    } catch (e) {
+      console.warn('[REDIS] OTP check failed, falling back to DB');
     }
 
-    if (user.emailVerificationExpiry && new Date() > user.emailVerificationExpiry) {
-      return this.sendError(res, new ValidationError('Verification code has expired'));
+    // Fallback to DB check
+    if (!isValidOtp) {
+      if (user.emailVerificationCode === code) {
+        if (user.emailVerificationExpiry && new Date() > user.emailVerificationExpiry) {
+          return this.sendError(res, new ValidationError('Verification code has expired'));
+        }
+        isValidOtp = true;
+      }
+    }
+
+    if (!isValidOtp) {
+      console.log(`[EMAIL VERIFICATION] Invalid code. Expected: ${user.emailVerificationCode}, Got: ${code}`);
+      return this.sendError(res, new ValidationError('Invalid verification code'));
     }
 
     const updatedUser = await storage.updateUser(user.id, {
@@ -356,8 +454,8 @@ export class AuthController extends BaseController {
     }
 
     console.log(`[EMAIL VERIFICATION] User ${email} successfully verified`);
-    
-    this.sendSuccess(res, { 
+
+    this.sendSuccess(res, {
       message: 'Email verified successfully',
       user: {
         id: updatedUser.id,
@@ -391,16 +489,24 @@ export class AuthController extends BaseController {
 
     await storage.updateUserEmailVerification(user.id, otp, otpExpiry);
 
-    const emailSent = await emailService.sendVerificationEmail(email, otp, user.firstName);
-    
+    // P1 SECURITY: Store OTP in Redis
+    try {
+      const redis = getRedisClient();
+      await redis.setex(`otp:${email} `, 900, otp);
+    } catch (redisError) {
+      console.warn('[REDIS] Failed to cache OTP:', redisError);
+    }
+
+    const emailSent = await emailService.sendVerificationEmail(email, otp, user.displayName || 'User');
+
     if (!emailSent) {
       return this.sendError(res, new Error('Failed to send verification email'));
     }
 
-    console.log(`[EMAIL] Resent verification email to ${email} with new OTP: ${otp}`);
-    
-    this.sendSuccess(res, { 
-      message: 'Verification email resent successfully' 
+    console.log(`[EMAIL] Resent verification email to ${email} with new OTP: ${otp} `);
+
+    this.sendSuccess(res, {
+      message: 'Verification email resent successfully'
     });
   });
 }

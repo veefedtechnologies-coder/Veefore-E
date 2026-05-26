@@ -11,3 +11,6 @@ export * from './Chat';
 
 export { IMetrics } from './Metrics';
 export { default as MetricsModel } from './Metrics';
+
+export { IGoal } from './Goal';
+export { default as Goal } from './Goal';

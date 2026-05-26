@@ -9,6 +9,7 @@ interface GrowthData {
 interface MetricsGridProps {
   periodData: {
     followerTotal: number
+    followerGains: number
     engagement: number
     reach: number
     posts: number
@@ -67,8 +68,14 @@ export function MetricsGrid({ periodData, growthPercentages, selectedPeriod, for
           <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
         </div>
         <div className="relative z-10">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">{formatNumber(periodData.followerTotal)}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">Total Followers</div>
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+            {periodData.followerGains > 0 ? '+' : ''}{formatNumber(periodData.followerGains)}
+          </div>
+          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">
+            {selectedPeriod === 'day' ? 'Today\'s Followers' : 
+             selectedPeriod === 'week' ? 'Weekly New Followers' : 
+             'Monthly New Followers'}
+          </div>
           <div className="flex items-center justify-between mb-2">
             <div className="w-full bg-white/60 dark:bg-gray-600/60 rounded-full h-1.5 mr-2">
               <div className="bg-blue-500 h-1.5 rounded-full w-3/4 transition-all duration-1000"></div>

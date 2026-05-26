@@ -88,7 +88,7 @@ export abstract class BaseController {
         success: false,
         error: {
           code: 'INTERNAL_ERROR',
-          message: defaultMessage,
+          message: error.message || defaultMessage,
         },
       });
     }

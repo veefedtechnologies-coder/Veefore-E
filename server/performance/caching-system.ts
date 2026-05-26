@@ -66,12 +66,15 @@ export class CachingSystem {
   static async initialize(): Promise<void> {
     try {
       // Use the robust, fail-fast Redis client (reusing the rate limit client as it has the right profile: fail-fast, ipv4, tls)
+      // FORCE DISABLE REDIS: The Upstash Redis is currently rate-limited, breaking caching
+      throw new Error("Redis bypassed due to rate-limit error, falling back to memory cache");
+      
       this.redisClient = getRateLimitRedisClient();
 
       if (this.redisClient) {
         this.redisClient.on('error', (err: Error) => {
           // Only log unique errors to avoid flooding
-          if (!err.message.includes('fail-safe')) {
+          if (!err.message.includes('fail-safe') && !err.message.includes('ECONNRESET')) {
             logger.warn({
               event: 'CACHE_REDIS_ERROR',
               error: err.message
@@ -123,19 +126,22 @@ export class CachingSystem {
       let result: T | null = null;
 
       if (this.redisClient) {
-        // Try Redis first
-        const cached = await this.redisClient.get(fullKey);
-        if (cached) {
-          result = JSON.parse(cached);
-          this.stats.hits++;
+        try {
+          // Try Redis with a hard 1s timeout to prevent hanging the whole request
+          const cached = await Promise.race([
+            this.redisClient.get(fullKey),
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Cache timeout')), 1000))
+          ]);
 
-          StructuredLogger.metric(
-            'cache_hit',
-            1,
-            'boolean',
-            { cache_type: 'redis', key },
-            correlationId
-          );
+          if (cached) {
+            result = JSON.parse(cached);
+            this.stats.hits++;
+            StructuredLogger.metric('cache_hit', 1, 'boolean', { cache_type: 'redis', key }, correlationId);
+          }
+        } catch (error) {
+          logger.warn({ event: 'CACHE_GET_ERROR', key, error: error instanceof Error ? error.message : 'Unknown error' });
+          this.stats.errors++;
+          // Fail open to memory cache
         }
       }
 
@@ -456,7 +462,10 @@ export class CachingSystem {
    * P5-1.4: Cache invalidation helpers
    */
   static async invalidateWorkspace(workspaceId: string, correlationId?: string): Promise<void> {
-    await this.invalidateByTag(`workspace:${workspaceId}`, correlationId);
+    await Promise.all([
+      this.invalidateByTag(`workspace:${workspaceId}`, correlationId),
+      this.invalidateByTag('social_accounts', correlationId)
+    ]);
   }
 
   static async invalidateUser(userId: string, correlationId?: string): Promise<void> {

@@ -26,24 +26,32 @@ const ListScheduledQuery = z.object({
   status: z.string().optional(),
 });
 
-router.post('/create', 
+router.post('/create',
   requireAuth,
   validateRequest({ body: CreateScheduledContentSchema }),
   schedulerController.createScheduledContent
 );
 
-router.get('/list', 
+router.get('/list',
   requireAuth,
   validateRequest({ query: ListScheduledQuery }),
   schedulerController.listScheduledContent
 );
 
-router.post('/add-samples', 
+
+
+router.get('/upcoming',
+  requireAuth,
+  validateRequest({ query: z.object({ workspaceId: z.string().min(1) }) }),
+  schedulerController.getUpcoming
+);
+
+router.post('/add-samples',
   requireAuth,
   schedulerController.addSampleScheduledPosts
 );
 
-router.delete('/delete/:id', 
+router.delete('/delete/:id',
   requireAuth,
   validateRequest({ params: ContentIdParams }),
   schedulerController.deleteScheduledContent

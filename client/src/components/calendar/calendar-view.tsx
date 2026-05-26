@@ -23,63 +23,66 @@ import {
   Award
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
+import { useSocialAccounts } from '@/hooks/useSocialAccounts'
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 // Real social media events mapped to actual dates in 2025
-const realSocialEvents = {
-  // January 2025
-  '2025-01-01': { title: 'New Year\'s Day', icon: '🎉', hashtags: ['#NewYear', '#2025', '#NewBeginnings'], engagement: 'Very High', category: 'Holiday' },
-  '2025-01-04': { title: 'World Braille Day', icon: '👁️', hashtags: ['#WorldBrailleDay', '#Accessibility', '#Inclusion'], engagement: 'Medium', category: 'Awareness' },
-  '2025-01-20': { title: 'Martin Luther King Jr. Day', icon: '✊', hashtags: ['#MLKDay', '#CivilRights', '#Equality'], engagement: 'High', category: 'Social Impact' },
+// Real social media events mapped to MM-DD
+const realSocialEvents: Record<string, any> = {
+  // January
+  '01-01': { title: 'New Year\'s Day', icon: '🎉', hashtags: ['#NewYear', '#2025', '#NewBeginnings'], engagement: 'Very High', category: 'Holiday' },
+  '01-04': { title: 'World Braille Day', icon: '👁️', hashtags: ['#WorldBrailleDay', '#Accessibility', '#Inclusion'], engagement: 'Medium', category: 'Awareness' },
+  '01-20': { title: 'Martin Luther King Jr. Day', icon: '✊', hashtags: ['#MLKDay', '#CivilRights', '#Equality'], engagement: 'High', category: 'Social Impact' },
   
-  // February 2025
-  '2025-02-04': { title: 'World Cancer Day', icon: '🎗️', hashtags: ['#WorldCancerDay', '#CancerAwareness', '#Hope'], engagement: 'High', category: 'Health' },
-  '2025-02-14': { title: 'Valentine\'s Day', icon: '💕', hashtags: ['#ValentinesDay', '#Love', '#Romance'], engagement: 'Very High', category: 'Holiday' },
-  '2025-02-20': { title: 'World Day of Social Justice', icon: '⚖️', hashtags: ['#SocialJustice', '#Equality', '#HumanRights'], engagement: 'Medium', category: 'Social Impact' },
+  // February
+  '02-04': { title: 'World Cancer Day', icon: '🎗️', hashtags: ['#WorldCancerDay', '#CancerAwareness', '#Hope'], engagement: 'High', category: 'Health' },
+  '02-14': { title: 'Valentine\'s Day', icon: '💕', hashtags: ['#ValentinesDay', '#Love', '#Romance'], engagement: 'Very High', category: 'Holiday' },
+  '02-20': { title: 'World Day of Social Justice', icon: '⚖️', hashtags: ['#SocialJustice', '#Equality', '#HumanRights'], engagement: 'Medium', category: 'Social Impact' },
   
-  // March 2025
-  '2025-03-08': { title: 'International Women\'s Day', icon: '👩', hashtags: ['#IWD2025', '#WomensDay', '#GenderEquality'], engagement: 'Very High', category: 'Social Impact' },
-  '2025-03-17': { title: 'St. Patrick\'s Day', icon: '🍀', hashtags: ['#StPatricksDay', '#LuckOfTheIrish', '#Green'], engagement: 'High', category: 'Holiday' },
-  '2025-03-21': { title: 'World Poetry Day', icon: '📝', hashtags: ['#WorldPoetryDay', '#Poetry', '#Literature'], engagement: 'Medium', category: 'Culture' },
+  // March
+  '03-08': { title: 'International Women\'s Day', icon: '👩', hashtags: ['#IWD', '#WomensDay', '#GenderEquality'], engagement: 'Very High', category: 'Social Impact' },
+  '03-17': { title: 'St. Patrick\'s Day', icon: '🍀', hashtags: ['#StPatricksDay', '#LuckOfTheIrish', '#Green'], engagement: 'High', category: 'Holiday' },
+  '03-21': { title: 'World Poetry Day', icon: '📝', hashtags: ['#WorldPoetryDay', '#Poetry', '#Literature'], engagement: 'Medium', category: 'Culture' },
   
-  // April 2025
-  '2025-04-07': { title: 'World Health Day', icon: '🏥', hashtags: ['#WorldHealthDay', '#Health', '#Wellness'], engagement: 'High', category: 'Health' },
-  '2025-04-22': { title: 'Earth Day', icon: '🌍', hashtags: ['#EarthDay', '#ClimateAction', '#Sustainability'], engagement: 'Very High', category: 'Environment' },
+  // April
+  '04-07': { title: 'World Health Day', icon: '🏥', hashtags: ['#WorldHealthDay', '#Health', '#Wellness'], engagement: 'High', category: 'Health' },
+  '04-22': { title: 'Earth Day', icon: '🌍', hashtags: ['#EarthDay', '#ClimateAction', '#Sustainability'], engagement: 'Very High', category: 'Environment' },
   
-  // May 2025
-  '2025-05-01': { title: 'International Workers\' Day', icon: '👷', hashtags: ['#MayDay', '#WorkersRights', '#Labor'], engagement: 'High', category: 'Social Impact' },
-  '2025-05-11': { title: 'Mother\'s Day', icon: '👩‍👧‍👦', hashtags: ['#MothersDay', '#Mom', '#Family'], engagement: 'Very High', category: 'Holiday' },
+  // May
+  '05-01': { title: 'International Workers\' Day', icon: '👷', hashtags: ['#MayDay', '#WorkersRights', '#Labor'], engagement: 'High', category: 'Social Impact' },
+  '05-11': { title: 'Mother\'s Day', icon: '👩‍👧‍👦', hashtags: ['#MothersDay', '#Mom', '#Family'], engagement: 'Very High', category: 'Holiday' },
   
-  // June 2025
-  '2025-06-05': { title: 'World Environment Day', icon: '🌱', hashtags: ['#WorldEnvironmentDay', '#ClimateChange', '#GreenLiving'], engagement: 'High', category: 'Environment' },
-  '2025-06-15': { title: 'Father\'s Day', icon: '👨‍👧‍👦', hashtags: ['#FathersDay', '#Dad', '#Family'], engagement: 'Very High', category: 'Holiday' },
+  // June
+  '06-05': { title: 'World Environment Day', icon: '🌱', hashtags: ['#WorldEnvironmentDay', '#ClimateChange', '#GreenLiving'], engagement: 'High', category: 'Environment' },
+  '06-15': { title: 'Father\'s Day', icon: '👨‍👧‍👦', hashtags: ['#FathersDay', '#Dad', '#Family'], engagement: 'Very High', category: 'Holiday' },
   
-  // July 2025
-  '2025-07-14': { title: 'National Mac and Cheese Day', icon: '🧀', hashtags: ['#MacNCheeseDay', '#ComfortFood', '#Foodie'], engagement: 'High', category: 'Food & Lifestyle' },
-  '2025-07-15': { title: 'Social Media Giving Day', icon: '💝', hashtags: ['#GivingTuesday', '#SocialGood', '#Charity'], engagement: 'Very High', category: 'Social Impact' },
-  '2025-07-17': { title: 'World Emoji Day', icon: '😊', hashtags: ['#WorldEmojiDay', '#Emojis', '#DigitalCommunication'], engagement: 'High', category: 'Digital Culture' },
-  '2025-07-18': { title: 'Nelson Mandela International Day', icon: '🕊️', hashtags: ['#MandelaDay', '#Peace', '#Leadership'], engagement: 'Very High', category: 'Social Impact' },
-  '2025-07-20': { title: 'International Chess Day', icon: '♟️', hashtags: ['#ChessDay', '#Strategy', '#MindGames'], engagement: 'Medium', category: 'Sports & Games' },
+  // July
+  '07-14': { title: 'National Mac and Cheese Day', icon: '🧀', hashtags: ['#MacNCheeseDay', '#ComfortFood', '#Foodie'], engagement: 'High', category: 'Food & Lifestyle' },
+  '07-15': { title: 'Social Media Giving Day', icon: '💝', hashtags: ['#GivingTuesday', '#SocialGood', '#Charity'], engagement: 'Very High', category: 'Social Impact' },
+  '07-17': { title: 'World Emoji Day', icon: '😊', hashtags: ['#WorldEmojiDay', '#Emojis', '#DigitalCommunication'], engagement: 'High', category: 'Digital Culture' },
+  '07-18': { title: 'Nelson Mandela International Day', icon: '🕊️', hashtags: ['#MandelaDay', '#Peace', '#Leadership'], engagement: 'Very High', category: 'Social Impact' },
+  '07-20': { title: 'International Chess Day', icon: '♟️', hashtags: ['#ChessDay', '#Strategy', '#MindGames'], engagement: 'Medium', category: 'Sports & Games' },
   
-  // August 2025
-  '2025-08-19': { title: 'World Photography Day', icon: '📸', hashtags: ['#WorldPhotographyDay', '#Photography', '#Visual'], engagement: 'High', category: 'Arts & Culture' },
+  // August
+  '08-19': { title: 'World Photography Day', icon: '📸', hashtags: ['#WorldPhotographyDay', '#Photography', '#Visual'], engagement: 'High', category: 'Arts & Culture' },
   
-  // September 2025
-  '2025-09-21': { title: 'International Day of Peace', icon: '🕊️', hashtags: ['#PeaceDay', '#WorldPeace', '#Unity'], engagement: 'High', category: 'Social Impact' },
+  // September
+  '09-21': { title: 'International Day of Peace', icon: '🕊️', hashtags: ['#PeaceDay', '#WorldPeace', '#Unity'], engagement: 'High', category: 'Social Impact' },
   
-  // October 2025
-  '2025-10-10': { title: 'World Mental Health Day', icon: '🧠', hashtags: ['#WorldMentalHealthDay', '#MentalHealth', '#Wellness'], engagement: 'Very High', category: 'Health' },
-  '2025-10-31': { title: 'Halloween', icon: '🎃', hashtags: ['#Halloween', '#SpookySeason', '#TrickOrTreat'], engagement: 'Very High', category: 'Holiday' },
+  // October
+  '10-10': { title: 'World Mental Health Day', icon: '🧠', hashtags: ['#WorldMentalHealthDay', '#MentalHealth', '#Wellness'], engagement: 'Very High', category: 'Health' },
+  '10-31': { title: 'Halloween', icon: '🎃', hashtags: ['#Halloween', '#SpookySeason', '#TrickOrTreat'], engagement: 'Very High', category: 'Holiday' },
   
-  // November 2025
-  '2025-11-25': { title: 'Giving Tuesday', icon: '🤝', hashtags: ['#GivingTuesday', '#Charity', '#Generosity'], engagement: 'Very High', category: 'Social Impact' },
-  '2025-11-27': { title: 'Thanksgiving', icon: '🦃', hashtags: ['#Thanksgiving', '#Gratitude', '#Family'], engagement: 'Very High', category: 'Holiday' },
+  // November
+  '11-25': { title: 'Giving Tuesday', icon: '🤝', hashtags: ['#GivingTuesday', '#Charity', '#Generosity'], engagement: 'Very High', category: 'Social Impact' },
+  '11-27': { title: 'Thanksgiving', icon: '🦃', hashtags: ['#Thanksgiving', '#Gratitude', '#Family'], engagement: 'Very High', category: 'Holiday' },
   
-  // December 2025
-  '2025-12-01': { title: 'World AIDS Day', icon: '🎗️', hashtags: ['#WorldAIDSDay', '#HIVAwareness', '#RedRibbon'], engagement: 'High', category: 'Health' },
-  '2025-12-25': { title: 'Christmas Day', icon: '🎄', hashtags: ['#Christmas', '#Holiday', '#Joy'], engagement: 'Very High', category: 'Holiday' },
-  '2025-12-31': { title: 'New Year\'s Eve', icon: '🎊', hashtags: ['#NYE', '#NewYear', '#Celebration'], engagement: 'Very High', category: 'Holiday' }
+  // December
+  '12-01': { title: 'World AIDS Day', icon: '🎗️', hashtags: ['#WorldAIDSDay', '#HIVAwareness', '#RedRibbon'], engagement: 'High', category: 'Health' },
+  '12-25': { title: 'Christmas Day', icon: '🎄', hashtags: ['#Christmas', '#Holiday', '#Joy'], engagement: 'Very High', category: 'Holiday' },
+  '12-31': { title: 'New Year\'s Eve', icon: '🎊', hashtags: ['#NYE', '#NewYear', '#Celebration'], engagement: 'Very High', category: 'Holiday' }
 }
 
 const socialEvents = [
@@ -195,6 +198,17 @@ export function CalendarView() {
   const [selectedView, setSelectedView] = useState('grid')
   const [showEventDetails, setShowEventDetails] = useState(false)
   const [currentWeekStart, setCurrentWeekStart] = useState(new Date())
+  
+  // Hooks
+  const { currentWorkspace } = useCurrentWorkspace()
+  const { socialAccounts } = useSocialAccounts(currentWorkspace?.id)
+
+  // Extract AI Best Active Time from the first valid account (if any)
+  const bestTimeData = useMemo(() => {
+    if (!socialAccounts || !Array.isArray(socialAccounts)) return null;
+    const accountWithData = socialAccounts.find((a: any) => a.aiBestActiveTime?.daily_best_hours);
+    return accountWithData?.aiBestActiveTime || null;
+  }, [socialAccounts]);
 
   // Generate real dates for current week
   const weekData = useMemo(() => {
@@ -218,10 +232,12 @@ export function CalendarView() {
     return { dates, formattedDates, weekRange }
   }, [currentWeekStart])
 
-  // Get real social media event for a specific date
+  // Get real social media event for a specific date (year-agnostic)
   const getEventForDate = (date: Date) => {
-    const dateKey = date.toISOString().split('T')[0] // Format: YYYY-MM-DD
-    return realSocialEvents[dateKey]
+    // Format: MM-DD
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return realSocialEvents[`${month}-${day}`];
   }
 
   // Fixed scheduled posts with specific real dates
@@ -315,19 +331,33 @@ export function CalendarView() {
     post.date.toDateString() === date.toDateString()
   )
 
-  // Generate recommended times for current week
+  // Generate recommended times from AI Best Active Time payload
   const getRecommendedTimeForDay = (dayIndex: number) => {
-    const times = ['10:00 AM', '2:00 PM', '6:00 PM', '8:30 PM', '11:00 AM', '4:00 PM', '7:00 PM']
-    const reasons = ['Peak engagement', 'Lunch break scroll', 'Evening active', 'Prime time', 'Morning coffee', 'Afternoon break', 'Weekend vibes']
+    if (!bestTimeData?.daily_best_hours) return null;
     
-    if (dayIndex < times.length) {
-      return {
-        time: times[dayIndex],
-        reason: reasons[dayIndex],
-        score: `${85 + dayIndex}%`
-      }
+    // dayIndex corresponds to Calendar Grid (0=Sun, 1=Mon, ..., 6=Sat)
+    // AI Payload uses 0=Mon, ..., 6=Sun
+    const aiIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+    const dayStats = bestTimeData.daily_best_hours.find((d: any) => d.day === aiIndex);
+    
+    if (!dayStats || dayStats.score === 0) return null; // No strong historical signal for this day
+    
+    const displayHour = dayStats.best_hour % 12 || 12;
+    const ampm = dayStats.best_hour >= 12 ? 'PM' : 'AM';
+    const timeString = `${displayHour}:00 ${ampm}`;
+    
+    let reason = "High Engagement Window";
+    if (dayStats.is_peak) {
+        reason = "Weekly Peak Engagement";
+    } else if (dayStats.score >= 0.8) {
+        reason = "Very High Engagement";
     }
-    return null
+    
+    return {
+      time: timeString,
+      reason: reason,
+      score: `${Math.round(dayStats.score * 100)}%`
+    }
   }
 
   const navigateWeek = (direction: 'prev' | 'next') => {

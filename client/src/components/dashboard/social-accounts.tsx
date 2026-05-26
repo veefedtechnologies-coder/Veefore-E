@@ -78,16 +78,16 @@ export function SocialAccounts() {
   const { toast } = useToast()
   const workspaceData = useCurrentWorkspace()
   const { currentWorkspace, isReady, isLoading: workspaceLoading } = workspaceData || { currentWorkspace: undefined, isReady: false, isLoading: true }
-  
+
   // ✅ CRITICAL FIX: Clear cache on component mount to ensure fresh data
   React.useEffect(() => {
     // Skip if workspace not ready or in production
     if (!isReady || !currentWorkspace) return;
     if ((import.meta as any).env?.PROD) return;
-    
+
     // Guard against SSR/environments without localStorage
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-    
+
     // Clear React Query cache for social accounts on mount
     try {
       queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
@@ -95,7 +95,7 @@ export function SocialAccounts() {
     } catch (err) {
       console.error('[SOCIAL ACCOUNTS] Error clearing query cache:', err)
     }
-    
+
     // Clear localStorage cache with defensive checks
     try {
       const keysToRemove: string[] = []
@@ -103,7 +103,7 @@ export function SocialAccounts() {
       for (let i = 0; i < storageLength; i++) {
         const key = localStorage.key(i)
         if (key && (
-          key.startsWith('REACT_QUERY_OFFLINE_CACHE') || 
+          key.startsWith('REACT_QUERY_OFFLINE_CACHE') ||
           key.startsWith('tanstack-query') ||
           key.includes('social-accounts')
         )) {
@@ -122,7 +122,7 @@ export function SocialAccounts() {
       console.error('[SOCIAL ACCOUNTS] Error clearing cache on mount:', error)
     }
   }, [currentWorkspace?.id, isReady, currentWorkspace])
-  
+
   // Fetch social accounts data for current workspace - IMMEDIATE FETCH ON LOAD
   const { data: socialAccounts, isLoading, isFetching, refetch: refetchAccounts } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id],
@@ -147,92 +147,26 @@ export function SocialAccounts() {
     placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
   })
 
-  // 🔍 DEBUG: Log the API response to see what we're actually receiving
-  React.useEffect(() => {
-    if (Array.isArray(socialAccounts) && socialAccounts.length > 0) {
-      const instagramAccount = socialAccounts.find((acc: any) => acc.platform === 'instagram')
-      if (instagramAccount) {
-        console.log('[FRONTEND DEBUG] Instagram account data received:', {
-          username: instagramAccount.username,
-          totalShares: instagramAccount.totalShares,
-          totalSaves: instagramAccount.totalSaves,
-          totalLikes: instagramAccount.totalLikes,
-          totalComments: instagramAccount.totalComments,
-          fullAccount: instagramAccount
-        })
-        
-        // 🔍 CRITICAL: Check if shares/saves are 0 when they shouldn't be
-        // If likes/comments exist but shares/saves are 0, it's likely cached data
-        if ((instagramAccount.totalShares === 0 || instagramAccount.totalSaves === 0) && 
-            (instagramAccount.totalLikes > 0 || instagramAccount.totalComments > 0)) {
-          console.warn('[FRONTEND DEBUG] ⚠️ Shares/Saves are 0 but likes/comments exist! Clearing ALL caches...')
-          
-          // ✅ AGGRESSIVE CACHE CLEARING: Clear ALL React Query cache
-          try {
-            // Guard against SSR/environments without localStorage
-            if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-              // Clear persisted cache from localStorage
-              const keysToRemove: string[] = []
-              const storageLength = localStorage.length || 0
-              for (let i = 0; i < storageLength; i++) {
-                const key = localStorage.key(i)
-                if (key && (
-                  key.startsWith('REACT_QUERY_OFFLINE_CACHE') || 
-                  key.startsWith('tanstack-query') ||
-                  key.includes('social-accounts') ||
-                  key.includes('queryClient')
-                )) {
-                  keysToRemove.push(key)
-                }
-              }
-              keysToRemove.forEach(key => {
-                try {
-                  localStorage.removeItem(key)
-                } catch (e) {
-                  // Ignore individual removal errors
-                }
-              })
-              console.log(`[FRONTEND DEBUG] ✅ Cleared ${keysToRemove.length} cache entries from localStorage`)
-            }
-            
-            // Clear ALL React Query cache
-            queryClient.clear()
-            console.log('[FRONTEND DEBUG] ✅ Cleared all React Query cache')
-            
-            // Remove specific queries
-            queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
-            queryClient.removeQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
-            
-            // Force immediate refetch with cache bypass
-            setTimeout(() => {
-              refetchAccounts()
-            }, 200)
-          } catch (error) {
-            console.error('[FRONTEND DEBUG] Error clearing cache:', error)
-          }
-        }
-      }
-    }
-  }, [socialAccounts, currentWorkspace?.id, refetchAccounts, queryClient])
+  // Removed aggressive cache clearing that caused infinite loops when shares/saves were genuinely 0
 
   // Smart Instagram sync mutation with rate limit protection and immediate updates
   const syncMutation = useMutation({
-    mutationFn: () => currentWorkspace?.id ? apiRequest('/api/instagram/force-sync', { 
+    mutationFn: () => currentWorkspace?.id ? apiRequest('/api/instagram/force-sync', {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         workspaceId: currentWorkspace.id
       })
     }) : Promise.reject(new Error('No workspace selected')),
     onSuccess: (data) => {
       console.log('Smart Instagram sync completed:', data)
-      
+
       // Immediately trigger a refresh of all data for real-time updates
       refetchAccounts()
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] })
       queryClient.invalidateQueries({ queryKey: ['/api/instagram/polling-status'] })
       // Force immediate refetch for instant updates
       queryClient.refetchQueries({ queryKey: ['/api/social-accounts'] })
-      
+
       toast({
         title: "🚀 Real-time sync complete!",
         description: `Instagram data refreshed instantly! ${data.newDataCount || 0} new updates fetched.`,
@@ -240,23 +174,23 @@ export function SocialAccounts() {
     },
     onError: (error: any) => {
       console.error('Smart Instagram sync failed:', error)
-      
+
       // Enhanced rate limit error handling
       if (error.message?.includes('rate limit') || error.message?.includes('429') || error.status === 429) {
         toast({
-          title: "⏳ Rate limit protection active", 
+          title: "⏳ Rate limit protection active",
           description: "Instagram API rate limit reached. Smart sync will retry automatically in 2-3 minutes.",
           variant: "destructive"
         })
       } else if (error.message?.includes('timeout') || error.message?.includes('network')) {
         toast({
-          title: "🔄 Network timeout", 
+          title: "🔄 Network timeout",
           description: "Connection timeout. Will retry automatically.",
           variant: "destructive"
         })
       } else {
         toast({
-          title: "❌ Sync failed", 
+          title: "❌ Sync failed",
           description: error.message || "Failed to sync Instagram data",
           variant: "destructive"
         })
@@ -270,21 +204,21 @@ export function SocialAccounts() {
     let lastRefreshTime = 0
     let lastActivityTime = Date.now()
     const MIN_REFRESH_INTERVAL = 30 * 1000 // Minimum 30 seconds between refreshes to respect rate limits
-    
+
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         // User returned to page - check if we need fresh data
         const timeSinceLastActivity = Date.now() - lastActivityTime
         const timeSinceLastRefresh = Date.now() - lastRefreshTime
         const shouldRefresh = timeSinceLastActivity > 3 * 60 * 1000 && timeSinceLastRefresh > MIN_REFRESH_INTERVAL // 3 minutes
-        
+
         if (shouldRefresh) {
           console.log('User returned after', Math.round(timeSinceLastActivity / 1000), 'seconds - refreshing data (hybrid mode)')
           // Debounce the refresh to prevent excessive API calls
           if (refreshTimeout) {
             clearTimeout(refreshTimeout)
           }
-          
+
           refreshTimeout = setTimeout(() => {
             // User returned to page - refresh data with delay
             refetchAccounts()
@@ -295,20 +229,20 @@ export function SocialAccounts() {
         }
       }
     }
-    
+
     // Track user activity for smart refreshing
     const handleUserActivity = () => {
       lastActivityTime = Date.now()
     }
-    
+
     // Listen for user activity
     document.addEventListener('visibilitychange', handleVisibilityChange)
     document.addEventListener('mousemove', handleUserActivity)
     document.addEventListener('keydown', handleUserActivity)
     document.addEventListener('click', handleUserActivity)
-    
+
     console.log('[SOCIAL ACCOUNTS] Hybrid mode: Webhooks for comments/mentions + Smart polling for likes/followers/engagement')
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       document.removeEventListener('mousemove', handleUserActivity)
@@ -322,7 +256,7 @@ export function SocialAccounts() {
 
   // Hybrid polling mutation - Webhooks for comments/mentions + Smart polling for other metrics
   const startPollingMutation = useMutation({
-    mutationFn: () => currentWorkspace?.id ? apiRequest('/api/instagram/start-polling', { 
+    mutationFn: () => currentWorkspace?.id ? apiRequest('/api/instagram/start-polling', {
       method: 'POST',
       body: JSON.stringify({ workspaceId: currentWorkspace.id })
     }) : Promise.reject(new Error('No workspace selected')),
@@ -416,28 +350,29 @@ export function SocialAccounts() {
   // Calculate real engagement rate from authentic data
   const calculateEngagement = (account: any) => {
     if (!account.followersCount || account.followersCount === 0) return '0.0'
-    
+
     // Use real engagement data if available
     if (account.avgEngagement) {
       // Normalize extremely high engagement rates (typical for small accounts)
-      const normalizedRate = account.avgEngagement > 100 ? 
+      const normalizedRate = account.avgEngagement > 100 ?
         Math.min(account.avgEngagement / 10, 15) : // Cap at 15% for display
         account.avgEngagement
       return normalizedRate.toFixed(1)
     }
-    
+
     // Fallback calculation using real metrics
     const totalEngagement = (account.totalLikes || 0) + (account.totalComments || 0)
     const avgEngagementPerPost = account.mediaCount ? totalEngagement / account.mediaCount : 0
     const engagementRate = account.followersCount ? (avgEngagementPerPost / account.followersCount) * 100 : 0
-    
+
     return Math.min(engagementRate, 15).toFixed(1) // Cap at 15% for realistic display
   }
 
   // Get platform icon
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
-      case 'instagram': return Instagram
+      case 'instagram':
+      case 'instagram_advanced': return Instagram
       case 'facebook': return Facebook
       case 'twitter': return Twitter
       case 'linkedin': return Linkedin
@@ -449,7 +384,8 @@ export function SocialAccounts() {
   // Get platform color
   const getPlatformColor = (platform: string) => {
     switch (platform) {
-      case 'instagram': return 'from-purple-500 to-pink-500'
+      case 'instagram':
+      case 'instagram_advanced': return 'from-purple-500 to-pink-500'
       case 'facebook': return 'from-blue-600 to-blue-700'
       case 'twitter': return 'from-blue-400 to-blue-600'
       case 'linkedin': return 'from-blue-700 to-blue-900'
@@ -461,7 +397,8 @@ export function SocialAccounts() {
   // Get platform background color
   const getPlatformBgColor = (platform: string) => {
     switch (platform) {
-      case 'instagram': return 'bg-gradient-to-br from-purple-50 to-pink-50 dark:from-slate-800 dark:to-slate-700'
+      case 'instagram':
+      case 'instagram_advanced': return 'bg-gradient-to-br from-purple-50 to-pink-50 dark:from-slate-800 dark:to-slate-700'
       case 'facebook': return 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700'
       case 'twitter': return 'bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-slate-800 dark:to-slate-700'
       case 'linkedin': return 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700'
@@ -493,11 +430,11 @@ export function SocialAccounts() {
                   <span>Live polling active</span>
                 </div>
               )}
-              
+
               {/* SMART sync button for Instagram with rate limit protection */}
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   // Trigger smart sync with rate limit protection
                   syncMutation.mutate()
@@ -511,7 +448,7 @@ export function SocialAccounts() {
                 <RefreshCw className={`w-4 h-4 mr-1 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
                 {syncMutation.isPending ? 'Smart Syncing...' : '🧠 Smart Sync'}
               </Button>
-              
+
               <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-200">
                 See all accounts
               </Button>
@@ -524,12 +461,14 @@ export function SocialAccounts() {
               <div className="flex items-start space-x-2">
                 <RefreshCw className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  {(() => { const c = getReconnectCopy(socialAccountsArray); return (
-                    <>
-                      <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">{c.title}</p>
-                      <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">{c.description}</p>
-                    </>
-                  )})()}
+                  {(() => {
+                    const c = getReconnectCopy(socialAccountsArray); return (
+                      <>
+                        <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">{c.title}</p>
+                        <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">{c.description}</p>
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
               <div className="mt-3">
@@ -550,16 +489,15 @@ export function SocialAccounts() {
             {connectedAccounts.map((account: any, index: number) => {
               const PlatformIcon = getPlatformIcon(account.platform)
               const isSelected = selectedAccount === account.platform
-              
+
               return (
                 <button
                   key={account.id || `account-${index}`}
                   onClick={() => setSelectedAccount(account.platform)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 ${
-                    isSelected 
-                      ? 'bg-white dark:bg-gray-700 shadow-md border-2 border-blue-200 dark:border-blue-500' 
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0 ${isSelected
+                      ? 'bg-white dark:bg-gray-700 shadow-md border-2 border-blue-200 dark:border-blue-500'
                       : 'bg-white/60 dark:bg-gray-700/60 hover:bg-white/80 dark:hover:bg-gray-700/80 border border-gray-200 dark:border-gray-600'
-                  }`}
+                    }`}
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(account.platform)}`}>
                     <PlatformIcon className="w-4 h-4" />
@@ -587,7 +525,7 @@ export function SocialAccounts() {
           </div>
         )}
 
-        
+
         {currentAccount && (
           <div className={`p-6 ${getPlatformBgColor(currentAccount.platform)}`}>
             {/* Reconnect Warning - Show only when token is invalid/expired/missing */}
@@ -620,149 +558,149 @@ export function SocialAccounts() {
               </div>
             ) : (
               <div className="bg-white dark:bg-gray-700 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-600">
-              {/* Account Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(currentAccount.platform)}`}>
-                    {currentAccount.profilePictureUrl || currentAccount.profilePicture ? (
-                      <img 
-                        src={getSafeAvatarUrl(currentAccount)} 
-                        alt={currentAccount.username}
-                        className="w-16 h-16 rounded-full object-cover"
-                        onError={(e) => {
-                          const fallback = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentAccount.username}`
-                          ;(e.currentTarget as HTMLImageElement).src = fallback
-                        }}
-                      />
-                    ) : (
-                      <span className="text-2xl font-bold">{currentAccount.username?.[0]?.toUpperCase() || 'A'}</span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-900 dark:text-gray-100 text-lg">@{currentAccount.username}</div>
-                    <div className="flex items-center space-x-2">
-                      {currentAccount.tokenStatus === 'valid' ? (
-                        <Badge className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-600">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                          token valid
-                        </Badge>
+                {/* Account Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(currentAccount.platform)}`}>
+                      {currentAccount.profilePictureUrl || currentAccount.profilePicture ? (
+                        <img
+                          src={getSafeAvatarUrl(currentAccount)}
+                          alt={currentAccount.username}
+                          className="w-16 h-16 rounded-full object-cover"
+                          onError={(e) => {
+                            const fallback = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentAccount.username}`
+                              ; (e.currentTarget as HTMLImageElement).src = fallback
+                          }}
+                        />
                       ) : (
-                        <Badge className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-600">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
-                          token {currentAccount.tokenStatus}
-                        </Badge>
-                      )}
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Last sync: {currentAccount.lastSyncAt ? 
-                          new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
-                            Math.round((new Date(currentAccount.lastSyncAt).getTime() - Date.now()) / (1000 * 60)), 'minute'
-                          ) :
-                          currentAccount.lastSync ? new Date(currentAccount.lastSync).toLocaleDateString() : 'Never'
-                        }
-                      </span>
-                      
-                      {/* Real-time polling status for this account */}
-                      {pollingStatus?.accounts?.find((acc: any) => acc.username === currentAccount.username) && (
-                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center space-x-1">
-                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                          <span>Smart polling: next check in {
-                            Math.round(
-                              (pollingStatus.accounts.find((acc: any) => acc.username === currentAccount.username)?.nextPollIn || 0) / 1000 / 60
-                            )
-                          } min</span>
-                        </div>
+                        <span className="text-2xl font-bold">{currentAccount.username?.[0]?.toUpperCase() || 'A'}</span>
                       )}
                     </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">{currentAccount.mediaCount || 0}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Total Posts</div>
-                </div>
-              </div>
+                    <div>
+                      <div className="font-bold text-gray-900 dark:text-gray-100 text-lg">@{currentAccount.username}</div>
+                      <div className="flex items-center space-x-2">
+                        {currentAccount.tokenStatus === 'valid' ? (
+                          <Badge className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-600">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                            token valid
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-600">
+                            <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+                            token {currentAccount.tokenStatus}
+                          </Badge>
+                        )}
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          Last sync: {currentAccount.lastSyncAt ?
+                            new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
+                              Math.round((new Date(currentAccount.lastSyncAt).getTime() - Date.now()) / (1000 * 60)), 'minute'
+                            ) :
+                            currentAccount.lastSync ? new Date(currentAccount.lastSync).toLocaleDateString() : 'Never'
+                          }
+                        </span>
 
-              {/* Key Metrics - Expanded to include Shares and Saves */}
-              <div className="grid grid-cols-5 gap-3 mb-6">
-                <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl">
-                  <div className="flex items-center justify-center mb-2">
-                    <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        {/* Real-time polling status for this account */}
+                        {pollingStatus?.accounts?.find((acc: any) => acc.username === currentAccount.username) && (
+                          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center space-x-1">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                            <span>Smart polling: next check in {
+                              Math.round(
+                                (pollingStatus.accounts.find((acc: any) => acc.username === currentAccount.username)?.nextPollIn || 0) / 1000 / 60
+                              )
+                            } min</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                    {formatNumber(currentAccount.followersCount || currentAccount.followers || 0)}
+                  <div className="text-right">
+                    <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">{currentAccount.mediaCount || 0}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Total Posts</div>
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">Followers</div>
                 </div>
-                <div className="text-center p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl">
-                  <div className="flex items-center justify-center mb-2">
-                    <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                    {calculateEngagement(currentAccount)}%
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">Engagement</div>
-                </div>
-                <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl">
-                  <div className="flex items-center justify-center mb-2">
-                    <Eye className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                    {currentAccount.mediaCount || currentAccount.posts || 0}
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">Posts</div>
-                </div>
-                <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl">
-                  <div className="flex items-center justify-center mb-2">
-                    <Share2 className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {formatNumber(currentAccount.totalShares || 0)}
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">Shares</div>
-                </div>
-                <div className="text-center p-3 bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/30 dark:to-amber-900/30 rounded-xl">
-                  <div className="flex items-center justify-center mb-2">
-                    <Bookmark className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
-                    {formatNumber(currentAccount.totalSaves || 0)}
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">Saves</div>
-                </div>
-              </div>
 
-              {/* Enhanced Engagement Metrics - Including Shares and Saves */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-gray-900 dark:text-gray-100">Account Reach</h4>
-                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{currentAccount.totalReach || 0}</span>
+                {/* Key Metrics - Expanded to include Shares and Saves */}
+                <div className="grid grid-cols-5 gap-3 mb-6">
+                  <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl">
+                    <div className="flex items-center justify-center mb-2">
+                      <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                      {formatNumber(currentAccount.followersCount || currentAccount.followers || 0)}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Followers</div>
+                  </div>
+                  <div className="text-center p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl">
+                    <div className="flex items-center justify-center mb-2">
+                      <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                      {calculateEngagement(currentAccount)}%
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Engagement</div>
+                  </div>
+                  <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl">
+                    <div className="flex items-center justify-center mb-2">
+                      <Eye className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                      {currentAccount.mediaCount || currentAccount.posts || 0}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Posts</div>
+                  </div>
+                  <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl">
+                    <div className="flex items-center justify-center mb-2">
+                      <Share2 className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                      {formatNumber(currentAccount.totalShares || 0)}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Shares</div>
+                  </div>
+                  <div className="text-center p-3 bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/30 dark:to-amber-900/30 rounded-xl">
+                    <div className="flex items-center justify-center mb-2">
+                      <Bookmark className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                      {formatNumber(currentAccount.totalSaves || 0)}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Saves</div>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                  Total engagement: {currentAccount.totalLikes || 0} likes • {currentAccount.totalComments || 0} comments • {currentAccount.totalShares || 0} shares • {currentAccount.totalSaves || 0} saves
-                </div>
-                <div className="w-full bg-white dark:bg-gray-600 rounded-full h-3 overflow-hidden">
-                  <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((currentAccount.totalReach || 0) / 500 * 100, 100)}%` }}></div>
-                </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                  Performance: {currentAccount.avgComments || 0} avg comments per post
-                </div>
-              </div>
 
-                             {/* Quick Actions */}
-               <div className="grid grid-cols-2 gap-3">
-                 <Button 
-                   onClick={() => setLocation('/create')}
-                   variant="outline" 
-                   size="sm" 
-                   className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-green-700 dark:hover:text-green-400 flex items-center space-x-2"
-                 >
-                   <MessageSquare className="w-4 h-4" />
-                   <span>Create post</span>
-                 </Button>
-                 <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-purple-700 dark:hover:text-purple-400 flex items-center space-x-2">
-                   <BarChart3 className="w-4 h-4" />
-                   <span>View insights</span>
-                 </Button>
-               </div>
+                {/* Enhanced Engagement Metrics - Including Shares and Saves */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900 dark:text-gray-100">Account Reach</h4>
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{currentAccount.totalReach || 0}</span>
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                    Total engagement: {currentAccount.totalLikes || 0} likes • {currentAccount.totalComments || 0} comments • {currentAccount.totalShares || 0} shares • {currentAccount.totalSaves || 0} saves
+                  </div>
+                  <div className="w-full bg-white dark:bg-gray-600 rounded-full h-3 overflow-hidden">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((currentAccount.totalReach || 0) / 500 * 100, 100)}%` }}></div>
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                    Performance: {currentAccount.avgComments || 0} avg comments per post
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    onClick={() => setLocation('/create')}
+                    variant="outline"
+                    size="sm"
+                    className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-green-700 dark:hover:text-green-400 flex items-center space-x-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Create post</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-purple-700 dark:hover:text-purple-400 flex items-center space-x-2">
+                    <BarChart3 className="w-4 h-4" />
+                    <span>View insights</span>
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -772,7 +710,7 @@ export function SocialAccounts() {
         {connectedAccounts.length === 0 && (
           <div className="p-6 text-center">
             <p className="text-gray-500 dark:text-gray-400 mb-4">No connected social accounts found.</p>
-            <Button 
+            <Button
               onClick={() => setLocation('/integration')}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >

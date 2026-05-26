@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import { BaseController, TypedRequest } from './BaseController';
-import { contentService } from '../services';
+import { contentService, workspaceService } from '../services';
 
 const ContentIdParams = z.object({
   contentId: z.string().min(1),
@@ -55,18 +55,68 @@ export class ContentController extends BaseController {
   });
 
   getByWorkspace = this.wrapAsync(async (
-    req: TypedRequest<{ workspaceId: string }, {}, { page?: string; limit?: string }>,
+    req: TypedRequest<{ workspaceId: string }, {}, { page?: string; limit?: string; accountId?: string }>,
     res: Response
   ) => {
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
     const { page, limit } = PaginationQuery.parse(req.query);
-    const result = await contentService.getContentByWorkspace(workspaceId, page, limit);
+    const accountId = req.query.accountId as string | undefined;
+    const result = await contentService.getContentByWorkspace(workspaceId, page, limit, accountId);
     this.sendPaginated(res, result.data, {
       page: result.page,
       limit: result.limit,
       total: result.total,
       totalPages: result.totalPages,
     });
+  });
+
+  getTopPerforming = this.wrapAsync(async (
+    req: TypedRequest<{}, {}, { limit?: string; workspaceId?: string }>,
+    res: Response
+  ) => {
+    console.log('[ContentController] getTopPerforming START');
+
+    try {
+      let workspaceId = req.query.workspaceId;
+
+      // 1. Fallback to user's default workspace if not provided
+      if (!workspaceId && req.user && req.user.workspaceId) {
+        workspaceId = req.user.workspaceId;
+        console.log(`[ContentController] Using fallback workspaceId from req.user: ${workspaceId}`);
+      }
+
+      // 2. Deep fallback: Fetch workspaces from DB if still missing
+      if (!workspaceId && req.user) {
+        console.log(`[ContentController] No workspace in query or user object. Fetching from DB for user ${req.user.id}...`);
+
+        const workspaces = await workspaceService.getWorkspacesByUserId(req.user.id);
+
+        if (workspaces && workspaces.length > 0) {
+          workspaceId = (workspaces[0] as any)._id.toString();
+          console.log(`[ContentController] Found workspace from DB: ${workspaceId}`);
+        } else {
+          console.warn(`[ContentController] No workspaces found for user ${req.user.id}`);
+        }
+      }
+
+      if (!workspaceId) {
+        console.error('[ContentController] CRITICAL: Could not resolve any workspaceId for user.');
+        throw new Error('Workspace ID is required and no default workspace found.');
+      }
+
+      // Validate format
+      WorkspaceIdParams.parse({ workspaceId });
+
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      console.log(`[ContentController] Calling service with workspaceId=${workspaceId}, limit=${limit}`);
+
+      const content = await contentService.getTopPerforming(workspaceId, limit);
+
+      this.sendSuccess(res, content);
+    } catch (error) {
+      console.error('[ContentController] CAUGHT Error in getTopPerforming:', error);
+      throw error;
+    }
   });
 
   getDrafts = this.wrapAsync(async (
@@ -133,6 +183,16 @@ export class ContentController extends BaseController {
       platform: input.platform,
     });
     this.sendSuccess(res, content, 200, 'Content scheduled successfully');
+  });
+
+  publishNow = this.wrapAsync(async (
+    req: TypedRequest<{ contentId: string }>,
+    res: Response
+  ) => {
+    const { contentId } = ContentIdParams.parse(req.params);
+    const baseUrl = req.protocol + '://' + req.get('host');
+    const content = await contentService.publishContentNow(contentId, baseUrl);
+    this.sendSuccess(res, content, 200, 'Content published successfully');
   });
 
   rescheduleContent = this.wrapAsync(async (

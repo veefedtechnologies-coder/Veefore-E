@@ -6,3 +6,4 @@ export { ContentService, contentService } from './ContentService';
 export { AnalyticsService, analyticsService } from './AnalyticsService';
 export { AICreditService, aiCreditService } from './AICreditService';
 export type { AIOperationType, AIProvider, CreditCost } from './AICreditService';
+export { GoalsService, goalsService } from './GoalsService';

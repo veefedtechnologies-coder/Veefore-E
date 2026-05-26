@@ -134,7 +134,7 @@ export class WebhookController extends BaseController {
 
   private async processInstagramChange(
     pageId: string,
-    change: { field: string; value: any }
+    change: { field: string; value?: any }
   ): Promise<void> {
     logger.info('Processing Instagram change', {
       pageId,
@@ -173,7 +173,7 @@ export class WebhookController extends BaseController {
     res: Response
   ) => {
     const signature = req.headers['stripe-signature'] as string;
-    
+
     if (!this.verifyStripeSignature(req, signature)) {
       logger.warn('Invalid Stripe webhook signature');
       throw new ValidationError('Invalid webhook signature');
@@ -297,7 +297,7 @@ export class WebhookController extends BaseController {
   private async processMetaChange(
     objectId: string,
     objectType: string,
-    change: { field: string; value: any }
+    change: { field: string; value?: any }
   ): Promise<void> {
     logger.info('Processing Meta change', {
       objectId,
@@ -317,6 +317,11 @@ export class WebhookController extends BaseController {
       .update(payload)
       .digest('hex');
 
+    if (typeof signature !== 'string') {
+      logger.warn('Invalid signature type', { type: typeof signature });
+      return false;
+    }
+
     return crypto.timingSafeEqual(
       Buffer.from(signature),
       Buffer.from(expectedSignature)
@@ -331,7 +336,7 @@ export class WebhookController extends BaseController {
     try {
       const elements = signature.split(',');
       const signatureMap: Record<string, string> = {};
-      
+
       for (const element of elements) {
         const [key, value] = element.split('=');
         signatureMap[key] = value;
@@ -354,6 +359,10 @@ export class WebhookController extends BaseController {
       const currentTime = Math.floor(Date.now() / 1000);
       if (currentTime - parseInt(timestamp, 10) > tolerance) {
         logger.warn('Stripe webhook timestamp too old');
+        return false;
+      }
+
+      if (typeof receivedSignature !== 'string' || typeof expectedSignature !== 'string') {
         return false;
       }
 

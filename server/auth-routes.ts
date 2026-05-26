@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express'
-import { firebaseAdmin, admin } from './firebase-admin'
+import { getFirebaseAdmin, admin } from './firebase-admin'
 import { storage } from './mongodb-storage'
 import { validateRequest, safeJsonParse } from './middleware/validation'
 import { z } from 'zod'
@@ -16,11 +16,12 @@ const verifyFirebaseToken = async (req: Request, res: Response, next: NextFuncti
 
     const token = authHeader.split(' ')[1]
 
-    if (!firebaseAdmin) {
+    const adminApp = getFirebaseAdmin();
+    if (!adminApp) {
       return res.status(500).json({ error: 'Firebase Admin not initialized' })
     }
 
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
+    const decodedToken = await adminApp.auth().verifyIdToken(token);
     req.user = decodedToken as Express.Request['user'];
     next()
   } catch (error) {

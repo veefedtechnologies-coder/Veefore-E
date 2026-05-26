@@ -32,13 +32,50 @@ export interface ISocialAccount extends Document {
   avgEngagement?: number;
   totalShares?: number;
   totalSaves?: number;
+  audienceCity?: Map<string, number>;
+  audienceCountry?: Map<string, number>;
+  audienceGenderAge?: Map<string, number>;
+  audienceActiveTime?: Map<string, number>;
+  aiBestActiveTime?: {
+    best_hour: number;
+    best_hour_label: string;
+    best_hours: number[];
+    best_window_label: string;
+    best_window?: {
+      start: number;
+      end: number;
+    };
+    confidence: number;
+    confidence_level?: string;
+    status?: string;
+    posts_used: number; // Keep for legacy
+    usable_posts?: number;
+    scanned_posts?: number;
+    z_score?: number;
+    separation_ratio?: number;
+    entropy?: number;
+    dominant_weekday?: string;
+    heatmap_data?: number[][];
+    daily_best_hours?: Array<{
+      day: number;
+      day_name: string;
+      best_hour: number;
+      score: number;
+      confidence: number;
+      confidence_level: string;
+      status: string;
+      is_peak: boolean;
+    }>;
+    method: string;
+    lastComputedAt: Date;
+  };
   lastSyncAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export const SocialAccountSchema = new Schema<ISocialAccount>({
-  workspaceId: { type: Schema.Types.Mixed, required: true },
+  workspaceId: { type: String, required: true },
   platform: { type: String, required: true },
   username: { type: String, required: true },
   accountId: String,
@@ -69,9 +106,53 @@ export const SocialAccountSchema = new Schema<ISocialAccount>({
   avgEngagement: { type: Number, default: 0 },
   totalShares: { type: Number, default: 0 },
   totalSaves: { type: Number, default: 0 },
+  audienceCity: { type: Map, of: Number, default: {} },
+  audienceCountry: { type: Map, of: Number, default: {} },
+  audienceGenderAge: { type: Map, of: Number, default: {} },
+  audienceActiveTime: { type: Map, of: Number, default: {} },
+  aiBestActiveTime: {
+    best_hour: { type: Number, default: null },
+    best_hour_label: { type: String, default: null },
+    best_hours: { type: [Number], default: [] },
+    best_window_label: { type: String, default: null },
+    best_window: {
+      start: Number,
+      end: Number
+    },
+    confidence: { type: Number, default: 0 },
+    confidence_level: { type: String, default: 'Learning' },
+    status: { type: String, default: 'Learning' },
+    posts_used: { type: Number, default: 0 },
+    usable_posts: { type: Number, default: 0 },
+    z_score: { type: Number, default: 0 },
+    separation_ratio: { type: Number, default: 0 },
+    entropy: { type: Number, default: 0 },
+    dominant_weekday: { type: String, default: null },
+    heatmap_data: { type: Schema.Types.Mixed, default: [] },
+    daily_best_hours: { type: Schema.Types.Mixed, default: [] },
+    today_best_hour: { type: Number, default: null },
+    next_peak_at: { type: Date, default: null },
+    billboard_day: { type: String, default: 'Today' },
+    is_billboard_today: { type: Boolean, default: true },
+    method: { type: String, default: 'AI Post Performance Model (V4 Adaptive)' },
+    lastComputedAt: { type: Date, default: null }
+  },
   lastSyncAt: Date,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true,
+  toJSON: {
+    virtuals: true,
+    transform: (doc, ret) => {
+      if (ret._id) {
+        ret.id = ret._id.toString();
+      }
+      return ret;
+    }
+  },
+  toObject: { virtuals: true },
+  bufferCommands: false // P1 FIX: Fail fast on connection issues instead of buffering/hanging
 });
 
 SocialAccountSchema.index({ workspaceId: 1 }, { background: true });

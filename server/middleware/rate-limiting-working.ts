@@ -143,9 +143,40 @@ async function getRateLimitInfo(key: string, windowMs: number, maxRequests: numb
  * P1-3: Global rate limiter middleware - 60 requests per minute
  */
 export const globalRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  // P1 SECURITY: Exclude OPTIONS requests (CORS preflight) from rate limiting
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
+  // SECURITY: Exempt OAuth callback endpoints from rate limiting
+  // These are legitimate redirects from external auth providers (Instagram, Facebook, Google, etc.)
+  // OAuth flows can trigger multiple rapid requests which would incorrectly trigger rate limits
+  const oauthExemptPaths = [
+    '/api/instagram/callback',
+    '/api/facebook/callback',
+    '/api/google/callback',
+    '/api/youtube/callback',
+    '/api/twitter/callback',
+    '/api/oauth/callback',
+    '/api/auth/callback',
+    '/api/v1/social-auth/instagram/callback',
+    '/api/v1/social-auth/facebook/callback',
+    '/api/v1/social-auth/google/callback',
+    '/api/v1/social-auth/twitter/callback'
+  ];
+
+  if (oauthExemptPaths.some(path => req.path.startsWith(path))) {
+    console.log(`✅ [RATE-LIMIT] OAuth callback exempt: ${req.path}`);
+    return next();
+  }
+
+  // Detailed API logging for debugging
+  console.log(`[API-DEBUG] ${req.method} ${req.url} | IP: ${req.ip}`);
+
   const key = `global_rl:${req.ip}`;
   const windowMs = 60 * 1000; // 1 minute
-  const maxRequests = 60;
+  // Stricter limit: 120 requests per minute (2 req/sec)
+  const maxRequests = 120;
 
   const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
 
@@ -178,13 +209,21 @@ export const globalRateLimiter = async (req: Request, res: Response, next: NextF
 };
 
 /**
- * P1-3: Authentication rate limiter - 5 attempts per 15 minutes
+ * P1-3: Authentication rate limiter - 10 attempts per 15 minutes
  */
 export const authRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  // P1 SECURITY: Exclude OPTIONS requests from auth rate limiting
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   const email = req.body?.email || req.body?.username || '';
+  console.log(`[AUTH-DEBUG] Checking rate limit for ${email || 'unknown'} (${req.ip})`);
+
   const key = `auth_rl:${req.ip}:${email}`;
   const windowMs = 15 * 60 * 1000; // 15 minutes
-  const maxRequests = 5;
+  // Stricter limit: 10 attempts per 15 minutes
+  const maxRequests = 10;
 
   const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
 
@@ -250,6 +289,11 @@ export const bruteForceMiddleware = async (req: Request, res: Response, next: Ne
  * P1-3: API rate limiter with dynamic limits
  */
 export const apiRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  // P1 SECURITY: Exclude OPTIONS requests from API rate limiting
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   const user = req.user;
   const key = user?.id ? `api_rl:user:${user.id}` : `api_rl:ip:${req.ip}`;
   const windowMs = 60 * 1000; // 1 minute

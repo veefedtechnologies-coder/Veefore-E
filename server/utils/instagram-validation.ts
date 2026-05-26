@@ -189,8 +189,10 @@ export function validateInstagramConnection(
     return { isValid: true };
   }
   
-  // Allow reconnection to the same workspace
-  if (targetWorkspaceId && existingConnection.workspaceId === targetWorkspaceId) {
+  // Allow reconnection to the same workspace (e.g., upgrading from standard to advanced flow)
+  // Use String() to handle ObjectId vs string comparison
+  if (targetWorkspaceId && String(existingConnection.workspaceId) === String(targetWorkspaceId)) {
+    console.log(`✅ [VALIDATION] Allowing reconnection to same workspace: ${targetWorkspaceId}`);
     return { isValid: true };
   }
   

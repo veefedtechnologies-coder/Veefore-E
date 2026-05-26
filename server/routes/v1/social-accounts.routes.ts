@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { socialAccountController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
@@ -16,9 +16,9 @@ const WorkspaceIdParams = z.object({
   workspaceId: z.string().min(1),
 });
 
-router.get('/', 
+router.get('/',
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string;
       if (!workspaceId || workspaceId === 'undefined' || workspaceId === 'null') {
@@ -26,7 +26,7 @@ router.get('/',
         return res.status(400).json({ error: 'Valid workspaceId is required' });
       }
       req.params = { workspaceId };
-      return socialAccountController.getByWorkspace(req, res);
+      return socialAccountController.getByWorkspace(req, res, next);
     } catch (error: any) {
       console.error('[SOCIAL ACCOUNTS] Error:', error);
       return res.status(500).json({ error: error.message || 'Internal server error' });
@@ -34,40 +34,47 @@ router.get('/',
   }
 );
 
-router.get('/workspace/:workspaceId', 
+router.get('/workspace/:workspaceId',
   requireAuth,
   validateRequest({ params: WorkspaceIdParams }),
   socialAccountController.getByWorkspace
 );
 
-router.get('/:accountId', 
+router.get('/:accountId',
   requireAuth,
   validateRequest({ params: AccountIdParams }),
   socialAccountController.getAccount
 );
 
-router.post('/workspace/:workspaceId', 
+router.post('/workspace/:workspaceId',
   requireAuth,
   validateRequest({ params: WorkspaceIdParams }),
   auditMiddleware(AuditActions.SOCIAL_ACCOUNT.CONNECT, { resource: 'social_account' }),
   socialAccountController.connectAccount
 );
 
-router.delete('/:accountId', 
+router.delete('/:accountId',
   requireAuth,
   validateRequest({ params: AccountIdParams }),
   auditMiddleware(AuditActions.SOCIAL_ACCOUNT.DISCONNECT, { resource: 'social_account' }),
   socialAccountController.disconnectAccount
 );
 
-router.put('/:accountId/tokens', 
+router.put('/:accountId/tokens',
   requireAuth,
   validateRequest({ params: AccountIdParams }),
   auditMiddleware(AuditActions.SOCIAL_ACCOUNT.REFRESH, { resource: 'social_account' }),
   socialAccountController.updateTokens
 );
 
-router.put('/:accountId/metrics', 
+router.put('/:accountId/metrics',
+  requireAuth,
+  validateRequest({ params: AccountIdParams }),
+  socialAccountController.updateMetrics
+);
+
+// Add POST support for mobile app compatibility (P1-5 FIX)
+router.post('/:accountId/metrics',
   requireAuth,
   validateRequest({ params: AccountIdParams }),
   socialAccountController.updateMetrics

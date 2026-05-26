@@ -112,6 +112,13 @@ export const getRateLimitRedisClient = (): Redis => {
                 }
                 return delay;
             },
+            reconnectOnError: (err) => {
+                const targetError = 'ECONNRESET';
+                if (err.message.includes(targetError)) {
+                    return true; // Reconnect on ECONNRESET
+                }
+                return false;
+            }
         });
 
         // Debug: access private property or just log the config to verify
@@ -121,6 +128,10 @@ export const getRateLimitRedisClient = (): Redis => {
         rateLimitClient.on('error', (err) => {
             // Suppress critical errors to prevent crash, just log warning
             // The rate limiter middleware handles these errors by failing open
+            if (err.message.includes('ECONNRESET')) {
+                // Silent partial failure, autorecovery handled by reconnectOnError
+                return;
+            }
             console.warn('[REDIS-RL] Client Error (Fail-safe):', err.message);
         });
 

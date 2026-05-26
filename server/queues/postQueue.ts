@@ -145,7 +145,7 @@ export class PostSchedulerManager {
     }
 
     try {
-      const jobs = await postQueue.getJobs(['waiting', 'delayed']);
+      const jobs = await postQueue.getJobs(['waiting', 'delayed', 'active']);
       const posts = jobs.map(job => job.data);
 
       if (workspaceId) {

@@ -6,26 +6,28 @@
  */
 
 import { Express, Request, Response } from 'express';
-import { 
-  initializeStructuredLogging, 
-  correlationMiddleware, 
-  logger, 
-  StructuredLogger 
+import {
+  initializeStructuredLogging,
+  correlationMiddleware,
+  logger,
+  StructuredLogger
 } from './structured-logger';
 import { registerHealthEndpoints } from './health-endpoints';
-import { 
-  initializeMetricsSystem, 
-  metricsMiddleware, 
-  MetricsCollector 
+import {
+  initializeMetricsSystem,
+  metricsMiddleware,
+  MetricsCollector
 } from './metrics-collector';
-import { 
-  initializeErrorTracking, 
-  errorTrackingMiddleware 
+import {
+  initializeErrorTracking,
+  errorTrackingMiddleware
 } from './error-tracking';
-import { 
-  initializeFeatureFlagSystem, 
-  featureFlagMiddleware 
+import {
+  initializeFeatureFlagSystem,
+  featureFlagMiddleware
 } from './feature-flags';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * P4: Initialize complete reliability and observability system
@@ -69,7 +71,7 @@ export function applyMonitoringMiddleware(app: Express): void {
   app.use(correlationMiddleware());
   app.use(metricsMiddleware());
   app.use(featureFlagMiddleware());
-  
+
   // Error tracking middleware should be applied last (after routes)
   // This will be called separately after route registration
 
@@ -88,7 +90,7 @@ export function applyMonitoringMiddleware(app: Express): void {
  */
 export function applyErrorTrackingMiddleware(app: Express): void {
   app.use(errorTrackingMiddleware());
-  
+
   logger.info({
     event: 'ERROR_TRACKING_MIDDLEWARE_APPLIED'
   }, '🔐 P4: Error tracking middleware applied');
@@ -104,7 +106,7 @@ export function createMonitoringEndpoints(app: Express): void {
       const metrics = MetricsCollector.exportPrometheusMetrics();
       res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
       res.send(metrics);
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/metrics',
@@ -126,7 +128,7 @@ export function createMonitoringEndpoints(app: Express): void {
     try {
       const metrics = MetricsCollector.exportJSONMetrics();
       res.json(metrics);
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/metrics.json',
@@ -160,7 +162,7 @@ export function createMonitoringEndpoints(app: Express): void {
       };
 
       res.json(systemInfo);
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/system/info',
@@ -217,8 +219,8 @@ export function recordStartupMetrics(): void {
 }
 
 // Re-export key components for external use
-export { 
-  logger, 
+export {
+  logger,
   StructuredLogger
 } from './structured-logger';
 export { MetricsCollector } from './metrics-collector';
@@ -253,8 +255,44 @@ export function setupGracefulShutdown(): void {
     }, 1000);
   };
 
+
+
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+
+
+
+  // Global error handlers to catch unhandled rejections and exceptions
+  process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+    const errorMsg = reason instanceof Error ? reason.message : String(reason);
+    const stack = reason instanceof Error ? reason.stack : undefined;
+
+    // Trigger graceful shutdown on critical errors
+    try {
+      const logPath = path.join(process.cwd(), 'server', 'crash.log');
+      fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] UNHANDLED REJECTION:\n${errorMsg}\nStack:\n${stack}\n`);
+    } catch (e) {
+      console.error('Failed to write to crash.log', e);
+    }
+    shutdown('UNHANDLED_REJECTION');
+  });
+
+  process.on('uncaughtException', (error: Error) => {
+    logger.error({
+      event: 'UNCAUGHT_EXCEPTION',
+      error: error.message,
+      stack: error.stack
+    }, '🚨 P4: Uncaught exception detected');
+
+    try {
+      const logPath = path.join(process.cwd(), 'server', 'crash.log');
+      fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] UNCAUGHT EXCEPTION:\n${error.message}\nStack:\n${error.stack}\n`);
+    } catch (e) {
+      console.error('Failed to write to crash.log', e);
+    }
+
+    shutdown('UNCAUGHT_EXCEPTION');
+  });
 
   logger.info({
     event: 'GRACEFUL_SHUTDOWN_HANDLERS_SETUP'

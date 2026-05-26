@@ -1,9 +1,11 @@
+import './env';
 import dotenv from 'dotenv';
-dotenv.config();
-dotenv.config({ path: 'server/.env' });
+import path from 'path';
 
 import { validateEnv, isProduction as isProd, isDevelopment as isDev } from './config/env';
 const validatedEnv = validateEnv();
+
+import * as fs from 'fs';
 
 import logger from './config/logger';
 
@@ -13,7 +15,6 @@ import { registerRoutes, initializeLeaderElection } from "./routes";
 import { MongoStorage } from "./mongodb-storage";
 import mongoose from 'mongoose';
 import { startSchedulerService } from "./scheduler-service";
-import { AutoSyncService } from "./auto-sync-service";
 // Re-enabling for comprehensive testing
 import MetricsWorker from "./workers/metricsWorker";
 import RealtimeService from "./services/realtime";
@@ -25,8 +26,6 @@ import cicdRoutes from "./routes/cicd";
 import productionRoutes from "./routes/production";
 import auditRoutes from "./routes/audit";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import {
   initializeRateLimiting,
   globalRateLimiter,
@@ -125,6 +124,7 @@ import { initializeGDPRCompliance } from './security/gdpr-compliance';
 initializeGDPRCompliance();
 
 const app = express();
+
 // Disable ETag to prevent 304 responses on API JSON endpoints
 app.set('etag', false);
 // Force no-cache headers for API endpoints in production
@@ -257,14 +257,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   // Set iframe-friendly headers
   const allowedOrigin = process.env.CORS_ORIGIN || '*';
-  // P1-5 SECURITY: Respect CORS_ORIGIN if set in production
-  if (isProduction && process.env.CORS_ORIGIN) {
-    res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  // NOTE: Combined with main corsSecurityMiddleware to prevent header conflicts
+  // if (isProduction && process.env.CORS_ORIGIN) {
+  //   res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN);
+  // } else {
+  //   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  // }
+  // res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  // res.setHeader('Access-Control-Allow-Headers', '*');
 
   // CRITICAL: Set ONLY valid Permissions-Policy features to eliminate warnings
   // Remove deprecated/invalid features that cause "Unrecognized feature" warnings
@@ -286,7 +286,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use((req: Request, res: Response, next: NextFunction) => {
   req.cookies = {};
   const cookieHeader = req.headers.cookie;
-  if (cookieHeader) {
+  if (cookieHeader && typeof cookieHeader === 'string') {
     cookieHeader.split(';').forEach((cookie: string) => {
       const trimmed = cookie.trim();
       const equalIndex = trimmed.indexOf('=');
@@ -544,11 +544,16 @@ app.use((req, res, next) => {
   (httpServer as any).requestTimeout = 0;
 
   // Start the background scheduler service
-  startSchedulerService(storage as any);
-
   // Instagram Smart Polling is now handled in routes.ts with distributed locking
   // This ensures only one instance runs polling when scaling horizontally
   console.log('[SMART POLLING] Instagram polling initialization delegated to routes.ts with leader election');
+
+  // Start base scheduler for daily snapshots and scheduled posts
+  startSchedulerService(storage as any);
+
+  // Ensure database is fully connected before registering routes
+  // since bufferCommands: false is set for key models
+  await storage.connect();
 
   await registerRoutes(app, storage as any, httpServer, upload);
 
@@ -610,6 +615,14 @@ app.use((req, res, next) => {
 
   // Additional webhook route to match Meta Console configuration
   app.use('/webhook', webhooksRoutes);
+
+  // P2-FIX: Legacy Instagram OAuth Callback Redirect
+  // Ensures existing .env configurations (pointing to /api/instagram/callback) still work
+  app.get('/api/instagram/callback', (req: Request, res: Response) => {
+    console.log('🔄 [LEGACY REDIRECT] Forwarding /api/instagram/callback to /api/v1/social-auth/instagram/callback');
+    const queryString = new URLSearchParams(req.query as any).toString();
+    res.redirect(`/api/v1/social-auth/instagram/callback?${queryString}`);
+  });
 
   const enableMetrics = process.env.ENABLE_PROMETHEUS_METRICS !== 'false';
   if (enableMetrics) {
@@ -710,7 +723,7 @@ app.use((req, res, next) => {
   app.get('/api/instagram/token-status/:accountId', async (req: Request, res: Response) => {
     try {
       const accountId = req.params.accountId;
-      const { SocialAccountModel } = await import('./mongodb-storage');
+      const { SocialAccountModel } = await import('./models/Social');
       let raw: any = await SocialAccountModel.findById(accountId);
       if (!raw) raw = await SocialAccountModel.findOne({ id: accountId });
       if (!raw) return res.status(404).json({ status: 'missing', message: 'Account not found' });
@@ -744,7 +757,7 @@ app.use((req, res, next) => {
   app.post('/api/instagram/disconnect', validateRequest({ body: z.object({ accountId: z.string().optional(), workspaceId: workspaceIdSchema.shape.workspaceId.optional() }).refine(d => !!d.accountId || !!d.workspaceId, { message: 'accountId or workspaceId is required' }) }), async (req: Request, res: Response) => {
     try {
       const { accountId, workspaceId } = req.body || {};
-      const { SocialAccountModel } = await import('./mongodb-storage');
+      const { SocialAccountModel } = await import('./models/Social');
       let raw: any = null;
       if (accountId) {
         raw = await SocialAccountModel.findById(accountId);
@@ -769,13 +782,17 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/reconnect/start', validateRequest({ body: workspaceIdSchema }), async (req: Request, res: Response) => {
+  app.post('/api/instagram/reconnect/start', validateRequest({
+    body: workspaceIdSchema.extend({
+      flow: z.enum(['standard', 'advanced']).optional()
+    })
+  }), async (req: Request, res: Response) => {
     try {
-      const { workspaceId } = req.body || {};
+      const { workspaceId, flow } = req.body || {};
       if (!workspaceId) return res.status(400).json({ error: 'workspaceId required' });
       // Cleanup first
-      await (await import('./index')).default; // no-op reference to ensure module context
-      const { SocialAccountModel } = await import('./mongodb-storage');
+      await import('./index'); // no-op reference to ensure module context
+      const { SocialAccountModel } = await import('./models/Social');
       const ig = await SocialAccountModel.findOne({ workspaceId, platform: 'instagram' });
       if (ig) {
         await SocialAccountModel.findByIdAndUpdate(ig._id, {
@@ -793,17 +810,44 @@ app.use((req, res, next) => {
       const storage = new (await import('./mongodb-storage')).MongoStorage();
       await storage.connect();
       const oauth = new InstagramOAuthService(storage as any);
-      const url = oauth.getAuthUrl(String(workspaceId));
+
+      // Unified Flow: Always use the advanced (Facebook Login) flow for Instagram 
+      // to ensure demographic insights and DM capabilities are available for all accounts
+      const url = oauth.getAdvancedAuthUrl(String(workspaceId));
+
       return res.json({ url });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
   });
 
+  app.post('/api/instagram/force-sync', validateRequest({
+    body: z.object({
+      workspaceId: z.string().min(1, 'Workspace ID is required')
+    })
+  }), async (req: Request, res: Response) => {
+    try {
+      const { workspaceId } = req.body;
+      const storage = new (await import('./mongodb-storage')).MongoStorage();
+      await storage.connect();
+      
+      const { InstagramDirectSync } = await import('./instagram-direct-sync');
+      const syncer = new InstagramDirectSync(storage as any);
+      
+      // Perform immediate sync
+      const result = await syncer.updateAccountWithRealData(workspaceId);
+      
+      return res.json({ success: true, result });
+    } catch (error: any) {
+      console.error('🚨 [FORCE-SYNC] Error forcing sync:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   app.get('/api/instagram/profile-picture/:accountId', async (req: Request, res: Response) => {
     try {
       const accountId = req.params.accountId;
-      const { SocialAccountModel } = await import('./mongodb-storage');
+      const { SocialAccountModel } = await import('./models/Social');
       let raw: any = await SocialAccountModel.findById(accountId);
       if (!raw) raw = await SocialAccountModel.findOne({ id: accountId });
       if (!raw) return res.status(404).json({ error: 'Account not found' });
@@ -856,7 +900,7 @@ app.use((req, res, next) => {
   app.get('/public/instagram/profile-picture/:accountId', async (req: Request, res: Response) => {
     try {
       const accountId = req.params.accountId;
-      const { SocialAccountModel } = await import('./mongodb-storage');
+      const { SocialAccountModel } = await import('./models/Social');
       let raw: any = await SocialAccountModel.findById(accountId);
       if (!raw) raw = await SocialAccountModel.findOne({ id: accountId });
       if (!raw) return res.status(404).send('Not Found');
@@ -925,7 +969,7 @@ app.use((req, res, next) => {
       // SECURITY: workspaceId is validated by middleware - user has verified access
       const workspaceId = req.workspaceId!;
 
-      const { SocialAccountModel } = await import('./mongodb-storage');
+      const { SocialAccountModel } = await import('./models/Social');
 
       // SECURITY: Only query accounts for the validated workspace
       const accounts = await SocialAccountModel.find({
@@ -969,7 +1013,7 @@ app.use((req, res, next) => {
       // SECURITY: workspaceId is validated by middleware - user has verified access
       const workspaceId = req.workspaceId!;
 
-      const { SocialAccountModel } = await import('./mongodb-storage');
+      const { SocialAccountModel } = await import('./models/Social');
 
       const accounts = await SocialAccountModel.find({
         platform: 'instagram',
@@ -1001,16 +1045,19 @@ app.use((req, res, next) => {
   // Dashboard analytics endpoint - returns aggregated social account metrics
   // Secured: Requires authentication AND workspace ownership validation
   app.get('/api/dashboard/analytics', requireAuth, validateWorkspaceAccess({ source: 'query' }), async (req: Request, res: Response) => {
+    const workspaceId = req.workspaceId!;
+    const logPath = path.join(process.cwd(), 'debug-trace.log');
+    const traceLog = (msg: string) => fs.appendFileSync(logPath, `[${new Date().toISOString()}] [DASHBOARD] ${msg}\n`);
+    
+    traceLog(`Request for workspace: ${workspaceId}`);
+    
     try {
-      // SECURITY: workspaceId is validated by middleware - user has verified access
-      const workspaceId = req.workspaceId!;
+      const { storage } = await import('./mongodb-storage');
+      const accounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+      
+      traceLog(`Found ${accounts.length} social accounts`);
 
-      const { SocialAccountModel } = await import('./mongodb-storage');
-
-      // SECURITY: Only query accounts for the validated workspace
-      const accounts = await SocialAccountModel.find({ workspaceId, platform: 'instagram' }).lean();
-
-      // Aggregate metrics from all accounts
+      // Aggregate metrics
       let totalFollowers = 0;
       let totalLikes = 0;
       let totalComments = 0;
@@ -1020,32 +1067,34 @@ app.use((req, res, next) => {
       let accountCount = 0;
 
       for (const acc of accounts) {
-        totalFollowers += (acc as any).followersCount || 0;
-        totalLikes += (acc as any).totalLikes || 0;
-        totalComments += (acc as any).totalComments || 0;
-        totalReach += (acc as any).totalReach || 0;
-        totalPosts += (acc as any).mediaCount || 0;
-        totalEngagement += (acc as any).engagementRate || (acc as any).avgEngagement || 0;
-        accountCount++;
+        if (acc.platform === 'instagram') {
+          totalFollowers += (acc as any).followersCount || 0;
+          totalLikes += (acc as any).totalLikes || 0;
+          totalComments += (acc as any).totalComments || 0;
+          totalReach += (acc as any).totalReach || 0;
+          totalPosts += (acc as any).mediaCount || (acc as any).posts || 0;
+          totalEngagement += (acc as any).engagementRate || (acc as any).avgEngagement || 0;
+          accountCount++;
+        }
       }
 
       const avgEngagement = accountCount > 0 ? totalEngagement / accountCount : 0;
+      
+      const result = {
+        totalFollowers,
+        totalLikes,
+        totalComments,
+        totalReach,
+        totalPosts,
+        avgEngagement: Math.round(avgEngagement * 100) / 100,
+        accountCount,
+        lastUpdated: new Date().toISOString()
+      };
 
-      res.json({
-        success: true,
-        data: {
-          totalFollowers,
-          totalLikes,
-          totalComments,
-          totalReach,
-          totalPosts,
-          avgEngagement: Math.round(avgEngagement * 100) / 100,
-          accountCount,
-          lastUpdated: new Date().toISOString()
-        }
-      });
+      traceLog(`Success: ${JSON.stringify(result)}`);
+      res.json({ success: true, data: result });
     } catch (error: any) {
-      console.error('[DASHBOARD ANALYTICS] Error:', error);
+      traceLog(`Error: ${error.message}`);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to get dashboard analytics'
@@ -1053,7 +1102,20 @@ app.use((req, res, next) => {
     }
   });
 
-  // Set up WebSocket server for real-time chat streaming
+  // Cache-bust endpoint: clears historical analytics cache so fresh data is served
+  app.post('/api/admin/clear-analytics-cache', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { CachingSystem } = await import('./performance/caching-system');
+      const deleted = await CachingSystem.invalidateByTag('historical');
+      const deleted2 = await CachingSystem.invalidateByTag('dashboard');
+      Logger.info('ADMIN', `Cleared analytics cache: ${deleted + deleted2} entries`);
+      res.json({ success: true, cleared: deleted + deleted2 });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+
   const { WebSocketServer } = await import('ws');
 
   // Initialize logger for metrics system
@@ -1430,6 +1492,7 @@ app.use((req, res, next) => {
       externalUrl: `https://${process.env.REPL_SLUG || 'app'}.${process.env.REPL_OWNER || 'user'}.repl.co`
     });
     log(`serving on port ${port} with WebSocket support`);
+    Logger.info('Server', '🚀 [P2-TRACE] Server starting with Token Crash Fixes (Session: 2026-02-08-LOG)');
     Logger.info('Server', `Instagram metrics system initialized and ready`);
 
     // P9 INFRASTRUCTURE: Initialize graceful shutdown after server starts

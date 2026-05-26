@@ -47,19 +47,21 @@ const Status = React.lazy(() => import('./pages/Status'))
 const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
 const CookieConsentBanner = React.lazy(() => import('./components/CookieConsentBanner'))
 const WaitlistPage = React.lazy(() => import('./pages/WaitlistPage'))
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
 
 const publicRoutes = [
   '/', '/features', '/pricing', '/changelog', '/about', '/blog', '/careers',
   '/contact', '/security', '/gdpr', '/privacy-policy', '/terms-of-service',
   '/free-trial', '/help', '/community', '/status', '/cookies', '/waitlist',
   '/signup', '/signin', '/admin-login', '/3d', '/3d-advanced', '/keyboard',
-  '/robot-hero', '/landing'
+  '/robot-hero', '/landing', '/auth/reset-password'
 ]
 
 const protectedRoutes = [
   '/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator',
   '/workspaces', '/profile', '/automation', '/veegpt', '/admin', '/settings',
-  '/security-dashboard', '/integrations', '/test-fixtures', '/encryption-health'
+  '/security-dashboard', '/integrations', '/test-fixtures', '/encryption-health',
+  '/best-time'
 ]
 
 function App() {
@@ -161,7 +163,10 @@ function App() {
     }
   }, [loading, user, isProtectedRoute, setLocation, hasEarlyAccess, earlyAccessLoading, effectiveLocation])
 
-  if (loading && !isPublicRoute) {
+  // Show loading spinner while Firebase auth is resolving
+  // For protected routes: always show loading
+  // For root path: show loading since it could be Landing OR Dashboard depending on auth
+  if (loading && (!isPublicRoute || effectiveLocation === '/')) {
     return <LoadingSpinner type="dashboard" />
   }
 
@@ -219,6 +224,8 @@ function App() {
         return <Landing onNavigate={handleNavigate} />
       case '/waitlist':
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><WaitlistPage /></React.Suspense>
+      case '/auth/reset-password':
+        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><ResetPassword /></React.Suspense>
       default:
         return null
     }
@@ -238,11 +245,21 @@ function App() {
               <AuthenticatedApp />
             </React.Suspense>
           ) : isPublicRoute ? (
-            effectiveLocation === '/waitlist' ? (
-              // Waitlist page renders without header/footer
-              <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                <WaitlistPage />
-              </React.Suspense>
+            effectiveLocation === '/waitlist' || effectiveLocation === '/signin' || effectiveLocation === '/signup' ? (
+              // Waitlist, SignIn, and SignUp pages render without header/footer
+              effectiveLocation === '/waitlist' ? (
+                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                  <WaitlistPage />
+                </React.Suspense>
+              ) : effectiveLocation === '/signin' ? (
+                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                  <SignIn onNavigate={handleNavigate} />
+                </React.Suspense>
+              ) : (
+                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                  <SignUpIntegrated />
+                </React.Suspense>
+              )
             ) : (
               <div className="min-h-screen bg-black text-white">
                 <MainNavigation />

@@ -20,6 +20,7 @@ export class SimpleInstagramPublisher {
     location?: string;
     pinFirstComment?: boolean;
     postType?: string;
+    mentions?: string[];
   }): Promise<{ success: boolean; postId?: string; url?: string; error?: string }> {
     
     console.log('[SIMPLE PUBLISHER] Publishing post with enhanced features:', {
@@ -72,7 +73,9 @@ export class SimpleInstagramPublisher {
         publishData.accessToken,
         mediaUrl,
         fullCaption,
-        contentType
+        contentType,
+        publishData.accountId,
+        publishData.mentions
       );
 
       if (!result.success) {
@@ -159,7 +162,9 @@ export class SimpleInstagramPublisher {
     accessToken: string,
     mediaUrl: string,
     caption: string,
-    contentType: 'video' | 'photo' | 'reel' | 'story'
+    contentType: 'video' | 'photo' | 'reel' | 'story',
+    accountId?: string,
+    mentions?: string[]
   ): Promise<{ success: boolean; id?: string; error?: string }> {
     
     console.log(`[SIMPLE PUBLISHER] Publishing ${contentType} content`);
@@ -169,13 +174,36 @@ export class SimpleInstagramPublisher {
     const cleanUrl = this.cleanURLForInstagram(mediaUrl);
     console.log(`[SIMPLE PUBLISHER] Cleaned URL: ${cleanUrl}`);
     
-    // For videos/reels, publish as actual video content
-    if (contentType === 'video' || contentType === 'reel') {
+    // For reels, publish as reel content
+    if (contentType === 'reel') {
+      console.log(`[SIMPLE PUBLISHER] Publishing ${contentType} as reel content`);
+      
+      try {
+        const result = await instagramAPI.publishReel(accessToken, cleanUrl, caption, accountId, mentions);
+        console.log(`[SIMPLE PUBLISHER] ✓ Published reel: ${result.id}`);
+        return { success: true, id: result.id };
+        
+      } catch (error: any) {
+        console.log(`[SIMPLE PUBLISHER] Reel publishing failed: ${error.message}`);
+        // Fallback to regular video if reel fails
+        console.log(`[SIMPLE PUBLISHER] Attempting fallback to regular video post for reel content`);
+        try {
+          const fallbackResult = await instagramAPI.publishVideo(accessToken, cleanUrl, caption, accountId, mentions);
+          console.log(`[SIMPLE PUBLISHER] ✓ Published reel as video fallback: ${fallbackResult.id}`);
+          return { success: true, id: fallbackResult.id };
+        } catch (fallbackError: any) {
+          return { success: false, error: `Reel publishing failed: ${error.message}. Video fallback also failed: ${fallbackError.message}` };
+        }
+      }
+    }
+    
+    // For videos, publish as actual video content
+    if (contentType === 'video') {
       console.log(`[SIMPLE PUBLISHER] Publishing ${contentType} as video content`);
       
       try {
-        const result = await instagramAPI.publishVideo(accessToken, cleanUrl, caption);
-        console.log(`[SIMPLE PUBLISHER] ✓ Published ${contentType} as video: ${result.id}`);
+        const result = await instagramAPI.publishVideo(accessToken, cleanUrl, caption, accountId, mentions);
+        console.log(`[SIMPLE PUBLISHER] ✓ Published video: ${result.id}`);
         return { success: true, id: result.id };
         
       } catch (error: any) {
@@ -183,7 +211,7 @@ export class SimpleInstagramPublisher {
         // Fallback to photo if video fails
         console.log(`[SIMPLE PUBLISHER] Attempting fallback to photo post for video content`);
         try {
-          const fallbackResult = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption);
+          const fallbackResult = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption, accountId, mentions);
           console.log(`[SIMPLE PUBLISHER] ✓ Published video as photo fallback: ${fallbackResult.id}`);
           return { success: true, id: fallbackResult.id };
         } catch (fallbackError: any) {
@@ -195,10 +223,11 @@ export class SimpleInstagramPublisher {
     // For stories, use story publishing API
     if (contentType === 'story') {
       try {
-        // Determine if media is video based on URL or type
-        const isVideo = cleanUrl.includes('video') || cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.mov');
+        // Determine if media is video based on URL extension, ignoring query parameters
+        const urlWithoutQuery = cleanUrl.split('?')[0];
+        const isVideo = !!urlWithoutQuery.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i);
         
-        const result = await instagramAPI.publishStory(accessToken, cleanUrl, isVideo);
+        const result = await instagramAPI.publishStory(accessToken, cleanUrl, isVideo, accountId);
         console.log(`[SIMPLE PUBLISHER] ✓ Published story: ${result.id}`);
         return { success: true, id: result.id };
         
@@ -207,7 +236,7 @@ export class SimpleInstagramPublisher {
         // Fallback to regular photo if story fails
         console.log(`[SIMPLE PUBLISHER] Attempting fallback to photo post for story content`);
         try {
-          const fallbackResult = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption);
+          const fallbackResult = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption, accountId, mentions);
           console.log(`[SIMPLE PUBLISHER] ✓ Published story as photo fallback: ${fallbackResult.id}`);
           return { success: true, id: fallbackResult.id };
         } catch (fallbackError: any) {
@@ -219,7 +248,7 @@ export class SimpleInstagramPublisher {
     // For photos, publish directly
     if (contentType === 'photo') {
       try {
-        const result = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption);
+        const result = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption, accountId, mentions);
         console.log(`[SIMPLE PUBLISHER] ✓ Published photo: ${result.id}`);
         return { success: true, id: result.id };
         
@@ -238,41 +267,44 @@ export class SimpleInstagramPublisher {
   static cleanURLForInstagram(inputUrl: string): string {
     console.log(`[URL CLEANER] Processing: ${inputUrl}`);
     
-    // Get the current domain from environment or default
-    const currentDomain = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-    const baseUrl = currentDomain.includes('localhost') ? `http://${currentDomain}` : `https://${currentDomain}`;
-    
-    console.log(`[URL CLEANER] Current domain: ${currentDomain}`);
-    console.log(`[URL CLEANER] Base URL: ${baseUrl}`);
-    
-    // Handle blob URLs
-    if (inputUrl.startsWith('blob:')) {
-      const parts = inputUrl.split('/');
-      const mediaId = parts[parts.length - 1];
-      const cleanUrl = `${baseUrl}/uploads/${mediaId}`;
-      console.log(`[URL CLEANER] Blob converted: ${cleanUrl}`);
-      return cleanUrl;
-    }
-    
-    // Handle malformed URLs with nested domains
-    if (inputUrl.includes('replit.dev') && inputUrl.includes('/uploads/')) {
-      const uploadsPart = inputUrl.substring(inputUrl.indexOf('/uploads/'));
-      const cleanUrl = `${baseUrl}${uploadsPart}`;
-      console.log(`[URL CLEANER] Nested domain fixed: ${cleanUrl}`);
-      return cleanUrl;
-    }
-    
-    // Handle already proper URLs with current domain
-    if (inputUrl.startsWith(baseUrl)) {
-      console.log(`[URL CLEANER] URL already clean: ${inputUrl}`);
+    // If it's already a valid ngrok or external HTTP/HTTPS URL, preserve it!
+    if (inputUrl.startsWith('http') && !inputUrl.includes('localhost') && !inputUrl.includes('your-replit-dev-domain-here')) {
+      console.log(`[URL CLEANER] URL is already valid and external: ${inputUrl}`);
       return inputUrl;
     }
     
-    // Extract filename and create clean URL
-    const filename = inputUrl.split('/').pop() || 'media';
-    const cleanUrl = `${baseUrl}/uploads/${filename}`;
-    console.log(`[URL CLEANER] Generic clean: ${cleanUrl}`);
-    return cleanUrl;
+    // Prioritize ngrok URL over localhost VITE_APP_URL
+    let baseUrl = process.env.SOCIAL_AUTH_BASE_URL;
+    
+    if (!baseUrl || baseUrl.includes('localhost')) {
+      baseUrl = process.env.VITE_APP_URL;
+    }
+    
+    if (!baseUrl || baseUrl.includes('localhost')) {
+      if (process.env.REPLIT_DEV_DOMAIN && process.env.REPLIT_DEV_DOMAIN !== 'your-replit-dev-domain-here') {
+         baseUrl = `https://${process.env.REPLIT_DEV_DOMAIN}`;
+      }
+    }
+    if (!baseUrl) {
+       baseUrl = 'http://localhost:5000';
+    }
+    
+    console.log(`[URL CLEANER] Base URL fallback: ${baseUrl}`);
+    
+    if (!inputUrl.startsWith('/')) {
+      inputUrl = '/' + inputUrl;
+    }
+    
+    let finalUrl = `${baseUrl}${inputUrl}`;
+    
+    // If using ngrok, add the skip-browser-warning parameter so Facebook crawlers don't get blocked
+    if (finalUrl.includes('ngrok')) {
+      const separator = finalUrl.includes('?') ? '&' : '?';
+      finalUrl = `${finalUrl}${separator}ngrok-skip-browser-warning=true`;
+    }
+    
+    console.log(`[URL CLEANER] Final clean URL: ${finalUrl}`);
+    return finalUrl;
   }
   
   /**
