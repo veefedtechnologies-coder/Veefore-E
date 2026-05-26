@@ -1,6 +1,6 @@
 import { apiRequest } from './queryClient'
 
-export type Platform = 'instagram' | 'youtube' | 'facebook' | 'twitter' | 'linkedin' | 'tiktok'
+export type Platform = 'instagram' | 'instagram_advanced' | 'youtube' | 'facebook' | 'twitter' | 'linkedin' | 'tiktok'
 
 export interface SimpleAccount {
   id: string
@@ -41,11 +41,17 @@ export async function startReconnectFlow(accounts: SimpleAccount[] = [], workspa
   const ws = workspaceId || (typeof window !== 'undefined' ? (localStorage.getItem('currentWorkspaceId') || undefined) : undefined)
   if (count === 1) {
     const p = invalid[0].platform
-    if (p === 'instagram') {
-      const data = await apiRequest('/api/instagram/reconnect/start', { method: 'POST', body: JSON.stringify({ workspaceId: ws }) })
+    if (p === 'instagram' || p === 'instagram_advanced') {
+      const data = await apiRequest('/api/instagram/reconnect/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          workspaceId: ws,
+          flow: p === 'instagram_advanced' ? 'advanced' : 'standard'
+        })
+      })
       const url = (data as any)?.url
       if (url && typeof window !== 'undefined') window.location.href = url
-      return { type: 'oauth', platform: 'instagram' as Platform }
+      return { type: 'oauth', platform: p as Platform }
     }
     if (p === 'youtube') {
       if (!ws) return { type: 'integrations' }

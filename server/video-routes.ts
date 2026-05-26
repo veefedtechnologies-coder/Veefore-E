@@ -8,7 +8,7 @@ import { SimpleVideoGenerator } from './services/simple-video-generator';
 import { WorkingVideoGenerator } from './services/working-video-generator';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
-import { firebaseAdmin } from './firebase-admin';
+import { getFirebaseAdmin } from './firebase-admin';
 
 const router = express.Router();
 
@@ -25,8 +25,9 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader) {
-      console.log('[VIDEO AUTH] No authorization header');
-      return res.status(401).json({ error: 'Unauthorized' });
+      console.log('[VIDEO AUTH] No authorization header', req.headers);
+      try { require('fs').appendFileSync('video-auth-debug.log', new Date().toISOString() + ' MISSING AUTH HEADER. Headers: ' + JSON.stringify(req.headers) + '\n\n'); } catch(e) {}
+      return res.status(401).json({ error: 'Unauthorized', receivedHeaders: req.headers });
     }
 
     let token;
@@ -42,7 +43,8 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
 
     // Verify Firebase token
     console.log('[VIDEO AUTH] Verifying Firebase token...');
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
+    const adminApp = getFirebaseAdmin();
+    const decodedToken = await adminApp.auth().verifyIdToken(token);
     const firebaseUid = decodedToken.uid;
     console.log('[VIDEO AUTH] Firebase token verified for UID:', firebaseUid);
     
@@ -58,15 +60,19 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     
     if (!user) {
       console.error('[VIDEO AUTH] User not found for Firebase UID:', firebaseUid);
+      try { require('fs').appendFileSync('video-auth-debug.log', new Date().toISOString() + ' USER NOT FOUND FOR UID: ' + firebaseUid + '\n\n'); } catch(e) {}
       return res.status(401).json({ error: 'User not found' });
     }
 
     console.log(`[VIDEO AUTH] User ${user.email} authenticated successfully`);
     req.user = user;
     next();
-  } catch (error) {
+  } catch (error: any) {
     console.error('[VIDEO AUTH] Authentication failed:', error);
-    return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      require('fs').appendFileSync('video-auth-debug.log', new Date().toISOString() + ' ERROR: ' + error.message + '\nStack: ' + error.stack + '\nHeaders: ' + JSON.stringify(req.headers) + '\n\n');
+    } catch(e) {}
+    return res.status(401).json({ error: 'Unauthorized', details: error.message, stack: error.stack });
   }
 };
 
@@ -88,17 +94,18 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB limit for images and videos
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi|webm/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const isImage = file.mimetype.startsWith('image/');
+    const isVideo = file.mimetype.startsWith('video/');
     
-    if (mimetype && extname) {
+    if ((isImage || isVideo) && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image and video files are allowed'));
     }
   }
 });

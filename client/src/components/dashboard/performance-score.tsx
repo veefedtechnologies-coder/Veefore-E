@@ -172,12 +172,12 @@ export function PerformanceScore() {
 
     const sortedData = historicalData.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
     const oldestRecord = sortedData[0]
-    const previousRecord = sortedData[sortedData.length - 2] || oldestRecord
 
     const followerGrowth = oldestRecord.followers === 0 ? 0 : ((currentData.followers - oldestRecord.followers) / oldestRecord.followers) * 100
-    const engagementGrowth = previousRecord.engagement === 0 ? 0 : ((currentData.engagement - previousRecord.engagement) / previousRecord.engagement) * 100
-    const reachGrowth = previousRecord.reach === 0 ? 0 : ((currentData.reach - previousRecord.reach) / previousRecord.reach) * 100
-    const postGrowth = oldestRecord.metrics?.posts === 0 ? 0 : ((currentData.posts - (oldestRecord.metrics?.posts || 0)) / (oldestRecord.metrics?.posts || 1)) * 100
+    const engagementGrowth = oldestRecord.engagement === 0 ? 0 : ((currentData.engagement - oldestRecord.engagement) / oldestRecord.engagement) * 100
+    const reachGrowth = oldestRecord.reach === 0 ? 0 : ((currentData.reach - oldestRecord.reach) / oldestRecord.reach) * 100
+    const oldPosts = oldestRecord.posts || oldestRecord.metrics?.posts || 0
+    const postGrowth = oldPosts === 0 ? 0 : ((currentData.posts - oldPosts) / (oldPosts || 1)) * 100
     const oldContentScore = oldestRecord.metrics?.contentScore?.score || 5
     const currentContentScore = 7.5
     const contentScoreGrowth = ((currentContentScore - oldContentScore) / oldContentScore) * 100
@@ -220,10 +220,10 @@ export function PerformanceScore() {
     username: account.username
   }))
 
-  const totalFollowers = analytics?.totalFollowers || connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.followers, 0)
-  const totalReach = analytics?.totalReach || connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.reach, 0)
+  const totalFollowers = connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.followers, 0)
+  const totalReach = connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.reach, 0)
   const avgEngagement = connectedPlatforms.length > 0 ? parseFloat(connectedPlatforms[0].engagement) || 0 : 0
-  const totalPosts = analytics?.totalPosts || connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.posts, 0)
+  const totalPosts = connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.posts, 0)
 
   const calculateContentScore = () => {
     if (connectedPlatforms.length === 0) return { score: 0, rating: 'No Data' }
@@ -255,11 +255,29 @@ export function PerformanceScore() {
     const realEngagementRate = analytics?.engagementRate || 0
     const avgEngagementBase = realEngagementRate > 0 ? realEngagementRate : avgEngagement || 0
 
+    const sortedData = historicalData && historicalData.length > 0 
+       ? [...historicalData].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+       : [];
+       
+    const oldestRecord = sortedData.length > 0 ? sortedData[0] : null;
+
+    const followerGains = oldestRecord 
+      ? totalFollowersBase - oldestRecord.followers
+      : 0;
+
+    const postGains = oldestRecord 
+      ? totalPostsBase - (oldestRecord.posts || oldestRecord.metrics?.posts || 0)
+      : 0;
+
+    const reachGains = oldestRecord 
+      ? totalReachBase - oldestRecord.reach
+      : totalReachBase;
+
     const periodData = {
-      reach: totalReachBase,
-      posts: totalPostsBase,
+      reach: reachGains,
+      posts: postGains,
       engagement: avgEngagementBase,
-      followerGains: 0,
+      followerGains: followerGains,
       followerTotal: totalFollowersBase
     }
 
@@ -276,9 +294,11 @@ export function PerformanceScore() {
   const { periodData, growthPercentages } = calculateTimeBasedData(selectedPeriod)
 
   const formatNumber = (num: number) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
-    return num.toString()
+    const absNum = Math.abs(num);
+    const sign = num < 0 ? '-' : '';
+    if (absNum >= 1000000) return `${sign}${(absNum / 1000000).toFixed(1)}M`;
+    if (absNum >= 1000) return `${sign}${(absNum / 1000).toFixed(1)}K`;
+    return num.toString();
   }
 
   const getPlatformIcon = (platform: string) => {

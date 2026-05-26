@@ -34,16 +34,16 @@ interface AnalyticsResult {
 }
 
 export class AnalyticsEngine {
-  constructor(private storage: IStorage) {}
+  constructor(private storage: IStorage) { }
 
   async calculateRealTimeAnalytics(accessToken: string, workspaceId: number): Promise<AnalyticsResult> {
     try {
-      // Get user's media data from last 30 days
-      const mediaData = await instagramAPI.getUserMedia(accessToken, 25);
-      
+      // Get user's media data using the standardized fetching strategy
+      const mediaData = await instagramAPI.getUserMedia(accessToken);
+
       // Get detailed insights for each media
       const engagementData: EngagementData[] = [];
-      
+
       for (const media of mediaData) {
         try {
           const insights = await instagramAPI.getMediaInsights(media.id, accessToken);
@@ -64,13 +64,13 @@ export class AnalyticsEngine {
 
       // Calculate authentic engagement rate
       const engagementRate = this.calculateEngagementRate(engagementData, accessToken);
-      
+
       // Calculate growth velocity based on posting patterns
       const growthVelocity = await this.calculateGrowthVelocity(engagementData, accessToken);
-      
+
       // Analyze optimal posting times from user's historical data with actual timestamps
       const optimalTime = await this.calculateOptimalTiming(engagementData, accessToken);
-      
+
       // Calculate trend data
       const trendsData = this.calculateTrends(engagementData);
 
@@ -111,9 +111,9 @@ export class AnalyticsEngine {
     }, 0);
 
     const totalReach = engagementData.reduce((sum, data) => sum + data.reach, 0);
-    
+
     if (totalReach === 0) return 0;
-    
+
     // Calculate engagement rate as percentage of total engagements vs total reach
     const rate = (totalEngagements / totalReach) * 100;
     return Math.round(rate * 10) / 10; // Round to 1 decimal place
@@ -130,7 +130,7 @@ export class AnalyticsEngine {
       }
 
       // Sort by date to analyze chronological growth patterns
-      const sortedData = engagementData.sort((a, b) => 
+      const sortedData = engagementData.sort((a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
 
@@ -138,17 +138,17 @@ export class AnalyticsEngine {
       const recentData = sortedData.slice(-7); // Last 7 posts
       const olderData = sortedData.slice(0, 7); // First 7 posts
 
-      const recentAvgEngagement = recentData.reduce((sum, data) => 
+      const recentAvgEngagement = recentData.reduce((sum, data) =>
         sum + data.likes + data.comments, 0) / recentData.length;
-      
-      const olderAvgEngagement = olderData.reduce((sum, data) => 
+
+      const olderAvgEngagement = olderData.reduce((sum, data) =>
         sum + data.likes + data.comments, 0) / olderData.length;
 
       if (olderAvgEngagement === 0) return 0;
 
       // Calculate growth velocity as percentage change in engagement efficiency
       const velocityPercentage = ((recentAvgEngagement - olderAvgEngagement) / olderAvgEngagement) * 100;
-      
+
       return Math.round(velocityPercentage * 10) / 10;
 
     } catch (error) {
@@ -165,33 +165,33 @@ export class AnalyticsEngine {
   }> {
     try {
       // Get authentic Instagram media data with timestamps
-      const mediaData = await instagramAPI.getUserMedia(accessToken, 25);
-      
+      const mediaData = await instagramAPI.getUserMedia(accessToken);
+
       if (mediaData.length === 0) {
         console.log('[ANALYTICS ENGINE] No media data available for optimal timing');
         return {
-          hour: "6:00 PM",
-          peakHours: "6-8 PM",
-          bestDays: ["Tue", "Thu"],
-          audienceActive: 50
+          hour: "N/A",
+          peakHours: "N/A",
+          bestDays: [],
+          audienceActive: 0
         };
       }
 
       // Combine Instagram timestamps with engagement data for authentic analysis
       const timingData: { hour: number; day: number; engagement: number; reach: number; timestamp: string }[] = [];
-      
+
       mediaData.forEach(media => {
         const date = new Date(media.timestamp);
         const hour = date.getHours();
         const dayOfWeek = date.getDay();
-        
+
         // Match with engagement data
         const engagementInfo = engagementData.find(ed => ed.mediaId === media.id) || {
           likes: 0, comments: 0, shares: 0, saves: 0, reach: 0
         };
-        
+
         const totalEngagement = engagementInfo.likes + engagementInfo.comments + engagementInfo.shares + engagementInfo.saves;
-        
+
         timingData.push({
           hour,
           day: dayOfWeek,
@@ -203,10 +203,10 @@ export class AnalyticsEngine {
 
       if (timingData.length === 0) {
         return {
-          hour: "6:00 PM",
-          peakHours: "6-8 PM",
-          bestDays: ["Tue", "Thu"],
-          audienceActive: 50
+          hour: "N/A",
+          peakHours: "N/A",
+          bestDays: [],
+          audienceActive: 0
         };
       }
 
@@ -255,15 +255,15 @@ export class AnalyticsEngine {
         const engagementRate = stats.totalReach > 0 ? (stats.totalEngagement / stats.totalReach) * 100 : 0;
         const totalEngagement = stats.totalEngagement;
         const postFrequency = stats.postCount;
-        
+
         // Combined scoring: engagement rate (40%) + total engagement (40%) + posting frequency (20%)
         const score = (engagementRate * 0.4) + (totalEngagement * 0.4) + (postFrequency * 20);
-        
-        console.log('[ANALYTICS ENGINE] Hour', hour, 'score:', score.toFixed(2), 
-          'engagementRate:', engagementRate.toFixed(2), 
-          'totalEngagement:', totalEngagement, 
+
+        console.log('[ANALYTICS ENGINE] Hour', hour, 'score:', score.toFixed(2),
+          'engagementRate:', engagementRate.toFixed(2),
+          'totalEngagement:', totalEngagement,
           'postCount:', postFrequency);
-        
+
         if (score > bestScore && stats.postCount > 0) {
           bestScore = score;
           bestHour = hour;
@@ -284,7 +284,7 @@ export class AnalyticsEngine {
       // Calculate peak hours from authentic data
       const avgEngagementRate = Array.from(hourlyStats.values())
         .filter(stats => stats.totalReach > 0)
-        .reduce((sum, stats) => sum + ((stats.totalEngagement / stats.totalReach) * 100), 0) / 
+        .reduce((sum, stats) => sum + ((stats.totalEngagement / stats.totalReach) * 100), 0) /
         Array.from(hourlyStats.values()).filter(stats => stats.totalReach > 0).length;
 
       const peakHours: number[] = [];
@@ -297,7 +297,7 @@ export class AnalyticsEngine {
 
       // Find best days from authentic performance data
       const dayAbbrev = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      
+
       const bestDaysData = Array.from(dailyStats.entries())
         .map(([day, stats]) => ({
           day,
@@ -312,7 +312,7 @@ export class AnalyticsEngine {
       // Calculate authentic audience activity from real data
       const totalEngagement = timingData.reduce((sum, entry) => sum + entry.engagement, 0);
       const totalReach = timingData.reduce((sum, entry) => sum + entry.reach, 0);
-      const audienceActive = totalReach > 0 ? Math.round((totalEngagement / totalReach) * 100) : 50;
+      const audienceActive = totalReach > 0 ? Math.round((totalEngagement / totalReach) * 100) : 0;
 
       // Format time display
       const formatHour = (hour: number) => {
@@ -322,11 +322,11 @@ export class AnalyticsEngine {
       };
 
       // Format peak hours range
-      const peakHoursRange = peakHours.length >= 2 ? 
+      const peakHoursRange = peakHours.length >= 2 ?
         `${Math.min(...peakHours)}-${Math.max(...peakHours)} ${peakHours[0] >= 12 ? 'PM' : 'AM'}` :
         peakHours.length === 1 ?
-        formatHour(peakHours[0]) :
-        "6-8 PM";
+          formatHour(peakHours[0]) :
+          "N/A";
 
       console.log('[ANALYTICS ENGINE] Final optimal timing calculation:', {
         bestHour: formatHour(bestHour),
@@ -340,17 +340,17 @@ export class AnalyticsEngine {
       return {
         hour: formatHour(bestHour),
         peakHours: peakHoursRange,
-        bestDays: bestDaysData.length > 0 ? bestDaysData : ["Tue", "Thu"],
+        bestDays: bestDaysData.length > 0 ? bestDaysData : [],
         audienceActive: Math.max(0, Math.min(100, audienceActive))
       };
 
     } catch (error) {
       console.error('[ANALYTICS ENGINE] Error calculating optimal timing:', error);
       return {
-        hour: "6:00 PM",
-        peakHours: "6-8 PM",
-        bestDays: ["Tue", "Thu"],
-        audienceActive: 50
+        hour: "N/A",
+        peakHours: "N/A",
+        bestDays: [],
+        audienceActive: 0
       };
     }
   }
@@ -368,7 +368,7 @@ export class AnalyticsEngine {
       };
     }
 
-    const sortedData = engagementData.sort((a, b) => 
+    const sortedData = engagementData.sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
@@ -378,35 +378,33 @@ export class AnalyticsEngine {
     const recentPeriod = sortedData.slice(midPoint);
 
     // Calculate averages for each period
-    const olderAvgEngagement = olderPeriod.reduce((sum, data) => 
+    const olderAvgEngagement = olderPeriod.reduce((sum, data) =>
       sum + data.likes + data.comments, 0) / olderPeriod.length;
-    
-    const recentAvgEngagement = recentPeriod.reduce((sum, data) => 
+
+    const recentAvgEngagement = recentPeriod.reduce((sum, data) =>
       sum + data.likes + data.comments, 0) / recentPeriod.length;
 
     const olderAvgReach = olderPeriod.reduce((sum, data) => sum + data.reach, 0) / olderPeriod.length;
     const recentAvgReach = recentPeriod.reduce((sum, data) => sum + data.reach, 0) / recentPeriod.length;
 
     // Calculate authentic percentage changes from real Instagram performance
-    const engagementTrend = olderAvgEngagement > 0 
-      ? ((recentAvgEngagement - olderAvgEngagement) / olderAvgEngagement) * 100 
-      : recentAvgEngagement > 0 ? 25 : 0; // Show growth for new engagement
+    const engagementTrend = olderAvgEngagement > 0
+      ? ((recentAvgEngagement - olderAvgEngagement) / olderAvgEngagement) * 100
+      : 0; // Return 0 for new engagement to stay authentic
 
-    const reachGrowth = olderAvgReach > 0 
-      ? ((recentAvgReach - olderAvgReach) / olderAvgReach) * 100 
-      : recentAvgReach > 0 ? 15 : 0; // Show growth for new reach
+    const reachGrowth = olderAvgReach > 0
+      ? ((recentAvgReach - olderAvgReach) / olderAvgReach) * 100
+      : 0; // Return 0 for new reach to stay authentic
 
-    // Calculate authentic weekly growth based on actual posting activity
     const totalEngagement = engagementData.reduce((sum, data) => sum + data.likes + data.comments, 0);
     const totalReach = engagementData.reduce((sum, data) => sum + data.reach, 0);
-    
-    // Show positive growth patterns based on real account activity
-    const weeklyGrowth = totalEngagement > 0 || totalReach > 0 
-      ? Math.max(5, (engagementTrend + reachGrowth) / 2) 
-      : 8; // Conservative growth for active accounts
+
+    const weeklyGrowth = totalEngagement > 0 || totalReach > 0
+      ? Math.max(0, (engagementTrend + reachGrowth) / 2)
+      : 0;
 
     return {
-      weeklyGrowth: Math.min(50, Math.max(5, Math.round(weeklyGrowth * 10) / 10)),
+      weeklyGrowth: Math.min(50, Math.max(0, Math.round(weeklyGrowth * 10) / 10)),
       engagementTrend: Math.min(40, Math.max(0, Math.round(engagementTrend * 10) / 10)),
       reachGrowth: Math.min(35, Math.max(0, Math.round(reachGrowth * 10) / 10))
     };

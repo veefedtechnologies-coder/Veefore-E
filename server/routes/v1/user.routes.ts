@@ -53,35 +53,76 @@ router.use(apiRateLimiter);
 
 router.get('/', userController.getCurrentUser);
 
-router.patch('/', 
-  validateRequest({ body: UpdateProfileSchema }), 
+router.patch('/',
+  validateRequest({ body: UpdateProfileSchema }),
   userController.updateProfile
 );
 
 router.get('/onboarding-status', userController.getOnboardingStatus);
 
-router.post('/onboarding', 
-  validateRequest({ body: UpdateOnboardingSchema }), 
+router.post('/onboarding',
+  validateRequest({ body: UpdateOnboardingSchema }),
   userController.updateOnboarding
 );
 
 router.post('/complete-onboarding', userController.completeOnboardingFull);
 
-router.patch('/onboarding-step', 
-  validateRequest({ body: UpdateOnboardingStepSchema }), 
+router.patch('/onboarding-step',
+  validateRequest({ body: UpdateOnboardingStepSchema }),
   userController.updateOnboardingStep
 );
 
 router.get('/credits', userController.getCredits);
 
-router.post('/credits', 
-  validateRequest({ body: AddCreditsSchema }), 
+router.post('/credits',
+  validateRequest({ body: AddCreditsSchema }),
   userController.addCredits
 );
 
-router.patch('/credits', 
-  validateRequest({ body: UpdateCreditsSchema }), 
+router.patch('/credits',
+  validateRequest({ body: UpdateCreditsSchema }),
   userController.updateCredits
+);
+
+
+// Goals Routes
+import { goalsController } from '../../controllers';
+
+router.get('/goals',
+  validateRequest({ query: z.object({ workspaceId: z.string().min(1) }) }),
+  goalsController.getGoals
+);
+
+router.post('/goals',
+  validateRequest({
+    body: z.object({
+      workspaceId: z.string().min(1),
+      type: z.enum(['followers', 'engagement', 'revenue', 'posts', 'custom']),
+      title: z.string().min(1).max(100),
+      description: z.string().max(500).optional(),
+      target: z.number().positive(),
+      deadline: z.coerce.date().optional(),
+    })
+  }),
+  goalsController.createGoal
+);
+
+router.patch('/goals/:goalId',
+  validateRequest({
+    params: z.object({ goalId: z.string().min(1) }),
+    body: z.object({
+      current: z.number().min(0).optional(),
+      status: z.enum(['active', 'completed', 'cancelled', 'overdue']).optional(),
+      target: z.number().positive().optional(),
+      deadline: z.coerce.date().optional(),
+    })
+  }),
+  goalsController.updateGoal
+);
+
+router.delete('/goals/:goalId',
+  validateRequest({ params: z.object({ goalId: z.string().min(1) }) }),
+  goalsController.deleteGoal
 );
 
 export default router;

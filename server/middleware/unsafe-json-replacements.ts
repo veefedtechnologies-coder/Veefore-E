@@ -83,6 +83,10 @@ export const analyticsRequestSchema = z.object({
 // Replace: JSON.parse(Buffer.from(finalParts[1], 'base64').toString())
 export function safeParseJWTPayload(base64Token: string) {
   try {
+    if (!base64Token || typeof base64Token !== 'string') {
+      console.warn('⚠️ [P2-FIX] safeParseJWTPayload called with invalid token:', typeof base64Token);
+      return { success: false, error: 'Invalid token format' } as const;
+    }
     const decoded = Buffer.from(base64Token, 'base64').toString();
     return safeJsonParse(decoded, jwtPayloadSchema);
   } catch (error) {
@@ -96,6 +100,10 @@ export function safeParseJWTPayload(base64Token: string) {
 // Replace: JSON.parse(decodedState) for Instagram OAuth
 export function safeParseInstagramState(stateParam: string) {
   try {
+    if (!stateParam || typeof stateParam !== 'string') {
+      console.warn('⚠️ [P2-FIX] safeParseInstagramState called with invalid state:', typeof stateParam);
+      return { success: false, error: 'Invalid state format' } as const;
+    }
     const decoded = Buffer.from(stateParam, 'base64').toString();
     return safeJsonParse(decoded, instagramStateSchema);
   } catch (error) {
@@ -109,6 +117,10 @@ export function safeParseInstagramState(stateParam: string) {
 // Replace: JSON.parse(Buffer.from(state as string, 'base64').toString())
 export function safeParseOAuthState(stateParam: string) {
   try {
+    if (!stateParam || typeof stateParam !== 'string') {
+      console.warn('⚠️ [P2-FIX] safeParseOAuthState called with invalid parameter:', typeof stateParam);
+      return { success: false, error: 'Invalid OAuth parameter format' } as const;
+    }
     const decoded = Buffer.from(stateParam, 'base64').toString();
     return safeJsonParse(decoded, oauthStateSchema);
   } catch (error) {
@@ -124,7 +136,7 @@ export function safeParseAIResponse(aiContent: string) {
   if (!aiContent.trim()) {
     return { success: false, error: 'Empty AI response' } as const;
   }
-  
+
   return safeJsonParse(aiContent, aiResponseSchema);
 }
 
@@ -154,12 +166,12 @@ export function migrateUnsafeJsonParse<T>(
   context: string = 'data'
 ): T {
   const result = safeJsonParse(input, schema);
-  
+
   if (!result.success) {
     console.error(`🚨 SECURITY: Unsafe JSON parse blocked in ${context}:`, result.error);
     throw new Error(`Invalid ${context} format: ${result.error}`);
   }
-  
+
   console.log(`✅ SECURITY: Safe JSON parse successful in ${context}`);
   return result.data;
 }
@@ -179,7 +191,7 @@ export function validateWorkspaceInQuery(query: any): {
   const schema = z.object({
     workspaceId: z.union([z.number(), z.string(), z.coerce.number()])
   });
-  
+
   const result = schema.safeParse(query);
   if (result.success) {
     return { success: true, workspaceId: result.data.workspaceId };
@@ -202,7 +214,7 @@ export function validatePaginationParams(query: any): {
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).default('desc')
   });
-  
+
   const result = schema.safeParse(query);
   if (result.success) {
     return { success: true, data: result.data };

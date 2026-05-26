@@ -107,7 +107,7 @@ export class ResponseOptimizer {
     if (!this.config.enabled || !acceptEncoding) return null;
 
     const clientSupports = acceptEncoding.toLowerCase();
-    
+
     // Prefer brotli for best compression, then gzip, then deflate
     if (clientSupports.includes('br') && this.compressionSupport.get('br')) {
       return 'br';
@@ -137,14 +137,14 @@ export class ResponseOptimizer {
       'image/', 'video/', 'audio/', 'application/zip', 'application/gzip',
       'application/x-rar', 'application/x-7z', 'application/pdf'
     ];
-    
+
     if (compressedTypes.some(type => contentType.includes(type))) {
       return false;
     }
 
     // Don't compress for very old browsers that have compression issues
     if (userAgent && (
-      userAgent.includes('MSIE 6') || 
+      userAgent.includes('MSIE 6') ||
       userAgent.includes('MSIE 5') ||
       userAgent.includes('MSIE 4')
     )) {
@@ -171,7 +171,7 @@ export class ResponseOptimizer {
   ): Promise<Buffer> {
     const startTime = Date.now();
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
-    
+
     try {
       let compressed: Buffer;
 
@@ -256,7 +256,7 @@ export class ResponseOptimizer {
 
     } catch (error) {
       const compressionTime = Date.now() - startTime;
-      
+
       logger.error({
         event: 'COMPRESSION_ERROR',
         algorithm,
@@ -285,10 +285,10 @@ export class ResponseOptimizer {
     this.stats.originalBytes += originalSize;
     this.stats.compressedBytes += compressedSize;
     this.stats.compressionTime += compressionTime;
-    
+
     // Update average compression ratio
-    this.stats.averageCompressionRatio = 
-      (this.stats.averageCompressionRatio * (this.stats.compressedResponses - 1) + compressionRatio) / 
+    this.stats.averageCompressionRatio =
+      (this.stats.averageCompressionRatio * (this.stats.compressedResponses - 1) + compressionRatio) /
       this.stats.compressedResponses;
   }
 
@@ -300,7 +300,7 @@ export class ResponseOptimizer {
     contentType: string = 'application/json'
   ): NodeJS.ReadableStream {
     const { Readable } = require('stream');
-    
+
     let jsonData: string;
     if (typeof data === 'string') {
       jsonData = data;
@@ -329,12 +329,12 @@ export class ResponseOptimizer {
   private static chunkData(data: string, chunkSize: number): Buffer[] {
     const chunks: Buffer[] = [];
     const buffer = Buffer.from(data, 'utf8');
-    
+
     for (let i = 0; i < buffer.length; i += chunkSize) {
       const end = Math.min(i + chunkSize, buffer.length);
       chunks.push(buffer.slice(i, end));
     }
-    
+
     return chunks;
   }
 
@@ -349,7 +349,7 @@ export class ResponseOptimizer {
     implementation: string;
   }> {
     const recommendations = [];
-    
+
     // Check compression effectiveness
     if (this.stats.compressedResponses > 0 && this.stats.averageCompressionRatio < 20) {
       recommendations.push({
@@ -362,10 +362,10 @@ export class ResponseOptimizer {
     }
 
     // Check compression usage
-    const compressionUsage = this.stats.totalResponses > 0 
-      ? (this.stats.compressedResponses / this.stats.totalResponses) * 100 
+    const compressionUsage = this.stats.totalResponses > 0
+      ? (this.stats.compressedResponses / this.stats.totalResponses) * 100
       : 0;
-    
+
     if (compressionUsage < 50) {
       recommendations.push({
         type: 'compression',
@@ -377,10 +377,10 @@ export class ResponseOptimizer {
     }
 
     // Check average compression time
-    const avgCompressionTime = this.stats.compressedResponses > 0 
-      ? this.stats.compressionTime / this.stats.compressedResponses 
+    const avgCompressionTime = this.stats.compressedResponses > 0
+      ? this.stats.compressionTime / this.stats.compressedResponses
       : 0;
-    
+
     if (avgCompressionTime > 50) {
       recommendations.push({
         type: 'compression',
@@ -392,10 +392,10 @@ export class ResponseOptimizer {
     }
 
     // Large response size recommendation
-    const avgResponseSize = this.stats.totalResponses > 0 
-      ? this.stats.originalBytes / this.stats.totalResponses 
+    const avgResponseSize = this.stats.totalResponses > 0
+      ? this.stats.originalBytes / this.stats.totalResponses
       : 0;
-    
+
     if (avgResponseSize > 100000) { // 100KB
       recommendations.push({
         type: 'streaming',
@@ -417,14 +417,14 @@ export class ResponseOptimizer {
     bandwidthSaved: number;
     averageCompressionTime: number;
   } {
-    const compressionUsage = this.stats.totalResponses > 0 
-      ? (this.stats.compressedResponses / this.stats.totalResponses) * 100 
+    const compressionUsage = this.stats.totalResponses > 0
+      ? (this.stats.compressedResponses / this.stats.totalResponses) * 100
       : 0;
-    
+
     const bandwidthSaved = this.stats.originalBytes - this.stats.compressedBytes;
-    
-    const averageCompressionTime = this.stats.compressedResponses > 0 
-      ? this.stats.compressionTime / this.stats.compressedResponses 
+
+    const averageCompressionTime = this.stats.compressedResponses > 0
+      ? this.stats.compressionTime / this.stats.compressedResponses
       : 0;
 
     return {
@@ -448,6 +448,16 @@ export class ResponseOptimizer {
       averageCompressionRatio: 0
     };
   }
+  /**
+   * P5-4.2g: Track response statistics publicly
+   */
+  static trackResponse(originalSize: number, compressedSize: number, shouldCompress: boolean): void {
+    this.stats.totalResponses++;
+    if (!shouldCompress) {
+      this.stats.originalBytes += originalSize;
+      this.stats.compressedBytes += compressedSize;
+    }
+  }
 }
 
 /**
@@ -459,17 +469,18 @@ export function responseOptimizationMiddleware() {
     const originalJson = res.json;
 
     // Override send to add compression
-    res.send = async function(data: any) {
+    // @ts-ignore - Fix type mismatch with Express Response.send
+    res.send = async function (data: any) {
       const acceptEncoding = req.get('Accept-Encoding') || '';
       const userAgent = req.get('User-Agent') || '';
       const contentType = res.get('Content-Type') || 'text/html';
-      
+
       let responseData = data;
       let shouldCompress = false;
-      
+
       if (typeof data === 'string' || Buffer.isBuffer(data)) {
         const contentLength = Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data, 'utf8');
-        
+
         shouldCompress = ResponseOptimizer.shouldCompress(
           contentType,
           contentLength,
@@ -478,25 +489,25 @@ export function responseOptimizationMiddleware() {
 
         if (shouldCompress) {
           const algorithm = ResponseOptimizer.getBestCompressionAlgorithm(acceptEncoding);
-          
+
           if (algorithm) {
             try {
               responseData = await ResponseOptimizer.compressResponse(
                 data,
-                algorithm,
-                req.correlationId
+                algorithm as 'gzip' | 'deflate' | 'br',
+                (req as any).correlationId
               );
-              
+
               res.set('Content-Encoding', algorithm);
               res.set('Vary', 'Accept-Encoding');
-              
+
               // Remove content-length as it will be different after compression
               res.removeHeader('Content-Length');
             } catch (error) {
               logger.warn({
                 event: 'COMPRESSION_FALLBACK',
                 error: error instanceof Error ? error.message : 'Unknown error',
-                correlationId: req.correlationId
+                correlationId: (req as any).correlationId
               }, '⚠️ Compression failed, sending uncompressed response');
             }
           }
@@ -504,18 +515,18 @@ export function responseOptimizationMiddleware() {
       }
 
       // Track response statistics
-      ResponseOptimizer.stats.totalResponses++;
-      if (!shouldCompress) {
-        const size = Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data, 'utf8');
-        ResponseOptimizer.stats.originalBytes += size;
-        ResponseOptimizer.stats.compressedBytes += size;
+      let size = 0;
+      if (data) {
+        size = Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data, 'utf8');
       }
+      ResponseOptimizer.trackResponse(size, 0, shouldCompress); // Compressed size tracked internally if compressed
 
       return originalSend.call(this, responseData);
     };
 
     // Override json to add compression for JSON responses
-    res.json = async function(data: any) {
+    // @ts-ignore - Fix type mismatch with Express Response.json
+    res.json = async function (data: any) {
       res.set('Content-Type', 'application/json; charset=utf-8');
       const jsonString = JSON.stringify(data);
       return res.send(jsonString);
@@ -534,13 +545,13 @@ export function initializeResponseOptimization(): void {
   // Setup periodic statistics collection
   setInterval(() => {
     const stats = ResponseOptimizer.getStats();
-    
+
     // Record metrics
     MetricsCollector.setGauge('response_compression_usage_percent', stats.compressionUsage);
     MetricsCollector.setGauge('response_compression_ratio_percent', stats.averageCompressionRatio);
     MetricsCollector.setGauge('response_bandwidth_saved_bytes', stats.bandwidthSaved);
     MetricsCollector.setGauge('response_compression_time_ms', stats.averageCompressionTime);
-    
+
     // Log performance summary
     if (stats.totalResponses > 0) {
       logger.info({
@@ -553,14 +564,14 @@ export function initializeResponseOptimization(): void {
   // Setup weekly optimization analysis
   setInterval(() => {
     const recommendations = ResponseOptimizer.getOptimizationRecommendations();
-    
+
     if (recommendations.length > 0) {
       logger.info({
         event: 'RESPONSE_OPTIMIZATION_RECOMMENDATIONS',
         recommendationCount: recommendations.length,
         highPriority: recommendations.filter(r => r.priority === 'high').length
       }, '📈 Response optimization recommendations available');
-      
+
       recommendations.forEach(rec => {
         if (rec.priority === 'high') {
           logger.warn({

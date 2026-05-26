@@ -299,6 +299,13 @@ export default defineConfig({
       : { protocol: 'ws' },
     // Allow all hosts including ngrok tunnels
     allowedHosts: 'all',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
 });
 

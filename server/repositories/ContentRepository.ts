@@ -10,8 +10,10 @@ export class ContentRepository extends BaseRepository<IContent> {
     super(ContentModel, 'Content');
   }
 
-  async findByWorkspaceId(workspaceId: string, options?: PaginationOptions) {
-    return this.findMany({ workspaceId }, options);
+  async findByWorkspaceId(workspaceId: string, options?: PaginationOptions, accountId?: string) {
+    const filter: any = { workspaceId };
+    if (accountId) filter.accountId = accountId;
+    return this.findMany(filter, options);
   }
 
   async findByWorkspaceAndStatus(
@@ -58,7 +60,7 @@ export class ContentRepository extends BaseRepository<IContent> {
         .sort({ scheduledAt: 1 })
         .limit(limit)
         .exec();
-      
+
       logger.db.query('findUpcomingScheduled', this.entityName, Date.now() - startTime, { workspaceId, limit });
       return result;
     } catch (error) {
@@ -78,7 +80,7 @@ export class ContentRepository extends BaseRepository<IContent> {
         .sort({ publishedAt: -1 })
         .limit(limit)
         .exec();
-      
+
       logger.db.query('findRecentlyPublished', this.entityName, Date.now() - startTime, { workspaceId, limit });
       return result;
     } catch (error) {
@@ -163,7 +165,7 @@ export class ContentRepository extends BaseRepository<IContent> {
           { new: true }
         )
         .exec();
-      
+
       logger.db.query('addCreditsUsed', this.entityName, Date.now() - startTime, { contentId, creditsUsed });
       return result;
     } catch (error) {
@@ -179,12 +181,12 @@ export class ContentRepository extends BaseRepository<IContent> {
         { $match: { workspaceId } },
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]).exec();
-      
+
       const counts: Record<string, number> = {};
       result.forEach((item: { _id: string; count: number }) => {
         counts[item._id] = item.count;
       });
-      
+
       logger.db.query('countByStatus', this.entityName, Date.now() - startTime, { workspaceId });
       return counts;
     } catch (error) {
@@ -200,12 +202,12 @@ export class ContentRepository extends BaseRepository<IContent> {
         { $match: { workspaceId } },
         { $group: { _id: '$type', count: { $sum: 1 } } }
       ]).exec();
-      
+
       const counts: Record<string, number> = {};
       result.forEach((item: { _id: string; count: number }) => {
         counts[item._id] = item.count;
       });
-      
+
       logger.db.query('countByType', this.entityName, Date.now() - startTime, { workspaceId });
       return counts;
     } catch (error) {
@@ -221,7 +223,7 @@ export class ContentRepository extends BaseRepository<IContent> {
         { $match: { workspaceId } },
         { $group: { _id: null, totalCredits: { $sum: '$creditsUsed' } } }
       ]).exec();
-      
+
       logger.db.query('getTotalCreditsUsed', this.entityName, Date.now() - startTime, { workspaceId });
       return result[0]?.totalCredits || 0;
     } catch (error) {
@@ -309,11 +311,69 @@ export class ContentRepository extends BaseRepository<IContent> {
       location: postData.location || '',
       accounts: postData.accounts || [],
       status: postData.status || 'draft',
-      publishedAt: postData.publishedAt || null,
+      publishedAt: postData.publishedAt === null ? undefined : postData.publishedAt,
       createdAt: postData.createdAt || new Date(),
       updatedAt: new Date()
     };
-    return this.create(post);
+    return this.create(post as any);
+  }
+
+  async getAggregatedMetrics(workspaceId: string, accountId?: string): Promise<{
+    totalReach: number;
+    totalImpressions: number;
+    totalLikes: number;
+    totalComments: number;
+    totalShares: number;
+    totalSaves: number;
+    totalVideos: number;
+    totalImages: number;
+    totalCarousels: number;
+  }> {
+    const startTime = Date.now();
+    try {
+      const matchFilter: any = { workspaceId: workspaceId.toString(), status: 'published' };
+      if (accountId) {
+        matchFilter.accountId = accountId;
+      }
+      const result = await this.model.aggregate([
+        { $match: matchFilter },
+        {
+          $group: {
+            _id: null,
+            totalReach: { $sum: { $ifNull: ['$metrics.reach', 0] } },
+            totalImpressions: { $sum: { $ifNull: ['$metrics.impressions', 0] } },
+            totalLikes: { $sum: { $ifNull: ['$metrics.likes', 0] } },
+            totalComments: { $sum: { $ifNull: ['$metrics.comments', 0] } },
+            totalShares: { $sum: { $ifNull: ['$metrics.shares', 0] } },
+            totalSaves: { $sum: { $ifNull: ['$metrics.saves', 0] } },
+            totalVideos: { $sum: { $cond: [{ $eq: ['$type', 'video'] }, 1, 0] } },
+            totalImages: { $sum: { $cond: [{ $eq: ['$type', 'image'] }, 1, 0] } },
+            totalCarousels: { $sum: { $cond: [{ $eq: ['$type', 'carousel'] }, 1, 0] } }
+          }
+        }
+      ]).exec();
+
+      logger.db.query('getAggregatedMetrics', this.entityName, Date.now() - startTime, { workspaceId });
+
+      if (result.length === 0) {
+        return {
+          totalReach: 0,
+          totalImpressions: 0,
+          totalLikes: 0,
+          totalComments: 0,
+          totalShares: 0,
+          totalSaves: 0,
+          totalVideos: 0,
+          totalImages: 0,
+          totalCarousels: 0
+        };
+      }
+
+      return result[0];
+    } catch (error) {
+      logger.db.error('getAggregatedMetrics', error, { entityName: this.entityName, workspaceId });
+      throw new DatabaseError('Failed to aggregate content metrics', error as Error);
+    }
   }
 
   async countAll(): Promise<number> {

@@ -74,41 +74,34 @@ const getAllowedOrigins = (): string[] => {
  * UPDATED: Added ngrok domain support for mobile development testing
  */
 function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  if (isDevelopment) {
+    // In development, allow ALL origins to simplify mobile/local testing
+    // This resolves issues where physical devices might have unexpected origins
+    console.log(`✅ [CORS] Development mode: Auto-allowed origin: ${origin || 'none'}`);
+    return true;
+  }
+
   if (!origin) {
     // Allow same-origin requests (no origin header)
     return true;
   }
 
-  // Check exact match first
   if (allowedOrigins.includes(origin)) {
-    console.log(`✅ CORS SECURITY: Allowed origin: ${origin}`);
+    console.log(`✅ [CORS] Allowed exact match: ${origin}`);
     return true;
   }
 
-  // In development, allow ngrok tunnels for mobile testing
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  if (isDevelopment) {
-    // Allow ngrok domains (*.ngrok-free.dev, *.ngrok.io, *.ngrok-free.app)
-    if (origin.includes('.ngrok-free.dev') ||
-      origin.includes('.ngrok.io') ||
-      origin.includes('.ngrok-free.app') ||
-      origin.includes('.ngrok.app')) {
-      console.log(`✅ CORS SECURITY: Allowed ngrok tunnel origin: ${origin}`);
-      return true;
-    }
-
-    // Allow localhost on any port
-    if (origin.startsWith('http://localhost:') ||
-      origin.startsWith('http://127.0.0.1:') ||
-      origin.startsWith('http://0.0.0.0:')) {
-      console.log(`✅ CORS SECURITY: Allowed localhost origin: ${origin}`);
-      return true;
-    }
+  // Allow ngrok tunnels
+  if (origin.includes('.ngrok-free.dev') ||
+    origin.includes('.ngrok.io') ||
+    origin.includes('.ngrok-free.app') ||
+    origin.includes('.ngrok.app')) {
+    console.log(`✅ [CORS] Allowed ngrok tunnel: ${origin}`);
+    return true;
   }
 
-  console.warn(`🚨 CORS SECURITY: Blocked unauthorized origin: ${origin}`);
-  console.warn(`🔒 CORS SECURITY: Allowed origins: ${allowedOrigins.join(', ')}`);
-
+  console.warn(`🚨 [CORS] BLOCKED Origin: "${origin}" | Method: ${process.env.NODE_ENV} | Headers: ${JSON.stringify(allowedOrigins)}`);
   return false;
 }
 

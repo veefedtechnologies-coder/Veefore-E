@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { apiRequest } from '@/lib/queryClient'
 
 export const useSocialAccounts = (workspaceId?: string) => {
@@ -6,9 +7,12 @@ export const useSocialAccounts = (workspaceId?: string) => {
     queryKey: ['/api/social-accounts', workspaceId],
     queryFn: async () => {
       if (!workspaceId) return [];
+      console.log('[useSocialAccounts] Fetching for workspace:', workspaceId);
       const response = await apiRequest(`/api/social-accounts?workspaceId=${workspaceId}`);
+      console.log('[useSocialAccounts] Raw API response:', JSON.stringify(response).slice(0, 500));
       if (Array.isArray(response)) return response;
       if (response && Array.isArray(response.data)) return response.data;
+      console.warn('[useSocialAccounts] Unexpected response shape, returning empty array');
       return [];
     },
     enabled: !!workspaceId,

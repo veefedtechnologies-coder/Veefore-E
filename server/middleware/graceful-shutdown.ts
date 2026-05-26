@@ -29,7 +29,7 @@ export class GracefulShutdown {
     this.server = server;
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.logger = this.config.logger || console.log;
-    
+
     this.setupSignalHandlers();
     this.trackConnections();
   }
@@ -59,7 +59,7 @@ export class GracefulShutdown {
     // Track active connections for proper cleanup
     this.server.on('connection', (connection) => {
       this.connections.add(connection);
-      
+
       connection.on('close', () => {
         this.connections.delete(connection);
       });
@@ -73,7 +73,7 @@ export class GracefulShutdown {
     }
 
     this.isShuttingDown = true;
-    
+
     const shutdownTimeout = setTimeout(() => {
       this.logger(`⏰ P9: Shutdown timeout reached (${this.config.timeout}ms), forcing exit...`);
       process.exit(1);
@@ -117,7 +117,7 @@ export class GracefulShutdown {
 
       clearTimeout(shutdownTimeout);
       this.logger('🎉 P9: Graceful shutdown completed successfully');
-      
+
       process.exit(exitCode);
 
     } catch (error) {
@@ -129,14 +129,14 @@ export class GracefulShutdown {
 
   private async cleanupResources() {
     this.logger('🧹 P9: Cleaning up additional resources...');
-    
+
     // Add cleanup for other resources like:
     // - Redis connections
     // - File handles
     // - WebSocket connections
     // - Background jobs
     // - Cache systems
-    
+
     // For now, just wait a moment to ensure cleanup
     await this.delay(1000);
     this.logger('✅ P9: Resource cleanup completed');
@@ -168,7 +168,7 @@ export class GracefulShutdown {
 
 // Helper function to initialize graceful shutdown
 export function initializeGracefulShutdown(
-  server: Server, 
+  server: Server,
   config?: Partial<GracefulShutdownConfig>
 ): GracefulShutdown {
   return new GracefulShutdown(server, config);

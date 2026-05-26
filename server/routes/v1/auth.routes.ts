@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
-import { authRateLimiter } from '../../middleware/rate-limiting-working';
+import { authRateLimiter, apiRateLimiter } from '../../middleware/rate-limiting-working';
 import { validateRequest } from '../../middleware/validation';
 import { z } from 'zod';
 
@@ -27,11 +27,15 @@ const LinkFirebaseSchema = z.object({
   displayName: z.string().optional(),
 });
 
+// Check if email already exists (for pre-signup validation)
+// Using apiRateLimiter (60/min) instead of authRateLimiter (5/15min) since this is a read-only check
+router.get('/check-email-exists', apiRateLimiter, authController.checkEmailExists);
+
 router.get('/session', authController.getSession);
 
-router.post('/link-firebase', 
-  authRateLimiter, 
-  validateRequest({ body: LinkFirebaseSchema }), 
+router.post('/link-firebase',
+  authRateLimiter,
+  validateRequest({ body: LinkFirebaseSchema }),
   authController.linkFirebase
 );
 
@@ -41,27 +45,27 @@ router.post('/record-login', requireAuth, authController.recordLogin);
 
 router.post('/associate-uid', authRateLimiter, authController.associateUid);
 
-router.post('/send-verification', 
-  authRateLimiter, 
-  validateRequest({ body: SendVerificationSchema }), 
+router.post('/send-verification',
+  authRateLimiter,
+  validateRequest({ body: SendVerificationSchema }),
   authController.sendVerification
 );
 
-router.post('/send-verification-email', 
-  authRateLimiter, 
-  validateRequest({ body: SendVerificationSchema }), 
+router.post('/send-verification-email',
+  authRateLimiter,
+  validateRequest({ body: SendVerificationSchema }),
   authController.sendVerificationEmail
 );
 
-router.post('/verify-email', 
-  authRateLimiter, 
-  validateRequest({ body: VerifyEmailSchema }), 
+router.post('/verify-email',
+  authRateLimiter,
+  validateRequest({ body: VerifyEmailSchema }),
   authController.verifyEmail
 );
 
-router.post('/resend-verification', 
-  authRateLimiter, 
-  validateRequest({ body: ResendVerificationSchema }), 
+router.post('/resend-verification',
+  authRateLimiter,
+  validateRequest({ body: ResendVerificationSchema }),
   authController.resendVerification
 );
 

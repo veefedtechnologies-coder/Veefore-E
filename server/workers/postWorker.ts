@@ -62,6 +62,7 @@ export class PostWorker {
           concurrency: 3,
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 50 },
+          lockDuration: 600000, // 10 minutes to allow for long Instagram video processing
         }
       );
 
@@ -118,7 +119,20 @@ export class PostWorker {
         return { status: 'skipped', reason: 'Platform not supported' };
       }
 
-      const instagramAccount = await this.storage.getSocialAccountByPlatform(workspaceId, 'instagram');
+      const accounts = await this.storage.getSocialAccountsWithTokensInternal(workspaceId);
+      
+      let instagramAccount;
+      
+      const specificAccountId = content.contentData?.accountId;
+      if (specificAccountId) {
+        console.log(`[POST_WORKER] Looking for specific account ID: ${specificAccountId} in workspace accounts`);
+        instagramAccount = accounts.find(a => a.id === specificAccountId);
+      }
+      
+      if (!instagramAccount) {
+        console.log(`[POST_WORKER] Looking for any Instagram account for workspace: ${workspaceId}`);
+        instagramAccount = accounts.find(a => a.platform === 'instagram');
+      }
 
       if (!instagramAccount || !instagramAccount.accessToken) {
         console.error(`[POST_WORKER] No Instagram account found for workspace ${workspaceId}`);
@@ -126,14 +140,38 @@ export class PostWorker {
         return { status: 'failed', reason: 'No Instagram account connected' };
       }
 
-      if (!content.contentData?.mediaUrl) {
+      const mediaUrl = content.contentData?.mediaUrls?.[0] || content.contentData?.mediaUrl;
+
+      if (!mediaUrl) {
         console.error(`[POST_WORKER] No media URL found for content ${contentId}`);
         await this.updateContentStatus(contentId, 'failed', 'No media URL');
         return { status: 'failed', reason: 'No media URL' };
       }
 
-      const caption = `${content.title}\n\n${content.description || ''}`;
-      const mediaUrl = content.contentData.mediaUrl;
+      let caption = '';
+      if (content.contentData?.text) {
+        caption = content.contentData.text;
+      } else {
+        caption = content.description ? content.description : content.title;
+      }
+      caption = caption.trim();
+
+      const mentions = content.contentData?.mentions || [];
+      const hashtags = content.contentData?.hashtags || [];
+
+      const isVideoType = content.type === 'video' || content.type === 'reel' || content.type === 'story' || 
+                         (mediaUrl && mediaUrl.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i));
+
+      if (hashtags.length > 0 || (mentions.length > 0 && isVideoType)) {
+        caption += '\n\n';
+        if (mentions.length > 0 && isVideoType) {
+          caption += mentions.map((m: string) => `@${m.replace(/^@+/, '')}`).join(' ') + ' ';
+        }
+        if (hashtags.length > 0) {
+          caption += hashtags.map((h: string) => `#${h.replace(/^#+/, '')}`).join(' ');
+        }
+      }
+      caption = caption.trim();
 
       let contentType: 'video' | 'photo' | 'reel' | 'story' = 'photo';
 
@@ -144,20 +182,37 @@ export class PostWorker {
       } else if (content.type === 'video') {
         contentType = 'video';
       } else {
-        const isVideo = mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i) ||
-          mediaUrl?.includes('video');
+        const isVideo = !!mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i);
         contentType = isVideo ? 'video' : 'photo';
       }
 
       console.log(`[POST_WORKER] Publishing ${contentType} content to Instagram`);
 
-      const { InstagramDirectPublisher } = await import('../instagram-direct-publisher');
+      const { SimpleInstagramPublisher } = await import('../simple-instagram-publisher');
+      
+      // Ensure mediaUrl is absolute using finalBaseUrl if necessary
+      let cleanUrl = mediaUrl;
+      const currentDomain = process.env.SOCIAL_AUTH_BASE_URL || process.env.VITE_APP_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      
+      if (cleanUrl.startsWith('/')) {
+        cleanUrl = `${currentDomain}${cleanUrl}`;
+      } else if (cleanUrl.includes('localhost') || cleanUrl.includes('your-replit-dev-domain')) {
+        try {
+          const urlObj = new URL(cleanUrl);
+          cleanUrl = `${currentDomain}${urlObj.pathname}${urlObj.search}`;
+        } catch (e) {
+          const filename = cleanUrl.split('/').pop() || 'media';
+          cleanUrl = `${currentDomain}/uploads/${filename}`;
+        }
+      }
 
-      const directResult = await InstagramDirectPublisher.publishContent(
+      const directResult = await SimpleInstagramPublisher.publishContent(
         instagramAccount.accessToken,
-        mediaUrl,
+        cleanUrl,
         caption,
-        contentType
+        contentType,
+        instagramAccount.accountId || (instagramAccount as any)._id?.toString(),
+        mentions
       );
 
       if (directResult.success) {

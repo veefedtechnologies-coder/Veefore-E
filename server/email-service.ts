@@ -33,7 +33,7 @@ export class EmailService {
                 sgMail.setApiKey(sendgridApiKey);
 
                 // Need a verified sender email - ask user to provide one
-                const fromEmail = process.env.SENDGRID_VERIFIED_SENDER;
+                const fromEmail = process.env.SENDGRID_VERIFIED_SENDER || process.env.SENDGRID_FROM_EMAIL;
                 if (!fromEmail) {
                     console.log('[EMAIL] No verified sender email configured. Please add SENDGRID_VERIFIED_SENDER environment variable with your verified SendGrid sender email.');
                     throw new Error('No verified sender email configured');
@@ -120,67 +120,137 @@ export class EmailService {
         }
     }
 
-    // Email verification template
+    // Email verification template description: Modern, responsive design with Veefore branding
     private getVerificationEmailTemplate(otp: string, firstName: string): string {
+        const logoUrl = 'https://res.cloudinary.com/dagelfucc/image/upload/v1767342187/veefore_lbulb6.png';
+
         return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Verify Your VeeFore Account</title>
-    </head>
-    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);">
-        <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
-            <!-- Header -->
-            <div style="background: linear-gradient(135deg, #1e40af 0%, #6b7280 100%); padding: 40px 20px; text-align: center;">
-                <h1 style="color: #ffffff; font-size: 32px; margin: 0; font-weight: 700;">VeeFore</h1>
-                <p style="color: #e0f2fe; margin: 10px 0 0 0; font-size: 16px;">AI-Powered Social Media Management</p>
-            </div>
-
-            <!-- Content -->
-            <div style="padding: 40px 30px; background: #ffffff;">
-                <h2 style="color: #1f2937; font-size: 24px; margin: 0 0 20px 0; font-weight: 600;">Verify Your Account</h2>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Verify Your Veefore Account</title>
+            <style>
+                /* Reset */
+                body, p, h1, h2, h3, div { margin: 0; padding: 0; }
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155; line-height: 1.6; }
                 
-                <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
-                    Hi ${firstName},
-                </p>
+                /* Reset */
+                body, table, td, p, div, a { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+                body { margin: 0; padding: 0; background-color: #ffffff; color: #334155; line-height: 1.6; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+                table { border-spacing: 0; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+                /* Inner Content Wrapper for readability */
+                .wrapper { width: 100%; margin: 0 auto; padding: 0 40px; }
                 
-                <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
-                    Thank you for signing up for VeeFore! To complete your registration and secure your account, please verify your email address using the verification code below:
-                </p>
+                /* Dark Mode */
+                @media (prefers-color-scheme: dark) {
+                    body, .body-bg { background-color: #0f172a !important; color: #e2e8f0 !important; }
+                    h1, h2, h3 { color: #f8fafc !important; }
+                    p { color: #cbd5e1 !important; }
+                    .content-bg { background-color: #0f172a !important; }
+                    .header-bg { background-color: #0f172a !important; }
+                }
 
-                <!-- OTP Box -->
-                <div style="background: #f8fafc; border: 2px solid #e5e7eb; border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0;">
-                    <p style="color: #6b7280; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase; font-weight: 600; letter-spacing: 1px;">Verification Code</p>
-                    <div style="font-size: 36px; font-weight: 700; color: #1e40af; letter-spacing: 8px; font-family: 'Courier New', monospace; margin: 10px 0;">${otp}</div>
-                    <p style="color: #9ca3af; font-size: 12px; margin: 15px 0 0 0;">This code expires in 15 minutes</p>
-                </div>
+                /* Responsive */
+                @media only screen and (max-width: 600px) {
+                    .wrapper { padding: 0 20px !important; }
+                    .content-td { padding: 30px 0 !important; }
+                    .otp-code { font-size: 32px !important; letter-spacing: 4px !important; }
+                    .header-td { padding: 40px 20px !important; }
+                }
+            </style>
+            <meta name="color-scheme" content="light dark">
+            <meta name="supported-color-schemes" content="light dark">
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #ffffff; width: 100%;">
+            <table class="body-bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; width: 100%;">
+                
+                <!-- Full Width Header -->
+                <tr>
+                                <!-- Header with Brand Texture -->
+                        <td align="center" class="header-bg" style="padding: 32px 20px; text-align: center; background-color: #0f2744; background: radial-gradient(circle at center top, #2b456b 0%, #0f2744 100%);">
+                            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <!-- Logo & Brand -->
+                                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 auto;">
+                                            <tr>
+                                                <td style="padding-right: 12px;">
+                                                    <img src="https://veefore.com/veefore-logo.png" width="40" height="40" alt="Veefore Logo" style="display: block; width: 40px; height: 40px; border-radius: 8px;">
+                                                </td>
+                                                <td style="font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 24px; font-weight: 700; color: #ffffff !important; letter-spacing: -0.5px;">
+                                                    VeeFore
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                </tr>
 
-                <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin: 25px 0;">
-                    Enter this code in the verification screen to activate your VeeFore account and start creating amazing content with AI.
-                </p>
+                <!-- Full Width Content -->
+                <tr>
+                    <td class="content-bg" align="center" style="background-color: #ffffff;">
+                        <table class="wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+                            <tr>
+                                <td class="content-td" align="left" style="padding: 40px 0;">
 
-                <div style="background: #f1f5f9; border: 1px solid #6b7280; border-radius: 8px; padding: 15px; margin: 25px 0;">
-                    <p style="color: #475569; font-size: 14px; margin: 0; font-weight: 500;">
-                        🔒 Security Tip: Never share this verification code with anyone. VeeFore will never ask for your verification code via phone or email.
+                <!-- Main Content -->
+                <div class="content" style="padding: 0 48px; text-align: left;">
+                    <h2 style="color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.5px;">Unlock the Power of AI</h2>
+                    
+                    <p style="color: #475569; font-size: 16px; margin-bottom: 24px;">
+                        Hi <strong>${firstName}</strong>,
+                        <br><br>
+                        You're just one step away from accessing VeeFore's advanced analytics suite. Verify your identity to secure your account and start your journey.
+                    </p>
+
+                    <!-- OTP Code Box Clean -->
+                    <div style="background: rgba(241, 245, 249, 0.5); border: 1px dashed #cbd5e1; border-radius: 12px; padding: 24px; margin: 32px 0; text-align: center;">
+                        <p style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px;">Verification Code</p>
+                        <div class="otp-code" style="font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace; font-size: 48px; font-weight: 700; color: #0f172a; letter-spacing: 12px; line-height: 1;">
+                            ${otp}
+                        </div>
+                        <p style="color: #94a3b8; font-size: 13px; margin-top: 16px;">Valid for 15 minutes</p>
+                    </div>
+
+                    <p style="color: #64748b; font-size: 14px; line-height: 1.5; border-top: 1px solid #e2e8f0; padding-top: 24px;">
+                        If you didn't create this account, you can safely ignore this email. Someone might have mistyped their address.
                     </p>
                 </div>
-            </div>
-
-            <!-- Footer -->
-            <div style="background: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-                <p style="color: #6b7280; font-size: 14px; margin: 0 0 10px 0;">
-                    If you didn't request this verification, please ignore this email.
-                </p>
-                <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-                    © 2025 VeeFore. All rights reserved.
-                </p>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <!-- Full Width Footer -->
+                <tr>
+                    <td class="footer-bg" align="center" style="background-color: #f8fafc; padding: 24px; border-top: 1px solid #e2e8f0;">
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td align="center">
+                                    <p style="color: #94a3b8; font-size: 12px; margin-bottom: 12px;">
+                                        Questions? Contact <a href="mailto:support@veefore.com" style="color: #0d9488; text-decoration: none; font-weight: 500;">support@veefore.com</a>
+                                    </p>
+                                    <div style="margin-bottom: 16px;">
+                                        <a href="#" style="display: inline-block; margin: 0 8px;"><img src="https://img.icons8.com/ios-filled/50/94a3b8/twitter.png" width="20" alt="Twitter"></a>
+                                        <a href="#" style="display: inline-block; margin: 0 8px;"><img src="https://img.icons8.com/ios-filled/50/94a3b8/instagram-new.png" width="20" alt="Instagram"></a>
+                                        <a href="#" style="display: inline-block; margin: 0 8px;"><img src="https://img.icons8.com/ios-filled/50/94a3b8/linkedin.png" width="20" alt="LinkedIn"></a>
+                                    </div>
+                                    <p style="color: #cbd5e1; font-size: 11px;">
+                                        &copy; ${new Date().getFullYear()} Veefed Technologies Inc.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        `;
     }
 
     // Welcome email template

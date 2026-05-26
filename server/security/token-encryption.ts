@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Logger } from '../utils/logger';
 
 /**
  * CRITICAL SECURITY SERVICE: Social Media Token Encryption
@@ -13,14 +14,12 @@ import crypto from 'crypto';
  * - Encrypted data integrity verification
  */
 
-// Encryption configuration
+// Default configurations for lazy initialization
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32; // 256 bits
 const IV_LENGTH = 12;  // 96 bits (correct for GCM mode)
 const SALT_LENGTH = 32; // 256 bits
 const TAG_LENGTH = 16;  // 128 bits
-const DEFAULT_KDF_ITERATIONS = parseInt(process.env.TOKEN_KDF_ITERATIONS || '100000', 10);
-const GLOBAL_SALT_STRING = process.env.TOKEN_ENCRYPTION_GLOBAL_SALT || '';
 
 interface EncryptedToken {
   encryptedData: string;
@@ -30,26 +29,69 @@ interface EncryptedToken {
   kdf?: number;
 }
 
-export class TokenEncryptionService {
-  private masterKey: string;
+export class TokenDecryptionError extends Error {
+  public readonly isAuthFailure: boolean;
+  constructor(message: string, isAuthFailure: boolean = false) {
+    super(message);
+    this.name = 'TokenDecryptionError';
+    this.isAuthFailure = isAuthFailure;
+  }
+}
 
-  constructor() {
-    // P1-6.2: Enhanced key management integration
-    // Get master key from environment - CRITICAL for production security
-    this.masterKey = process.env.TOKEN_ENCRYPTION_KEY || this.generateMasterKey();
-    
-    if (!process.env.TOKEN_ENCRYPTION_KEY) {
-      // CRITICAL: Fail fast in production environments for security
+export class TokenEncryptionService {
+  private _masterKey: string | null = null;
+  private _globalSalt: Buffer | null = null;
+  private _iterations: number | null = null;
+
+  /**
+   * Lazy-loaded master key from environment OR generated fallback
+   */
+  private get masterKey(): string {
+    if (this._masterKey) return this._masterKey;
+
+    const envKey = process.env.TOKEN_ENCRYPTION_KEY;
+    if (envKey) {
+      this._masterKey = envKey;
+      Logger.info('TokenEncryption', '🛡️ [SECURITY] Using persistent TOKEN_ENCRYPTION_KEY from environment');
+    } else {
       if (process.env.NODE_ENV === 'production') {
         console.error('🚨 CRITICAL SECURITY ERROR: TOKEN_ENCRYPTION_KEY is required in production');
-        console.error('💀 Exiting to prevent insecure operation');
         process.exit(1);
       }
-      // Only warn once in development, not on every startup
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 Development mode: Auto-generating temporary encryption key');
-      }
+      this._masterKey = this.generateMasterKey();
+      console.warn('🔧 [SECURITY] TOKEN_ENCRYPTION_KEY missing. Using temporary development key. TOKENS WILL BE LOST ON RESTART!');
     }
+    return this._masterKey;
+  }
+
+  /**
+   * Lazy-loaded global salt
+   */
+  private get globalSalt(): Buffer | null {
+    if (this._globalSalt !== null) return this._globalSalt;
+
+    const saltStr = process.env.TOKEN_ENCRYPTION_GLOBAL_SALT;
+    if (saltStr) {
+      this._globalSalt = Buffer.from(saltStr, 'utf8');
+      Logger.info('TokenEncryption', '🛡️ [SECURITY] Using TOKEN_ENCRYPTION_GLOBAL_SALT from environment');
+    } else {
+      this._globalSalt = Buffer.alloc(0); // Empty buffer instead of null for easy concatenation
+    }
+    return this._globalSalt;
+  }
+
+  /**
+   * Lazy-loaded KDF iterations
+   */
+  private get iterations(): number {
+    if (this._iterations !== null) return this._iterations;
+    const envIter = process.env.TOKEN_KDF_ITERATIONS;
+    this._iterations = envIter ? parseInt(envIter, 10) : 100000;
+    return this._iterations;
+  }
+
+  constructor() {
+    // Constructor is now minimal to support lazy loading
   }
 
   /**
@@ -64,9 +106,10 @@ export class TokenEncryptionService {
    * Derive encryption key from master key using PBKDF2
    */
   private deriveKey(salt: Buffer, iterations: number): Buffer {
-    const globalSalt = GLOBAL_SALT_STRING ? Buffer.from(GLOBAL_SALT_STRING, 'utf8') : null;
-    const effectiveSalt = globalSalt ? Buffer.concat([salt, globalSalt]) : salt;
-    return crypto.pbkdf2Sync(this.masterKey, effectiveSalt, iterations, KEY_LENGTH, 'sha256');
+    const saltWithGlobal = this.globalSalt && this.globalSalt.length > 0
+      ? Buffer.concat([salt, this.globalSalt])
+      : salt;
+    return crypto.pbkdf2Sync(this.masterKey, saltWithGlobal, iterations, KEY_LENGTH, 'sha256');
   }
 
   /**
@@ -83,19 +126,19 @@ export class TokenEncryptionService {
       // Generate random salt and IV for this encryption
       const salt = crypto.randomBytes(SALT_LENGTH);
       const iv = crypto.randomBytes(IV_LENGTH);
-      
+
       // Derive encryption key from master key + salt
-      const iterations = DEFAULT_KDF_ITERATIONS;
+      const iterations = this.iterations;
       const key = this.deriveKey(salt, iterations);
-      
+
       // SECURITY FIX: Create cipher with proper AES-256-GCM using IV
       const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
       cipher.setAutoPadding(true);
-      
+
       // Encrypt the token
       let encryptedData = cipher.update(token, 'utf8', 'base64');
       encryptedData += cipher.final('base64');
-      
+
       // Get authentication tag for integrity verification
       const tag = cipher.getAuthTag();
 
@@ -120,46 +163,59 @@ export class TokenEncryptionService {
   public decryptToken(encryptedToken: EncryptedToken): string {
     try {
       if (!encryptedToken || !encryptedToken.encryptedData) {
-        throw new Error('Invalid encrypted token data');
+        throw new TokenDecryptionError('Invalid encrypted token data');
       }
+
+      Logger.info('TokenEncryption', '🛡️ [DIAGNOSTIC] TokenEncryptionService.decryptToken called with:', {
+        hasEncryptedData: !!encryptedToken.encryptedData,
+        hasIV: !!encryptedToken.iv,
+        hasSalt: !!encryptedToken.salt,
+        hasTag: !!encryptedToken.tag
+      });
 
       const { encryptedData, iv, salt, tag } = encryptedToken;
 
-      // Validate all required fields exist
-      if (!encryptedData || !iv || !salt || !tag) {
-        throw new Error('Missing encryption metadata fields');
+      // Validate all required fields exist and are strings (P2-FIX: prevents TypeError)
+      if (typeof encryptedData !== 'string' || typeof iv !== 'string' || typeof salt !== 'string' || typeof tag !== 'string') {
+        const missing = [];
+        if (typeof encryptedData !== 'string') missing.push('encryptedData');
+        if (typeof iv !== 'string') missing.push('iv');
+        if (typeof salt !== 'string') missing.push('salt');
+        if (typeof tag !== 'string') missing.push('tag');
+
+        throw new TokenDecryptionError(`Invalid or missing encryption metadata fields: ${missing.join(', ')}`);
       }
 
       // Convert base64 strings back to buffers with validation
       let ivBuffer: Buffer, saltBuffer: Buffer, tagBuffer: Buffer;
-      
+
       try {
         ivBuffer = Buffer.from(iv, 'base64');
         saltBuffer = Buffer.from(salt, 'base64');
         tagBuffer = Buffer.from(tag, 'base64');
       } catch (parseError) {
-        throw new Error('Invalid base64 encoding in token metadata');
+        throw new TokenDecryptionError('Invalid base64 encoding in token metadata');
       }
 
       // Validate buffer lengths
       if (ivBuffer.length !== IV_LENGTH) {
-        throw new Error(`Invalid IV length: expected ${IV_LENGTH}, got ${ivBuffer.length}`);
+        throw new TokenDecryptionError(`Invalid IV length: expected ${IV_LENGTH}, got ${ivBuffer.length}`);
       }
       if (saltBuffer.length !== SALT_LENGTH) {
-        throw new Error(`Invalid salt length: expected ${SALT_LENGTH}, got ${saltBuffer.length}`);
+        throw new TokenDecryptionError(`Invalid salt length: expected ${SALT_LENGTH}, got ${saltBuffer.length}`);
       }
       if (tagBuffer.length !== TAG_LENGTH) {
-        throw new Error(`Invalid tag length: expected ${TAG_LENGTH}, got ${tagBuffer.length}`);
+        throw new TokenDecryptionError(`Invalid tag length: expected ${TAG_LENGTH}, got ${tagBuffer.length}`);
       }
-      
+
       // Derive the same encryption key
-      const iterations = typeof (encryptedToken as any).kdf === 'number' ? Number((encryptedToken as any).kdf) : DEFAULT_KDF_ITERATIONS;
+      const iterations = typeof (encryptedToken as any).kdf === 'number' ? Number((encryptedToken as any).kdf) : this.iterations;
       const key = this.deriveKey(saltBuffer, iterations);
-      
+
       // Create decipher with proper AES-256-GCM
       const decipher = crypto.createDecipheriv(ALGORITHM, key, ivBuffer);
       decipher.setAuthTag(tagBuffer);
-      
+
       // Decrypt the token
       let decryptedData: string;
       try {
@@ -168,13 +224,13 @@ export class TokenEncryptionService {
       } catch (cryptoError: unknown) {
         // Handle specific GCM authentication failures
         const errorMessage = cryptoError instanceof Error ? cryptoError.message : 'Unknown crypto error';
-        if (errorMessage.includes('Unsupported state') || 
-            errorMessage.includes('unable to authenticate')) {
-          throw new Error('Token authentication failed - key mismatch or corrupted data');
+        if (errorMessage.includes('Unsupported state') ||
+          errorMessage.includes('unable to authenticate')) {
+          throw new TokenDecryptionError('Token authentication failed - key mismatch or corrupted data', true);
         }
-        throw cryptoError;
+        throw new TokenDecryptionError(`Cryptography error: ${errorMessage}`);
       }
-      
+
       return decryptedData;
     } catch (error: unknown) {
       // Provide detailed error information for debugging
@@ -225,7 +281,7 @@ export class TokenEncryptionService {
     try {
       const plain1 = this.decryptToken(token1);
       const plain2 = this.decryptToken(token2);
-      
+
       // Use constant-time comparison to prevent timing attacks
       return crypto.timingSafeEqual(
         Buffer.from(plain1, 'utf8'),
@@ -253,7 +309,7 @@ export class TokenEncryptionService {
       keyLength: KEY_LENGTH * 8, // Convert to bits
       hasEnvironmentKey: !!process.env.TOKEN_ENCRYPTION_KEY,
       version: '1.0.0',
-      kdfIterations: DEFAULT_KDF_ITERATIONS,
+      kdfIterations: this.iterations,
       rotationDays: parseInt(process.env.TOKEN_ROTATION_DAYS || '0', 10),
       rotationActive: (process.env.NODE_ENV === 'production') && parseInt(process.env.TOKEN_ROTATION_DAYS || '0', 10) > 0
     };

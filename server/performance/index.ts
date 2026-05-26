@@ -6,29 +6,29 @@
  */
 
 import { Express, Request, Response, NextFunction } from 'express';
-import { 
-  initializeCachingSystem, 
-  CachingSystem, 
-  cacheMiddleware 
+import {
+  initializeCachingSystem,
+  CachingSystem,
+  cacheMiddleware
 } from './caching-system';
-import { 
-  initializeDatabaseOptimization, 
-  DatabaseOptimizer, 
-  databaseOptimizationMiddleware 
+import {
+  initializeDatabaseOptimization,
+  DatabaseOptimizer,
+  databaseOptimizationMiddleware
 } from './database-optimization';
-import { 
-  initializeStaticOptimization, 
-  StaticOptimizer, 
-  staticOptimizationMiddleware 
+import {
+  initializeStaticOptimization,
+  StaticOptimizer,
+  staticOptimizationMiddleware
 } from './static-optimization';
-import { 
-  initializeResponseOptimization, 
-  ResponseOptimizer, 
-  responseOptimizationMiddleware 
+import {
+  initializeResponseOptimization,
+  ResponseOptimizer,
+  responseOptimizationMiddleware
 } from './response-optimization';
-import { 
-  initializeBackgroundJobOptimization, 
-  BackgroundJobOptimizer 
+import {
+  initializeBackgroundJobOptimization,
+  BackgroundJobOptimizer
 } from './background-optimization';
 import { logger, StructuredLogger } from '../monitoring/structured-logger';
 
@@ -108,7 +108,7 @@ export function createPerformanceEndpoints(app: Express): void {
         timestamp: new Date().toISOString(),
         cache: stats
       });
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/api/performance/cache',
@@ -131,7 +131,7 @@ export function createPerformanceEndpoints(app: Express): void {
       const stats = DatabaseOptimizer.getPerformanceStats();
       const health = await DatabaseOptimizer.checkDatabaseHealth();
       const recommendations = DatabaseOptimizer.getOptimizationRecommendations();
-      
+
       res.json({
         timestamp: new Date().toISOString(),
         database: {
@@ -140,7 +140,7 @@ export function createPerformanceEndpoints(app: Express): void {
           recommendations
         }
       });
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/api/performance/database',
@@ -162,7 +162,7 @@ export function createPerformanceEndpoints(app: Express): void {
     try {
       const stats = StaticOptimizer.getStats();
       const recommendations = StaticOptimizer.getOptimizationRecommendations();
-      
+
       res.json({
         timestamp: new Date().toISOString(),
         static: {
@@ -170,7 +170,7 @@ export function createPerformanceEndpoints(app: Express): void {
           recommendations
         }
       });
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/api/performance/static',
@@ -192,7 +192,7 @@ export function createPerformanceEndpoints(app: Express): void {
     try {
       const stats = ResponseOptimizer.getStats();
       const recommendations = ResponseOptimizer.getOptimizationRecommendations();
-      
+
       res.json({
         timestamp: new Date().toISOString(),
         response: {
@@ -200,7 +200,7 @@ export function createPerformanceEndpoints(app: Express): void {
           recommendations
         }
       });
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/api/performance/response',
@@ -222,7 +222,7 @@ export function createPerformanceEndpoints(app: Express): void {
     try {
       const stats = BackgroundJobOptimizer.getStats();
       const recommendations = BackgroundJobOptimizer.getOptimizationRecommendations();
-      
+
       res.json({
         timestamp: new Date().toISOString(),
         jobs: {
@@ -230,7 +230,7 @@ export function createPerformanceEndpoints(app: Express): void {
           recommendations
         }
       });
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/api/performance/jobs',
@@ -261,9 +261,9 @@ export function createPerformanceEndpoints(app: Express): void {
         response: ResponseOptimizer.getStats(),
         jobs: BackgroundJobOptimizer.getStats()
       };
-      
+
       res.json(overview);
-      
+
       StructuredLogger.apiCall(
         'GET',
         '/api/performance/overview',
@@ -284,7 +284,7 @@ export function createPerformanceEndpoints(app: Express): void {
     event: 'PERFORMANCE_ENDPOINTS_CREATED',
     endpoints: [
       '/api/performance/cache',
-      '/api/performance/database', 
+      '/api/performance/database',
       '/api/performance/static',
       '/api/performance/response',
       '/api/performance/jobs',
@@ -299,8 +299,12 @@ export function createPerformanceEndpoints(app: Express): void {
 export function applyCachedRoutes(app: Express): void {
   // Cache dashboard analytics with workspace-specific invalidation
   app.get('/api/dashboard/analytics', cacheMiddleware(180, ['dashboard']), (req: Request, res: Response, next: NextFunction) => {
+    // Skip caching if cache system not initialized
+    if (!req.cache) {
+      return next();
+    }
     const cacheKey = `dashboard:${req.query.workspaceId}`;
-    
+
     req.cache.get(cacheKey).then((cached: any) => {
       if (cached) {
         res.json(cached);
@@ -312,8 +316,12 @@ export function applyCachedRoutes(app: Express): void {
 
   // Cache social accounts with workspace-specific invalidation
   app.get('/api/social-accounts', cacheMiddleware(600, ['social_accounts']), (req: Request, res: Response, next: NextFunction) => {
+    // Skip caching if cache system not initialized
+    if (!req.cache) {
+      return next();
+    }
     const cacheKey = `social_accounts:${req.query.workspaceId}`;
-    
+
     req.cache.get(cacheKey).then((cached: any) => {
       if (cached) {
         res.json(cached);
@@ -323,10 +331,14 @@ export function applyCachedRoutes(app: Express): void {
     }).catch(() => next());
   });
 
-  // Cache historical analytics
-  app.get('/api/analytics/historical', cacheMiddleware(1800, ['historical']), (req: Request, res: Response, next: NextFunction) => {
+  // Cache historical analytics — keep TTL short (60s) so follower changes reflect quickly
+  app.get('/api/analytics/historical', cacheMiddleware(60, ['historical']), (req: Request, res: Response, next: NextFunction) => {
+    // Skip caching if cache system not initialized
+    if (!req.cache) {
+      return next();
+    }
     const cacheKey = `historical:${req.query.workspaceId}:${req.query.period}:${req.query.days}`;
-    
+
     req.cache.get(cacheKey).then((cached: any) => {
       if (cached) {
         res.json(cached);

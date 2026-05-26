@@ -155,6 +155,9 @@ export class MongoConnectionManager {
   async ensureConnected(): Promise<void> {
     if (!this.isConnected || mongoose.connection.readyState !== 1) {
       await this.connect();
+      if (!this.isConnected || mongoose.connection.readyState !== 1) {
+        throw new Error('Database connection failed: Unable to establish connection to MongoDB');
+      }
     }
   }
 }

@@ -45,6 +45,16 @@ export const userSchema = z.object({
   businessType: z.string().nullable().optional(),
   experienceLevel: z.string().nullable().optional(),
   primaryObjective: z.string().nullable().optional(),
+  workspaceId: z.string().nullable().optional(),
+  instagramToken: z.string().nullable().optional(),
+  instagramRefreshToken: z.string().nullable().optional(),
+  instagramTokenExpiry: z.date().nullable().optional(),
+  instagramAccountId: z.string().nullable().optional(),
+  instagramUsername: z.string().nullable().optional(),
+  tokenStatus: z.string().optional().default("active"),
+  lastApiCallTimestamp: z.date().nullable().optional(),
+  rateLimitResetAt: z.date().nullable().optional(),
+  apiCallCount: z.number().optional().default(0),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional()
 });
@@ -155,13 +165,16 @@ export type InsertTeamInvitation = z.infer<typeof insertTeamInvitationSchema>;
 // ============================================================================
 export const socialAccountSchema = z.object({
   id: z.number(),
-  workspaceId: z.number(),
+  workspaceId: z.string(),
   platform: z.string(),
   accountId: z.string(),
   username: z.string(),
-  accessToken: z.string(),
+  accessToken: z.string().nullable().optional(),
   refreshToken: z.string().nullable().optional(),
+  encryptedAccessToken: z.any().nullable().optional(),
+  encryptedRefreshToken: z.any().nullable().optional(),
   expiresAt: z.date().nullable().optional(),
+  tokenStatus: z.string().optional().default("valid"),
   isActive: z.boolean().optional().default(true),
   followersCount: z.number().nullable().optional(),
   followingCount: z.number().nullable().optional(),
@@ -177,26 +190,44 @@ export const socialAccountSchema = z.object({
   accountType: z.string().nullable().optional(),
   isBusinessAccount: z.boolean().optional().default(false),
   isVerified: z.boolean().optional().default(false),
+  avgLikes: z.number().nullable().optional(),
+  avgComments: z.number().nullable().optional(),
+  avgReach: z.number().nullable().optional(),
+  engagementRate: z.number().nullable().optional(),
   totalLikes: z.number().optional().default(0),
   totalComments: z.number().optional().default(0),
   totalShares: z.number().optional().default(0),
   totalSaves: z.number().optional().default(0),
+  postsAnalyzed: z.number().nullable().optional(),
   totalReach: z.number().optional().default(0),
   totalImpressions: z.number().optional().default(0),
   avgEngagement: z.number().optional().default(0),
+  accountLevelReach: z.number().nullable().optional(),
+  postLevelReach: z.number().nullable().optional(),
+  reachSource: z.string().nullable().optional(),
+  reachByPeriod: z.any().nullable().optional(),
+  pageId: z.string().nullable().optional(),
+  hasAccessToken: z.boolean().optional(),
+  hasRefreshToken: z.boolean().optional(),
   lastSyncAt: z.date().nullable().optional(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional()
 });
 
 export const insertSocialAccountSchema = z.object({
-  workspaceId: z.number(),
+  workspaceId: z.string(),
   platform: z.string(),
   accountId: z.string(),
   username: z.string(),
   accessToken: z.string(),
   refreshToken: z.string().optional(),
-  expiresAt: z.date().optional()
+  expiresAt: z.date().optional(),
+  accountType: z.string().optional(),
+  followersCount: z.number().optional(),
+  mediaCount: z.number().optional(),
+  isBusinessAccount: z.boolean().optional(),
+  pageId: z.string().optional(),
+  isActive: z.boolean().optional()
 });
 
 export type SocialAccount = z.infer<typeof socialAccountSchema>;

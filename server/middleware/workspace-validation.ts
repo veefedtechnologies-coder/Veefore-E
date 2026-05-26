@@ -1,20 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { storage } from '../mongodb-storage';
 
+import { Workspace } from '../domain/types';
+
 // Extend Express Request to include workspace data
 declare global {
   namespace Express {
     interface Request {
-      workspace?: {
-        id: string;
-        name: string;
-        ownerId: string;
-        members: Array<{
-          userId: string;
-          role: string;
-          status: string;
-        }>;
-      };
+      workspace?: Workspace;
       workspaceId?: string;
     }
   }
@@ -40,7 +33,7 @@ export function validateWorkspaceAccess(options: {
     try {
       // Ensure user is authenticated
       if (!req.user || !(req.user as any).id) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'Authentication required',
           code: 'AUTH_REQUIRED'
         });
@@ -51,17 +44,17 @@ export function validateWorkspaceAccess(options: {
 
       // Extract workspaceId from multiple possible sources
       let workspaceId: string | undefined;
-      
+
       if (source === 'auto') {
         // Auto-detect from params, query, body, or headers
-        workspaceId = req.params[paramName] || 
-                     req.params.workspaceId ||
-                     req.query[paramName] as string ||
-                     req.query.workspaceId as string ||
-                     req.body[paramName] ||
-                     req.body.workspaceId ||
-                     req.headers['x-workspace-id'] as string ||
-                     req.headers['workspace-id'] as string;
+        workspaceId = req.params[paramName] ||
+          req.params.workspaceId ||
+          req.query[paramName] as string ||
+          req.query.workspaceId as string ||
+          req.body[paramName] ||
+          req.body.workspaceId ||
+          req.headers['x-workspace-id'] as string ||
+          req.headers['workspace-id'] as string;
       } else if (source === 'params') {
         workspaceId = req.params[paramName] || req.params.workspaceId;
       } else if (source === 'query') {
@@ -75,7 +68,7 @@ export function validateWorkspaceAccess(options: {
       // Handle missing workspaceId
       if (!workspaceId) {
         if (required) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: 'Workspace ID is required',
             code: 'WORKSPACE_ID_REQUIRED',
             hint: 'Include workspaceId in request params, query, body, or headers'
@@ -84,7 +77,7 @@ export function validateWorkspaceAccess(options: {
           // Optional workspace - use user's default workspace
           const defaultWorkspace = await storage.getDefaultWorkspace(userId);
           if (defaultWorkspace) {
-            workspaceId = defaultWorkspace.id;
+            workspaceId = defaultWorkspace.id.toString();
           } else {
             // No workspace available - continue without workspace validation
             return next();
@@ -96,20 +89,23 @@ export function validateWorkspaceAccess(options: {
       let workspace;
       try {
         workspace = await storage.getWorkspace(workspaceId!);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`🚨 WORKSPACE VALIDATION: Database error for workspace ${workspaceId}:`, error);
-        return res.status(500).json({ 
+        console.error('Stack:', error.stack);
+        return res.status(500).json({
           error: 'Database connection error',
-          code: 'DATABASE_ERROR'
+          code: 'DATABASE_ERROR',
+          details: error.message,
+          stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
         });
       }
-      
+
       if (!workspace) {
         console.log(`❌ WORKSPACE VALIDATION: Workspace ${workspaceId} not found for user ${userId}`);
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: 'Workspace not found',
           code: 'WORKSPACE_NOT_FOUND',
-          workspaceId 
+          workspaceId
         });
       }
 
@@ -117,24 +113,32 @@ export function validateWorkspaceAccess(options: {
       let userWorkspaces;
       try {
         userWorkspaces = await storage.getWorkspacesByUserId(userId);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`🚨 WORKSPACE VALIDATION: Database error getting user workspaces for ${userId}:`, error);
-        return res.status(500).json({ 
+        console.error('Stack:', error.stack);
+        return res.status(500).json({
           error: 'Database connection error',
-          code: 'DATABASE_ERROR'
+          code: 'DATABASE_ERROR',
+          details: error.message,
+          stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
         });
       }
-      
+
       const hasAccess = userWorkspaces.some(w => w.id.toString() === workspaceId!.toString());
-      
+
       if (!hasAccess) {
-        // Log potential security breach attempt
-        console.warn(`🚨 SECURITY: User ${userId} (${userEmail || 'unknown'}) attempted unauthorized access to workspace ${workspaceId}`);
-        
-        return res.status(403).json({ 
+        // Log potential security breach or sync issue
+        console.warn(`🚨 [WORKSPACE-DENIED] User ${userId} (${userEmail || 'unknown'}) attempted access to workspace ${workspaceId}`);
+        console.warn(`🚨 [WORKSPACE-DENIED] User's authorized workspaces: ${userWorkspaces.map(w => w.id).join(', ')}`);
+
+        return res.status(403).json({
           error: 'Access denied to workspace',
           code: 'WORKSPACE_ACCESS_DENIED',
-          message: 'You do not have permission to access this workspace'
+          message: 'You do not have permission to access this workspace',
+          debug: {
+            requestedWorkspace: workspaceId,
+            authorizedCount: userWorkspaces.length
+          }
         });
       }
 
@@ -148,7 +152,7 @@ export function validateWorkspaceAccess(options: {
       next();
     } catch (error) {
       console.error('🚨 WORKSPACE VALIDATION ERROR:', error);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Workspace validation failed',
         code: 'WORKSPACE_VALIDATION_ERROR'
       });
@@ -160,7 +164,7 @@ export function validateWorkspaceAccess(options: {
  * Helper function for routes that need workspace validation
  * Usage: app.get('/api/route', requireAuth, validateWorkspace(), handler)
  */
-export const validateWorkspace = (options?: Parameters<typeof validateWorkspaceAccess>[0]) => 
+export const validateWorkspace = (options?: Parameters<typeof validateWorkspaceAccess>[0]) =>
   validateWorkspaceAccess(options);
 
 /**
@@ -173,19 +177,19 @@ export const optionalWorkspace = () => validateWorkspaceAccess({ required: false
  * Validate workspace from URL params specifically (for RESTful routes)
  * Usage: app.get('/api/workspaces/:workspaceId/data', requireAuth, validateWorkspaceFromParams(), handler)
  */
-export const validateWorkspaceFromParams = (paramName = 'workspaceId') => 
+export const validateWorkspaceFromParams = (paramName = 'workspaceId') =>
   validateWorkspaceAccess({ source: 'params', paramName });
 
 /**
  * Validate workspace from query parameters
  * Usage: app.get('/api/data?workspaceId=xxx', requireAuth, validateWorkspaceFromQuery(), handler)
  */
-export const validateWorkspaceFromQuery = (paramName = 'workspaceId') => 
+export const validateWorkspaceFromQuery = (paramName = 'workspaceId') =>
   validateWorkspaceAccess({ source: 'query', paramName });
 
 /**
  * Validate workspace from request body
  * Usage: app.post('/api/data', requireAuth, validateWorkspaceFromBody(), handler)
  */
-export const validateWorkspaceFromBody = (paramName = 'workspaceId') => 
+export const validateWorkspaceFromBody = (paramName = 'workspaceId') =>
   validateWorkspaceAccess({ source: 'body', paramName });

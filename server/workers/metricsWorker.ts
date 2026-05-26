@@ -1,10 +1,10 @@
 import { Worker, Job } from 'bullmq';
-import { 
-  metricsQueue, 
-  webhookQueue, 
-  tokenRefreshQueue, 
-  FetchMetricsJobData, 
-  WebhookProcessJobData, 
+import {
+  metricsQueue,
+  webhookQueue,
+  tokenRefreshQueue,
+  FetchMetricsJobData,
+  WebhookProcessJobData,
   TokenRefreshJobData,
   redisConnection,
   isRedisAvailable
@@ -89,7 +89,7 @@ export class MetricsWorker {
    */
   static async stop(): Promise<void> {
     console.log('🛑 Stopping Instagram metrics workers...');
-    
+
     try {
       await Promise.all([
         this.metricsWorker?.close(),
@@ -108,7 +108,7 @@ export class MetricsWorker {
    */
   private static async processMetricsFetchJob(job: Job<FetchMetricsJobData>): Promise<any> {
     const { workspaceId, userId, instagramAccountId, token, metricsType, forceRefresh } = job.data;
-    
+
     console.log(`📊 Processing metrics fetch: workspace=${workspaceId}, account=${instagramAccountId}, type=${metricsType}`);
 
     try {
@@ -156,7 +156,7 @@ export class MetricsWorker {
       if (error instanceof Error && (error as any).is_rate_limit) {
         const rateLimitError = error as unknown as InstagramApiError;
         await TokenManager.handleRateLimit(workspaceId, token, rateLimitError.retry_after || 3600);
-        
+
         // Retry the job later
         throw new Error(`Rate limited. Retrying after ${rateLimitError.retry_after || 3600} seconds`);
       }
@@ -176,7 +176,7 @@ export class MetricsWorker {
    */
   private static async processWebhookJob(job: Job<WebhookProcessJobData>): Promise<any> {
     const { workspaceId, instagramAccountId, webhookData, eventType } = job.data;
-    
+
     console.log(`🔔 Processing webhook: workspace=${workspaceId}, account=${instagramAccountId}, event=${eventType}`);
 
     try {
@@ -185,23 +185,23 @@ export class MetricsWorker {
         case 'comments':
           await this.processCommentWebhook(workspaceId, instagramAccountId, webhookData);
           break;
-        
+
         case 'mentions':
           await this.processMentionWebhook(workspaceId, instagramAccountId, webhookData);
           break;
-        
+
         case 'story_insights':
           await this.processStoryInsightsWebhook(workspaceId, instagramAccountId, webhookData);
           break;
-        
+
         case 'messages':
           await this.processMessageWebhook(workspaceId, instagramAccountId, webhookData);
           break;
-        
+
         case 'media_updates':
           await this.processMediaUpdateWebhook(workspaceId, instagramAccountId, webhookData);
           break;
-        
+
         default:
           console.log(`⚠️ Unknown webhook event type: ${eventType}`);
       }
@@ -236,12 +236,12 @@ export class MetricsWorker {
    */
   private static async processTokenRefreshJob(job: Job<TokenRefreshJobData>): Promise<any> {
     const { workspaceId, userId, refreshToken, instagramAccountId } = job.data;
-    
+
     console.log(`🔄 Processing token refresh: workspace=${workspaceId}, user=${userId}`);
 
     try {
       const success = await TokenManager.refreshToken(userId, workspaceId);
-      
+
       if (success) {
         console.log(`✅ Successfully refreshed token for user ${userId}`);
         return { status: 'success' };
@@ -264,24 +264,9 @@ export class MetricsWorker {
     instagramAccountId: string,
     metricsType: string
   ): Promise<any> {
-    switch (metricsType) {
-      case 'all':
-        return InstagramApiService.getComprehensiveMetrics(token, instagramAccountId);
-      
-      case 'followers':
-        return InstagramApiService.getAccountInfo(token);
-      
-      case 'likes':
-      case 'comments':
-        return InstagramApiService.getRecentMediaWithInsights(token, 7);
-      
-      case 'reach':
-      case 'impressions':
-        return InstagramApiService.getAccountInsights(instagramAccountId, token, 'day');
-      
-      default:
-        return InstagramApiService.getComprehensiveMetrics(token, instagramAccountId);
-    }
+    // Standardize on comprehensive metrics for ALL cases to leverage batching
+    // This ensures consistency and maximizes data retrieval per API call
+    return InstagramApiService.getComprehensiveMetrics(token, instagramAccountId);
   }
 
   /**
@@ -325,7 +310,7 @@ export class MetricsWorker {
     if (metricsData.account) {
       // Comprehensive metrics
       const { account, insights, aggregated } = metricsData;
-      
+
       metricsToSave = {
         ...metricsToSave,
         followers: account.followers_count,
@@ -345,7 +330,7 @@ export class MetricsWorker {
       // Media data
       const totalLikes = metricsData.reduce((sum, media) => sum + (media.like_count || 0), 0);
       const totalComments = metricsData.reduce((sum, media) => sum + (media.comments_count || 0), 0);
-      
+
       metricsToSave.likes = totalLikes;
       metricsToSave.comments = totalComments;
     } else if (metricsData.followers_count !== undefined) {

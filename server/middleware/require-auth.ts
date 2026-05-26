@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { storage } from '../mongodb-storage';
-import { firebaseAdmin } from '../firebase-admin';
+import { getFirebaseAdmin } from '../firebase-admin';
 import { safeParseJWTPayload } from './unsafe-json-replacements';
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -21,7 +21,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -32,19 +32,19 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     } else {
       token = authHeader;
     }
-    
+
     if (!token || token.trim() === '') {
       console.error('[AUTH] No token found in authorization header:', authHeader.substring(0, 20) + '...');
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    
+
     token = token.trim();
 
     let firebaseUid;
     let cleanToken = token;
-    
+
     cleanToken = cleanToken.replace(/\s+/g, '');
-    
+
     const tokenParts = cleanToken.split('.');
     if (tokenParts.length > 3) {
       cleanToken = tokenParts.slice(0, 3).join('.');
@@ -55,18 +55,16 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ error: 'Invalid token format' });
     }
 
-    if (firebaseAdmin) {
+    const adminApp = getFirebaseAdmin();
+    if (adminApp) {
       try {
-        const decoded = await Promise.race([
-          firebaseAdmin.auth().verifyIdToken(cleanToken),
-          new Promise((_resolve, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
-        ]) as any;
+        const decoded = await withTimeout(adminApp.auth().verifyIdToken(cleanToken), 4000);
         firebaseUid = decoded?.uid;
       } catch (e: any) {
         console.warn('[AUTH] Admin verification skipped:', e?.message);
       }
     }
-    
+
     if (!firebaseUid) {
       try {
         const finalParts = cleanToken.split('.');
@@ -88,15 +86,15 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         return res.status(401).json({ error: 'Invalid token format' });
       }
     }
-    
+
     let user: any;
     const parts = cleanToken.split('.');
     const payloadResult = parts.length === 3 ? safeParseJWTPayload(parts[1]) : ({ success: false } as any);
     const payload: any = payloadResult.success ? payloadResult.data : {};
     const userEmail = payload.email;
 
-    const uidPromise = withTimeout(storage.getUserByFirebaseUid(firebaseUid), 2500);
-    const emailPromise = userEmail ? withTimeout(storage.getUserByEmail(userEmail), 2500) : Promise.reject(new Error('noemail'));
+    const uidPromise = withTimeout(storage.getUserByFirebaseUid(firebaseUid), 8000);
+    const emailPromise = userEmail ? withTimeout(storage.getUserByEmail(userEmail), 8000) : Promise.reject(new Error('noemail'));
     const results = await Promise.allSettled([uidPromise, emailPromise]);
     const uidUser = results[0].status === 'fulfilled' ? results[0].value as any : undefined;
     const emailUser = results[1].status === 'fulfilled' ? results[1].value as any : undefined;
@@ -123,25 +121,34 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
           displayName: payload.name || undefined,
           avatar: payload.picture || undefined,
           referredBy: undefined
-        }), 2500);
-      } catch {
-        user = {
-          id: firebaseUid,
-          firebaseUid,
-          email,
-          username: email.split('@')[0],
-          displayName: payload.name || null,
-          avatar: payload.picture || null,
-          isOnboarded: false,
-          isEmailVerified: true,
-          plan: 'free',
-          credits: 0
-        } as any;
+        }), 8000);
+      } catch (err: any) {
+        // If creation failed (e.g. duplicate key due to race condition), try fetching one last time
+        try {
+          user = await withTimeout(storage.getUserByFirebaseUid(firebaseUid), 4000);
+        } catch {
+          // Ignore
+        }
+        
+        if (!user) {
+          user = {
+            id: firebaseUid,
+            firebaseUid,
+            email,
+            username: email.split('@')[0],
+            displayName: payload.name || null,
+            avatar: payload.picture || null,
+            isOnboarded: false,
+            isEmailVerified: true,
+            plan: 'free',
+            credits: 0
+          } as any;
+        }
       }
     }
 
     if (!user.firebaseUid) {
-      try { await withTimeout(storage.updateUser(user.id, { firebaseUid }), 1500); } catch {}
+      try { await withTimeout(storage.updateUser(user.id, { firebaseUid }), 1500); } catch { }
     }
 
     try {
@@ -155,15 +162,14 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
           const a = await withTimeout(storage.getWorkspacesByUserId(user.id), 4000).catch(() => []);
           const b = await withTimeout(storage.getWorkspacesByUserId(emailUser.id), 4000).catch(() => []);
           if (b.length >= a.length) {
-            try { await withTimeout(storage.updateUser(emailUser.id, { firebaseUid }), 6000); } catch {}
+            try { await withTimeout(storage.updateUser(emailUser.id, { firebaseUid }), 6000); } catch { }
             user = emailUser;
           }
         }
       }
-    } catch {}
-    
-    console.log(`[AUTH] User ${user.email} authenticated successfully, allowing request`);
-    console.log(`[AUTH] Setting req.user - ID: ${user.id}, isOnboarded: ${user.isOnboarded}`);
+    } catch { }
+
+    console.log(`[AUTH-TRACE] Request: ${req.method} ${req.path} | FirebaseUID: ${firebaseUid} | UserID: ${user.id} | Email: ${user.email}`);
     req.user = user;
     next();
   } catch (error) {
@@ -178,7 +184,7 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
     if (!authHeader) {
       return next();
     }
-    
+
     await requireAuth(req, res, next);
   } catch {
     next();

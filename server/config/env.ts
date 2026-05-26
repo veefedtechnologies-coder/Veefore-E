@@ -85,9 +85,9 @@ const EnvSchema = z.object({
   HOSTNAME: z.string().optional(),
   NODE_ID: z.string().optional(),
 
-  CSRF_SECRET: z.string().optional(),
-  DEFAULT_ADMIN_PASSWORD: z.string().optional(),
-  PAGE_ACCESS_TOKEN: z.string().optional(),
+  TOKEN_ENCRYPTION_KEY: z.string().optional(),
+  TOKEN_ENCRYPTION_GLOBAL_SALT: z.string().optional(),
+  TOKEN_KDF_ITERATIONS: z.coerce.number().default(100000),
 
   OPENAI_MAX_TOKENS: z.coerce.number().optional(),
 });

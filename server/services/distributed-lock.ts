@@ -255,6 +255,19 @@ class DistributedLockService {
     }
   }
 
+  async forceReleaseLock(lockName: string): Promise<void> {
+    try {
+      const collection = await this.getLockCollection();
+      if (!collection) return;
+
+      await collection.deleteOne({ _id: lockName as any });
+      console.log(`[DISTRIBUTED LOCK] 🧨 Force released lock '${lockName}'`);
+
+    } catch (error) {
+      console.error(`[DISTRIBUTED LOCK] Error force releasing lock '${lockName}':`, error);
+    }
+  }
+
   async releaseAllLocks(): Promise<void> {
     console.log(`[DISTRIBUTED LOCK] Releasing all locks for instance ${this.instanceId}...`);
 

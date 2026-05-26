@@ -34,9 +34,9 @@ export class SchedulerController extends BaseController {
     if (!user) {
       throw new UnauthorizedError('Authentication required');
     }
-    
+
     const input = CreateScheduledContentSchema.parse(req.body);
-    
+
     const scheduledTime = new Date(input.scheduledAt);
     if (scheduledTime <= new Date()) {
       throw new ValidationError('Scheduled time must be in the future');
@@ -92,7 +92,7 @@ export class SchedulerController extends BaseController {
     if (!user) {
       throw new UnauthorizedError('Authentication required');
     }
-    
+
     const { workspaceId, status } = ListScheduledQuery.parse(req.query);
 
     const workspaces = await workspaceService.getWorkspacesByUserId(user.id);
@@ -105,11 +105,11 @@ export class SchedulerController extends BaseController {
     }
 
     let scheduledContent = await contentService.getScheduledContent(workspaceId);
-    
+
     if (status && status !== 'scheduled') {
       scheduledContent = scheduledContent.filter((content: any) => content.status === status);
     }
-    
+
     const formattedContent = scheduledContent.map((content: any) => ({
       id: content.id,
       title: content.title || 'Untitled',
@@ -129,6 +129,26 @@ export class SchedulerController extends BaseController {
     });
   });
 
+  getUpcoming = this.wrapAsync(async (
+    req: TypedRequest<{ workspaceId: string }, {}, { limit?: string }>,
+    res: Response
+  ) => {
+    const { workspaceId } = z.object({ workspaceId: z.string().min(1) }).parse(req.query);
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+
+    // Use existing service method
+    const upcoming = await contentService.getUpcomingScheduled(workspaceId, limit);
+
+    // Format for response
+    const formatted = upcoming.map(content => ({
+      ...content.toObject(),
+      // Ensure scheduledFor is present for UI compatibility
+      scheduledFor: content.scheduledAt
+    }));
+
+    this.sendSuccess(res, formatted);
+  });
+
   addSampleScheduledPosts = this.wrapAsync(async (
     req: TypedRequest,
     res: Response
@@ -137,10 +157,10 @@ export class SchedulerController extends BaseController {
     if (!user) {
       throw new UnauthorizedError('Authentication required');
     }
-    
+
     const workspaces = await workspaceService.getWorkspacesByUserId(user.id);
     const workspace = workspaces.find((w: any) => w.isDefault) || workspaces[0];
-    
+
     if (!workspace) {
       throw new NotFoundError('Workspace', 'default');
     }
@@ -215,7 +235,7 @@ export class SchedulerController extends BaseController {
     if (!user) {
       throw new UnauthorizedError('Authentication required');
     }
-    
+
     const { id } = ContentIdParams.parse(req.params);
 
     const content = await contentRepository.findById(id);

@@ -33,6 +33,13 @@ export default defineConfig({
     hmr: { protocol: "wss", clientPort: 443 },
     allowedHosts: true,
     strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   optimizeDeps: {
     force: true,

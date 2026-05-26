@@ -7,6 +7,7 @@ import { PostWorker } from "./workers/postWorker";
 export class SchedulerService {
   private storage: IStorage;
   private checkInterval: NodeJS.Timeout | null = null;
+  private dailySnapshotInterval: NodeJS.Timeout | null = null;
   private workerStarted: boolean = false;
 
   constructor(storage: IStorage) {
@@ -26,17 +27,34 @@ export class SchedulerService {
       console.log('[SCHEDULER] Redis unavailable - using in-memory fallback scheduler');
     }
 
+    // Schedule post processing every minute
     this.checkInterval = setInterval(() => {
       this.processScheduledContent();
     }, 60000);
 
+    // Schedule daily analytics snapshot every hour (it will only run once per day per workspace)
+    // In a real production app, this should be a cron job running at midnight
+    this.dailySnapshotInterval = setInterval(() => {
+      this.processDailySnapshots();
+    }, 60 * 60 * 1000); // Check every hour
+
     this.processScheduledContent();
+
+    // Run initial snapshot check after short delay to let server startup
+    setTimeout(() => {
+      this.processDailySnapshots();
+    }, 30000);
   }
 
   stop() {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+    }
+
+    if (this.dailySnapshotInterval) {
+      clearInterval(this.dailySnapshotInterval);
+      this.dailySnapshotInterval = null;
     }
 
     if (PostWorker.isRunning()) {
@@ -196,9 +214,21 @@ export class SchedulerService {
         return;
       }
 
-      console.log(`[SCHEDULER] Looking for Instagram account for workspace: ${content.workspaceId} (type: ${typeof content.workspaceId})`);
       const workspaceId = content.workspaceId.toString();
-      const instagramAccount = await this.storage.getSocialAccountByPlatform(workspaceId, 'instagram');
+      const accounts = await this.storage.getSocialAccountsWithTokensInternal(workspaceId);
+      
+      let instagramAccount;
+      
+      const specificAccountId = content.contentData?.accountId;
+      if (specificAccountId) {
+        console.log(`[SCHEDULER] Looking for specific account ID: ${specificAccountId} in workspace accounts`);
+        instagramAccount = accounts.find(a => a.id === specificAccountId);
+      }
+      
+      if (!instagramAccount) {
+        console.log(`[SCHEDULER] Looking for any Instagram account for workspace: ${workspaceId}`);
+        instagramAccount = accounts.find(a => a.platform === 'instagram');
+      }
 
       if (!instagramAccount || !instagramAccount.accessToken) {
         console.error(`[SCHEDULER] No Instagram account found for workspace ${content.workspaceId}`);
@@ -206,14 +236,38 @@ export class SchedulerService {
         return;
       }
 
-      if (!content.contentData?.mediaUrl) {
+      const mediaUrl = content.contentData?.mediaUrls?.[0] || content.contentData?.mediaUrl;
+
+      if (!mediaUrl) {
         console.error(`[SCHEDULER] No media URL found for content ${content.id}`);
         await this.updateContentStatus(content.id, 'failed', 'No media URL');
         return;
       }
 
-      const caption = `${content.title}\n\n${content.description || ''}`;
-      const mediaUrl = content.contentData.mediaUrl;
+      let caption = '';
+      if (content.contentData?.text) {
+        caption = content.contentData.text;
+      } else {
+        caption = content.description ? content.description : content.title;
+      }
+      caption = caption.trim();
+
+      const mentions = content.contentData?.mentions || [];
+      const hashtags = content.contentData?.hashtags || [];
+
+      const isVideoType = content.type === 'video' || content.type === 'reel' || content.type === 'story' || 
+                         (mediaUrl && mediaUrl.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i));
+
+      if (hashtags.length > 0 || (mentions.length > 0 && isVideoType)) {
+        caption += '\n\n';
+        if (mentions.length > 0 && isVideoType) {
+          caption += mentions.map((m: string) => `@${m.replace(/^@+/, '')}`).join(' ') + ' ';
+        }
+        if (hashtags.length > 0) {
+          caption += hashtags.map((h: string) => `#${h.replace(/^#+/, '')}`).join(' ');
+        }
+      }
+      caption = caption.trim();
 
       console.log(`[SCHEDULER] Publishing ${content.type || 'post'} content to Instagram`);
 
@@ -226,21 +280,39 @@ export class SchedulerService {
       } else if (content.type === 'video') {
         contentType = 'video';
       } else {
-        const isVideo = mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i) ||
-          mediaUrl?.includes('video');
+        const isVideo = !!mediaUrl?.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i);
         contentType = isVideo ? 'video' : 'photo';
       }
 
       console.log(`[SCHEDULER] Detected content type: ${contentType} for URL: ${mediaUrl}`);
 
-      const { InstagramDirectPublisher } = await import('./instagram-direct-publisher');
+      const { SimpleInstagramPublisher } = await import('./simple-instagram-publisher');
 
-      console.log(`[SCHEDULER] Using direct publisher for permission-compatible publishing`);
-      const directResult = await InstagramDirectPublisher.publishContent(
+      console.log(`[SCHEDULER] Using simple publisher for permission-compatible publishing`);
+      
+      // Ensure mediaUrl is absolute using finalBaseUrl if necessary
+      let cleanUrl = mediaUrl;
+      const currentDomain = process.env.SOCIAL_AUTH_BASE_URL || process.env.VITE_APP_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      
+      if (cleanUrl.startsWith('/')) {
+        cleanUrl = `${currentDomain}${cleanUrl}`;
+      } else if (cleanUrl.includes('localhost') || cleanUrl.includes('your-replit-dev-domain')) {
+        try {
+          const urlObj = new URL(cleanUrl);
+          cleanUrl = `${currentDomain}${urlObj.pathname}${urlObj.search}`;
+        } catch (e) {
+          const filename = cleanUrl.split('/').pop() || 'media';
+          cleanUrl = `${currentDomain}/uploads/${filename}`;
+        }
+      }
+
+      const directResult = await SimpleInstagramPublisher.publishContent(
         instagramAccount.accessToken,
-        mediaUrl,
+        cleanUrl,
         caption,
-        contentType
+        contentType,
+        instagramAccount.accountId || (instagramAccount as any)._id?.toString(),
+        mentions
       );
 
       if (directResult.success) {
@@ -293,6 +365,40 @@ export class SchedulerService {
       console.log(`[SCHEDULER] Updated content ${contentId} status to ${status}`);
     } catch (error) {
       console.error(`[SCHEDULER] Error updating content ${contentId} status:`, error);
+    }
+  }
+
+  private async processDailySnapshots() {
+    try {
+      console.log('[SCHEDULER] Starting daily analytics snapshot process');
+      // Import here dynamically to avoid circular dependencies if any
+      const { analyticsService } = await import('./services/index');
+      const { workspaceRepository } = await import('./repositories/index');
+
+      // 1. Get all workspaces
+      // In a large system, we would stream this or paginate
+      const workspaces = await workspaceRepository.findAll();
+      console.log(`[SCHEDULER] Found ${workspaces.length} workspaces for analytics snapshot`);
+
+      // 2. Generate snapshot for each workspace
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const workspace of workspaces) {
+        try {
+          const workspaceId = (workspace._id as any).toString();
+          // Generate for Instagram (default)
+          await analyticsService.generateDailySnapshot(workspaceId, 'instagram');
+          successCount++;
+        } catch (error) {
+          // console.error(`[SCHEDULER] Failed to generate snapshot for workspace ${workspace._id}:`, error);
+          failCount++;
+        }
+      }
+
+      console.log(`[SCHEDULER] Daily snapshots completed. Success: ${successCount}, Failed: ${failCount}`);
+    } catch (error) {
+      console.error('[SCHEDULER] Error in processDailySnapshots:', error);
     }
   }
 }

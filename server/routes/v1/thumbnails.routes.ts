@@ -4,7 +4,7 @@ import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
 import { storage } from '../../mongodb-storage';
 import { ThumbnailAIService } from '../../thumbnail-ai-service';
-import { advancedThumbnailGenerator } from '../../advanced-thumbnail-generator';
+// import { advancedThumbnailGenerator } from '../../advanced-thumbnail-generator'; // Temporarily disabled - requires canvas package
 import OpenAI from 'openai';
 import { AuthenticatedRequest } from '../../types/express';
 

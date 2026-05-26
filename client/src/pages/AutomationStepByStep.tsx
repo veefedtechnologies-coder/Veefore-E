@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo, forwardRef } from 'react'
 import { SEO, seoConfig, generateStructuredData } from '@/lib/seo-optimization'
 import { 
   Instagram, 
@@ -1069,6 +1069,81 @@ const CommentScreen = ({ isVisible, onClose, triggerKeywords, automationType, co
   );
 };
 
+
+
+interface PreviewVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
+  src: string;
+  poster?: string;
+  alt?: string;
+}
+
+const PreviewVideo = forwardRef<HTMLVideoElement, PreviewVideoProps>(
+  ({ src, poster, alt, id, onError, ...props }, forwardedRef) => {
+    const [error, setError] = useState(false);
+    const internalRef = useRef<HTMLVideoElement>(null);
+    
+    // Merge forwarded ref and internal ref
+    const setRefs = React.useCallback(
+      (node: HTMLVideoElement) => {
+        internalRef.current = node;
+        if (typeof forwardedRef === 'function') {
+          forwardedRef(node);
+        } else if (forwardedRef) {
+          forwardedRef.current = node;
+        }
+      },
+      [forwardedRef]
+    );
+
+    // Force autoplay at the DOM level whenever src changes
+    useEffect(() => {
+      const video = internalRef.current;
+      if (video && src && !error) {
+        video.muted = true;
+        video.defaultMuted = true;
+        
+        // Use a slight delay to ensure browser has processed the DOM insertion
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => {
+            console.log('Autoplay prevented by browser policy, will retry on interact:', err);
+          });
+        }
+      }
+    }, [src, error]);
+    
+    return (
+      <>
+        {(error || !src) && (
+          <img 
+            src={poster || src || ''} 
+            alt={alt || 'Post'} 
+            className={props.className || "w-full h-full object-cover"} 
+          />
+        )}
+        <video
+          ref={setRefs}
+          src={src}
+          className={props.className || "w-full h-full object-cover"}
+          style={{ display: (error || !src) ? 'none' : 'block' }}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster={poster}
+          onError={(e) => {
+            console.log('Live preview video error for post:', id, e);
+            setError(true);
+            if (onError) onError(e);
+          }}
+          {...props}
+        />
+      </>
+    );
+  }
+);
+
 export default function AutomationStepByStep() {
   console.log('AutomationStepByStep component loaded successfully')
   
@@ -1118,25 +1193,17 @@ function AutomationStepByStepContent() {
       return [];
     },
     enabled: !!currentWorkspace?.id,
-    staleTime: Infinity, // Never consider data stale - only fetch when explicitly invalidated
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: false, // Don't refetch on component mount if data exists
-    placeholderData: (previousData) => previousData, // Keep showing old data while new data loads
-    notifyOnChangeProps: ['data'], // Only notify when data changes, not loading states
-    // Hide loading states completely and prevent UI disruption
-    keepPreviousData: true,
-    retry: false, // Don't retry on failure to avoid loading states
-    refetchOnReconnect: false, // Don't refetch on reconnect
-    // Silent background updates
-    refetchInterval: false, // Disable automatic polling (we handle it manually)
-    refetchIntervalInBackground: false // Don't refetch when tab is not active
+    staleTime: 0, // CRITICAL: Always fetch fresh data - never serve stale account list
+    refetchOnMount: true, // Always refetch on mount to get current accounts
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 
   // Transform real account data with proper null/undefined checks
   const realAccounts = socialAccountsData && Array.isArray(socialAccountsData) ? socialAccountsData.map((account: any) => ({
     id: account.id,
     name: `@${account.username}`,
-    followers: `${account.followers} followers`,
+    followers: `${(account.followersCount || 0).toLocaleString()} followers`,
     platform: account.platform,
     avatar: account.profilePictureUrl || `https://picsum.photos/40/40?random=${account.id}`,
     workspaceId: account.workspaceId
@@ -1148,12 +1215,15 @@ function AutomationStepByStepContent() {
   // Fetch real Instagram posts when account is selected - seamless loading
   // Using completely unique query key to avoid global webhook invalidations
   const { data: postsData, isLoading: postsLoading, isFetching: postsFetching } = useQuery({
-    queryKey: ['automation-instagram-content', selectedAccountData?.workspaceId],
+    queryKey: ['automation-instagram-content', selectedAccount, selectedAccountData?.workspaceId],
     queryFn: async () => {
       if (!selectedAccount || !selectedAccountData?.workspaceId) return []
       
-      const response = await apiRequest(`/api/instagram-content?workspaceId=${selectedAccountData.workspaceId}`)
-      return response
+      const response = await apiRequest(`/api/v1/content/workspace/${selectedAccountData.workspaceId}?accountId=${selectedAccount}&limit=100&page=1`)
+      // API returns paginated response: { data: [...], page, limit, total, totalPages }
+      const items = Array.isArray(response) ? response : (response?.data || [])
+      console.log('[Automation] Posts fetched from DB:', items.length, 'for account:', selectedAccount)
+      return items
     },
     enabled: !!selectedAccount && !!socialAccountsData,
     staleTime: Infinity, // Never consider data stale - only fetch when explicitly invalidated
@@ -1616,32 +1686,46 @@ function AutomationStepByStepContent() {
 
   // Transform real posts data with real-time metrics integration and proper null/undefined checks
   const realPosts = postsData && Array.isArray(postsData) ? postsData.map((post: any) => {
-    console.log('Processing post data:', post); // Debug log
-    
-    // Map Instagram content types properly
+    // The Content documents from DB have data in sub-objects:
+    //   post.contentData: { externalId, mediaUrl, thumbnailUrl, permalink, mediaType }
+    //   post.metrics: { likes, comments, shares, saves, reach, impressions }
+    //   post.title: (caption snippet)
+    //   post.description: (full caption)
+    //   post.type: 'image'|'video'
+    //   post.publishedAt: Date
+    const contentData = post.contentData || {};
+    const metrics = post.metrics || {};
+
+    // Map content type to automation-friendly labels
+    const rawType = (post.type || contentData.mediaType || 'image').toLowerCase();
     let mappedType = 'post';
-    if (post.type === 'reel' || post.type === 'video') {
-      mappedType = 'reel'; // Both reels and videos should show as reels for automation
-    } else if (post.type === 'carousel') {
-      mappedType = 'post'; // Carousels are treated as posts
-    } else if (post.type === 'story') {
-      mappedType = 'story';
-    }
+    if (rawType === 'video' || rawType === 'reel') mappedType = 'reel';
+    else if (rawType === 'carousel_album' || rawType === 'carousel') mappedType = 'post';
+    else if (rawType === 'story') mappedType = 'story';
+
+    // Get thumbnail - prefer thumbnailUrl, then mediaUrl
+    const image = contentData.thumbnailUrl || contentData.mediaUrl || contentData.thumbnail_url || contentData.media_url || '';
     
-    // Use actual post data (no real-time metrics to avoid WebSocket usage)
-    const realtimeLikes = post.likes || post.engagement?.likes || 0;
-    const realtimeComments = post.comments || post.engagement?.comments || 0;
-    
+    // Get caption - prefer description (full), fall back to title
+    const caption = post.description || post.title || '';
+    const displayTitle = caption.length > 30 ? caption.substring(0, 30) + '...' : (caption || 'Instagram Post');
+
     return {
-      id: post.id,
-      title: post.caption ? post.caption.substring(0, 30) + '...' : 'Instagram Post',
+      id: post._id?.toString() || post.id || contentData.externalId,
+      externalId: contentData.externalId,
+      title: displayTitle,
       type: mappedType,
-      image: post.mediaUrl || post.thumbnailUrl || 'https://picsum.photos/300/300?random=1',
-      mediaUrl: post.mediaUrl,
-      thumbnailUrl: post.thumbnailUrl,
-      likes: realtimeLikes,
-      comments: realtimeComments,
-      caption: post.caption || 'Instagram post content'
+      image,
+      mediaUrl: contentData.mediaUrl || contentData.media_url || '',
+      thumbnailUrl: contentData.thumbnailUrl || contentData.thumbnail_url || image,
+      permalink: contentData.permalink || '',
+      likes: metrics.likes || 0,
+      comments: metrics.comments || 0,
+      shares: metrics.shares || 0,
+      saves: metrics.saves || 0,
+      reach: metrics.reach || 0,
+      caption: caption || 'Instagram post content',
+      publishedAt: post.publishedAt || post.createdAt
     };
   }) : []
 
@@ -2160,44 +2244,17 @@ function AutomationStepByStepContent() {
                             <div className="relative w-full h-full group">
                               {/* Test video URL accessibility */}
                               {(() => {
-                                const videoUrl = post.image || post.mediaUrl || post.thumbnailUrl;
+                                const videoUrl = post.mediaUrl || post.image || post.thumbnailUrl;
                                 if (videoUrl) {
                                   testVideoUrl(videoUrl, post.id);
                                 }
                                 return null;
                               })()}
-                              <video
-                                src={post.image || post.mediaUrl || post.thumbnailUrl} 
-                                className="w-full h-full object-cover"
-                                autoPlay
-                                muted
-                                loop
-                                playsInline
-                                preload="metadata"
+                              <PreviewVideo 
+                                src={post.mediaUrl || post.image || post.thumbnailUrl || ''} 
                                 poster={post.thumbnailUrl || post.image}
-                                onError={(e) => {
-                                  console.log('Live preview video error for post:', post.id, e);
-                                  console.log('Live preview video error details:', {
-                                    error: e.currentTarget.error,
-                                    networkState: e.currentTarget.networkState,
-                                    readyState: e.currentTarget.readyState,
-                                    src: e.currentTarget.src
-                                  });
-                                  // Fallback to image if video fails
-                                  const video = e.currentTarget;
-                                  const img = document.createElement('img');
-                                  img.src = post.thumbnailUrl || post.image || post.mediaUrl;
-                                  img.className = 'w-full h-full object-cover';
-                                  img.alt = post.caption || post.title;
-                                  video.parentNode?.replaceChild(img, video);
-                                }}
-                                onLoadStart={() => console.log('Live preview video loading started for post:', post.id)}
-                                onCanPlay={() => console.log('Live preview video can play for post:', post.id)}
-                                onLoadedMetadata={() => console.log('Live preview video metadata loaded for post:', post.id)}
-                                onLoadedData={() => console.log('Live preview video data loaded for post:', post.id)}
-                                onProgress={() => console.log('Live preview video progress for post:', post.id)}
-                                onStalled={() => console.log('Live preview video stalled for post:', post.id)}
-                                onSuspend={() => console.log('Live preview video suspended for post:', post.id)}
+                                alt={post.caption || post.title || 'Post'}
+                                id={post.id}
                               />
                               
                               {/* Mute/Unmute button - only visible on hover */}
@@ -3139,13 +3196,13 @@ function AutomationStepByStepContent() {
                 )}
               </div>
               <div>
-                <div className="font-semibold text-sm text-gray-900">
+                <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">
                   {selectedAccountData?.name || 'your_account'}
                 </div>
-                <div className="text-xs text-gray-500">2 hours ago • 📍 Location</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">2 hours ago • 📍 Location</div>
               </div>
             </div>
-            <MoreHorizontal className="w-6 h-6 text-gray-700" />
+            <MoreHorizontal className="w-6 h-6 text-gray-700 dark:text-gray-300" />
           </div>
           )}
           
@@ -3156,17 +3213,13 @@ function AutomationStepByStepContent() {
                 // Instagram Reel Layout - Full Screen Vertical Video
                 <div className="relative w-full h-[600px] bg-black">
                   {/* Video Player - Full Screen */}
-                  <video 
+                  <PreviewVideo 
                     ref={videoRef}
-                    key={`video-${selectedPostData.id}-${selectedPostData.type}`} // Stable key to prevent recreation
-                    src={selectedPostData.image || selectedPostData.mediaUrl || selectedPostData.thumbnailUrl} 
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
+                    key={`video-${selectedPostData.id}-${selectedPostData.type}`}
+                    src={selectedPostData.mediaUrl || selectedPostData.image || selectedPostData.thumbnailUrl || ''} 
                     poster={selectedPostData.thumbnailUrl || selectedPostData.image}
+                    alt={selectedPostData.caption || 'Post'}
+                    id={selectedPostData.id}
                     onPlay={(e) => {
                       // Video started playing - show pause icon and hide button after delay
                       const video = e.currentTarget;
@@ -3205,16 +3258,6 @@ function AutomationStepByStepContent() {
                         button.style.opacity = '1';
                         button.style.transform = 'scale(1)';
                       }
-                    }}
-                    onError={(e) => {
-                      console.log('Live preview video error for post:', selectedPostData.id, e);
-                      // Fallback to image if video fails
-                      const video = e.currentTarget;
-                      const img = document.createElement('img');
-                      img.src = selectedPostData.thumbnailUrl || selectedPostData.image || selectedPostData.mediaUrl;
-                      img.className = 'w-full h-full object-cover';
-                      img.alt = selectedPostData.caption || 'Post';
-                      video.parentNode?.replaceChild(img, video);
                     }}
                   />
                   
@@ -3563,28 +3606,28 @@ function AutomationStepByStepContent() {
           <div className="p-3">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-4">
-                <Heart className="w-6 h-6 text-gray-700 hover:text-red-500 transition-colors cursor-pointer" />
-                <InstagramCommentIcon className="w-6 h-6 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer" />
-                <Send className="w-6 h-6 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer" />
+                <Heart className="w-6 h-6 text-gray-700 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer" />
+                <InstagramCommentIcon className="w-6 h-6 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer" />
+                <Send className="w-6 h-6 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer" />
               </div>
-              <Bookmark className="w-6 h-6 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer" />
+              <Bookmark className="w-6 h-6 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer" />
             </div>
             
             {/* Likes count */}
-            <div className="text-sm font-semibold text-gray-900 mb-2">
+            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
               {selectedPostData ? `${(selectedPostData?.likes || selectedPostData?.engagement?.likes || 0).toLocaleString()} likes` : '1,247 likes'}
             </div>
             
             {/* Caption */}
               {selectedPostData?.caption && (
-                <div className="text-sm text-gray-900 mb-2">
-                  <span className="font-semibold mr-2">wanderwithsky</span>
+                <div className="text-sm text-gray-900 dark:text-gray-100 mb-2">
+                  <span className="font-semibold mr-2">{selectedAccountData?.name?.replace('@', '') || 'your_account'}</span>
                   {selectedPostData.caption}
                 </div>
               )}
               
               {/* Comments */}
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
                 View all {(selectedPostData?.comments || selectedPostData?.engagement?.comments || 0).toLocaleString()} comments
               </div>
                 </div>

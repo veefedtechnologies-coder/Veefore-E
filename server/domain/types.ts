@@ -45,6 +45,8 @@ export interface User {
   discountCode?: string;
   discountExpiresAt?: Date;
   hasUsedWaitlistBonus: boolean;
+  hasClaimedWelcomeBonus: boolean;
+  welcomeBonusClaimedAt?: Date;
   dailyLoginStreak: number;
   lastLoginAt?: Date;
   feedbackSubmittedAt?: Date;
@@ -58,6 +60,7 @@ export interface User {
   lastApiCallTimestamp?: Date;
   rateLimitResetAt?: Date;
   apiCallCount: number;
+  planStatus: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -194,9 +197,19 @@ export interface SocialAccount {
   totalLikes?: number;
   totalComments?: number;
   totalReach?: number;
+  totalImpressions?: number;
   avgEngagement?: number;
+  postsAnalyzed?: number;
+  accountLevelReach?: number;
+  postLevelReach?: number;
+  reachSource?: string;
+  reachByPeriod?: any;
   totalShares?: number;
   totalSaves?: number;
+  audienceCity?: Record<string, number>;
+  audienceCountry?: Record<string, number>;
+  audienceGenderAge?: Record<string, number>;
+  audienceActiveTime?: Record<string, number>;
   lastSyncAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -212,6 +225,10 @@ export interface InsertSocialAccount {
   refreshToken?: string;
   expiresAt?: Date;
   isActive?: boolean;
+  accountType?: string;
+  followersCount?: number;
+  mediaCount?: number;
+  isBusinessAccount?: boolean;
 }
 
 // ============================================================================
@@ -579,4 +596,568 @@ export interface InsertWaitlistEntry {
   status?: string;
   position?: number;
   metadata?: Record<string, any>;
+}
+
+export interface WaitlistUser {
+  id: string;
+  name?: string;
+  email: string;
+  referralCode?: string;
+  referredBy?: string;
+  referralCount: number;
+  credits: number;
+  status: string;
+  discountCode?: string;
+  discountExpiresAt?: Date;
+  dailyLogins: number;
+  feedbackSubmitted: boolean;
+  joinedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  metadata: Record<string, any>;
+}
+
+export interface InsertWaitlistUser {
+  name?: string;
+  email: string;
+  referralCode?: string;
+  referredBy?: string;
+  status?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface Suggestion {
+  id: string;
+  workspaceId: string;
+  type: string;
+  data: any;
+  confidence: number;
+  isUsed: boolean;
+  validUntil?: Date;
+  createdAt: Date;
+}
+
+export interface InsertSuggestion {
+  workspaceId: string;
+  type: string;
+  data: any;
+  confidence?: number;
+}
+
+export interface Referral {
+  id: string;
+  referrerId: string;
+  referredId: string;
+  code: string;
+  status: string;
+  rewardAmount: number;
+  createdAt: Date;
+}
+
+export interface InsertReferral {
+  referrerId: string;
+  referredId: string;
+  code: string;
+  rewardAmount?: number;
+}
+
+export interface Addon {
+  id: string;
+  userId: string;
+  type: string;
+  name: string;
+  price: number;
+  isActive: boolean;
+  expiresAt?: Date;
+  metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertAddon {
+  userId: string;
+  type: string;
+  name: string;
+  price: number;
+  metadata?: Record<string, any>;
+}
+
+export interface ContentRecommendation {
+  id: string;
+  workspaceId: string;
+  type: string;
+  title: string;
+  description?: string;
+  duration?: number;
+  category: string;
+  country: string;
+  tags: string[];
+  engagement: any;
+  thumbnailUrl?: string;
+  mediaUrl?: string;
+  sourceUrl?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertContentRecommendation {
+  workspaceId: string;
+  type: string;
+  title: string;
+  category: string;
+  country: string;
+}
+
+export interface UserContentHistory {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  action: string;
+  recommendationId?: string;
+  metadata: Record<string, any>;
+  createdAt: Date;
+}
+
+export interface InsertUserContentHistory {
+  userId: string;
+  workspaceId: string;
+  action: string;
+  recommendationId?: string;
+}
+
+export interface Admin {
+  id: string;
+  email: string;
+  username: string;
+  password?: string;
+  role: string;
+  isActive: boolean;
+  lastLogin?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertAdmin {
+  email: string;
+  username: string;
+  password?: string;
+  role?: string;
+}
+
+export interface AdminSession {
+  id: string;
+  adminId: string;
+  token: string;
+  ipAddress?: string;
+  userAgent?: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
+export interface InsertAdminSession {
+  adminId: string;
+  token: string;
+  expiresAt: Date;
+}
+
+export interface Popup {
+  id: string;
+  title: string;
+  content: string;
+  type: string;
+  priority: number;
+  isActive: boolean;
+  targetUserType?: string;
+  displayConditions?: any;
+  actionButton?: any;
+  startDate?: Date;
+  endDate?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertPopup {
+  title: string;
+  content: string;
+  type: string;
+  priority?: number;
+  isActive?: boolean;
+}
+
+
+export interface AppSetting {
+  id: string;
+  key: string;
+  value: any;
+  description?: string;
+  category: string;
+  isPublic: boolean;
+  updatedBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertAppSetting {
+  key: string;
+  value: any;
+  description?: string;
+  category: string;
+  isPublic?: boolean;
+}
+
+// ============================================================================
+// FEEDBACK TYPES
+// ============================================================================
+export interface FeedbackMessage {
+  id: string;
+  userId?: string;
+  subject: string;
+  message: string;
+  type: string;
+  status: string;
+  adminResponse?: string;
+  respondedBy?: string;
+  respondedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertFeedbackMessage {
+  subject: string;
+  message: string;
+  type: string;
+  userId?: string;
+  name?: string;
+  email?: string;
+}
+
+// ============================================================================
+// THUMBNAIL TYPES
+// ============================================================================
+export interface ThumbnailProject {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  uploadedImageUrl?: string;
+  status: string;
+  stage: number;
+  creditsUsed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertThumbnailProject {
+  userId: string;
+  workspaceId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  uploadedImageUrl?: string;
+  status?: string;
+  stage?: number;
+}
+
+export interface ThumbnailStrategy {
+  id: string;
+  projectId: string;
+  titles?: any;
+  ctas?: any;
+  fonts?: any;
+  colors?: any;
+  style?: string;
+  emotion?: string;
+  hooks?: any;
+  placement?: any;
+  createdAt: Date;
+}
+
+export interface InsertThumbnailStrategy {
+  projectId: string;
+  titles?: any;
+  ctas?: any;
+  fonts?: any;
+  colors?: any;
+  style?: string;
+  emotion?: string;
+  hooks?: any;
+  placement?: any;
+}
+
+export interface ThumbnailVariant {
+  id: string;
+  projectId: string;
+  variantNumber: number;
+  layoutType: string;
+  previewUrl: string;
+  layerMetadata?: any;
+  layoutClassification?: string;
+  predictedCtr?: number;
+  composition?: any;
+  createdAt: Date;
+}
+
+export interface InsertThumbnailVariant {
+  projectId: string;
+  variantNumber: number;
+  layoutType: string;
+  previewUrl: string;
+  layerMetadata?: any;
+  layoutClassification?: string;
+  predictedCtr?: number;
+  composition?: any;
+}
+
+export interface CanvasEditorSession {
+  id: string;
+  variantId: string;
+  userId: string;
+  canvasData?: any;
+  layers?: any;
+  editHistory?: any;
+  lastSaved?: Date;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface InsertCanvasEditorSession {
+  variantId: string;
+  userId: string;
+  canvasData?: any;
+  layers?: any;
+  editHistory?: any;
+  isActive?: boolean;
+}
+
+export interface ThumbnailExport {
+  id: string;
+  sessionId: string;
+  format: string;
+  exportUrl: string;
+  downloadCount: number;
+  cloudStorageUrl?: string;
+  metadata?: any;
+  createdAt: Date;
+}
+
+export interface InsertThumbnailExport {
+  sessionId: string;
+  format: string;
+  exportUrl: string;
+  cloudStorageUrl?: string;
+  metadata?: any;
+}
+
+// ============================================================================
+// CREATIVE BRIEF & REPURPOSE TYPES
+// ============================================================================
+export interface CreativeBrief {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  title: string;
+  targetAudience: string;
+  platforms: any;
+  campaignGoals: any;
+  tone: string;
+  style: string;
+  industry: string;
+  deadline?: Date;
+  budget?: number;
+  briefContent: string;
+  keyMessages?: any;
+  contentFormats?: any;
+  hashtags?: any;
+  references?: any;
+  status: string;
+  creditsUsed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertCreativeBrief {
+  workspaceId: string;
+  userId: string;
+  title: string;
+  targetAudience: string;
+  platforms: any;
+  campaignGoals: any;
+  tone: string;
+  style: string;
+  industry: string;
+  briefContent: string;
+}
+
+export interface ContentRepurpose {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  originalContentId?: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  sourceContent: string;
+  repurposedContent: string;
+  contentType: string;
+  culturalAdaptations?: any;
+  toneAdjustments?: any;
+  platform: string;
+  qualityScore?: number;
+  isApproved: boolean;
+  creditsUsed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertContentRepurpose {
+  workspaceId: string;
+  userId: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  sourceContent: string;
+  repurposedContent: string;
+  contentType: string;
+  platform: string;
+}
+
+// ============================================================================
+// COMPETITOR ANALYSIS TYPES
+// ============================================================================
+export interface CompetitorAnalysis {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  competitorUsername: string;
+  platform: string;
+  analysisType: string;
+  scrapedData: any;
+  analysisResults: any;
+  topPerformingPosts?: any;
+  contentPatterns?: any;
+  hashtags?: any;
+  postingSchedule?: any;
+  engagementRate?: number;
+  growthRate?: number;
+  recommendations: string;
+  competitorScore?: number;
+  lastScraped?: Date;
+  creditsUsed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertCompetitorAnalysis {
+  workspaceId: string;
+  userId: string;
+  competitorUsername: string;
+  platform: string;
+  analysisType: string;
+  recommendations: string;
+}
+
+// ============================================================================
+// DM TYPES
+// ============================================================================
+export interface DmConversation {
+  id: string;
+  workspaceId: string;
+  platform: string;
+  participantId: string;
+  participantUsername: string;
+  lastMessageAt: Date;
+  messageCount: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertDmConversation {
+  workspaceId: string;
+  platform: string;
+  participantId: string;
+  participantUsername: string;
+}
+
+export interface DmMessage {
+  id: string;
+  conversationId: string;
+  messageId: string;
+  sender: 'user' | 'participant' | 'ai';
+  content: string;
+  messageType: string;
+  sentiment?: string;
+  topics?: string[];
+  aiResponse?: string;
+  automationRuleId?: string;
+  createdAt: Date;
+}
+
+export interface InsertDmMessage {
+  conversationId: string;
+  messageId: string;
+  sender: 'user' | 'participant' | 'ai';
+  content: string;
+  messageType?: string;
+}
+
+// ============================================================================
+// CHAT TYPES (continued)
+// ============================================================================
+export interface ChatConversation {
+  id: string;
+  userId: string;
+  workspaceId?: string;
+  title: string;
+  lastMessageAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertChatConversation {
+  userId: string;
+  workspaceId?: string;
+  title: string;
+  lastMessageAt?: Date;
+}
+
+export interface InsertChatMessage {
+  conversationId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  metadata?: Record<string, any>;
+}
+
+// ============================================================================
+// CONVERSATION CONTEXT TYPES
+// ============================================================================
+export interface ConversationContext {
+  id: string;
+  conversationId: string;
+  contextType: string;
+  contextValue: string;
+  confidence: number;
+  source: string;
+  expiresAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertConversationContext {
+  conversationId: string;
+  contextType: string;
+  contextValue: string;
+  confidence?: number;
+  expiresAt?: Date;
 }

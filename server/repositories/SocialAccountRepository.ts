@@ -4,8 +4,21 @@ import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
 import { getAccessTokenFromAccount, getRefreshTokenFromAccount, encryptAndStoreToken } from '../storage/converters';
 import { InsertSocialAccount, SocialAccount } from '@shared/schema';
+import * as fs from 'fs';
+import * as path from 'path';
 
-export type Platform = 'instagram' | 'twitter' | 'facebook' | 'youtube' | 'tiktok' | 'linkedin';
+const traceLog = (msg: string, data?: any) => {
+  try {
+    const logPath = path.join(process.cwd(), 'debug-trace.log');
+    const timestamp = new Date().toISOString();
+    const entry = `[${timestamp}] [REPO] ${msg}${data ? ' ' + JSON.stringify(data) : ''}\n`;
+    fs.appendFileSync(logPath, entry);
+  } catch (e) {
+    console.error('Failed to log to trace file', e);
+  }
+};
+
+export type Platform = 'instagram' | 'instagram_advanced' | 'twitter' | 'facebook' | 'youtube' | 'tiktok' | 'linkedin';
 
 export interface SocialAccountWithDecryptedTokens {
   id: string;
@@ -35,6 +48,7 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   async createWithEncryptedTokens(account: InsertSocialAccount): Promise<ISocialAccount> {
     const startTime = Date.now();
     try {
+      traceLog('createWithEncryptedTokens called', { workspace: account.workspaceId, hasToken: !!account.accessToken });
       const socialAccountData: any = {
         ...account,
         isActive: true,
@@ -48,16 +62,18 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
       delete socialAccountData._id;
 
       if (account.accessToken) {
+        traceLog('Encrypting new accessToken', { len: account.accessToken.length });
         socialAccountData.encryptedAccessToken = encryptAndStoreToken(account.accessToken);
-        delete socialAccountData.accessToken;
+        socialAccountData.accessToken = null; // P4-FIX: Explicitly nullify to clear stale plain field
       }
 
       if (account.refreshToken) {
         socialAccountData.encryptedRefreshToken = encryptAndStoreToken(account.refreshToken);
-        delete socialAccountData.refreshToken;
+        socialAccountData.refreshToken = null; // P4-FIX: Explicitly nullify
       }
 
       const result = await this.create(socialAccountData);
+      traceLog('Create complete', { id: result._id?.toString() });
       logger.db.query('createWithEncryptedTokens', this.entityName, Date.now() - startTime);
       return result;
     } catch (error) {
@@ -69,27 +85,33 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   async updateWithEncryptedTokens(id: string, updates: Partial<SocialAccount>): Promise<ISocialAccount> {
     const startTime = Date.now();
     try {
+      traceLog(`updateWithEncryptedTokens called for ${id}`, { hasToken: !!updates.accessToken });
       const encryptedUpdates: any = { ...updates, updatedAt: new Date() };
 
       if (updates.accessToken) {
+        traceLog('Encrypting updated accessToken', { len: updates.accessToken.length });
         encryptedUpdates.encryptedAccessToken = encryptAndStoreToken(updates.accessToken);
-        delete encryptedUpdates.accessToken;
+        encryptedUpdates.accessToken = null; // P4-FIX: Explicitly nullify to clear stale plain field
       }
 
       if (updates.refreshToken) {
         encryptedUpdates.encryptedRefreshToken = encryptAndStoreToken(updates.refreshToken);
-        delete encryptedUpdates.refreshToken;
+        encryptedUpdates.refreshToken = null; // P4-FIX: Explicitly nullify
       }
 
+      traceLog('Calling updateById', { id, updateKeys: Object.keys(encryptedUpdates) });
       const result = await this.updateById(id, encryptedUpdates);
-      
+
       if (!result) {
+        traceLog('Update failed: Account not found', { id });
         throw new Error('Social account not found');
       }
 
+      traceLog('Update successful', { id: result._id?.toString() });
       logger.db.query('updateWithEncryptedTokens', this.entityName, Date.now() - startTime, { id });
       return result;
     } catch (error) {
+      traceLog('Update error', { error: (error as Error).message });
       logger.db.error('updateWithEncryptedTokens', error, { entityName: this.entityName, id });
       throw new DatabaseError('Failed to update social account with encrypted tokens', error as Error);
     }
@@ -121,7 +143,7 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   async findAccountsNeedingSync(olderThanHours: number = 24): Promise<ISocialAccount[]> {
     const threshold = new Date();
     threshold.setHours(threshold.getHours() - olderThanHours);
-    
+
     return this.findAll({
       isActive: true,
       $or: [
@@ -179,6 +201,12 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
       totalLikes?: number;
       totalComments?: number;
       totalReach?: number;
+      totalSaves?: number;
+      totalShares?: number;
+      audienceCity?: Map<string, number> | Record<string, number>;
+      audienceCountry?: Map<string, number> | Record<string, number>;
+      audienceGenderAge?: Map<string, number> | Record<string, number>;
+      audienceActiveTime?: Map<string, number> | Record<string, number>;
     }
   ): Promise<ISocialAccount | null> {
     return this.updateById(accountId, {
@@ -210,15 +238,23 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   }
 
   async disconnectAccount(accountId: string): Promise<ISocialAccount | null> {
-    return this.updateById(accountId, {
-      isActive: false,
-      accessToken: null,
-      refreshToken: null,
-      encryptedAccessToken: null,
-      encryptedRefreshToken: null,
-      tokenStatus: 'disconnected',
-      updatedAt: new Date()
-    });
+    console.log(`[SocialAccountRepository] Disconnecting account ${accountId}`);
+    try {
+      const result = await this.updateById(accountId, {
+        isActive: false,
+        accessToken: null,
+        refreshToken: null,
+        encryptedAccessToken: null,
+        encryptedRefreshToken: null,
+        tokenStatus: 'disconnected',
+        updatedAt: new Date()
+      });
+      console.log(`[SocialAccountRepository] Account ${accountId} disconnected successfully`);
+      return result;
+    } catch (error) {
+      console.error(`[SocialAccountRepository] Error disconnecting account ${accountId}`, error);
+      throw error;
+    }
   }
 
   async getAccountsByWorkspaceWithMetrics(workspaceId: string): Promise<ISocialAccount[]> {
@@ -235,12 +271,12 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
         { $match: { isActive: true } },
         { $group: { _id: '$platform', count: { $sum: 1 } } }
       ]).exec();
-      
+
       const counts: Record<string, number> = {};
       result.forEach((item: { _id: string; count: number }) => {
         counts[item._id] = item.count;
       });
-      
+
       logger.db.query('countByPlatform', this.entityName, Date.now() - startTime);
       return counts;
     } catch (error) {
@@ -256,7 +292,7 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
         { $match: { workspaceId, isActive: true } },
         { $group: { _id: null, totalFollowers: { $sum: '$followersCount' } } }
       ]).exec();
-      
+
       logger.db.query('getTotalFollowersByWorkspace', this.entityName, Date.now() - startTime, { workspaceId });
       return result[0]?.totalFollowers || 0;
     } catch (error) {
@@ -269,37 +305,16 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
     const startTime = Date.now();
     try {
       const workspaceIdStr = workspaceId.toString();
-      const workspaceIdFirst6 = workspaceIdStr.substring(0, 6);
-      
-      const accounts = await this.model.find({
-        $or: [
-          { workspaceId: workspaceIdStr },
-          { workspaceId: workspaceId },
-          { workspaceId: workspaceIdFirst6 },
-          { workspaceId: parseInt(workspaceIdFirst6) }
-        ]
-      }).exec();
-      
-      for (const account of accounts) {
-        const accountWorkspaceId = account.workspaceId?.toString() || '';
-        const expectedWorkspaceId = workspaceIdStr;
-        
-        if (accountWorkspaceId !== expectedWorkspaceId &&
-            (accountWorkspaceId === workspaceIdFirst6 ||
-             accountWorkspaceId === parseInt(workspaceIdFirst6).toString())) {
-          await this.model.updateOne(
-            { _id: account._id },
-            { workspaceId: expectedWorkspaceId, updatedAt: new Date() }
-          );
-          account.workspaceId = expectedWorkspaceId;
-        }
-      }
-      
-      logger.db.query('findByWorkspaceWithTolerantLookup', this.entityName, Date.now() - startTime, { workspaceId });
+
+      // P1-FIX: Removed prefix-based lookup logic that was causing cross-workspace data leakage
+      // and "tolerant" lookups that matched multiple workspaces.
+      const accounts = await this.model.find({ workspaceId: workspaceIdStr }).exec();
+
+      logger.db.query('findByWorkspaceWithTolerantLookup', this.entityName, Date.now() - startTime, { workspaceId: workspaceIdStr });
       return accounts;
     } catch (error) {
       logger.db.error('findByWorkspaceWithTolerantLookup', error, { entityName: this.entityName, workspaceId });
-      throw new DatabaseError('Failed to find accounts with tolerant lookup', error as Error);
+      throw new DatabaseError('Failed to find accounts', error as Error);
     }
   }
 
@@ -310,9 +325,9 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
         workspaceId: workspaceId.toString(),
         isActive: true
       }).exec();
-      
+
       const result = accounts.map(account => ({
-        id: account._id.toString(),
+        id: (account._id as any).toString(),
         workspaceId: account.workspaceId,
         platform: account.platform,
         username: account.username,
@@ -326,7 +341,7 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
         profilePictureUrl: account.profilePictureUrl,
         lastSyncAt: account.lastSyncAt
       }));
-      
+
       logger.db.query('findActiveWithDecryptedTokens', this.entityName, Date.now() - startTime, { workspaceId });
       return result;
     } catch (error) {
@@ -338,20 +353,20 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   async findByPageIdOrAccountId(pageId: string): Promise<ISocialAccount | null> {
     const startTime = Date.now();
     try {
-      let account = await this.model.findOne({ 
+      let account = await this.model.findOne({
         pageId: pageId,
         platform: 'instagram',
-        isActive: true 
+        isActive: true
       }).exec();
-      
+
       if (!account) {
-        account = await this.model.findOne({ 
+        account = await this.model.findOne({
           accountId: pageId,
           platform: 'instagram',
-          isActive: true 
+          isActive: true
         }).exec();
       }
-      
+
       logger.db.query('findByPageIdOrAccountId', this.entityName, Date.now() - startTime, { pageId });
       return account;
     } catch (error) {
@@ -361,29 +376,29 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   }
 
   async findByWorkspaceIds(
-    workspaceIds: string[], 
-    options?: { 
-      activeOnly?: boolean; 
+    workspaceIds: string[],
+    options?: {
+      activeOnly?: boolean;
       projection?: Record<string, 0 | 1>;
     }
   ): Promise<ISocialAccount[]> {
     const startTime = Date.now();
     try {
       const query: Record<string, any> = { workspaceId: { $in: workspaceIds } };
-      
+
       if (options?.activeOnly) {
         query.isActive = true;
       }
 
       const queryBuilder = this.model.find(query);
-      
+
       if (options?.projection) {
         queryBuilder.select(options.projection);
       }
 
       const accounts = await queryBuilder.lean().exec();
-      
-      logger.db.query('findByWorkspaceIds', this.entityName, Date.now() - startTime, { 
+
+      logger.db.query('findByWorkspaceIds', this.entityName, Date.now() - startTime, {
         workspaceIdsCount: workspaceIds.length,
         activeOnly: options?.activeOnly,
         hasProjection: !!options?.projection
@@ -395,7 +410,7 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
     }
   }
 
-  async updateYouTubePlatformData(updates: {
+  async updateYouTubePlatformData(accountId: string, updates: {
     workspaceId?: string;
     subscriberCount?: number;
     videoCount?: number;
@@ -405,11 +420,11 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   }): Promise<any> {
     const startTime = Date.now();
     try {
-      const result = await this.model.updateMany(
-        { platform: 'youtube' },
+      // P1-FIX: Changed from global updateMany to account-scoped updateOne
+      const result = await this.model.updateOne(
+        { accountId: accountId, platform: 'youtube' },
         {
           $set: {
-            workspaceId: updates.workspaceId,
             subscriberCount: updates.subscriberCount,
             videoCount: updates.videoCount,
             viewCount: updates.viewCount,
@@ -418,11 +433,11 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
           }
         }
       ).exec();
-      
-      logger.db.query('updateYouTubePlatformData', this.entityName, Date.now() - startTime);
+
+      logger.db.query('updateYouTubePlatformData', this.entityName, Date.now() - startTime, { accountId });
       return result;
     } catch (error) {
-      logger.db.error('updateYouTubePlatformData', error, { entityName: this.entityName });
+      logger.db.error('updateYouTubePlatformData', error, { entityName: this.entityName, accountId });
       throw new DatabaseError('Failed to update YouTube platform data', error as Error);
     }
   }

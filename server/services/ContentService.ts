@@ -2,6 +2,10 @@ import { BaseService } from './BaseService';
 import { contentRepository, ContentStatus } from '../repositories';
 import { IContent } from '../models/Content';
 import { NotFoundError, ValidationError } from '../errors';
+import { socialAccountService } from './SocialAccountService';
+import { getAccessTokenFromAccount } from '../storage/converters';
+import { SimpleInstagramPublisher } from '../simple-instagram-publisher';
+import { getSchedulerService } from '../scheduler-service';
 
 interface CreateContentInput {
   workspaceId: string;
@@ -44,10 +48,11 @@ export class ContentService extends BaseService {
   async getContentByWorkspace(
     workspaceId: string,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    accountId?: string
   ) {
     return this.withErrorHandling('getContentByWorkspace', async () => {
-      return contentRepository.findByWorkspaceId(workspaceId, { page, limit });
+      return contentRepository.findByWorkspaceId(workspaceId, { page, limit }, accountId);
     });
   }
 
@@ -75,6 +80,58 @@ export class ContentService extends BaseService {
   async getUpcomingScheduled(workspaceId: string, limit: number = 10): Promise<IContent[]> {
     return this.withErrorHandling('getUpcomingScheduled', async () => {
       return contentRepository.findUpcomingScheduled(workspaceId, limit);
+    });
+  }
+
+  async getTopPerforming(workspaceId: string, limit: number = 10): Promise<any[]> {
+    return this.withErrorHandling('getTopPerforming', async () => {
+      console.log(`[ContentService] getTopPerforming called for workspaceId: ${workspaceId}, limit: ${limit}`);
+      // Find published posts
+      const result = await contentRepository.findByWorkspaceAndStatus(
+        workspaceId,
+        'published',
+        { page: 1, limit: 100 } // Fetch more to sort
+      );
+
+      console.log(`[ContentService] Found ${result.data.length} published posts`);
+
+
+      // Sort by engagement (simple heuristic)
+      const sorted = result.data.sort((a, b) => {
+        const scoreA = (a.metrics?.engagement || 0) + (a.metrics?.likes || 0) + (a.metrics?.comments || 0);
+        const scoreB = (b.metrics?.engagement || 0) + (b.metrics?.likes || 0) + (b.metrics?.comments || 0);
+        return scoreB - scoreA;
+      });
+
+      return sorted.slice(0, limit).map(post => {
+        // Safe conversion to object
+        const postObj = typeof post.toObject === 'function' ? post.toObject() : post;
+        const metrics = postObj.metrics || {};
+        const contentData = postObj.contentData || {};
+
+        return {
+          ...postObj,
+          id: postObj._id?.toString() || postObj.id,
+          // Flatten media URLs for easier frontend access (Support both camelCase and snake_case)
+          thumbnailUrl: contentData.thumbnailUrl || contentData.thumbnail_url || contentData.mediaUrl || contentData.media_url || 'https://via.placeholder.com/400',
+          mediaUrl: contentData.mediaUrl || contentData.media_url || 'https://via.placeholder.com/400',
+          // Ensure platform is available at top level
+          platform: postObj.platform || contentData.platform || 'instagram',
+          // Support both snake_case and camelCase for media_type
+          type: postObj.type || contentData.media_type?.toLowerCase() || contentData.mediaType?.toLowerCase() || 'image',
+          // Fallbacks for metrics
+          metrics: {
+            ...metrics,
+            likes: metrics.likes || 0,
+            comments: metrics.comments || 0,
+            shares: metrics.shares || 0,
+            views: metrics.views || metrics.reach || 0,
+            engagement: metrics.engagement || 0
+          },
+          performanceScore: (metrics.engagement || 0) + (metrics.likes || 0) + (metrics.comments || 0),
+          rankingReason: 'High Engagement'
+        };
+      });
     });
   }
 
@@ -137,7 +194,9 @@ export class ContentService extends BaseService {
         throw new ValidationError('Cannot schedule published content');
       }
 
-      if (input.scheduledAt <= new Date()) {
+      // Allow up to 5 minutes in the past to account for client-server clock skew
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      if (input.scheduledAt < fiveMinutesAgo) {
         throw new ValidationError('Scheduled time must be in the future');
       }
 
@@ -149,6 +208,28 @@ export class ContentService extends BaseService {
 
       if (!updated) {
         throw new NotFoundError('Content', contentId);
+      }
+
+      // INTEGRATE BULLMQ REDIS SCHEDULING
+      const scheduler = getSchedulerService();
+      if (scheduler) {
+        try {
+          const result = await scheduler.scheduleWithQueue({
+            id: updated._id?.toString() || contentId,
+            scheduledAt: input.scheduledAt,
+            workspaceId: updated.workspaceId,
+            platform: input.platform || updated.platform,
+            title: updated.title
+          });
+          if (result.success) {
+            this.log('scheduleContent', 'Content scheduled via BullMQ', {
+              contentId,
+              jobId: result.jobId
+            });
+          }
+        } catch (queueError) {
+          console.error('[SCHEDULER] Failed to schedule with queue, relying on fallback:', queueError);
+        }
       }
 
       this.log('scheduleContent', 'Content scheduled', {
@@ -199,6 +280,116 @@ export class ContentService extends BaseService {
       });
 
       this.log('cancelSchedule', 'Schedule cancelled', { contentId });
+      return updated;
+    });
+  }
+
+  async publishContentNow(contentId: string, baseUrl?: string): Promise<IContent> {
+    return this.withErrorHandling('publishContentNow', async () => {
+      const content = await this.getContentById(contentId);
+
+      if (content.status === 'published') {
+        throw new ValidationError('Content is already published');
+      }
+
+      // Get workspace's instagram account
+      const instagramAccount = await socialAccountService.getAccountByPlatform(content.workspaceId.toString(), 'instagram');
+      if (!instagramAccount) {
+        throw new ValidationError('No Instagram account connected to this workspace');
+      }
+
+      const accessToken = getAccessTokenFromAccount(instagramAccount);
+      if (!accessToken) {
+        throw new ValidationError('Instagram account access token is invalid or expired');
+      }
+
+      // Handle media based on new structure or legacy structure
+      let mediaUrls: string[] = [];
+      const contentData = content.contentData || {};
+      
+      if (contentData.mediaUrls && Array.isArray(contentData.mediaUrls) && contentData.mediaUrls.length > 0) {
+        mediaUrls = contentData.mediaUrls;
+      } else if (contentData.mediaUrl) {
+        mediaUrls = [contentData.mediaUrl];
+      }
+
+      if (mediaUrls.length === 0) {
+        throw new ValidationError('No media available to publish');
+      }
+
+      // Build proper URLs
+      const finalBaseUrl = baseUrl || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      
+      const publisher = new SimpleInstagramPublisher();
+      let caption = '';
+      if (contentData?.text) {
+        caption = contentData.text;
+      } else {
+        caption = content.description ? content.description : content.title;
+      }
+      caption = caption.trim();
+
+      const mentions = contentData?.mentions || [];
+      const hashtags = contentData?.hashtags || [];
+
+      const isVideoType = content.type === 'video' || content.type === 'reel' || content.type === 'story' || 
+                         mediaUrls.some((url: string) => url.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i));
+
+      if (hashtags.length > 0 || (mentions.length > 0 && isVideoType)) {
+        caption += '\n\n';
+        if (mentions.length > 0 && isVideoType) {
+          caption += mentions.map((m: string) => `@${m.replace(/^@+/, '')}`).join(' ') + ' ';
+        }
+        if (hashtags.length > 0) {
+          caption += hashtags.map((h: string) => `#${h.replace(/^#+/, '')}`).join(' ');
+        }
+      }
+      caption = caption.trim();
+
+      const result = await publisher.publishPost({
+        accountId: instagramAccount.accountId || (instagramAccount as any)._id?.toString(),
+        accessToken: accessToken,
+        content: caption,
+        mentions: mentions,
+        mediaFiles: mediaUrls.map((url: string) => {
+          let cleanUrl = url;
+          if (url.startsWith('blob:')) {
+            const filename = url.split('/').pop() || 'media';
+            cleanUrl = `${finalBaseUrl}/uploads/${filename}`;
+          } else if (url.startsWith('/')) {
+            cleanUrl = `${finalBaseUrl}${url}`;
+          } else if (url.includes('localhost') || url.includes('your-replit-dev-domain')) {
+            try {
+              const urlObj = new URL(url);
+              cleanUrl = `${finalBaseUrl}${urlObj.pathname}${urlObj.search}`;
+            } catch (e) {
+              const filename = url.split('/').pop() || 'media';
+              cleanUrl = `${finalBaseUrl}/uploads/${filename}`;
+            }
+          }
+          return { url: cleanUrl, type: content.type === 'video' || url.match(/\.(mp4|mov)$/i) ? 'video' : 'photo' };
+        }),
+        postType: content.type
+      });
+
+      if (!result.success) {
+        await contentRepository.updateByIdOrFail(contentId, {
+          status: 'failed',
+          error: result.error,
+          updatedAt: new Date()
+        });
+        throw new Error(result.error || 'Failed to publish to Instagram');
+      }
+
+      // Success
+      const updated = await contentRepository.updateByIdOrFail(contentId, {
+        status: 'published',
+        instagramPostId: result.postId,
+        publishedAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      this.log('publishContentNow', 'Content published immediately', { contentId, postId: result.postId });
       return updated;
     });
   }
