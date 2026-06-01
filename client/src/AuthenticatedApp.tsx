@@ -9,8 +9,9 @@ import { apiRequest, queryClient } from '@/lib/queryClient'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { RealtimeProvider } from './contexts/RealtimeContext'
 
-const Sidebar = React.lazy(() => import('./components/layout/sidebar').then(m => ({ default: m.Sidebar })))
-const Header = React.lazy(() => import('./components/layout/header').then(m => ({ default: m.Header })))
+import { Sidebar } from './components/layout/sidebar'
+import { Header } from './components/layout/header'
+
 const CreateDropdown = React.lazy(() => import('./components/layout/create-dropdown').then(m => ({ default: m.CreateDropdown })))
 const QuickActions = React.lazy(() => import('./components/dashboard/quick-actions').then(m => ({ default: m.QuickActions })))
 const PerformanceScore = React.lazy(() => import('./components/dashboard/performance-score').then(m => ({ default: m.PerformanceScore })))
@@ -18,6 +19,7 @@ const Recommendations = React.lazy(() => import('./components/dashboard/recommen
 const GetStarted = React.lazy(() => import('./components/dashboard/get-started').then(m => ({ default: m.GetStarted })))
 const ScheduledPosts = React.lazy(() => import('./components/dashboard/scheduled-posts').then(m => ({ default: m.ScheduledPosts })))
 const Drafts = React.lazy(() => import('./components/dashboard/scheduled-posts').then(m => ({ default: m.Drafts })))
+const PublishedPosts = React.lazy(() => import('./components/dashboard/scheduled-posts').then(m => ({ default: m.PublishedPosts })))
 const Listening = React.lazy(() => import('./components/dashboard/listening').then(m => ({ default: m.Listening })))
 const SocialAccounts = React.lazy(() => import('./components/dashboard/social-accounts').then(m => ({ default: m.SocialAccounts })))
 const InstagramWebhookListener = React.lazy(() => import('./components/dashboard/instagram-webhook-listener'))
@@ -27,6 +29,10 @@ const BestTimeWidget = React.lazy(() => import('./components/dashboard/best-time
 const CalendarView = React.lazy(() => import('./components/calendar/calendar-view').then(m => ({ default: m.CalendarView })))
 const AnalyticsDashboard = React.lazy(() => import('./components/analytics/analytics-dashboard').then(m => ({ default: m.AnalyticsDashboard })))
 const CreatePost = React.lazy(() => import('./components/create/create-post').then(m => ({ default: m.CreatePost })))
+const ScheduledPostsPage = React.lazy(() => import('./pages/ScheduledPostsPage'))
+const DraftsPage = React.lazy(() => import('./pages/DraftsPage'))
+const PublishedPostsPage = React.lazy(() => import('./pages/PublishedPostsPage'))
+const PostAnalyticsPage = React.lazy(() => import('./pages/PostAnalyticsPage'))
 const VeeGPT = React.lazy(() => import('./pages/VeeGPT'))
 const Workspaces = React.lazy(() => import('./pages/Workspaces'))
 const Profile = React.lazy(() => import('./pages/Profile'))
@@ -37,6 +43,7 @@ const AdminPanel = React.lazy(() => import('./pages/AdminPanel'))
 const Settings = React.lazy(() => import('./pages/Settings'))
 const SecurityDashboard = React.lazy(() => import('./pages/SecurityDashboard'))
 const BestTimeDetail = React.lazy(() => import('./pages/BestTimeDetail'))
+const SocialListeningPage = React.lazy(() => import('./pages/SocialListeningPage'))
 const TestFixtures = React.lazy(() => import('./pages/TestFixtures'))
 const EncryptionHealth = React.lazy(() => import('./pages/EncryptionHealth'))
 const Tabs = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.Tabs })))
@@ -82,22 +89,18 @@ const DashboardLayout = ({
   children: React.ReactNode,
   isCreateDropdownOpen: boolean,
   setIsCreateDropdownOpen: (open: boolean) => void,
-  handleCreateOptionSelect: () => void
+  handleCreateOptionSelect: (option: string) => void
 }) => (
   <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
     <div className="h-screen overflow-y-auto">
-      <React.Suspense fallback={null}>
-        <Sidebar
-          className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-          isCreateDropdownOpen={isCreateDropdownOpen}
-          setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-        />
-      </React.Suspense>
+      <Sidebar
+        className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+        isCreateDropdownOpen={isCreateDropdownOpen}
+        setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+      />
     </div>
     <div className="flex-1 flex flex-col h-screen overflow-hidden">
-      <React.Suspense fallback={null}>
-        <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
-      </React.Suspense>
+      <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
       {isCreateDropdownOpen && (
         <React.Suspense fallback={null}>
           <CreateDropdown
@@ -198,21 +201,16 @@ export default function AuthenticatedApp() {
     }
   }, [user, loading, userData, userDataLoading, location, setLocation, workspaces, workspacesLoading])
 
-  const handleCreateOptionSelect = () => {
+  const handleCreateOptionSelect = (option: string) => {
     setIsCreateDropdownOpen(false)
+    if (option === 'post') setLocation('/posts')
+    if (option === 'automation') setLocation('/automation')
+    if (option === 'video') setLocation('/video-generator')
   }
   return (
     <RealtimeProvider>
       <Switch location={location}>
-        <Route path="/admin">
-          <ProtectedRoute>
-            <React.Suspense fallback={<LoadingSpinner type="admin" />}>
-              <div className="min-h-screen bg-gray-50">
-                <AdminPanel />
-              </div>
-            </React.Suspense>
-          </ProtectedRoute>
-        </Route>
+
 
         <Route path="/plan">
           <ProtectedRoute>
@@ -222,7 +220,7 @@ export default function AuthenticatedApp() {
                   <Tabs defaultValue="calendar" className="w-full">
                     <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                       <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                      <TabsTrigger value="drafts">Drafts</TabsTrigger>
+                      <TabsTrigger value="drafts">Posts</TabsTrigger>
                       <TabsTrigger value="content">Content</TabsTrigger>
                       <TabsTrigger value="dm-automation">DM automation</TabsTrigger>
                     </TabsList>
@@ -230,9 +228,10 @@ export default function AuthenticatedApp() {
                       <CalendarView />
                     </TabsContent>
                     <TabsContent value="drafts" className="mt-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <ScheduledPosts />
                         <Drafts />
+                        <PublishedPosts />
                       </div>
                     </TabsContent>
                     <TabsContent value="content" className="mt-6">
@@ -250,6 +249,55 @@ export default function AuthenticatedApp() {
                   </Tabs>
                 </React.Suspense>
               </div>
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/posts">
+          <ProtectedRoute>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
+              <div className="space-y-6">
+                <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+                  <div className="flex flex-col space-y-4">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Posts & Drafts</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <ScheduledPosts />
+                      <Drafts />
+                      <PublishedPosts />
+                    </div>
+                  </div>
+                </React.Suspense>
+              </div>
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/posts/scheduled">
+          <ProtectedRoute>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
+              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+                <ScheduledPostsPage />
+              </React.Suspense>
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/posts/drafts">
+          <ProtectedRoute>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
+              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+                <DraftsPage />
+              </React.Suspense>
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/posts/published">
+          <ProtectedRoute>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
+              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+                <PublishedPostsPage />
+              </React.Suspense>
             </DashboardLayout>
           </ProtectedRoute>
         </Route>
@@ -276,28 +324,38 @@ export default function AuthenticatedApp() {
           </ProtectedRoute>
         </Route>
 
-        <Route path="/inbox">
+        <Route path="/analytics/post/:contentId">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <div className="text-center py-12">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Inbox 2.0</h3>
-                <p className="text-gray-600 dark:text-gray-400">Manage your social media conversations here.</p>
-              </div>
+              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+                <PostAnalyticsPage />
+              </React.Suspense>
             </DashboardLayout>
           </ProtectedRoute>
         </Route>
+
+        {import.meta.env.VITE_META_PHASE_1_REVIEW_MODE !== 'true' && (
+          <Route path="/inbox">
+            <ProtectedRoute>
+              <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
+                <div className="text-center py-12">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Inbox 2.0</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Manage your social media conversations here.</p>
+                </div>
+              </DashboardLayout>
+            </ProtectedRoute>
+          </Route>
+        )}
 
         <Route path="/video-generator">
           <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
               <div className="h-screen overflow-y-auto">
-                <React.Suspense fallback={null}>
-                  <Sidebar
-                    className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                    isCreateDropdownOpen={isCreateDropdownOpen}
-                    setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                  />
-                </React.Suspense>
+                <Sidebar
+                  className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                  isCreateDropdownOpen={isCreateDropdownOpen}
+                  setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                />
               </div>
               <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {isCreateDropdownOpen && (
@@ -361,17 +419,26 @@ export default function AuthenticatedApp() {
           </ProtectedRoute>
         </Route>
 
+        <Route path="/social-listening">
+          <ProtectedRoute>
+            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
+              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+                <SocialListeningPage />
+              </React.Suspense>
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+
         <Route path="/automation">
           <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
               <div className="h-screen overflow-y-auto">
-                <React.Suspense fallback={null}>
-                  <Sidebar
-                    className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                    isCreateDropdownOpen={isCreateDropdownOpen}
-                    setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                  />
-                </React.Suspense>
+                <Sidebar
+                  className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                  isCreateDropdownOpen={isCreateDropdownOpen}
+                  setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                />
               </div>
               <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {isCreateDropdownOpen && (
@@ -397,13 +464,11 @@ export default function AuthenticatedApp() {
           <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
               <div className="h-screen overflow-y-auto">
-                <React.Suspense fallback={null}>
-                  <Sidebar
-                    className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                    isCreateDropdownOpen={isCreateDropdownOpen}
-                    setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                  />
-                </React.Suspense>
+                <Sidebar
+                  className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                  isCreateDropdownOpen={isCreateDropdownOpen}
+                  setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                />
               </div>
               <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                 <React.Suspense fallback={<SkeletonPageLoader type="veegpt" />}>
@@ -418,18 +483,14 @@ export default function AuthenticatedApp() {
           <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
               <div className="h-screen overflow-y-auto">
-                <React.Suspense fallback={null}>
-                  <Sidebar
-                    className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                    isCreateDropdownOpen={isCreateDropdownOpen}
-                    setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                  />
-                </React.Suspense>
+                <Sidebar
+                  className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                  isCreateDropdownOpen={isCreateDropdownOpen}
+                  setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                />
               </div>
               <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                <React.Suspense fallback={null}>
-                  <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
-                </React.Suspense>
+                <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
                 {isCreateDropdownOpen && (
                   <React.Suspense fallback={null}>
                     <CreateDropdown
@@ -437,7 +498,7 @@ export default function AuthenticatedApp() {
                       onClose={() => setIsCreateDropdownOpen(false)}
                       onOptionSelect={(option) => {
                         setIsCreateDropdownOpen(false)
-                        if (option === 'post') setLocation('/create')
+                        if (option === 'post') setLocation('/posts')
                         if (option === 'automation') setLocation('/automation')
                         if (option === 'video') setLocation('/video-generator')
                       }}
@@ -466,18 +527,14 @@ export default function AuthenticatedApp() {
           <ProtectedRoute>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
               <div className="h-screen overflow-y-auto">
-                <React.Suspense fallback={null}>
-                  <Sidebar
-                    className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
-                    isCreateDropdownOpen={isCreateDropdownOpen}
-                    setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                  />
-                </React.Suspense>
+                <Sidebar
+                  className="w-24 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full shadow-sm transition-colors duration-300"
+                  isCreateDropdownOpen={isCreateDropdownOpen}
+                  setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                />
               </div>
               <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                <React.Suspense fallback={null}>
-                  <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
-                </React.Suspense>
+                <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
                 {isCreateDropdownOpen && (
                   <React.Suspense fallback={null}>
                     <CreateDropdown
@@ -485,7 +542,7 @@ export default function AuthenticatedApp() {
                       onClose={() => setIsCreateDropdownOpen(false)}
                       onOptionSelect={(option) => {
                         setIsCreateDropdownOpen(false)
-                        if (option === 'post') setLocation('/create')
+                        if (option === 'post') setLocation('/posts')
                         if (option === 'automation') setLocation('/automation')
                         if (option === 'video') setLocation('/video-generator')
                       }}
@@ -540,18 +597,14 @@ export default function AuthenticatedApp() {
                 </React.Suspense>
               )}
               <div className="h-screen overflow-y-auto bg-white dark:bg-gray-800 transition-colors duration-300">
-                <React.Suspense fallback={null}>
-                  <Sidebar
-                    className="w-24 bg-white dark:bg-gray-800 h-full transition-colors duration-300"
-                    isCreateDropdownOpen={isCreateDropdownOpen}
-                    setIsCreateDropdownOpen={setIsCreateDropdownOpen}
-                  />
-                </React.Suspense>
+                <Sidebar
+                  className="w-24 bg-white dark:bg-gray-800 h-full transition-colors duration-300"
+                  isCreateDropdownOpen={isCreateDropdownOpen}
+                  setIsCreateDropdownOpen={setIsCreateDropdownOpen}
+                />
               </div>
               <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                <React.Suspense fallback={null}>
-                  <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
-                </React.Suspense>
+                <Header onCreateClick={() => setIsCreateDropdownOpen(!isCreateDropdownOpen)} />
                 {isCreateDropdownOpen && (
                   <React.Suspense fallback={null}>
                     <CreateDropdown
