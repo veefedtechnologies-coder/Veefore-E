@@ -2,12 +2,20 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { automationRateLimiter } from '../../middleware/rate-limiting-working';
 import { storage } from '../../storage';
 import { AutomationSystem } from '../../automation-system';
 
 const router = Router();
 
 const automationSystem = new AutomationSystem(storage);
+
+const phase1ReviewGuard = (req: Request, res: Response, next: any) => {
+  if (process.env.META_PHASE_1_REVIEW_MODE === 'true') {
+    return res.status(403).json({ error: 'Feature disabled during Phase 1 Review' });
+  }
+  next();
+};
 
 const GetRulesQuerySchema = z.object({
   workspaceId: z.string().min(1, 'Workspace ID is required'),
@@ -20,6 +28,10 @@ const CreateRuleSchema = z.object({
   keywords: z.any(),
   responses: z.any(),
   targetMediaIds: z.array(z.string()).optional(),
+  matchMode: z.string().optional(),
+  negativeKeywords: z.array(z.string()).optional(),
+  aiIntents: z.array(z.string()).optional(),
+  followerGate: z.any().optional(),
 });
 
 const UpdateRuleParamsSchema = z.object({
@@ -32,6 +44,7 @@ const UpdateRuleBodySchema = z.object({
   keywords: z.any().optional(),
   responses: z.any().optional(),
   enabled: z.boolean().optional(),
+  followerGate: z.any().optional(),
 }).passthrough();
 
 const RuleIdParamsSchema = z.object({
@@ -65,17 +78,25 @@ router.get('/rules',
 
 router.post('/rules',
   requireAuth,
+  phase1ReviewGuard,
+  automationRateLimiter,
   validateRequest({ body: CreateRuleSchema }),
   async (req: Request, res: Response) => {
     try {
       console.log('[NEW AUTOMATION] Creating rule with body:', req.body);
-      const { workspaceId, name, type, keywords, targetMediaIds, responses } = req.body;
+      const { workspaceId, name, type, keywords, targetMediaIds, responses: responsesConfig, matchMode, negativeKeywords, aiIntents } = req.body;
       
+      // Extract properties that might be nested inside responses due to frontend structure
+      const responses = Array.isArray(responsesConfig) ? responsesConfig : (responsesConfig?.responses || []);
+      const dmResponses = responsesConfig?.dmResponses || [];
+      const dmButtons = responsesConfig?.dmButtons || [];
+      const followerGate = req.body.followerGate || responsesConfig?.followerGate;
+
       console.log('[NEW AUTOMATION] Extracted fields:', {
-        workspaceId, name, type, keywords, targetMediaIds, responses
+        workspaceId, name, type, keywords, targetMediaIds, responses, dmResponses, dmButtons, matchMode, negativeKeywords, aiIntents, followerGate
       });
       
-      if (!workspaceId || !name || !type || !keywords || !responses) {
+      if (!workspaceId || !name || !type || !keywords) {
         console.log('[NEW AUTOMATION] Missing required fields validation failed');
         return res.status(400).json({ error: 'Missing required fields' });
       }
@@ -87,7 +108,25 @@ router.post('/rules',
         keywords,
         targetMediaIds: targetMediaIds || [],
         responses,
+        matchMode,
+        negativeKeywords: negativeKeywords || [],
+        aiIntents: aiIntents || [],
+        followerGate: followerGate,
         isActive: true,
+      } as any);
+
+      // We must manually add dmResponses and dmButtons to the payload since createRule doesn't pass them in its type definition natively
+      (rule as any).action = {
+        responses,
+        dmResponses,
+        dmButtons
+      };
+      
+      // Actually update the rule in the database with the proper action block
+      const { automationRuleRepository } = await import('../../repositories/AutomationRepository');
+      await automationRuleRepository.updateById(rule.id, {
+        action: { responses, dmResponses, dmButtons },
+        followerGate: followerGate
       });
 
       console.log('[NEW AUTOMATION] Rule created successfully:', rule);
@@ -101,11 +140,30 @@ router.post('/rules',
 
 router.put('/rules/:ruleId',
   requireAuth,
+  phase1ReviewGuard,
   validateRequest({ params: UpdateRuleParamsSchema, body: UpdateRuleBodySchema }),
   async (req: Request, res: Response) => {
     try {
       const { ruleId } = req.params;
-      const updates = req.body;
+      const updates = { ...req.body };
+      
+      // Extract properties that might be nested inside responses due to frontend structure
+      if (updates.responses && !Array.isArray(updates.responses)) {
+        const responsesConfig = updates.responses;
+        updates.responses = Array.isArray(responsesConfig.responses) ? responsesConfig.responses : [];
+        
+        // Structure the action block correctly for updates
+        updates.action = {
+          ...(updates.action || {}),
+          responses: updates.responses,
+          dmResponses: responsesConfig.dmResponses || [],
+          dmButtons: responsesConfig.dmButtons || []
+        };
+        
+        if (responsesConfig.followerGate) {
+          updates.followerGate = responsesConfig.followerGate;
+        }
+      }
       
       const rule = await storage.updateAutomationRule(ruleId, updates);
       res.json({ rule });
@@ -118,6 +176,7 @@ router.put('/rules/:ruleId',
 
 router.delete('/rules/:ruleId',
   requireAuth,
+  phase1ReviewGuard,
   validateRequest({ params: RuleIdParamsSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -134,6 +193,8 @@ router.delete('/rules/:ruleId',
 
 router.post('/rules/:ruleId/toggle',
   requireAuth,
+  phase1ReviewGuard,
+  automationRateLimiter,
   validateRequest({ params: RuleIdParamsSchema }),
   async (req: Request, res: Response) => {
     try {

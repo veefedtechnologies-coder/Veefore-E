@@ -10,6 +10,30 @@ import { safeParseAIResponse } from '../../middleware/unsafe-json-replacements';
 import OpenAI from 'openai';
 import { AuthenticatedRequest } from '../../types/express';
 
+
+async function getAIPreferences(userId: string, req: Request): Promise<any> {
+  let preferences: any = {};
+  try {
+    const userObj = await storage.getUser(userId);
+    if (userObj && userObj.preferences) preferences = { ...userObj.preferences };
+  } catch (e) {
+    console.warn('Failed to load user preferences');
+  }
+  
+  const workspaceId = req.body.workspaceId || req.query.workspaceId || req.headers['workspace-id'];
+  if (workspaceId) {
+    try {
+      const workspace = await storage.getWorkspace(workspaceId);
+      if (workspace && workspace.aiConfiguration) {
+        preferences = { ...preferences, ...workspace.aiConfiguration };
+      }
+    } catch (e) {
+      console.warn('Failed to load workspace AI configuration');
+    }
+  }
+  return preferences;
+}
+
 const router = Router();
 
 const CreativeBriefSchema = z.object({
@@ -797,6 +821,102 @@ Format as JSON with: script, caption, hashtags`;
     } catch (error: any) {
       console.error('[AI SCRIPT] Error:', error);
       res.status(500).json({ error: error.message || 'Failed to generate script' });
+    }
+  }
+);
+
+const GenerateContentSchema = z.object({
+  mediaUrl: z.string().url().optional(),
+  mediaType: z.enum(['image', 'video']).optional(),
+  postType: z.enum(['post', 'story', 'reel']).optional(),
+  platform: z.string().optional(),
+  existingCaption: z.string().optional(),
+  workspaceId: z.string().optional(),
+});
+
+router.post('/generate-content',
+  requireAuth,
+  aiRateLimiter,
+  validateRequest({ body: GenerateContentSchema }),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const { mediaUrl, mediaType, postType, platform, existingCaption, workspaceId } = req.body;
+
+      console.log('[AI GENERATE CONTENT] Request:', { userId, mediaUrl: !!mediaUrl, mediaType, postType });
+
+      const creditCost = AICreditService.calculateCost('content_generation');
+      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
+      if (!creditCheck.hasCredits) {
+        return res.status(402).json({ 
+          error: 'Insufficient credits',
+          required: creditCost,
+          current: creditCheck.currentCredits
+        });
+      }
+
+      // Validate workspace access if provided
+      if (workspaceId) {
+        const workspace = await storage.getWorkspace(workspaceId);
+        if (!workspace) {
+          return res.status(404).json({ error: 'Workspace not found' });
+        }
+        
+        const user = await storage.getUser(userId);
+        const workspaceUserId = workspace.userId?.toString();
+        const requestUserId = userId.toString();
+        const firebaseUid = user?.firebaseUid;
+        
+        const userOwnsWorkspace = workspaceUserId === requestUserId || 
+                                 workspaceUserId === firebaseUid ||
+                                 workspace.userId === userId ||
+                                 workspace.userId === firebaseUid;
+        
+        if (!userOwnsWorkspace) {
+          return res.status(403).json({ error: 'Access denied to workspace' });
+        }
+      }
+
+      // Import and use AI content generator
+      const { aiContentGenerator } = await import('../../ai-content-generator');
+      
+      const generatedContent = await aiContentGenerator.generateContent({
+        userId,
+        workspaceId,
+        mediaUrl,
+        mediaType,
+        postType: postType || 'post',
+        platform: platform || 'instagram',
+        existingCaption
+      });
+
+      // Deduct credits
+      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
+        creditsToDeduct: creditCost,
+        workspaceId,
+        endpoint: '/api/v1/ai/generate-content'
+      });
+
+      if (!deductResult.success) {
+        console.error('[AI GENERATE CONTENT] Credit deduction failed:', deductResult.error);
+        return res.status(402).json({ error: deductResult.error || 'Failed to deduct credits' });
+      }
+
+      console.log('[AI GENERATE CONTENT] Successfully generated content');
+
+      res.json({
+        success: true,
+        ...generatedContent,
+        creditsUsed: deductResult.creditsDeducted,
+        remainingCredits: deductResult.creditsAfter
+      });
+
+    } catch (error: any) {
+      console.error('[AI GENERATE CONTENT] Error:', error);
+      res.status(500).json({ 
+        error: 'Failed to generate content',
+        details: error.message 
+      });
     }
   }
 );

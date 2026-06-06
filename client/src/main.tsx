@@ -2,6 +2,7 @@ import { memo, Component, ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import AppWrapper from './AppWrapper'
+import { Agentation } from 'agentation'
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -45,6 +46,7 @@ const Router = memo(() => {
   return (
     <AppErrorBoundary>
       <AppWrapper />
+      {import.meta.env.DEV && <Agentation />}
     </AppErrorBoundary>
   )
 })

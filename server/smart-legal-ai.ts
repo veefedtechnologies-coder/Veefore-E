@@ -124,24 +124,16 @@ export class SmartLegalAI {
       
       const legalPrompt = this.buildLegalGuidancePrompt(input, jurisdiction);
       
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are a legal technology assistant specializing in creator economy and digital content law. Provide general legal guidance based on publicly available information. Always include appropriate disclaimers and recommend consulting with qualified legal counsel for specific legal advice. Output in valid JSON format.`
-          },
-          {
-            role: "user",
-            content: legalPrompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.2, // Lower temperature for more consistent legal guidance
-        max_tokens: 2000
-      });
-
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const promptStr = `System: You are a legal technology assistant specializing in creator economy and digital content law. Provide general legal guidance based on publicly available information. Always include appropriate disclaimers and recommend consulting with qualified legal counsel for specific legal advice. Output in valid JSON format.\n\nUser: ${legalPrompt}`;
+      
+      const { aiServiceManager } = await import('./services/AIServiceManager');
+      let result: any = {};
+      try {
+        result = await aiServiceManager.generateJSON(promptStr, preferences);
+      } catch (e) {
+        console.warn('[SMART LEGAL AI] Failed to generate JSON using AIServiceManager', e);
+        throw new Error('Failed to parse AI response');
+      }
       
       console.log(`[SMART LEGAL AI] Legal guidance provided for query: ${input.query.substring(0, 50)}...`);
       
@@ -169,24 +161,16 @@ export class SmartLegalAI {
       
       const contractPrompt = this.buildContractPrompt(input, jurisdiction);
       
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are a legal document generation assistant. Create contract templates based on standard industry practices. Include all necessary clauses and protective provisions. Always include disclaimers about legal review requirements. Output in valid JSON format.`
-          },
-          {
-            role: "user",
-            content: contractPrompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.1, // Very low temperature for consistent contract generation
-        max_tokens: 3000
-      });
-
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const promptStr = `System: You are a legal document generation assistant. Create contract templates based on standard industry practices. Include all necessary clauses and protective provisions. Always include disclaimers about legal review requirements. Output in valid JSON format.\n\nUser: ${contractPrompt}`;
+      
+      const { aiServiceManager } = await import('./services/AIServiceManager');
+      let result: any = {};
+      try {
+        result = await aiServiceManager.generateJSON(promptStr, preferences);
+      } catch (e) {
+        console.warn('[SMART LEGAL AI] Failed to generate JSON using AIServiceManager', e);
+        throw new Error('Failed to parse AI response');
+      }
       
       console.log(`[SMART LEGAL AI] Contract generated successfully`);
       

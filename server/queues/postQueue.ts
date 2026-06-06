@@ -26,6 +26,27 @@ export const postQueue = redisConnection ? new Queue<ScheduledPostJobData>('post
   },
 }) : null;
 
+export interface VerifyPostJobData {
+  contentId: number;
+  workspaceId: string;
+  containerId: string;
+  accessToken: string;
+  accountId?: string;
+}
+
+export const verifyQueue = redisConnection ? new Queue<VerifyPostJobData>('post-verifier', {
+  connection: redisConnection,
+  defaultJobOptions: {
+    removeOnComplete: 100,
+    removeOnFail: 50,
+    attempts: 6, // 6 attempts total for verification
+    backoff: {
+      type: 'exponential',
+      delay: 30000, // 30s, 60s, 120s, 240s, 480s, 960s
+    },
+  },
+}) : null;
+
 export class PostSchedulerManager {
   static async schedulePost(
     contentId: number,
@@ -56,7 +77,7 @@ export class PostSchedulerManager {
 
       const job = await postQueue.add('publish-post', jobData, {
         delay,
-        jobId: `post-${contentId}-${Date.now()}`,
+        jobId: `post-${contentId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         removeOnComplete: true,
         removeOnFail: false,
       });
@@ -199,6 +220,27 @@ export class PostSchedulerManager {
         redisAvailable: false,
         error: error.message,
       };
+    }
+  }
+
+  static async scheduleFallbackChecks(): Promise<void> {
+    if (!isRedisAvailable() || !postQueue) {
+      console.log(`[POST_QUEUE] Redis unavailable, skipping fallback checks`);
+      return;
+    }
+
+    try {
+      await postQueue.add(
+        'fallback-checks' as any,
+        { fallback: true } as any,
+        {
+          repeat: { pattern: '*/5 * * * *' }, // Every 5 minutes
+          jobId: 'global-fallback-post-checks',
+        }
+      );
+      console.log(`🔄 Scheduled Content Fallback Checks via BullMQ`);
+    } catch (error) {
+      console.error(`🚨 Failed to schedule fallback checks:`, error);
     }
   }
 }

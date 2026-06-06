@@ -337,13 +337,23 @@ export class CrossTenantProtection {
     }
   }
 
+  private static cleanupTimer: NodeJS.Timeout | null = null;
+
   /**
    * Initialize cleanup scheduler
    */
   static initialize(): void {
-    setInterval(() => {
+    CrossTenantProtection.cleanupTimer = setInterval(() => {
       CrossTenantProtection.cleanupSuspiciousActivity();
     }, 5 * 60 * 1000); // Clean every 5 minutes
+
+    const stopCleanup = () => {
+      if (CrossTenantProtection.cleanupTimer) {
+        clearInterval(CrossTenantProtection.cleanupTimer);
+      }
+    };
+    process.on('SIGTERM', stopCleanup);
+    process.on('SIGINT', stopCleanup);
 
     console.log('🔐 P2-5: Cross-tenant protection initialized');
   }

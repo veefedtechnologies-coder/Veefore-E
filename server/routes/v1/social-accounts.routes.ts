@@ -2,8 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { socialAccountController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { validateWorkspaceAccess, requireWorkspaceMember } from '../../middleware/workspace-validation';
 import { auditMiddleware } from '../../middleware/audit-middleware';
 import { AuditActions } from '../../utils/audit-logger';
+import { syncRateLimiter } from '../../middleware/rate-limiting-working';
 import { z } from 'zod';
 
 const router = Router();
@@ -18,6 +20,7 @@ const WorkspaceIdParams = z.object({
 
 router.get('/',
   requireAuth,
+  validateWorkspaceAccess({ source: 'query' }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string;
@@ -36,6 +39,7 @@ router.get('/',
 
 router.get('/workspace/:workspaceId',
   requireAuth,
+  validateWorkspaceAccess({ source: 'params' }),
   validateRequest({ params: WorkspaceIdParams }),
   socialAccountController.getByWorkspace
 );
@@ -43,11 +47,13 @@ router.get('/workspace/:workspaceId',
 router.get('/:accountId',
   requireAuth,
   validateRequest({ params: AccountIdParams }),
+  requireWorkspaceMember('accountId'),
   socialAccountController.getAccount
 );
 
 router.post('/workspace/:workspaceId',
   requireAuth,
+  validateWorkspaceAccess({ source: 'params' }),
   validateRequest({ params: WorkspaceIdParams }),
   auditMiddleware(AuditActions.SOCIAL_ACCOUNT.CONNECT, { resource: 'social_account' }),
   socialAccountController.connectAccount
@@ -56,6 +62,7 @@ router.post('/workspace/:workspaceId',
 router.delete('/:accountId',
   requireAuth,
   validateRequest({ params: AccountIdParams }),
+  requireWorkspaceMember('accountId'),
   auditMiddleware(AuditActions.SOCIAL_ACCOUNT.DISCONNECT, { resource: 'social_account' }),
   socialAccountController.disconnectAccount
 );
@@ -63,20 +70,25 @@ router.delete('/:accountId',
 router.put('/:accountId/tokens',
   requireAuth,
   validateRequest({ params: AccountIdParams }),
+  requireWorkspaceMember('accountId'),
   auditMiddleware(AuditActions.SOCIAL_ACCOUNT.REFRESH, { resource: 'social_account' }),
   socialAccountController.updateTokens
 );
 
 router.put('/:accountId/metrics',
   requireAuth,
+  syncRateLimiter,
   validateRequest({ params: AccountIdParams }),
+  requireWorkspaceMember('accountId'),
   socialAccountController.updateMetrics
 );
 
 // Add POST support for mobile app compatibility (P1-5 FIX)
 router.post('/:accountId/metrics',
   requireAuth,
+  syncRateLimiter,
   validateRequest({ params: AccountIdParams }),
+  requireWorkspaceMember('accountId'),
   socialAccountController.updateMetrics
 );
 

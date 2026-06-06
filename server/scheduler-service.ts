@@ -3,6 +3,7 @@ import { instagramAPI } from "./instagram-api";
 import { PostSchedulerManager, isRedisAvailable } from "./queues/postQueue";
 import { ensureRedisConnected } from "./queues/metricsQueue";
 import { PostWorker } from "./workers/postWorker";
+import { VerifyWorker } from "./workers/verifyWorker";
 
 export class SchedulerService {
   private storage: IStorage;
@@ -20,30 +21,57 @@ export class SchedulerService {
     // Try to connect to Redis and start the worker
     const redisConnected = await ensureRedisConnected();
     if (redisConnected) {
-      console.log('[SCHEDULER] Redis available - starting BullMQ post worker');
+      console.log('[SCHEDULER] Redis available - starting BullMQ post + verify workers');
       await PostWorker.start(this.storage);
+      await VerifyWorker.start(this.storage);
       this.workerStarted = true;
     } else {
       console.log('[SCHEDULER] Redis unavailable - using in-memory fallback scheduler');
     }
 
-    // Schedule post processing every minute
-    this.checkInterval = setInterval(() => {
-      this.processScheduledContent();
-    }, 60000);
+    // Schedule daily analytics snapshot + deep hibernation cleanup via BullMQ
+    import('./queues/metricsQueue').then(({ MetricsQueueManager }) => {
+      MetricsQueueManager.scheduleDailySnapshots();
+      MetricsQueueManager.scheduleSocialListeningTrends();
+      MetricsQueueManager.scheduleDeepHibernationCleanup();
+    }).catch(err => {
+      console.error('Failed to load metricsQueue:', err);
+    });
 
-    // Schedule daily analytics snapshot every hour (it will only run once per day per workspace)
-    // In a real production app, this should be a cron job running at midnight
-    this.dailySnapshotInterval = setInterval(() => {
-      this.processDailySnapshots();
-    }, 60 * 60 * 1000); // Check every hour
+    // Schedule fallback content processing via BullMQ
+    import('./queues/postQueue').then(({ PostSchedulerManager }) => {
+      PostSchedulerManager.scheduleFallbackChecks();
+    }).catch(err => {
+      console.error('Failed to load postQueue for fallback checks:', err);
+    });
+
+    // Clean up corrupted ghost records before starting
+    this.cleanupCorruptedScheduledContent().catch(err => {
+      console.error('[SCHEDULER] Failed to clean up corrupted content:', err);
+    });
 
     this.processScheduledContent();
+  }
 
-    // Run initial snapshot check after short delay to let server startup
-    setTimeout(() => {
-      this.processDailySnapshots();
-    }, 30000);
+  private async cleanupCorruptedScheduledContent() {
+    try {
+      const { ContentModel } = await import('./models/Content');
+      // Delete content that was permanently corrupted by old legacy code
+      // missing workspaceId, or scheduled/queued but without a scheduledAt date
+      const result = await ContentModel.deleteMany({
+        $or: [
+          { workspaceId: { $exists: false } },
+          { workspaceId: null },
+          { status: { $in: ['scheduled', 'queued'] }, scheduledAt: null }
+        ]
+      });
+      
+      if (result.deletedCount > 0) {
+        console.log(`[SCHEDULER] 🧹 Cleaned up ${result.deletedCount} permanently corrupted ghost records from database.`);
+      }
+    } catch (err) {
+      console.error('[SCHEDULER] Cleanup check failed:', err);
+    }
   }
 
   stop() {
@@ -60,6 +88,7 @@ export class SchedulerService {
     if (PostWorker.isRunning()) {
       PostWorker.stop();
     }
+    VerifyWorker.stop();
 
     console.log('[SCHEDULER] Stopped background scheduler service');
   }
@@ -73,8 +102,9 @@ export class SchedulerService {
 
     // Start worker if not already running (late Redis connection)
     if (!this.workerStarted && !PostWorker.isRunning()) {
-      console.log('[SCHEDULER] Late Redis connection detected - starting BullMQ post worker');
+      console.log('[SCHEDULER] Late Redis connection detected - starting BullMQ post + verify workers');
       await PostWorker.start(this.storage);
+      await VerifyWorker.start(this.storage);
       this.workerStarted = true;
     }
 
@@ -125,41 +155,37 @@ export class SchedulerService {
       console.log(`[SCHEDULER] Checking for scheduled content to publish at ${currentTime.toISOString()}`);
 
       const allScheduledContent = await this.getAllScheduledContent();
-      console.log(`[SCHEDULER] Found ${allScheduledContent.length} total scheduled items`);
+      
+      // Only log if there are items to publish
+      if (allScheduledContent.length > 0) {
+        // Find items that are ready to publish
+        const contentToPublish = allScheduledContent.filter((content: any) => {
+          if (!content.scheduledAt || content.status !== 'scheduled') {
+            return false;
+          }
 
-      allScheduledContent.forEach((content: any, index: number) => {
-        console.log(`[SCHEDULER] Item ${index + 1}:`, {
-          id: content.id,
-          title: content.title,
-          status: content.status,
-          scheduledAt: content.scheduledAt,
-          scheduledTime: content.scheduledAt ? new Date(content.scheduledAt).toISOString() : 'null',
-          shouldPublish: content.scheduledAt && content.status === 'scheduled' && new Date(content.scheduledAt) <= currentTime
+          const scheduledTime = new Date(content.scheduledAt);
+          return scheduledTime <= currentTime;
         });
-      });
 
-      const contentToPublish = allScheduledContent.filter((content: any) => {
-        if (!content.scheduledAt || content.status !== 'scheduled') {
-          return false;
-        }
+        if (contentToPublish.length > 0) {
+          console.log(`[SCHEDULER] Found ${contentToPublish.length} items ready to publish`);
 
-        const scheduledTime = new Date(content.scheduledAt);
-        return scheduledTime <= currentTime;
-      });
+          for (const content of contentToPublish) {
+            if (isRedisAvailable()) {
+              const isInQueue = await this.isContentInQueue(content.id);
+              if (isInQueue) {
+                console.log(`[SCHEDULER] Content ${content.id} is already in BullMQ queue, skipping in-memory processing`);
+                continue;
+              }
+            }
 
-      console.log(`[SCHEDULER] Found ${contentToPublish.length} items ready to publish`);
-
-      for (const content of contentToPublish) {
-        if (isRedisAvailable()) {
-          const isInQueue = await this.isContentInQueue(content.id);
-          if (isInQueue) {
-            console.log(`[SCHEDULER] Content ${content.id} is already in BullMQ queue, skipping in-memory processing`);
-            continue;
+            await this.publishScheduledContent(content);
           }
         }
-
-        await this.publishScheduledContent(content);
       }
+
+
     } catch (error) {
       console.error('[SCHEDULER] Error processing scheduled content:', error);
     }
@@ -181,14 +207,6 @@ export class SchedulerService {
   private async getAllScheduledContent(): Promise<any[]> {
     try {
       const allScheduled = await this.storage.getScheduledContent();
-      console.log(`[SCHEDULER DEBUG] Raw scheduled content from storage:`, allScheduled.map(c => ({
-        id: c.id,
-        title: c.title,
-        workspaceId: c.workspaceId,
-        workspaceIdType: typeof c.workspaceId,
-        status: c.status,
-        scheduledAt: c.scheduledAt
-      })));
       return allScheduled;
     } catch (error) {
       console.error('[SCHEDULER] Error getting all scheduled content:', error);
@@ -292,7 +310,8 @@ export class SchedulerService {
       
       // Ensure mediaUrl is absolute using finalBaseUrl if necessary
       let cleanUrl = mediaUrl;
-      const currentDomain = process.env.SOCIAL_AUTH_BASE_URL || process.env.VITE_APP_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      const devDomain = process.env.REPLIT_DEV_DOMAIN && process.env.REPLIT_DEV_DOMAIN !== 'your-replit-dev-domain-here' ? process.env.REPLIT_DEV_DOMAIN : null;
+      const currentDomain = process.env.SOCIAL_AUTH_BASE_URL || process.env.VITE_APP_URL || (devDomain ? `https://${devDomain}` : 'http://localhost:5000');
       
       if (cleanUrl.startsWith('/')) {
         cleanUrl = `${currentDomain}${cleanUrl}`;
@@ -316,17 +335,37 @@ export class SchedulerService {
       );
 
       if (directResult.success) {
-        console.log(`[SCHEDULER] ✓ Publishing succeeded using ${directResult.approach}: ${directResult.id}`);
-        console.log(`[SCHEDULER] Successfully published ${content.type || 'post'} content ${content.id} to Instagram:`, directResult.id);
-
-        await this.updateContentStatus(content.id, 'published', '', directResult.id);
+        if (directResult.processing && directResult.id) {
+          console.log(`[SCHEDULER] ⏳ Content ${content.id} is processing (container: ${directResult.id}). Dispatching to verifyQueue.`);
+          
+          try {
+            const { verifyQueue } = await import('./queues/postQueue');
+            if (verifyQueue) {
+              await verifyQueue.add('verify-post', {
+                contentId: content.id,
+                workspaceId: content.workspaceId.toString(),
+                containerId: directResult.id,
+                accessToken: instagramAccount.accessToken,
+                accountId: instagramAccount.accountId || (instagramAccount as any)._id?.toString()
+              }, { delay: 30000 });
+            }
+          } catch (err) {
+            console.error(`[SCHEDULER] Failed to dispatch to verifyQueue:`, err);
+          }
+          
+          await this.updateContentStatus(content.id, workspaceId, 'processing', '', directResult.id);
+        } else {
+          console.log(`[SCHEDULER] ✓ Publishing succeeded: ${directResult.id}`);
+          console.log(`[SCHEDULER] Successfully published ${content.type || 'post'} content ${content.id} to Instagram:`, directResult.id);
+          await this.updateContentStatus(content.id, workspaceId, 'published', '', directResult.id);
+        }
       } else {
-        console.error(`[SCHEDULER] ✗ Publishing failed with ${directResult.approach}: ${directResult.error}`);
+        console.error(`[SCHEDULER] ✗ Publishing failed: ${directResult.error}`);
         const nextAttempts = attempts + 1;
         const updates: any = { contentData: { ...(content.contentData || {}), publishAttempts: nextAttempts } };
         await this.storage.updateContent(content.id, updates);
         if (nextAttempts >= maxAttempts) {
-          await this.updateContentStatus(content.id, 'failed', directResult.error || 'Publishing failed');
+          await this.updateContentStatus(content.id, workspaceId, 'failed', directResult.error || 'Publishing failed');
         } else {
           console.log(`[SCHEDULER] Will retry content ${content.id} on next interval (attempt ${nextAttempts}/${maxAttempts})`);
         }
@@ -339,66 +378,50 @@ export class SchedulerService {
       const updates: any = { contentData: { ...(content.contentData || {}), publishAttempts: attempts } };
       await this.storage.updateContent(content.id, updates);
       if (attempts >= maxAttempts) {
-        await this.updateContentStatus(content.id, 'failed', error.message);
+        await this.updateContentStatus(content.id, content.workspaceId.toString(), 'failed', error.message);
       } else {
         console.log(`[SCHEDULER] Will retry content ${content.id} on next interval (attempt ${attempts}/${maxAttempts})`);
       }
     }
   }
 
-  private async updateContentStatus(contentId: number, status: string, error?: string, instagramPostId?: string) {
+  private async updateContentStatus(contentId: number, workspaceId: string, status: string, error?: string, instagramPostId?: string) {
     try {
       const updates: any = {
         status,
-        publishedAt: status === 'published' ? new Date() : undefined
+        updatedAt: new Date(),
+        publishedAt: status === 'published' ? new Date() : undefined,
+        processingStartedAt: status === 'processing' ? new Date() : undefined,
+        failedAt: status === 'failed' ? new Date() : undefined,
+        lastError: (status === 'failed' && error) ? error : undefined
       };
 
-      if (error) {
+      if (error && status !== 'failed') {
         updates.error = error;
       }
 
       if (instagramPostId) {
         updates.instagramPostId = instagramPostId;
+        updates.metaCreationId = instagramPostId;
       }
 
       await this.storage.updateContent(contentId.toString(), updates);
       console.log(`[SCHEDULER] Updated content ${contentId} status to ${status}`);
+      
+      try {
+        const { RealtimeService } = await import('./services/realtime');
+        RealtimeService.broadcastToWorkspace(workspaceId, 'post_status_updated', {
+          contentId,
+          status,
+          error,
+          instagramPostId,
+          timestamp: new Date()
+        });
+      } catch (wsErr) {
+        console.error('[SCHEDULER] Failed to emit websocket event:', wsErr);
+      }
     } catch (error) {
       console.error(`[SCHEDULER] Error updating content ${contentId} status:`, error);
-    }
-  }
-
-  private async processDailySnapshots() {
-    try {
-      console.log('[SCHEDULER] Starting daily analytics snapshot process');
-      // Import here dynamically to avoid circular dependencies if any
-      const { analyticsService } = await import('./services/index');
-      const { workspaceRepository } = await import('./repositories/index');
-
-      // 1. Get all workspaces
-      // In a large system, we would stream this or paginate
-      const workspaces = await workspaceRepository.findAll();
-      console.log(`[SCHEDULER] Found ${workspaces.length} workspaces for analytics snapshot`);
-
-      // 2. Generate snapshot for each workspace
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const workspace of workspaces) {
-        try {
-          const workspaceId = (workspace._id as any).toString();
-          // Generate for Instagram (default)
-          await analyticsService.generateDailySnapshot(workspaceId, 'instagram');
-          successCount++;
-        } catch (error) {
-          // console.error(`[SCHEDULER] Failed to generate snapshot for workspace ${workspace._id}:`, error);
-          failCount++;
-        }
-      }
-
-      console.log(`[SCHEDULER] Daily snapshots completed. Success: ${successCount}, Failed: ${failCount}`);
-    } catch (error) {
-      console.error('[SCHEDULER] Error in processDailySnapshots:', error);
     }
   }
 }

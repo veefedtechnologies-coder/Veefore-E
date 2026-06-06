@@ -76,6 +76,34 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+// Add download endpoint to serve files securely through /api proxy
+router.get('/download', async (req: Request, res: Response) => {
+  try {
+    const filePath = req.query.path as string;
+    if (!filePath || typeof filePath !== 'string') {
+      return res.status(400).json({ error: 'Missing path parameter' });
+    }
+    
+    // Ensure the path is within the uploads directory to prevent path traversal
+    const safePath = path.basename(filePath);
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    let absolutePath = path.join(uploadsDir, 'video-images', safePath);
+    
+    if (!fs.existsSync(absolutePath)) {
+      // Try root uploads dir if not in video-images
+      absolutePath = path.join(uploadsDir, safePath);
+      if (!fs.existsSync(absolutePath)) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+    }
+    
+    res.sendFile(absolutePath);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Failed to download file' });
+  }
+});
+
 // Configure multer for image uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -217,6 +245,88 @@ router.get('/jobs', requireAuth, (req: Request, res: Response) => {
 });
 
 // Upload image for video generation
+router.post('/adjust', requireAuth, upload.single('video'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No video file provided' });
+      return;
+    }
+
+    const { trimStart, trimEnd, cropX, cropY, cropWidth, cropHeight } = req.body;
+    
+    // Convert string inputs to numbers
+    const start = parseFloat(trimStart || '0');
+    const end = parseFloat(trimEnd || '0');
+    const x = parseFloat(cropX || '0');
+    const y = parseFloat(cropY || '0');
+    const width = parseFloat(cropWidth || '0');
+    const height = parseFloat(cropHeight || '0');
+
+    const inputPath = req.file.path;
+    const outputPath = path.join(path.dirname(inputPath), `adjusted-${uuidv4()}.mp4`);
+
+    console.log('[VIDEO ADJUST] Starting adjust for:', inputPath, 'to', outputPath);
+
+    const ffmpeg = (await import('fluent-ffmpeg')).default;
+    const ffmpegPath = (await import('ffmpeg-static')).default;
+    if (ffmpegPath) {
+      ffmpeg.setFfmpegPath(ffmpegPath);
+    }
+    
+    let command = ffmpeg(inputPath);
+
+    // Trimming
+    if (end > start && end > 0) {
+      console.log('[VIDEO ADJUST] Trimming:', start, 'to', end);
+      command = command.setStartTime(start).setDuration(end - start);
+    }
+
+    // Cropping
+    if (width > 0 && height > 0) {
+      console.log('[VIDEO ADJUST] Cropping:', width, height, x, y);
+      command = command.videoFilter(`crop=${width}:${height}:${x}:${y}`);
+    }
+
+    console.log('[VIDEO ADJUST] Executing ffmpeg command...');
+
+    command
+      .outputOptions([
+        '-y',
+        '-c:v libx264',
+        '-preset fast',
+        '-crf 23',
+        '-c:a aac',
+        '-b:a 128k',
+        '-movflags +faststart'
+      ])
+      .save(outputPath)
+      .on('start', (cmdline) => {
+        console.log('[VIDEO ADJUST] Started ffmpeg with command:', cmdline);
+      })
+      .on('progress', (progress) => {
+        console.log('[VIDEO ADJUST] Processing:', progress.percent, '% done');
+      })
+      .on('end', () => {
+        console.log('[VIDEO ADJUST] Finished processing');
+        // Cleanup original file
+        try { fs.unlinkSync(inputPath); } catch (e) {}
+        
+        const relativeUrl = `/uploads/${path.basename(outputPath)}`;
+        res.json({ success: true, url: relativeUrl });
+      })
+      .on('error', (err) => {
+        console.error('[VIDEO ADJUST] FFmpeg error:', err);
+        try { fs.unlinkSync(inputPath); } catch (e) {}
+        try { fs.unlinkSync(outputPath); } catch (e) {}
+        res.status(500).json({ error: 'Failed to process video', details: err.message });
+      });
+
+  } catch (error: any) {
+    console.error('[VIDEO ADJUST] Request error:', error);
+    res.status(500).json({ error: 'Internal server error processing video' });
+  }
+});
+
 router.post('/upload-image', requireAuth, upload.single('image'), (req: Request, res: Response) => {
   try {
     const file = req.file;

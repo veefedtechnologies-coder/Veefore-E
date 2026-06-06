@@ -69,6 +69,7 @@ const Pricing = () => {
     const isMobile = useIsMobile()
     const { openWaitlist } = useWaitlist()
     const [openFAQ, setOpenFAQ] = useState<number | null>(0)
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true'
 
     // Pricing Plans
     const pricingPlans = [
@@ -77,7 +78,7 @@ const Pricing = () => {
             credits: 300,
             description: 'For new creators testing growth',
             features: ['AI Hook Generator', 'Caption & CTA Engine', 'Basic Scheduler', '1 Competitor Analysis', 'Read-only Analytics'],
-            locked: ['Comment Automation', 'DM Automation', 'Adaptive AI'],
+            locked: isPhase1 ? ['Advanced Publishing', 'Content Scoring', 'Adaptive AI'] : ['Comment Automation', 'DM Automation', 'Adaptive AI'],
             gradient: 'from-slate-500/20 to-slate-600/10',
             border: 'border-white/10'
         },
@@ -85,7 +86,9 @@ const Pricing = () => {
             name: 'Growth',
             credits: 1200,
             description: 'For serious creators ready to scale',
-            features: ['Everything in Starter', 'AI Comment Automation', 'Smart DM Replies', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics'],
+            features: isPhase1 
+                ? ['Everything in Starter', 'Cross-Platform Publishing', 'Smart Content Scoring', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics']
+                : ['Everything in Starter', 'AI Comment Automation', 'Smart DM Replies', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics'],
             locked: [],
             gradient: 'from-blue-500/20 to-indigo-500/20',
             border: 'border-blue-500/30',
@@ -95,7 +98,9 @@ const Pricing = () => {
             name: 'Pro',
             credits: 3000,
             description: 'For agencies and power users',
-            features: ['Everything in Growth', '3-5 Social Accounts', 'Advanced DM Funnels', 'Team Access (2-5)', 'Priority Processing', 'Dedicated Support'],
+            features: isPhase1 
+                ? ['Everything in Growth', '3-5 Social Accounts', 'Advanced Publishing Hub', 'Team Access (2-5)', 'Priority Processing', 'Dedicated Support']
+                : ['Everything in Growth', '3-5 Social Accounts', 'Advanced DM Funnels', 'Team Access (2-5)', 'Priority Processing', 'Dedicated Support'],
             locked: [],
             gradient: 'from-purple-500/20 to-pink-500/20',
             border: 'border-purple-500/30'
@@ -104,7 +109,7 @@ const Pricing = () => {
 
     // FAQs
     const faqs = [
-        { q: "How does the credit system work?", a: "1 Credit = 1 AI Action. Actions include generating hooks, creating captions, replying to comments or DMs. Credits reset monthly. Starter gets 300, Growth gets 1,200, Pro gets 3,000 credits." },
+        { q: "How does the credit system work?", a: isPhase1 ? "1 Credit = 1 AI Action. Actions include generating hooks, creating captions, or analyzing content. Credits reset monthly. Starter gets 300, Growth gets 1,200, Pro gets 3,000 credits." : "1 Credit = 1 AI Action. Actions include generating hooks, creating captions, replying to comments or DMs. Credits reset monthly. Starter gets 300, Growth gets 1,200, Pro gets 3,000 credits." },
         { q: "Can I upgrade or downgrade anytime?", a: "Yes! You can change your plan at any time. Upgrades take effect immediately, and downgrades apply at the end of your billing cycle." },
         { q: "Is there a free trial?", a: "Yes! All plans come with a 7-day free trial. No credit card required to start." },
         { q: "What payment methods do you accept?", a: "We accept all major credit cards, debit cards, UPI, and net banking for Indian users." },
@@ -115,7 +120,7 @@ const Pricing = () => {
         <div className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
             <SEO
                 title="Pricing - Veefore | AI-Powered Growth Engine"
-                description="Choose the perfect plan for your growth journey. Start with a free trial and scale as you grow with Veefore's AI-powered engagement automation."
+                description={isPhase1 ? "Choose the perfect plan for your growth journey. Start with a free trial and scale as you grow with Veefore's AI-powered scheduling workflows." : "Choose the perfect plan for your growth journey. Start with a free trial and scale as you grow with Veefore's AI-powered engagement automation."}
             />
 
             {/* Ambient Background */}
@@ -322,7 +327,9 @@ const Pricing = () => {
                                 Ready to Start Growing?
                             </h2>
                             <p className="text-white/60 mb-8 max-w-lg mx-auto">
-                                Join thousands of creators who are actively growing their audience with AI-powered engagement.
+                                {isPhase1 
+                                    ? "Join thousands of creators who are actively growing their audience with AI-powered publishing tools."
+                                    : "Join thousands of creators who are actively growing their audience with AI-powered engagement."}
                             </p>
 
                             <button

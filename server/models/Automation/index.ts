@@ -6,5 +6,7 @@ export { DmMessageSchema, DmMessageModel } from './DmMessage';
 export type { IDmMessage } from './DmMessage';
 export { ConversationContextSchema, ConversationContextModel } from './ConversationContext';
 export type { IConversationContext } from './ConversationContext';
+export * from './Lead';
+export * from './AutomationFunnelState';
 export { DmTemplateSchema, DmTemplateModel } from './DmTemplate';
 export type { IDmTemplate } from './DmTemplate';

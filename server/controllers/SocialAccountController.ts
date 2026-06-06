@@ -5,17 +5,15 @@ import { logger } from '../config/logger';
 import { ValidationError } from '../errors';
 import { socialAccountService } from '../services';
 import { CachingSystem } from '../performance/caching-system';
+import { MetricsQueueManager } from '../queues/metricsQueue';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const traceLog = (msg: string, data?: any) => {
-  try {
-    const logPath = path.join(process.cwd(), 'debug-trace.log');
-    const timestamp = new Date().toISOString();
-    const entry = `[${timestamp}] [CONTROLLER] ${msg}${data ? ' ' + JSON.stringify(data) : ''}\n`;
-    fs.appendFileSync(logPath, entry);
-  } catch (e) {
-    console.error('Failed to log to trace file', e);
+  if (data) {
+    logger.debug(`[CONTROLLER] ${msg}`, data);
+  } else {
+    logger.debug(`[CONTROLLER] ${msg}`);
   }
 };
 
@@ -158,21 +156,30 @@ export class SocialAccountController extends BaseController {
     }
 
     const { accountId } = AccountIdParams.parse(req.params);
-    // Trigger real sync from Instagram instead of just saving passed data (P1-5 FIX)
-    const account = await socialAccountService.syncAccount(accountId);
-    traceLog('Manual sync successful', { accountId, username: account.username });
 
-    // Clear cache immediately so the UI reflects the synced metrics!
-    try {
-      await CachingSystem.invalidateByTag('dashboard');
-      await CachingSystem.invalidateByTag('historical');
-      await CachingSystem.invalidateByTag('social_accounts');
-      traceLog('Cache invalidated for new metrics');
-    } catch (err) {
-      logger.error('Failed to invalidate cache after sync', err as Error);
-    }
+    // Get the account from the database to find its workspace ID
+    const account = await socialAccountService.getAccountById(accountId);
 
-    this.sendSuccess(res, account, 200, 'Metrics updated successfully via Instagram sync');
+    console.log(`\n======================================================`);
+    console.log(`[FRONTEND DECOUPLED API] 🚀 Received request to update metrics for ${accountId}`);
+    console.log(`[FRONTEND DECOUPLED API] Immediately queueing background job in BullMQ...`);
+
+    // Delegate to the background worker queue instead of blocking the request
+    await MetricsQueueManager.scheduleMetricsFetch(
+      account.workspaceId.toString(),
+      'system',
+      accountId,
+      '', // Token is handled securely by the worker
+      'all',
+      { priority: 5, forceRefresh: true } // Priority 5 = High (manual refresh)
+    );
+
+    console.log(`[FRONTEND DECOUPLED API] ✅ Job queued! Sending 202 response to frontend without waiting for Meta API.`);
+    console.log(`======================================================\n`);
+
+    traceLog('Manual sync scheduled in background', { accountId, username: account.username });
+
+    this.sendSuccess(res, account, 202, 'Metrics refresh scheduled successfully via background worker');
   });
 }
 

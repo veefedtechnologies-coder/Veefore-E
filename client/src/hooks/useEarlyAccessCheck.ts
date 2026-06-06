@@ -8,9 +8,22 @@ interface EarlyAccessStatus {
 
 export function useEarlyAccessCheck() {
     const [isLoading, setIsLoading] = useState(false);
-    const [status, setStatus] = useState<EarlyAccessStatus>({
-        hasEarlyAccess: false,
-        status: null
+    const [status, setStatus] = useState<EarlyAccessStatus>(() => {
+        if (typeof window !== 'undefined') {
+            const email = localStorage.getItem('veefore_early_access_email');
+            const cachedStatus = localStorage.getItem('veefore_early_access_status');
+            if (email && cachedStatus === 'approved') {
+                return {
+                    hasEarlyAccess: true,
+                    status: 'early_access',
+                    email
+                };
+            }
+        }
+        return {
+            hasEarlyAccess: false,
+            status: null
+        };
     });
 
     // Check status against API

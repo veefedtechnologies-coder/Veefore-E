@@ -10,35 +10,35 @@ interface MetricsGridProps {
   periodData: {
     followerTotal: number
     followerGains: number
-    engagement: number
+    likes: number
     reach: number
-    posts: number
+    views: number
   }
   growthPercentages: {
     followers: GrowthData
-    engagement: GrowthData
+    likes: GrowthData
     reach: GrowthData
-    posts: GrowthData
+    views: GrowthData
   }
   selectedPeriod: 'day' | 'week' | 'month'
   formatNumber: (num: number) => string
   isLoading?: boolean
 }
 
-function SkeletonMetricGridCard({ colorClass }: { colorClass: string }) {
+function SkeletonMetricGridCard() {
   return (
-    <div className={`${colorClass} rounded-2xl p-4 relative overflow-hidden`}>
-      <div className="absolute top-2 right-2 opacity-20">
-        <Skeleton className="w-6 h-6 rounded-full" />
-      </div>
+    <div className="bg-white dark:bg-slate-900/50 rounded-xl p-6 border border-gray-100 dark:border-gray-800/60 relative overflow-hidden">
       <div className="relative z-10">
-        <Skeleton className="h-8 w-24 mb-1 rounded-lg" />
-        <Skeleton className="h-3 w-20 mb-2 rounded" />
-        <div className="flex items-center justify-between mb-2">
-          <div className="w-full bg-white/60 dark:bg-gray-600/60 rounded-full h-1.5 mr-2">
-            <Skeleton className="h-1.5 rounded-full w-3/4" />
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <Skeleton className="h-3 w-24 mb-3 rounded" />
+            <Skeleton className="h-8 w-20 rounded-lg" />
           </div>
-          <Skeleton className="h-4 w-12 rounded" />
+          <Skeleton className="w-10 h-10 rounded-lg" />
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50 flex justify-between">
+            <Skeleton className="h-3 w-28 rounded" />
+            <Skeleton className="h-3 w-12 rounded" />
         </div>
       </div>
     </div>
@@ -47,11 +47,9 @@ function SkeletonMetricGridCard({ colorClass }: { colorClass: string }) {
 
 export function MetricsGridSkeleton() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <SkeletonMetricGridCard colorClass="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30" />
-      <SkeletonMetricGridCard colorClass="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30" />
-      <SkeletonMetricGridCard colorClass="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30" />
-      <SkeletonMetricGridCard colorClass="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30" />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <SkeletonMetricGridCard />
+      <SkeletonMetricGridCard />
     </div>
   )
 }
@@ -62,116 +60,78 @@ export function MetricsGrid({ periodData, growthPercentages, selectedPeriod, for
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl p-4 relative overflow-hidden">
-        <div className="absolute top-2 right-2 opacity-20">
-          <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-        </div>
-        <div className="relative z-10">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
-            {periodData.followerGains > 0 ? '+' : ''}{formatNumber(periodData.followerGains)}
-          </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">
-            {selectedPeriod === 'day' ? 'Today\'s Followers' : 
-             selectedPeriod === 'week' ? 'Weekly New Followers' : 
-             'Monthly New Followers'}
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-full bg-white/60 dark:bg-gray-600/60 rounded-full h-1.5 mr-2">
-              <div className="bg-blue-500 h-1.5 rounded-full w-3/4 transition-all duration-1000"></div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      {/* Followers Card */}
+      <div className="group relative bg-blue-50 dark:bg-gray-800 rounded-xl p-6 transition-all duration-300 hover:shadow-md border border-blue-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        {/* Subtle decorative glow */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10 flex flex-col h-full justify-between">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <div className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-2">
+                {selectedPeriod === 'day' ? 'Today\'s New Followers' : 
+                 selectedPeriod === 'week' ? 'Weekly New Followers' : 
+                 'Monthly New Followers'}
+              </div>
+              <div className="text-4xl font-extrabold text-blue-900 dark:text-white tracking-tight">
+                {periodData.followerGains > 0 ? '+' : ''}{formatNumber(periodData.followerGains)}
+              </div>
             </div>
-            <div className={`flex items-center text-xs font-semibold ${
-              growthPercentages.followers.isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-            }`}>
-              {growthPercentages.followers.isPositive ? 
-                <ArrowUpRight className="w-3 h-3 mr-1" /> : 
-                <ArrowDownRight className="w-3 h-3 mr-1" />
-              }
-              <span>{growthPercentages.followers.value}</span>
+            <div className="p-3 bg-blue-200/50 dark:bg-blue-500/20 rounded-xl text-blue-700 dark:text-blue-400 shadow-sm border border-blue-300/50 dark:border-blue-400/30">
+              <Users className="w-6 h-6" />
             </div>
           </div>
-        </div>
-      </div>
-      
-      <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-2xl p-4 relative overflow-hidden">
-        <div className="absolute top-2 right-2 opacity-20">
-          <Heart className="w-6 h-6 text-green-600 dark:text-green-400" />
-        </div>
-        <div className="relative z-10">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">{periodData.engagement.toFixed(1)}%</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">
-            {selectedPeriod === 'day' ? 'Today\'s Engagement' : 
-             selectedPeriod === 'week' ? 'Weekly Engagement' : 
-             'Monthly Engagement'}
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-full bg-white/60 dark:bg-gray-600/60 rounded-full h-1.5 mr-2">
-              <div className="bg-green-500 h-1.5 rounded-full w-4/5 transition-all duration-1000"></div>
-            </div>
-            <div className={`flex items-center text-xs font-semibold ${
-              growthPercentages.engagement.isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-            }`}>
-              {growthPercentages.engagement.isPositive ? 
-                <ArrowUpRight className="w-3 h-3 mr-1" /> : 
-                <ArrowDownRight className="w-3 h-3 mr-1" />
-              }
-              <span>{growthPercentages.engagement.value}</span>
+          
+          <div className="mt-4 pt-4 border-t border-blue-200/50 dark:border-blue-500/20">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-blue-800/70 dark:text-gray-400 font-medium">vs previous period</span>
+              <div className={`flex items-center font-bold ${
+                growthPercentages.followers.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {growthPercentages.followers.isPositive ? 
+                  <ArrowUpRight className="w-4 h-4 mr-1" /> : 
+                  <ArrowDownRight className="w-4 h-4 mr-1" />
+                }
+                <span>{growthPercentages.followers.value}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
       
-      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-2xl p-4 relative overflow-hidden">
-        <div className="absolute top-2 right-2 opacity-20">
-          <Eye className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-        </div>
-        <div className="relative z-10">
-          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">{formatNumber(periodData.reach)}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">
-            {selectedPeriod === 'day' ? 'Today\'s Reach' : 
-             selectedPeriod === 'week' ? 'Weekly Reach' : 
-             'Monthly Reach'}
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-full bg-white/60 dark:bg-gray-600/60 rounded-full h-1.5 mr-2">
-              <div className="bg-purple-500 h-1.5 rounded-full w-2/3 transition-all duration-1000"></div>
+      {/* Reach Card */}
+      <div className="group relative bg-purple-50 dark:bg-gray-800 rounded-xl p-6 transition-all duration-300 hover:shadow-md border border-purple-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        {/* Subtle decorative glow */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-400/20 dark:bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10 flex flex-col h-full justify-between">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <div className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider mb-2">
+                {selectedPeriod === 'day' ? 'Today\'s Reach' : 
+                 selectedPeriod === 'week' ? 'Weekly Reach' : 
+                 'Monthly Reach'}
+              </div>
+              <div className="text-4xl font-extrabold text-purple-900 dark:text-white tracking-tight">
+                {formatNumber(periodData.reach)}
+              </div>
             </div>
-            <div className={`flex items-center text-xs font-semibold ${
-              growthPercentages.reach.isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-            }`}>
-              {growthPercentages.reach.isPositive ? 
-                <ArrowUpRight className="w-3 h-3 mr-1" /> : 
-                <ArrowDownRight className="w-3 h-3 mr-1" />
-              }
-              <span>{growthPercentages.reach.value}</span>
+            <div className="p-3 bg-purple-200/50 dark:bg-purple-500/20 rounded-xl text-purple-700 dark:text-purple-400 shadow-sm border border-purple-300/50 dark:border-purple-400/30">
+              <Eye className="w-6 h-6" />
             </div>
           </div>
-        </div>
-      </div>
-      
-      <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 rounded-2xl p-4 relative overflow-hidden">
-        <div className="absolute top-2 right-2 opacity-20">
-          <Share className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-        </div>
-        <div className="relative z-10">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-1">{periodData.posts}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">
-            {selectedPeriod === 'day' ? 'Posts Today' : 
-             selectedPeriod === 'week' ? 'Posts This Week' : 
-             'Posts This Month'}
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="w-full bg-white/60 dark:bg-gray-600/60 rounded-full h-1.5 mr-2">
-              <div className="bg-orange-500 h-1.5 rounded-full w-5/6 transition-all duration-1000"></div>
-            </div>
-            <div className={`flex items-center text-xs font-semibold ${
-              growthPercentages.posts.isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-            }`}>
-              {growthPercentages.posts.isPositive ? 
-                <ArrowUpRight className="w-3 h-3 mr-1" /> : 
-                <ArrowDownRight className="w-3 h-3 mr-1" />
-              }
-              <span>{growthPercentages.posts.value}</span>
+          
+          <div className="mt-4 pt-4 border-t border-purple-200/50 dark:border-purple-500/20">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-purple-800/70 dark:text-gray-400 font-medium">vs previous period</span>
+              <div className={`flex items-center font-bold ${
+                growthPercentages.reach.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {growthPercentages.reach.isPositive ? 
+                  <ArrowUpRight className="w-4 h-4 mr-1" /> : 
+                  <ArrowDownRight className="w-4 h-4 mr-1" />
+                }
+                <span>{growthPercentages.reach.value}</span>
+              </div>
             </div>
           </div>
         </div>

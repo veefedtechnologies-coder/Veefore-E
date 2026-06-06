@@ -290,17 +290,22 @@ export default defineConfig({
     host: '0.0.0.0',
     // Allow ngrok and other external origins
     cors: true,
-    hmr: process.env.REPLIT_DEV_DOMAIN
+    hmr: process.env.REPLIT_DEV_DOMAIN && process.env.REPLIT_DEV_DOMAIN.trim() !== 'your-replit-dev-domain-here'
       ? {
         protocol: 'wss',
         clientPort: 443,
-        host: process.env.REPLIT_DEV_DOMAIN
+        host: process.env.REPLIT_DEV_DOMAIN.trim()
       }
       : { protocol: 'ws' },
     // Allow all hosts including ngrok tunnels
     allowedHosts: 'all',
     proxy: {
       '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,

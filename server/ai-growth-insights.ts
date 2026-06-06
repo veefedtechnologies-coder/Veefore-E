@@ -411,20 +411,31 @@ Focus on:
 Ensure insights are data-driven, specific, and immediately actionable.
 `;
 
-    console.log('[AI INSIGHTS] Sending request to Anthropic Claude with data for', data.platforms.length, 'platforms');
-    
-    const response = await getAnthropic().messages.create({
-      model: DEFAULT_MODEL_STR,
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: analysisPrompt }]
-    });
+    const promptStr = `System: You are a social media growth expert with advanced analytics capabilities. Provide actionable growth insights in valid JSON array format only.\n\nUser: ${analysisPrompt}`;
 
-    console.log('[AI INSIGHTS] Received response from Claude API');
-    const responseText = response.content[0].text;
-    console.log('[AI INSIGHTS] Raw response length:', responseText.length);
+    console.log('[AI INSIGHTS] Sending request to AIServiceManager with data for', data.platforms.length, 'platforms');
     
-    // Parse JSON response
-    const insights = JSON.parse(responseText);
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let insights = [];
+    try {
+      insights = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[AI INSIGHTS] AIServiceManager generation failed', e);
+      throw e;
+    }
+    
+    if (!Array.isArray(insights)) {
+      if (insights.insights && Array.isArray(insights.insights)) {
+        insights = insights.insights;
+      } else if (insights.recommendations && Array.isArray(insights.recommendations)) {
+        insights = insights.recommendations;
+      } else if (insights.id) {
+        insights = [insights];
+      } else {
+        throw new Error('Unexpected JSON format returned by AIServiceManager');
+      }
+    }
+
     console.log('[AI INSIGHTS] Successfully generated', insights.length, 'real AI insights');
     
     // Ensure each insight has required fields

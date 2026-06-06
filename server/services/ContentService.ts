@@ -1,11 +1,14 @@
 import { BaseService } from './BaseService';
 import { contentRepository, ContentStatus } from '../repositories';
 import { IContent } from '../models/Content';
+import { ContentModel } from '../models/Content/Content';
 import { NotFoundError, ValidationError } from '../errors';
 import { socialAccountService } from './SocialAccountService';
+import { openaiService } from './openai-service';
 import { getAccessTokenFromAccount } from '../storage/converters';
 import { SimpleInstagramPublisher } from '../simple-instagram-publisher';
 import { getSchedulerService } from '../scheduler-service';
+import InstagramApiService from './instagramApi';
 
 interface CreateContentInput {
   workspaceId: string;
@@ -49,10 +52,11 @@ export class ContentService extends BaseService {
     workspaceId: string,
     page: number = 1,
     limit: number = 20,
-    accountId?: string
+    accountId?: string,
+    excludeImported?: boolean
   ) {
     return this.withErrorHandling('getContentByWorkspace', async () => {
-      return contentRepository.findByWorkspaceId(workspaceId, { page, limit }, accountId);
+      return contentRepository.findByWorkspaceId(workspaceId, { page, limit }, accountId, excludeImported);
     });
   }
 
@@ -318,7 +322,8 @@ export class ContentService extends BaseService {
       }
 
       // Build proper URLs
-      const finalBaseUrl = baseUrl || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      const devDomain = process.env.REPLIT_DEV_DOMAIN && process.env.REPLIT_DEV_DOMAIN !== 'your-replit-dev-domain-here' ? process.env.REPLIT_DEV_DOMAIN : null;
+      const finalBaseUrl = baseUrl || (devDomain ? `https://${devDomain}` : 'http://localhost:5000');
       
       const publisher = new SimpleInstagramPublisher();
       let caption = '';
@@ -351,6 +356,7 @@ export class ContentService extends BaseService {
         accessToken: accessToken,
         content: caption,
         mentions: mentions,
+        collaborators: contentData?.collaborators || [],
         mediaFiles: mediaUrls.map((url: string) => {
           let cleanUrl = url;
           if (url.startsWith('blob:')) {
@@ -412,6 +418,75 @@ export class ContentService extends BaseService {
         throw new NotFoundError('Content', contentId);
       }
       this.log('markFailed', 'Content marked as failed', { contentId });
+      return updated;
+    });
+  }
+
+  async syncMissingInstagramId(contentId: string, userId: string): Promise<IContent> {
+    return this.withErrorHandling('syncMissingInstagramId', async () => {
+      const content = await this.getContentById(contentId);
+      
+      if (content.instagramPostId || content.contentData?.externalId) {
+        return content; // Already has ID
+      }
+      
+      const instagramAccount = await socialAccountService.getAccountByPlatform(content.workspaceId.toString(), 'instagram');
+      if (!instagramAccount) {
+        throw new Error('No Instagram account connected to this workspace');
+      }
+
+      const token = getAccessTokenFromAccount(instagramAccount);
+      if (!token) {
+        throw new Error('Instagram account is disconnected');
+      }
+
+      // Fetch recent media from Instagram
+      const accountId = instagramAccount.accountId || (instagramAccount as any)._id?.toString();
+      
+      // Using dynamic import to avoid circular dependencies if any
+      const { InstagramApiService } = await import('./instagramApi');
+      
+      const mediaResponse = await InstagramApiService.getUserMedia(token, 50, accountId);
+      
+      if (!mediaResponse.data || mediaResponse.data.length === 0) {
+        throw new Error('Could not find any recent posts on Instagram');
+      }
+
+      // Try to find a match
+      // First try matching by text/caption if available
+      let matchedMedia = null;
+      const contentText = content.contentData?.text?.trim() || content.title?.trim();
+      
+      if (contentText) {
+        matchedMedia = mediaResponse.data.find(m => m.caption && m.caption.includes(contentText.substring(0, 50)));
+      }
+      
+      // Fallback: match by timestamp within a 2-hour window
+      if (!matchedMedia) {
+        const targetTime = new Date(content.publishedAt || content.scheduledAt || content.createdAt).getTime();
+        
+        for (const media of mediaResponse.data) {
+          const mediaTime = new Date(media.timestamp).getTime();
+          const diffHours = Math.abs(mediaTime - targetTime) / (1000 * 60 * 60);
+          
+          if (diffHours < 2) {
+            matchedMedia = media;
+            break;
+          }
+        }
+      }
+
+      if (!matchedMedia) {
+        throw new Error('Could not find a matching post on Instagram. It may not have been published, or the caption/time is too different.');
+      }
+
+      // We found a match! Save it to DB
+      const updated = await contentRepository.updateByIdOrFail(contentId, {
+        instagramPostId: matchedMedia.id,
+        updatedAt: new Date()
+      });
+      
+      this.log('syncMissingInstagramId', 'Successfully synced missing Instagram ID', { contentId, matchedId: matchedMedia.id });
       return updated;
     });
   }
@@ -482,6 +557,181 @@ export class ContentService extends BaseService {
       ]);
 
       return { byStatus, byType, totalCreditsUsed };
+    });
+  }
+
+  async getContentAnalytics(contentId: string): Promise<any> {
+    return this.withErrorHandling('getContentAnalytics', async () => {
+      const content = await this.getContentById(contentId);
+      
+      // Get the workspace's Instagram account for demographics and token
+      const instagramAccount = await socialAccountService.getAccountByPlatform(content.workspaceId.toString(), 'instagram');
+      
+      let demographics = null;
+      let token = null;
+
+      if (instagramAccount) {
+        token = getAccessTokenFromAccount(instagramAccount);
+        demographics = {
+          audienceCity: (instagramAccount as any).audienceCity || {},
+          audienceCountry: (instagramAccount as any).audienceCountry || {},
+          audienceGenderAge: (instagramAccount as any).audienceGenderAge || {},
+          audienceActiveTime: (instagramAccount as any).audienceActiveTime || {}
+        };
+      }
+
+      const now = new Date().getTime();
+      const lastSync = content.metrics?.lastSyncAt ? new Date(content.metrics.lastSyncAt).getTime() : 0;
+      
+      // 90 minutes cache
+      const isStale = (now - lastSync) > 90 * 60 * 1000;
+
+      let currentMetrics = content.metrics || {};
+      
+      const mediaId = content.instagramPostId || content.contentData?.externalId;
+
+      if (content.status === 'published' && mediaId && token && isStale) {
+        try {
+          this.log('getContentAnalytics', 'Fetching fresh media insights from Instagram', { contentId, mediaId });
+          
+          let mediaType: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'STORY' = 'IMAGE';
+          if (content.type === 'video' || content.type === 'reel') mediaType = 'VIDEO';
+          else if (content.type === 'story') mediaType = 'STORY';
+          else if (content.contentData?.mediaUrls && content.contentData.mediaUrls.length > 1) mediaType = 'CAROUSEL_ALBUM';
+
+          const freshInsights = await InstagramApiService.getMediaInsights(
+            mediaId,
+            token,
+            mediaType
+          );
+
+          // Merge fresh insights
+          const mergedMetrics: Record<string, any> = { ...currentMetrics };
+          
+          // Only overwrite if the fresh insight is a number
+          for (const [key, value] of Object.entries(freshInsights)) {
+            if (typeof value === 'number') {
+              mergedMetrics[key] = value;
+            }
+          }
+          
+          mergedMetrics.lastSyncAt = new Date();
+          currentMetrics = mergedMetrics;
+
+          // Update in DB
+          await contentRepository.updateByIdOrFail(contentId, {
+            metrics: currentMetrics,
+            updatedAt: new Date()
+          });
+
+        } catch (error) {
+          this.log('getContentAnalytics', 'Error fetching fresh insights', { contentId, error: (error as Error).message });
+          // If it fails, we just fall back to the existing metrics
+        }
+      }
+
+      // Calculate Historical Benchmarks and Growth
+      let historicalData: any[] = [];
+      let benchmark: any = {};
+      let aiInsight = null;
+
+      try {
+        // Fetch last 10 published posts of the same type
+        const historicalPosts = await contentRepository.findHistoricalPosts(
+          content.workspaceId.toString(),
+          content.type,
+          content._id.toString()
+        );
+
+        if (historicalPosts.length > 0) {
+          // Calculate averages
+          const sums = { reach: 0, likes: 0, comments: 0, plays: 0, replies: 0 };
+          let counts = { reach: 0, likes: 0, comments: 0, plays: 0, replies: 0 };
+
+          const rawHistorical = historicalPosts.map((p: any) => {
+            const m = p.metrics || {};
+            if (m.reach != null) { sums.reach += m.reach; counts.reach++; }
+            if (m.likes != null) { sums.likes += m.likes; counts.likes++; }
+            if (m.comments != null) { sums.comments += m.comments; counts.comments++; }
+            if (m.plays != null) { sums.plays += m.plays; counts.plays++; }
+            if (m.replies != null) { sums.replies += m.replies; counts.replies++; }
+
+            return {
+              date: new Date(p.publishedAt || p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              reach: m.reach || 0,
+              likes: m.likes || 0,
+              plays: m.plays || 0,
+              replies: m.replies || 0,
+              isCurrent: false
+            };
+          }).reverse(); // chronological for chart
+
+          benchmark = {
+            avgReach: counts.reach > 0 ? Math.round(sums.reach / counts.reach) : 0,
+            avgLikes: counts.likes > 0 ? Math.round(sums.likes / counts.likes) : 0,
+            avgComments: counts.comments > 0 ? Math.round(sums.comments / counts.comments) : 0,
+            avgPlays: counts.plays > 0 ? Math.round(sums.plays / counts.plays) : 0,
+            avgReplies: counts.replies > 0 ? Math.round(sums.replies / counts.replies) : 0,
+          };
+
+          // Calculate growth percentages
+          const calcGrowth = (current: number, avg: number) => {
+            if (!avg || avg === 0) return current > 0 ? 100 : 0;
+            return Math.round(((current - avg) / avg) * 100);
+          };
+
+          benchmark.growthReach = calcGrowth(currentMetrics.reach || 0, benchmark.avgReach);
+          benchmark.growthLikes = calcGrowth(currentMetrics.likes || 0, benchmark.avgLikes);
+          benchmark.growthComments = calcGrowth(currentMetrics.comments || 0, benchmark.avgComments);
+          benchmark.growthPlays = calcGrowth(currentMetrics.plays || 0, benchmark.avgPlays);
+          benchmark.growthReplies = calcGrowth(currentMetrics.replies || 0, benchmark.avgReplies);
+
+          historicalData = [...rawHistorical, {
+            date: new Date(content.publishedAt || content.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            reach: currentMetrics.reach || 0,
+            likes: currentMetrics.likes || 0,
+            plays: currentMetrics.plays || 0,
+            replies: currentMetrics.replies || 0,
+            isCurrent: true
+          }];
+
+          // Generate AI Insight
+          const relevantCurrent: any = { reach: currentMetrics.reach, likes: currentMetrics.likes, comments: currentMetrics.comments };
+          const relevantAvg: any = { reach: benchmark.avgReach, likes: benchmark.avgLikes, comments: benchmark.avgComments };
+          if (content.type === 'story') {
+             relevantCurrent.replies = currentMetrics.replies;
+             relevantAvg.replies = benchmark.avgReplies;
+          } else if (content.type === 'reel' || content.type === 'video') {
+             relevantCurrent.plays = currentMetrics.plays;
+             relevantAvg.plays = benchmark.avgPlays;
+          }
+
+          aiInsight = await openaiService.generateAnalyticsInsight(relevantCurrent, relevantAvg, content.type);
+        } else {
+          // No historical data, just current
+          historicalData = [{
+            date: new Date(content.publishedAt || content.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            reach: currentMetrics.reach || 0,
+            likes: currentMetrics.likes || 0,
+            plays: currentMetrics.plays || 0,
+            replies: currentMetrics.replies || 0,
+            isCurrent: true
+          }];
+          aiInsight = "This is your first post of this type! As you publish more, we'll generate advanced growth insights and benchmarks here.";
+        }
+      } catch (err) {
+        console.error('🚨 [getContentAnalytics] CRITICAL ERROR IN AI ALGORITHM:', err);
+        this.log('getContentAnalytics', 'Error calculating historical benchmarks', { error: (err as Error).message });
+      }
+
+      return {
+        content,
+        metrics: currentMetrics,
+        demographics,
+        benchmark,
+        historicalData,
+        aiInsight
+      };
     });
   }
 }

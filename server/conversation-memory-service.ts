@@ -96,7 +96,12 @@ export class ConversationMemoryService {
     console.log(`[MEMORY] Getting history for conversation ${conversationId}, limit: ${limit}`);
     
     try {
-      const messages = await this.storage.getDmMessages(conversationId, limit);
+      if (preferences?.aiMemory === 'off') {
+        return [];
+      }
+      
+      const actualLimit = preferences?.aiMemory === 'short-term' ? 3 : limit;
+      const messages = await this.storage.getDmMessages(conversationId, actualLimit);
       console.log(`[MEMORY] Retrieved ${messages.length} messages from history`);
       return messages;
     } catch (error) {
@@ -129,7 +134,7 @@ export class ConversationMemoryService {
 
     try {
       // Get conversation history - expand to get more context
-      const history = await this.getConversationHistory(conversationId, 15);
+      const history = await this.getConversationHistory(conversationId, 15, preferences);
       const context = await this.getConversationContext(conversationId);
       
       console.log(`[MEMORY] Retrieved ${history.length} messages from history`);

@@ -202,7 +202,7 @@ export class FFmpegService {
         duration: parseFloat(info.format.duration),
         width: videoStream.width,
         height: videoStream.height,
-        fps: eval(videoStream.r_frame_rate) // e.g., "30/1" -> 30
+        fps: videoStream.r_frame_rate.includes('/') ? (parseInt(videoStream.r_frame_rate.split('/')[0]) / parseInt(videoStream.r_frame_rate.split('/')[1])) : parseFloat(videoStream.r_frame_rate) // e.g., "30/1" -> 30
       };
     } catch (error) {
       console.error('[FFMPEG] Failed to get video info:', error);

@@ -12,7 +12,8 @@ import {
 import InstagramApiService, { InstagramApiError } from '../services/instagramApi';
 import TokenManager from '../services/tokenManager';
 import Metrics, { IMetrics } from '../models/Metrics';
-// Removed User and Workspace imports - using mongodb-storage directly
+import IORedis from 'ioredis';
+import { getRedisOptions } from '../lib/redis';
 
 export class MetricsWorker {
   private static metricsWorker: Worker;
@@ -22,12 +23,11 @@ export class MetricsWorker {
   /**
    * Start all workers
    */
-  static start(): void {
+  static async start(): Promise<void> {
     console.log('🚀 Starting Instagram metrics workers...');
 
-    // Check if Redis is available
-    if (!isRedisAvailable() || !redisConnection) {
-      console.log('⚠️ Redis unavailable, workers will not start. Using fallback polling system.');
+    if (!redisConnection) {
+      console.log('⚠️ Redis connection undefined, workers will not start. Using fallback polling system.');
       return;
     }
 
@@ -39,7 +39,7 @@ export class MetricsWorker {
           return this.processMetricsFetchJob(job);
         },
         {
-          connection: redisConnection,
+          connection: new IORedis(process.env.REDIS_URL!, { ...getRedisOptions(process.env.REDIS_URL!), maxRetriesPerRequest: null }),
           concurrency: 5, // Process 5 jobs concurrently
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 50 },
@@ -53,7 +53,7 @@ export class MetricsWorker {
           return this.processWebhookJob(job);
         },
         {
-          connection: redisConnection,
+          connection: new IORedis(process.env.REDIS_URL!, { ...getRedisOptions(process.env.REDIS_URL!), maxRetriesPerRequest: null }),
           concurrency: 10, // High concurrency for real-time webhooks
           removeOnComplete: { count: 50 },
           removeOnFail: { count: 25 },
@@ -67,7 +67,7 @@ export class MetricsWorker {
           return this.processTokenRefreshJob(job);
         },
         {
-          connection: redisConnection,
+          connection: new IORedis(process.env.REDIS_URL!, { ...getRedisOptions(process.env.REDIS_URL!), maxRetriesPerRequest: null }),
           concurrency: 2, // Lower concurrency for token operations
           removeOnComplete: { count: 25 },
           removeOnFail: { count: 10 },
@@ -108,49 +108,243 @@ export class MetricsWorker {
    */
   private static async processMetricsFetchJob(job: Job<FetchMetricsJobData>): Promise<any> {
     const { workspaceId, userId, instagramAccountId, token, metricsType, forceRefresh } = job.data;
+    const isDailySnapshot = job.name === 'daily-snapshot' || (metricsType as any) === 'daily-snapshot' || (job.data as any).type === 'daily-snapshot';
+    const isTokenHygieneRefresh = job.name === 'token-hygiene-refresh' || (job.data as any).type === 'token-hygiene-refresh';
+      const isTokenHygieneCleanup = job.name === 'token-hygiene-cleanup' || (job.data as any).type === 'token-hygiene-cleanup';
+      const isSocialListeningTrends = job.name === 'social-listening-trends' || (job.data as any).type === 'social-listening-trends';
+      
+      console.log(`📊 Processing metrics fetch: name=${job.name}, workspace=${workspaceId || 'N/A'}, account=${instagramAccountId || 'N/A'}`);
 
-    console.log(`📊 Processing metrics fetch: workspace=${workspaceId}, account=${instagramAccountId}, type=${metricsType}`);
+      try {
+        // PHASE 4: Global Daily Snapshot Job Intercept
+        if (isDailySnapshot) {
+          console.log(`[BULLMQ] 📸 Running global daily snapshot job`);
+          const { analyticsService } = await import('../services');
+          const { workspaceRepository, socialAccountRepository } = await import('../repositories');
+          const { InstagramApiService } = await import('../services/instagramApi');
+          const { InstagramFollowerSnapshotModel } = await import('../models/Analytics');
+          const { getAccessTokenFromAccount } = await import('../storage/converters');
+          
+          const workspaces = await workspaceRepository.findAll();
+          let successCount = 0;
+          let failCount = 0;
+  
+          for (const workspace of workspaces) {
+            try {
+              const workspaceId = (workspace._id as any).toString();
+              await analyticsService.generateDailySnapshot(workspaceId, 'instagram');
+              
+              // Now also run true follower snapshot sync via API
+              const accounts = await socialAccountRepository.findActiveByWorkspace(workspaceId);
+              for (const account of accounts) {
+                if (account.platform === 'instagram' && account.accountId) {
+                  try {
+                    const token = getAccessTokenFromAccount(account);
+                    if (!token) continue;
+                    
+                    // forceRefresh=true: daily snapshots must use real counts, not cached values
+                    const igInfo = await InstagramApiService.getAccountInfo(token, account.accountId, true);
+                    if (igInfo && typeof igInfo.followers_count === 'number') {
+                      const today = new Date();
+                      today.setUTCHours(0, 0, 0, 0);
+                      
+                      await InstagramFollowerSnapshotModel.findOneAndUpdate(
+                        { 
+                          accountId: account._id, 
+                          instagramUserId: account.accountId,
+                          snapshotDate: today
+                        },
+                        {
+                          followerCount: igInfo.followers_count,
+                        },
+                        { upsert: true, new: true }
+                      );
+                      console.log(`[BULLMQ] 📸 Logged follower snapshot for account ${account.accountId}: ${igInfo.followers_count} followers`);
+                    }
+                  } catch (snapshotErr: any) {
+                     console.error(`[BULLMQ] ❌ Failed to fetch follower snapshot for account ${account._id}:`, snapshotErr.message);
+                  }
+                }
+              }
 
-    try {
-      // Check if we need to fetch (unless force refresh)
-      if (!forceRefresh) {
-        const existingMetrics = await this.getLatestMetrics(workspaceId, instagramAccountId);
-        if (existingMetrics && this.isMetricsFresh(existingMetrics, metricsType)) {
-          console.log(`⚡ Using cached metrics for ${instagramAccountId} (type: ${metricsType})`);
-          return { status: 'cached', metrics: existingMetrics };
+              successCount++;
+            } catch (error) {
+              failCount++;
+            }
+          }
+          console.log(`[BULLMQ] 📸 Daily snapshots completed. Success: ${successCount}, Failed: ${failCount}`);
+          return { status: 'success', type: 'daily-snapshot', successCount, failCount };
+        }
+  
+        // Handle Social Listening Trends Job
+        if (isSocialListeningTrends) {
+          console.log('[BULLMQ] 📈 Triggering Trend Engine for all workspaces...');
+          const { ListeningSourceModel } = await import('../models/SocialListening/ListeningSource');
+          const { TrendEngineService } = await import('../services/social-listening/trend-engine.service');
+          
+          const distinctWorkspaces = await ListeningSourceModel.distinct('workspaceId');
+          for (const workspaceId of distinctWorkspaces) {
+            if (workspaceId) {
+              await TrendEngineService.calculateTrends(workspaceId.toString(), 24);
+            }
+          }
+          console.log(`[BULLMQ] 📈 Finished processing trends for ${distinctWorkspaces.length} workspaces.`);
+          return { status: 'success', type: 'social-listening-trends' };
+        }
+
+        // Handle token hygiene tasks directly
+        if (isTokenHygieneRefresh) {
+          console.log(`[BULLMQ] 🧹 Running global token hygiene refresh checks...`);
+          const { TokenManager } = await import('../services/tokenManager');
+          await TokenManager.scheduleTokenRefresh();
+          return { status: 'success', type: 'token-hygiene-refresh' };
+        }
+  
+        if (isTokenHygieneCleanup) {
+          console.log(`[BULLMQ] 🧹 Running global token hygiene cleanup (rate limits)...`);
+          const { TokenManager } = await import('../services/tokenManager');
+          TokenManager.cleanupExpiredRateLimits();
+          return { status: 'success', type: 'token-hygiene-cleanup' };
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // DEEP HIBERNATION CLEANUP (Layer 2 defense-in-depth)
+        // Runs daily at 2 AM. Scans all workspaces and physically removes
+        // BullMQ repeatable jobs for any workspace inactive >30 days.
+        // ══════════════════════════════════════════════════════════════
+        const isDeepHibernationCleanup = job.name === 'deep-hibernation-cleanup' || (job.data as any).type === 'deep-hibernation-cleanup';
+        if (isDeepHibernationCleanup) {
+          console.log(`[DEEP HIBERNATION] 🌙 Starting daily deep hibernation cleanup scan...`);
+          try {
+            const { metricsQueue: mq } = await import('../queues/metricsQueue');
+            const { workspaceRepository } = await import('../repositories');
+            const DEEP_SLEEP_DAYS = 30;
+
+            const allWorkspaces = await workspaceRepository.findAll();
+            let removedCount = 0;
+            let scannedCount = 0;
+
+            for (const workspace of allWorkspaces) {
+              scannedCount++;
+              const lastActivity = (workspace as any).lastActivity
+                ? new Date((workspace as any).lastActivity).getTime()
+                : 0;
+              const daysInactive = (Date.now() - lastActivity) / (1000 * 60 * 60 * 24);
+
+              if (daysInactive > DEEP_SLEEP_DAYS) {
+                const workspaceId = (workspace._id as any).toString();
+                console.log(`[DEEP HIBERNATION] 💤 Workspace ${workspaceId} inactive ${daysInactive.toFixed(0)} days — removing all BullMQ jobs`);
+
+                if (mq) {
+                  try {
+                    const repeatableJobs = await mq.getRepeatableJobs();
+                    // Ensure exact workspace ID match by checking with delimiters to avoid substring matches
+                    const workspaceJobs = repeatableJobs.filter(j => j.key.includes(`-${workspaceId}-`));
+                    for (const rj of workspaceJobs) {
+                      await mq.removeRepeatableByKey(rj.key);
+                      removedCount++;
+                    }
+                    // Also purge any waiting/delayed instances left over
+                    const pendingJobs = await mq.getJobs(['waiting', 'delayed', 'prioritized']);
+                    for (const pj of pendingJobs) {
+                      if (pj.data.workspaceId === workspaceId && !pj.data.forceRefresh) {
+                        await pj.remove();
+                        removedCount++;
+                      }
+                    }
+                  } catch (removeErr: any) {
+                    console.error(`[DEEP HIBERNATION] Failed to remove jobs for workspace ${workspaceId}:`, removeErr.message);
+                  }
+                }
+              }
+            }
+
+            console.log(`[DEEP HIBERNATION] ✅ Scan complete. Scanned ${scannedCount} workspaces, removed ${removedCount} stale BullMQ job entries.`);
+            return { status: 'success', type: 'deep-hibernation-cleanup', scannedCount, removedCount };
+          } catch (err: any) {
+            console.error(`[DEEP HIBERNATION] ❌ Cleanup scan failed:`, err.message);
+            return { status: 'error', type: 'deep-hibernation-cleanup', error: err.message };
+          }
+        }
+
+      // Force refresh is now handled natively by SocialAccountService bypassing memory caching
+
+      // ==========================================
+      // SMART POLLING HIBERNATION CHECK
+      // ==========================================
+      if (workspaceId && !forceRefresh && metricsType !== 'all') {
+        try {
+          const { storage } = await import('../mongodb-storage');
+          const workspace = await storage.getWorkspace(workspaceId);
+          if (workspace && workspace.lastActivity) {
+            const daysInactive = (Date.now() - new Date(workspace.lastActivity).getTime()) / (1000 * 60 * 60 * 24);
+            if (daysInactive > 7) {
+              console.log(`[HIBERNATION] 💤 Workspace ${workspaceId} has been inactive for ${daysInactive.toFixed(1)} days. Suspending active polling schedules.`);
+              // Suspend polling by physically removing this specific job from the repeatable list
+              if (job.repeatJobKey) {
+                const { metricsQueue: mq } = await import('../queues/metricsQueue');
+                if (mq) {
+                   await mq.removeRepeatableByKey(job.repeatJobKey);
+                   console.log(`[HIBERNATION] 🗑️ Removed repeatable schedule ${job.repeatJobKey}`);
+                }
+              }
+              return { status: 'suspended', reason: 'hibernation', daysInactive };
+            }
+          }
+        } catch (err: any) {
+          console.error(`[HIBERNATION] Failed to check workspace activity: ${err.message}`);
         }
       }
 
-      // Get token from token manager (handles rotation)
-      const tokenInfo = await TokenManager.getWorkspaceToken(workspaceId);
-      if (!tokenInfo) {
-        throw new Error(`No available tokens for workspace ${workspaceId}`);
+      // P4-FIX: Delegate to the robust SocialAccountService.syncAccount which handles 
+      // rate limits, ContentModel tracking, Analytics snapshots, and WebSockets broadcasting properly!
+      console.log(`\n======================================================`);
+      console.log(`[BULLMQ WORKER] 🚀 DELEGATING FETCH TO SOCIAL ACCOUNT SERVICE`);
+      console.log(`[BULLMQ WORKER] Account ID: ${instagramAccountId}`);
+      console.log(`======================================================\n`);
+      
+      const { socialAccountService } = await import('../services/SocialAccountService');
+      const { default: mongoose } = await import('mongoose');
+      
+      let targetAccountId = instagramAccountId;
+      
+      // Guard against null or missing account IDs from corrupted jobs
+      if (!instagramAccountId || typeof instagramAccountId !== 'string') {
+        throw new Error('Invalid or missing instagramAccountId in job data');
+      }
+      
+      // If the provided ID is not a valid Mongo ObjectId (e.g. it is the external Instagram numerical ID)
+      if (!mongoose.Types.ObjectId.isValid(instagramAccountId)) {
+        console.log(`[BULLMQ WORKER] Resolving external ID ${instagramAccountId} to internal DB ID...`);
+        const account = await socialAccountService.findByInstagramAccountId(instagramAccountId);
+        if (account && account._id) {
+          targetAccountId = account._id.toString();
+          console.log(`[BULLMQ WORKER] Resolved to internal ID: ${targetAccountId}`);
+        } else {
+          // If we can't find it by instagramAccountId, it might be a tolerant lookup issue.
+          // We will throw an error to fail the job gracefully rather than crashing the DB.
+          throw new Error(`Could not resolve external Instagram ID ${instagramAccountId} to internal database record`);
+        }
       }
 
-      // Fetch metrics from Instagram API
-      const metricsData = await this.fetchMetricsFromInstagram(
-        tokenInfo.token,
-        instagramAccountId,
-        metricsType
-      );
+      // Delegate targeted sync to SocialAccountService
+      const savedMetrics = await socialAccountService.syncAccount(targetAccountId, {
+        metricsType: metricsType as any,
+        forceRefresh: forceRefresh
+      });
 
-      // Save metrics to database
-      const savedMetrics = await this.saveMetricsToDatabase(
-        workspaceId,
-        instagramAccountId,
-        tokenInfo.instagramUsername,
-        metricsData,
-        metricsType
-      );
-
-      // Emit real-time update (this will be handled by realtime service)
-      await this.emitMetricsUpdate(workspaceId, savedMetrics);
-
-      console.log(`✅ Successfully processed metrics for ${instagramAccountId} (type: ${metricsType})`);
+      console.log(`✅ Successfully processed metrics for ${instagramAccountId} (type: ${metricsType || 'all'})`);
       return { status: 'success', metrics: savedMetrics };
 
-    } catch (error) {
-      console.error(`🚨 Error processing metrics job:`, error);
+    } catch (error: any) {
+      const isTokenError = error instanceof Error && error.message.toLowerCase().includes('token');
+      
+      if (isTokenError) {
+        // Clean logging for expected token expirations without scary stack traces
+        console.log(`\n⚠️ [BULLMQ WORKER] Job failed due to token validation: ${error.message}`);
+      } else {
+        console.error(`🚨 Error processing metrics job:`, error);
+      }
 
       // Handle rate limiting
       if (error instanceof Error && (error as any).is_rate_limit) {
@@ -162,9 +356,17 @@ export class MetricsWorker {
       }
 
       // Handle token expiration
-      if (error instanceof Error && error.message.includes('token')) {
+      if (isTokenError) {
         console.log(`🔄 Token may be expired for user ${userId}, scheduling refresh`);
-        await TokenManager.refreshToken(userId, workspaceId);
+        const { default: mongoose } = await import('mongoose');
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          await TokenManager.refreshToken(userId, workspaceId);
+        } else {
+          console.log(`⚠️ Cannot auto-refresh token for system-scheduled job. The TokenManager background cron will handle workspace ${workspaceId} automatically.\n`);
+        }
+        
+        // Throw a clean string instead of the Error object so BullMQ doesn't dump the massive stack trace in the terminal
+        throw new Error(`Expected Failure: Token validation failed - ${error.message}`);
       }
 
       throw error;
@@ -199,27 +401,26 @@ export class MetricsWorker {
           break;
 
         case 'media_updates':
-          await this.processMediaUpdateWebhook(workspaceId, instagramAccountId, webhookData);
+          console.log(`📸 Media update detected for ${instagramAccountId}. Skipping targeted sync to prevent rate limit exhaustion.`);
+          // const tokenInfo = await TokenManager.getWorkspaceToken(workspaceId);
+          // if (tokenInfo && metricsQueue) {
+          //   await metricsQueue.add('fetch-metrics' as any, {
+          //     workspaceId,
+          //     userId: tokenInfo.userId,
+          //     instagramAccountId,
+          //     token: tokenInfo.token,
+          //     metricsType: 'all', // Best to do a full sync on new post to ensure state is consistent
+          //     forceRefresh: true,
+          //   }, {
+          //     priority: 1, // Highest priority
+          //     delay: 10000, // 10 second delay to allow Instagram graph edge to propagate
+          //     jobId: `fetch-media-${instagramAccountId}-${webhookData.media_id || Date.now()}` // Deduplicate requests for the same media
+          //   });
+          // }
           break;
 
         default:
           console.log(`⚠️ Unknown webhook event type: ${eventType}`);
-      }
-
-      // Trigger immediate metrics refresh for the affected account
-      const tokenInfo = await TokenManager.getWorkspaceToken(workspaceId);
-      if (tokenInfo && metricsQueue) {
-        await metricsQueue.add('fetch-metrics' as any, {
-          workspaceId,
-          userId: tokenInfo.userId,
-          instagramAccountId,
-          token: tokenInfo.token,
-          metricsType: 'all',
-          forceRefresh: true,
-        }, {
-          priority: 1, // Highest priority
-          delay: 5000, // 5 second delay to allow Instagram to process
-        });
       }
 
       console.log(`✅ Successfully processed webhook for ${instagramAccountId} (event: ${eventType})`);
@@ -256,175 +457,15 @@ export class MetricsWorker {
     }
   }
 
-  /**
-   * Fetch metrics from Instagram API based on type
-   */
-  private static async fetchMetricsFromInstagram(
-    token: string,
-    instagramAccountId: string,
-    metricsType: string
-  ): Promise<any> {
-    // Standardize on comprehensive metrics for ALL cases to leverage batching
-    // This ensures consistency and maximizes data retrieval per API call
-    return InstagramApiService.getComprehensiveMetrics(token, instagramAccountId);
-  }
+  
 
-  /**
-   * Save metrics to database with delta detection
-   */
-  private static async saveMetricsToDatabase(
-    workspaceId: string,
-    instagramAccountId: string,
-    instagramUsername: string,
-    metricsData: any,
-    metricsType: string
-  ): Promise<IMetrics> {
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+  
 
-    // Get existing metrics for comparison (delta detection)
-    const existingMetrics = await Metrics.findOne({
-      workspaceId,
-      instagramAccountId,
-      period: 'day',
-      startDate: { $gte: startOfDay },
-      endDate: { $lt: endOfDay }
-    });
+  
 
-    // Prepare metrics data based on type
-    let metricsToSave: Partial<IMetrics> = {
-      workspaceId,
-      instagramAccountId,
-      instagramUsername,
-      period: 'day',
-      startDate: startOfDay,
-      endDate: endOfDay,
-      lastUpdated: now,
-      fetchedAt: now,
-      source: 'api',
-      dataStatus: 'fresh',
-    };
+  
 
-    // Extract metrics based on data structure
-    if (metricsData.account) {
-      // Comprehensive metrics
-      const { account, insights, aggregated } = metricsData;
-
-      metricsToSave = {
-        ...metricsToSave,
-        followers: account.followers_count,
-        following: account.follows_count,
-        mediaCount: account.media_count,
-        likes: aggregated.totalLikes,
-        comments: aggregated.totalComments,
-        shares: aggregated.totalShares,
-        saves: aggregated.totalSaves,
-        reach: aggregated.totalReach || insights.reach || 0,
-        impressions: aggregated.totalImpressions || insights.impressions || 0,
-        profileViews: insights.profile_views || 0,
-        websiteClicks: insights.website_clicks || 0,
-        engagementRate: aggregated.averageEngagementRate,
-      };
-    } else if (Array.isArray(metricsData)) {
-      // Media data
-      const totalLikes = metricsData.reduce((sum, media) => sum + (media.like_count || 0), 0);
-      const totalComments = metricsData.reduce((sum, media) => sum + (media.comments_count || 0), 0);
-
-      metricsToSave.likes = totalLikes;
-      metricsToSave.comments = totalComments;
-    } else if (metricsData.followers_count !== undefined) {
-      // Account info
-      metricsToSave.followers = metricsData.followers_count;
-      metricsToSave.following = metricsData.follows_count;
-      metricsToSave.mediaCount = metricsData.media_count;
-    }
-
-    // Calculate changes since last update
-    if (existingMetrics) {
-      metricsToSave.previousValues = {
-        followers: existingMetrics.followers,
-        likes: existingMetrics.likes,
-        comments: existingMetrics.comments,
-        reach: existingMetrics.reach,
-        impressions: existingMetrics.impressions,
-        engagementRate: existingMetrics.engagementRate,
-      };
-
-      metricsToSave.changesSince = {
-        followers: (metricsToSave.followers || 0) - (existingMetrics.followers || 0),
-        likes: (metricsToSave.likes || 0) - (existingMetrics.likes || 0),
-        comments: (metricsToSave.comments || 0) - (existingMetrics.comments || 0),
-        reach: (metricsToSave.reach || 0) - (existingMetrics.reach || 0),
-        impressions: (metricsToSave.impressions || 0) - (existingMetrics.impressions || 0),
-        engagementRate: (metricsToSave.engagementRate || 0) - (existingMetrics.engagementRate || 0),
-      };
-    }
-
-    // Calculate derived metrics
-    if (metricsToSave.followers && metricsToSave.mediaCount) {
-      metricsToSave.averageLikesPerPost = (metricsToSave.likes || 0) / metricsToSave.mediaCount;
-      metricsToSave.averageCommentsPerPost = (metricsToSave.comments || 0) / metricsToSave.mediaCount;
-    }
-
-    if (metricsToSave.reach && metricsToSave.followers) {
-      metricsToSave.reachRate = (metricsToSave.reach / metricsToSave.followers) * 100;
-    }
-
-    // Save or update metrics
-    const savedMetrics = await Metrics.findOneAndUpdate(
-      {
-        workspaceId,
-        instagramAccountId,
-        period: 'day',
-        startDate: { $gte: startOfDay },
-        endDate: { $lt: endOfDay }
-      },
-      metricsToSave,
-      { upsert: true, new: true }
-    );
-
-    return savedMetrics;
-  }
-
-  /**
-   * Check if metrics are fresh enough to skip fetching
-   */
-  private static isMetricsFresh(metrics: IMetrics, metricsType: string): boolean {
-    const now = new Date();
-    const ageInMinutes = (now.getTime() - metrics.lastUpdated.getTime()) / (1000 * 60);
-
-    // Smart polling intervals based on metric type
-    const freshnessTresholds = {
-      followers: 60,    // 1 hour for stable metrics
-      likes: 15,        // 15 minutes for dynamic metrics
-      comments: 10,     // 10 minutes for dynamic metrics
-      reach: 30,        // 30 minutes
-      impressions: 45,  // 45 minutes
-      all: 20,          // 20 minutes for comprehensive
-    };
-
-    const threshold = freshnessTresholds[metricsType as keyof typeof freshnessTresholds] || 20;
-    return ageInMinutes < threshold;
-  }
-
-  /**
-   * Get latest metrics for an account
-   */
-  private static async getLatestMetrics(workspaceId: string, instagramAccountId: string): Promise<IMetrics | null> {
-    return Metrics.findOne({
-      workspaceId,
-      instagramAccountId,
-    }).sort({ lastUpdated: -1 });
-  }
-
-  /**
-   * Emit metrics update via WebSocket (placeholder - will be implemented in realtime service)
-   */
-  private static async emitMetricsUpdate(workspaceId: string, metrics: IMetrics): Promise<void> {
-    // This will be implemented when we create the realtime service
-    console.log(`📡 Emitting metrics update for workspace ${workspaceId}`);
-  }
+  
 
   /**
    * Process different webhook event types

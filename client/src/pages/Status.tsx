@@ -154,6 +154,7 @@ const IncidentCard = ({ title, date, status, description, updates }: {
 
 const Status = () => {
     const isMobile = useIsMobile()
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true'
 
     // Current system status
     const overallStatus: 'operational' | 'degraded' | 'outage' | 'maintenance' = 'operational'
@@ -163,7 +164,7 @@ const Status = () => {
         { icon: Globe, name: 'Web Application', description: 'Main web platform and dashboard', status: 'operational' as const, uptime: '99.99%' },
         { icon: Server, name: 'API Services', description: 'REST API and GraphQL endpoints', status: 'operational' as const, uptime: '99.98%' },
         { icon: Database, name: 'Database', description: 'Data storage and retrieval', status: 'operational' as const, uptime: '99.99%' },
-        { icon: Zap, name: 'AI Engine', description: 'Comment automation and content generation', status: 'operational' as const, uptime: '99.95%' },
+        { icon: Zap, name: 'AI Engine', description: isPhase1 ? 'Content optimization and generation engine' : 'Comment automation and content generation', status: 'operational' as const, uptime: '99.95%' },
         { icon: Activity, name: 'Social Integrations', description: 'Instagram, Twitter, and other platforms', status: 'operational' as const, uptime: '99.90%' },
         { icon: Shield, name: 'Authentication', description: 'Login, signup, and security services', status: 'operational' as const, uptime: '99.99%' },
     ]

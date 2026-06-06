@@ -12,12 +12,15 @@ export abstract class BaseService {
   }
 
   protected logError(method: string, error: Error, meta?: Record<string, any>): void {
+    const isValidationError = error.name === 'ValidationError';
+    
     logger.error(`[${this.serviceName}] ${method}: ${error.message}`, {
       ...meta,
       error: {
         name: error.name,
         message: error.message,
-        stack: error.stack
+        // Omit giant stack traces for expected validation logic to keep terminal clean
+        stack: isValidationError ? undefined : error.stack
       }
     });
   }

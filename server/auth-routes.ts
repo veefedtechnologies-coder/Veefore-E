@@ -3,8 +3,18 @@ import { getFirebaseAdmin, admin } from './firebase-admin'
 import { storage } from './mongodb-storage'
 import { validateRequest, safeJsonParse } from './middleware/validation'
 import { z } from 'zod'
+import rateLimit from 'express-rate-limit'
 
 const router = Router()
+
+// Rate limiter for verification endpoints to prevent brute-forcing
+const verificationRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per `window`
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification attempts, please try again after 15 minutes' }
+})
 
 // Middleware to verify Firebase ID token
 const verifyFirebaseToken = async (req: Request, res: Response, next: NextFunction) => {
@@ -32,7 +42,7 @@ const verifyFirebaseToken = async (req: Request, res: Response, next: NextFuncti
 
 // Register or login user
 // Send email verification code with validation
-router.post('/send-verification', verifyFirebaseToken, async (req: Request, res: Response) => {
+router.post('/send-verification', verifyFirebaseToken, verificationRateLimiter, async (req: Request, res: Response) => {
   try {
     if (!req.user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -45,8 +55,9 @@ router.post('/send-verification', verifyFirebaseToken, async (req: Request, res:
       return res.status(404).json({ error: 'User not found' })
     }
 
-    // Generate 6-digit verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+    // Generate 6-digit verification code securely
+    const { randomInt } = require('crypto');
+    const verificationCode = randomInt(100000, 1000000).toString()
     const expiryTime = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
 
     // Update user with verification code and expiry
@@ -59,7 +70,7 @@ router.post('/send-verification', verifyFirebaseToken, async (req: Request, res:
     const { emailService } = await import('./email-service')
     await emailService.sendVerificationEmail(user.email, verificationCode)
 
-    console.log(`[EMAIL VERIFICATION] Code sent to ${user.email} (${verificationCode})`)
+    console.log(`[EMAIL VERIFICATION] Code sent to ${user.email} (code redacted for security)`)
 
     res.json({
       success: true,
@@ -78,7 +89,7 @@ const verifyEmailValidation = validateRequest({
   })
 });
 
-router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (req: Request, res: Response) => {
+router.post('/verify-email', verifyFirebaseToken, verificationRateLimiter, verifyEmailValidation, async (req: Request, res: Response) => {
   try {
     if (!req.user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -97,7 +108,13 @@ router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (
     }
 
     // Check if code matches and is not expired
-    if (user.emailVerificationCode !== code) {
+    let codeIsValid = false;
+    if (user.emailVerificationCode && user.emailVerificationCode.length === code.length) {
+      const { timingSafeEqual } = require('crypto');
+      codeIsValid = timingSafeEqual(Buffer.from(user.emailVerificationCode), Buffer.from(code));
+    }
+    
+    if (!codeIsValid) {
       return res.status(400).json({ error: 'Invalid verification code' })
     }
 
@@ -125,7 +142,7 @@ router.post('/verify-email', verifyFirebaseToken, verifyEmailValidation, async (
 })
 
 // Complete user signup with early access details
-router.post('/signup', async (req, res) => {
+router.post('/signup', verifyFirebaseToken, async (req, res) => {
   try {
     const {
       fullName,
@@ -143,8 +160,8 @@ router.post('/signup', async (req, res) => {
     // Get existing user or create new one (assuming they've been verified)
     let user = await storage.getUserByEmail(email)
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found. Please verify your email first.' })
+    if (!user || user.firebaseUid !== (req as any).user?.uid) {
+      return res.status(404).json({ error: 'User not found or unauthenticated. Please verify your email first.' })
     }
 
     // Update user with early access information
@@ -273,32 +290,21 @@ router.post('/register', async (req, res) => {
 router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
     const uid = req.user!.uid!
-    const user = await storage.getUserByFirebaseId(uid)
+    let user = await storage.getUserByFirebaseId(uid)
+
+    // Backward-compatible fallback: some older records may not have firebaseUid linked.
+    if (!user && req.user?.email) {
+      const fallbackUser = await storage.getUserByEmail(req.user.email);
+      if (fallbackUser) {
+        user = await storage.updateUser(fallbackUser.id.toString(), { firebaseUid: uid });
+      }
+    }
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
 
-    res.json({
-      user: {
-        id: user._id,
-        email: user.email,
-        displayName: user.displayName,
-        profilePictureUrl: user.profilePictureUrl,
-        username: user.username,
-        avatar: user.avatar,
-        credits: user.credits,
-        plan: user.plan,
-        isOnboarded: user.isOnboarded,
-        preferences: user.preferences,
-        isEmailVerified: user.isEmailVerified,
-        onboardingStep: user.onboardingStep,
-        status: user.status,
-        trialExpiresAt: user.trialExpiresAt,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt
-      }
-    })
+    res.json({ user })
   } catch (error) {
     console.error('Failed to get user:', error)
     res.status(500).json({ error: 'Failed to get user' })
@@ -309,12 +315,27 @@ router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
 router.put('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
   try {
     const uid = req.user!.uid!
-    const { displayName, profilePictureUrl } = req.body
+    const { displayName, profilePictureUrl, niche } = req.body
+    let existingUser = await storage.getUserByFirebaseId(uid)
 
-    const updatedUser = await storage.updateUser(uid, {
-      displayName,
-      profilePictureUrl
-    })
+    // Backward-compatible fallback: resolve by email and link firebaseUid.
+    if (!existingUser && req.user?.email) {
+      const fallbackUser = await storage.getUserByEmail(req.user.email);
+      if (fallbackUser) {
+        existingUser = await storage.updateUser(fallbackUser.id.toString(), { firebaseUid: uid });
+      }
+    }
+
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const updates: Record<string, any> = {};
+    if (typeof displayName === 'string') updates.displayName = displayName.trim();
+    if (typeof profilePictureUrl === 'string') updates.profilePictureUrl = profilePictureUrl.trim();
+    if (typeof niche === 'string') updates.niche = niche.trim();
+
+    const updatedUser = await storage.updateUser(existingUser.id.toString(), updates)
 
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' })
@@ -322,12 +343,7 @@ router.put('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
 
     res.json({
       success: true,
-      user: {
-        id: updatedUser._id,
-        email: updatedUser.email,
-        displayName: updatedUser.displayName,
-        profilePictureUrl: updatedUser.profilePictureUrl
-      }
+      user: updatedUser
     })
   } catch (error) {
     console.error('Failed to update user:', error)

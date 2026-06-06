@@ -36,12 +36,13 @@ export function useCacheInvalidation() {
 
     const connectSocket = () => {
       // Add a small delay to avoid connection conflicts
-      setTimeout(() => {
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = setTimeout(() => {
         attemptConnection()
       }, 100 + Math.random() * 1000) // Random delay between 100-1100ms
     }
     
-    const attemptConnection = () => {
+    const attemptConnection = async () => {
       try {
         // Check if WebSocket connections are disabled
         if (localStorage.getItem('disable-websocket') === 'true') {
@@ -71,12 +72,14 @@ export function useCacheInvalidation() {
           return 'anonymous'
         }
         
+        const token = await getAuthToken()
+        
         const socket = io(socketUrl, {
           // CRITICAL FIX: Use the correct path that matches server configuration
           path: '/ws/metrics',
           transports: ['polling'], // Use polling only to avoid WebSocket frame issues
           auth: {
-            token: 'anonymous' // Use anonymous for now to avoid auth issues
+            token // Use real token instead of anonymous
           },
           timeout: 15000, // Reduced timeout for faster failure
           forceNew: false, // Don't force new connections
@@ -122,6 +125,19 @@ export function useCacheInvalidation() {
               handleForceRefresh(data)
               break
           }
+        })
+        
+        socket.on('post_status_updated', (data: any) => {
+          console.log('[CACHE INVALIDATION] 📝 Post status updated:', data)
+          
+          if (data.workspaceId && data.workspaceId !== currentWorkspace.id) {
+            return
+          }
+          
+          // Invalidate content queries to refresh the UI
+          queryClient.invalidateQueries({ queryKey: ['/api/scheduled-content'] })
+          queryClient.invalidateQueries({ queryKey: ['/api/content'] })
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] })
         })
         
         socket.on('disconnect', () => {

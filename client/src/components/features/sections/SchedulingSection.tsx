@@ -5,6 +5,8 @@ import { Calendar, Clock, Zap, RefreshCw, Instagram, Send, Eye } from 'lucide-re
 import SchedulingCalendarMockup from '../mockups/SchedulingCalendarMockup';
 
 export const SchedulingSection = React.memo(() => {
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
     return (
 
         <section className="py-24 md:py-36 px-4 sm:px-6 relative overflow-hidden" style={{ contain: 'content' }}>
@@ -132,7 +134,7 @@ export const SchedulingSection = React.memo(() => {
                         {[
                             { title: 'AI Optimal Times', desc: 'Post when your audience is most active', icon: Clock },
                             { title: 'Drag & Drop', desc: 'Easily reschedule with visual calendar', icon: Calendar },
-                            { title: 'Auto-Publish', desc: 'Set it and forget it automation', icon: Zap },
+                            { title: 'Auto-Publish', desc: isPhase1 ? 'Set it and forget it scheduling' : 'Set it and forget it automation', icon: Zap },
                             { title: 'Smart Queue', desc: 'Auto-rebalance based on performance', icon: RefreshCw },
                             { title: 'Multi-Platform', desc: 'Schedule across all your accounts', icon: Instagram },
                             { title: 'Bulk Upload', desc: 'Upload and schedule weeks ahead', icon: Send },

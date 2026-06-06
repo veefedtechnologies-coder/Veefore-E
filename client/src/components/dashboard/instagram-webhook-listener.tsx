@@ -16,22 +16,15 @@ export function InstagramWebhookListener() {
   const queryClient = useQueryClient()
   const { currentWorkspace } = useCurrentWorkspace()
   const socketRef = useRef<Socket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const reconnectAttemptsRef = useRef(0)
   const webhookFailureCountRef = useRef(0)
-  const maxReconnectAttempts = 5
   const maxWebhookFailures = 3 // Enable polling fallback after 3 webhook failures
 
   // Enable polling fallback when webhooks fail (for webhook-supported events only)
   const enablePollingFallback = () => {
     console.log('[Instagram Webhook] 🚨 Enabling polling fallback for webhook-supported events due to webhook failures')
-    // Re-enable polling for webhook-supported events (comments, mentions, etc.)
-    queryClient.setQueryData(['/api/social-accounts', currentWorkspace?.id], (oldData: any) => {
-      // Force refetch with polling enabled for webhook events
-      queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] })
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] })
-      return oldData
-    })
+    // Trigger the fallback refetches directly instead of inside setQueryData
+    queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics'] })
   }
 
   useEffect(() => {
@@ -51,13 +44,16 @@ export function InstagramWebhookListener() {
           timeout: 20000,
           forceNew: true,
           upgrade: false, // Disable WebSocket upgrade to avoid frame errors
-          rememberUpgrade: false
+          rememberUpgrade: false,
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 30000
         })
         
         socket.on('connect', () => {
           console.log('[Instagram Webhook] Connected successfully')
           socketRef.current = socket
-          reconnectAttemptsRef.current = 0
           webhookFailureCountRef.current = 0
           
           // Join workspace-specific room
@@ -208,23 +204,10 @@ export function InstagramWebhookListener() {
           }
         })
 
-        socket.on('disconnect', () => {
-          console.log('[Instagram Webhook] Socket disconnected')
-          socketRef.current = null
-          webhookFailureCountRef.current++
-          
-          // Auto-reconnect with exponential backoff
-          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000) // Max 30 seconds
-            console.log(`[Instagram Webhook] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`)
-            
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectAttemptsRef.current++
-              connectSocket()
-            }, delay)
-          } else {
-            console.log('[Instagram Webhook] Max reconnection attempts reached, enabling polling fallback')
-            enablePollingFallback()
+        socket.on('disconnect', (reason) => {
+          console.log('[Instagram Webhook] Socket disconnected:', reason)
+          if (reason === 'io server disconnect' || reason === 'io client disconnect') {
+            socketRef.current = null
           }
         })
 
@@ -232,10 +215,15 @@ export function InstagramWebhookListener() {
           console.error('[Instagram Webhook] Connection error:', error)
           webhookFailureCountRef.current++
           
-          if (webhookFailureCountRef.current >= maxWebhookFailures) {
+          if (webhookFailureCountRef.current === maxWebhookFailures) {
             console.log('[Instagram Webhook] Too many webhook failures, enabling polling fallback')
             enablePollingFallback()
           }
+        })
+        
+        socket.io.on('reconnect_failed', () => {
+          console.log('[Instagram Webhook] Max reconnection attempts reached by Socket.io, enabling polling fallback')
+          enablePollingFallback()
         })
         
 
@@ -250,9 +238,6 @@ export function InstagramWebhookListener() {
 
     // Cleanup on unmount
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-      }
       if (socketRef.current) {
         socketRef.current.disconnect()
       }

@@ -14,10 +14,16 @@ import helmet from "helmet";
 import { registerRoutes, initializeLeaderElection } from "./routes";
 import { MongoStorage } from "./mongodb-storage";
 import mongoose from 'mongoose';
+import axios from 'axios';
+import { ApiMonitorService } from './services/api-monitor';
+
+// P1 Observability: Attach API monitor to intercept Meta API requests globally
+ApiMonitorService.getInstance().attachToAxios(axios);
 import { startSchedulerService } from "./scheduler-service";
 // Re-enabling for comprehensive testing
 import MetricsWorker from "./workers/metricsWorker";
 import RealtimeService from "./services/realtime";
+import { serverAdapter } from "./lib/bull-board";
 import Logger from "./utils/logger";
 import metricsRoutes from "./routes/metrics";
 import webhooksRoutes from "./routes/webhooks";
@@ -25,6 +31,8 @@ import testingRoutes from "./routes/testing";
 import cicdRoutes from "./routes/cicd";
 import productionRoutes from "./routes/production";
 import auditRoutes from "./routes/audit";
+import socialListeningRoutes from "./routes/social-listening";
+import adminMonitoringRoutes from "./routes/admin-monitoring";
 import multer from "multer";
 import {
   initializeRateLimiting,
@@ -112,8 +120,8 @@ import { initializeWorkspaceIsolation } from './security/workspace-isolation';
 initializeWorkspaceIsolation();
 
 // P2-7 SECURITY: Initialize token hygiene automation
-import { initializeTokenHygiene } from './security/token-hygiene';
-initializeTokenHygiene();
+// import { initializeTokenHygiene } from './security/token-hygiene';
+// initializeTokenHygiene(); // Migrated to BullMQ Background Workers (Phase 6)
 
 // P2-9 SECURITY: Initialize resource namespacing system
 import { initializeResourceNamespacing } from './security/resource-namespacing';
@@ -124,6 +132,14 @@ import { initializeGDPRCompliance } from './security/gdpr-compliance';
 initializeGDPRCompliance();
 
 const app = express();
+
+// Mount Bull Board UI early to bypass all security middlewares that cause Safari download bugs
+app.use('/queues-dashboard', (req, res, next) => {
+  if (req.path === '/' && !req.originalUrl.endsWith('/')) {
+    return res.redirect(301, '/queues-dashboard/');
+  }
+  next();
+}, serverAdapter.getRouter());
 
 // Disable ETag to prevent 304 responses on API JSON endpoints
 app.set('etag', false);
@@ -331,7 +347,12 @@ setInterval(() => {
   cleanupTempFiles(24 * 60 * 60 * 1000); // Clean files older than 24 hours
 }, 60 * 60 * 1000); // Run every hour
 
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ 
+  limit: '50mb',
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
 // Create uploads directory if it doesn't exist
@@ -608,6 +629,8 @@ app.use((req, res, next) => {
   app.use('/api/cicd', cicdRoutes);
   app.use('/api/production', productionRoutes);
   app.use('/api/audit', auditRoutes);
+  app.use('/api/social-listening', socialListeningRoutes);
+  app.use('/api/admin/monitoring', adminMonitoringRoutes);
 
   // P9 INFRASTRUCTURE: Enterprise health check endpoints
   app.use('/health', healthRoutes);
@@ -615,6 +638,39 @@ app.use((req, res, next) => {
 
   // Additional webhook route to match Meta Console configuration
   app.use('/webhook', webhooksRoutes);
+
+  // FIREBASE SDK CONFIG PROBE
+  // Firebase SDK probes this URL when it starts. Since we use explicit config, 
+  // we return a silent 404 to prevent it from triggering the security logger's 404 warnings.
+  app.get('/__/firebase/init.json', (req, res) => {
+    res.status(404).end();
+  });
+
+  // FIREBASE AUTH PROXY: Forward /__/auth/* to Firebase's hosted handler endpoint.
+  // This allows authDomain to be set to app.veefore.com so the Google sign-in popup
+  // opens on the SAME origin as the app. Without this proxy, the popup opens on
+  // veefore-b84c8.firebaseapp.com and Safari's ITP blocks the cross-origin postMessage
+  // that sends the credential back to the parent window.
+  const https = await import('https');
+  app.use('/__/auth', (req: Request, res: Response) => {
+    const firebaseHandlerUrl = `https://veefore-b84c8.firebaseapp.com/__/auth${req.url}`;
+    const proxyReq = https.get(firebaseHandlerUrl, {
+      headers: {
+        'user-agent': req.headers['user-agent'] || '',
+        'accept': req.headers['accept'] || '*/*',
+        'accept-language': req.headers['accept-language'] || '',
+      }
+    }, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+    proxyReq.on('error', (err) => {
+      console.error('[FIREBASE AUTH PROXY] Error:', err.message);
+      if (!res.headersSent) {
+        res.status(502).send('Firebase auth handler unavailable');
+      }
+    });
+  });
 
   // P2-FIX: Legacy Instagram OAuth Callback Redirect
   // Ensures existing .env configurations (pointing to /api/instagram/callback) still work
@@ -643,6 +699,18 @@ app.use((req, res, next) => {
     const { initQueues } = await import('./lib/queue');
     const { initEmailWorker } = await import('./workers/email.worker');
     const { getRedisClient, getRateLimitRedisClient } = await import('./lib/redis');
+    const { AutomationWorker } = await import('./workers/automationWorker');
+    const { MessageWorker } = await import('./workers/messageWorker');
+    const { PostWorker } = await import('./workers/postWorker');
+    const { VerifyWorker } = await import('./workers/verifyWorker');
+    const { startSocialListeningWorker } = await import('./workers/social-listening.worker');
+    const { startSocialListeningAIWorker } = await import('./workers/social-listening-ai.worker');
+    
+    // Phase 8 Background Workers
+    const { startWebhookWorker } = await import('./workers/webhookWorker');
+    const { startAIWorker } = await import('./workers/aiWorker');
+    const { startNotificationWorker } = await import('./workers/notificationWorker');
+
 
     // Connect to Redis (Standard client for queues)
     const redis = getRedisClient();
@@ -653,6 +721,17 @@ app.use((req, res, next) => {
     // Initialize systems
     initQueues();
     initEmailWorker();
+    AutomationWorker.start(storage);
+    MessageWorker.start(storage);
+    PostWorker.start(storage);
+    VerifyWorker.start(storage);
+    startSocialListeningWorker();
+    startSocialListeningAIWorker();
+    
+    // Phase 8 Start
+    startWebhookWorker();
+    startAIWorker();
+    startNotificationWorker();
     initializeRateLimiting(rateLimitRedis); // Connect rate limiter to fail-fast client
 
     console.log('[INFRA] Background workers and Rate Limiting connected to Redis');
@@ -831,13 +910,24 @@ app.use((req, res, next) => {
       const storage = new (await import('./mongodb-storage')).MongoStorage();
       await storage.connect();
       
-      const { InstagramDirectSync } = await import('./instagram-direct-sync');
-      const syncer = new InstagramDirectSync(storage as any);
+      const accounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+      const instagramAccount = accounts.find(acc => acc.platform === 'instagram');
       
-      // Perform immediate sync
-      const result = await syncer.updateAccountWithRealData(workspaceId);
+      let queued = false;
+      if (instagramAccount && instagramAccount.accountId) {
+        const { MetricsQueueManager } = await import('./queues/metricsQueue');
+        await MetricsQueueManager.scheduleMetricsFetch(
+          workspaceId,
+          'system',
+          instagramAccount.accountId,
+          (instagramAccount as any).accessToken || '',
+          'all',
+          { priority: 5, forceRefresh: true }
+        );
+        queued = true;
+      }
       
-      return res.json({ success: true, result });
+      return res.json({ success: true, message: queued ? 'Sync queued successfully' : 'No valid Instagram account found' });
     } catch (error: any) {
       console.error('🚨 [FORCE-SYNC] Error forcing sync:', error);
       return res.status(500).json({ success: false, error: error.message });
@@ -970,6 +1060,17 @@ app.use((req, res, next) => {
       const workspaceId = req.workspaceId!;
 
       const { SocialAccountModel } = await import('./models/Social');
+      
+      // 1. Fetch real BullMQ repeatable jobs to get EXACT timer truths
+      let repeatableJobs: any[] = [];
+      try {
+         const { metricsQueue } = await import('./queues/metricsQueue');
+         if (metricsQueue) {
+             repeatableJobs = await metricsQueue.getRepeatableJobs();
+         }
+      } catch (err) {
+         console.error('Failed to get repeatable jobs for status UI', err);
+      }
 
       // SECURITY: Only query accounts for the validated workspace
       const accounts = await SocialAccountModel.find({
@@ -981,12 +1082,51 @@ app.use((req, res, next) => {
       const accountStatuses = accounts.map((acc: any) => {
         const hasValidToken = !!(acc.accessToken || acc.encryptedAccessToken);
         const lastSync = acc.lastSyncAt || acc.updatedAt;
+        const accId = acc._id?.toString() || acc.id;
+        
+        const getExactNextPollIn = (metricType: string, fallbackIntervalMins: number) => {
+             if (!hasValidToken) return 0;
+             
+             // Look for the absolute truth timer inside the BullMQ engine
+             // Due to historical inconsistencies, jobs might be scheduled with EITHER the Meta ID or the MongoDB _id.
+             const metaAccountId = acc.instagramAccountId || acc.accountId;
+             const mongoId = acc._id?.toString() || acc.id;
+             const expectedKeyMeta = `smart-poll-${workspaceId}-${metaAccountId}-${metricType}`;
+             const expectedKeyMongo = `smart-poll-${workspaceId}-${mongoId}-${metricType}`;
+             const job = repeatableJobs.find((j: any) => 
+               (j.key && (j.key.includes(expectedKeyMeta) || j.key.includes(expectedKeyMongo))) || 
+               j.name === expectedKeyMeta || j.name === expectedKeyMongo
+             );
+             
+             if (job && job.next) {
+                 // Return the exact millisecond difference from right now!
+                 return Math.max(0, job.next - Date.now());
+             }
+             
+             // Mathematical fallback if the job hasn't been injected into Redis yet
+             if (!lastSync) return fallbackIntervalMins * 60 * 1000;
+             const intervalMs = fallbackIntervalMins * 60 * 1000;
+             const timeSinceSync = Date.now() - new Date(lastSync).getTime();
+             return Math.max(0, intervalMs - (timeSinceSync % intervalMs));
+        };
+
+        const nextPollAll = getExactNextPollIn('all', 80);
 
         return {
-          id: acc._id?.toString() || acc.id,
+          id: accId,
           username: acc.username,
           isActive: hasValidToken,
           lastSync: lastSync,
+          nextPollIn: nextPollAll, // Backward compatibility
+          metricsPollIn: {
+             likes: nextPollAll, 
+             shares: nextPollAll,
+             saves: nextPollAll,
+             reach: nextPollAll,
+             views: nextPollAll,
+             profile_views: nextPollAll,
+             stories: nextPollAll
+          },
           tokenStatus: acc.tokenStatus || (hasValidToken ? 'valid' : 'missing')
         };
       });
@@ -1007,30 +1147,32 @@ app.use((req, res, next) => {
   });
 
   // Instagram start-polling endpoint - triggers smart polling for accounts
-  // Secured: Requires authentication AND workspace ownership validation
   app.post('/api/instagram/start-polling', requireAuth, validateWorkspaceAccess({ source: 'body' }), async (req: Request, res: Response) => {
     try {
-      // SECURITY: workspaceId is validated by middleware - user has verified access
-      const workspaceId = req.workspaceId!;
+      const { workspaceId } = req.body;
+      const { SocialAccountModel } = await import('./models/Social/SocialAccount');
+      
+      const accounts = await SocialAccountModel.find({ 
+        workspaceId, 
+        platform: 'instagram' 
+      });
 
-      const { SocialAccountModel } = await import('./models/Social');
-
-      const accounts = await SocialAccountModel.find({
-        platform: 'instagram',
-        workspaceId: workspaceId
-      }).lean();
-
-      const activeAccounts = accounts.filter((acc: any) =>
+      const activeAccounts = accounts.filter(acc => 
         !!(acc.accessToken || acc.encryptedAccessToken)
       );
 
       console.log(`[START POLLING] Workspace ${workspaceId}: ${activeAccounts.length}/${accounts.length} accounts have valid tokens`);
 
+      // NOTE: We intentionally no longer trigger an immediate sync here because 
+      // the frontend (especially older cached bundles) may hit this on component mount,
+      // which bypasses smart polling timers and triggers an immediate followers update.
+      // MetricsWorker already handles the background schedule automatically.
+
       res.json({
         success: true,
-        message: 'Hybrid polling system active',
-        totalAccounts: accounts.length,
+        message: 'Polling system activated and sync triggered',
         activeAccounts: activeAccounts.length,
+        totalAccounts: accounts.length,
         pollingStarted: activeAccounts.length > 0
       });
     } catch (error: any) {
@@ -1047,7 +1189,7 @@ app.use((req, res, next) => {
   app.get('/api/dashboard/analytics', requireAuth, validateWorkspaceAccess({ source: 'query' }), async (req: Request, res: Response) => {
     const workspaceId = req.workspaceId!;
     const logPath = path.join(process.cwd(), 'debug-trace.log');
-    const traceLog = (msg: string) => fs.appendFileSync(logPath, `[${new Date().toISOString()}] [DASHBOARD] ${msg}\n`);
+    const traceLog = (msg: string) => console.log(`[DASHBOARD] ${msg}`);
     
     traceLog(`Request for workspace: ${workspaceId}`);
     
@@ -1061,6 +1203,7 @@ app.use((req, res, next) => {
       let totalFollowers = 0;
       let totalLikes = 0;
       let totalComments = 0;
+      let totalViews = 0;
       let totalReach = 0;
       let totalPosts = 0;
       let totalEngagement = 0;
@@ -1071,6 +1214,7 @@ app.use((req, res, next) => {
           totalFollowers += (acc as any).followersCount || 0;
           totalLikes += (acc as any).totalLikes || 0;
           totalComments += (acc as any).totalComments || 0;
+          totalViews += (acc as any).totalViews || 0;
           totalReach += (acc as any).totalReach || 0;
           totalPosts += (acc as any).mediaCount || (acc as any).posts || 0;
           totalEngagement += (acc as any).engagementRate || (acc as any).avgEngagement || 0;
@@ -1084,6 +1228,7 @@ app.use((req, res, next) => {
         totalFollowers,
         totalLikes,
         totalComments,
+        totalViews,
         totalReach,
         totalPosts,
         avgEngagement: Math.round(avgEngagement * 100) / 100,
@@ -1148,11 +1293,12 @@ app.use((req, res, next) => {
       console.log('⚠️ Rate Limiting: Redis not available, using memory-based fallbacks');
     }
 
-    // TEMPORARILY DISABLED: MetricsWorker disabled due to Redis quota limits
-    // await MetricsWorker.start();
-    console.log('⚠️  MetricsWorker: Disabled to prevent Redis quota exceeded errors');
+    // ENABLED: Phase 4 BullMQ Migration
+    await MetricsWorker.start();
+    console.log('✅  MetricsWorker: Started successfully for Phase 4 Background Job processing');
     console.log('📊 Instagram metrics continue via existing smart polling system');
   } catch (error) {
+    console.log('⚠️  MetricsWorker startup failed:', error);
     console.log('⚠️  MetricsWorker: Redis unavailable, using smart polling fallback');
     console.log('📊 Instagram metrics continue via existing polling system');
     console.log('⚠️ Rate Limiting: Using memory-based fallbacks without Redis persistence');
@@ -1505,6 +1651,9 @@ app.use((req, res, next) => {
     });
 
     console.log('🔄 P9: Graceful shutdown system initialized');
+
+    // SOCIAL LISTENING: Trend Engine is now securely managed via BullMQ in MetricsQueueManager
+
 
     // P2-2 SECURITY: Initialize token encryption AFTER server starts
     try {

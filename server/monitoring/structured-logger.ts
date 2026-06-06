@@ -377,7 +377,8 @@ export class StructuredLogger {
       timestamp: new Date().toISOString()
     };
 
-    logger.info(logData, `📊 METRIC: ${metricName} = ${value} ${unit}`);
+    // Verbose metrics are temporarily muted to keep console clean for debugging cache
+    // logger.info(logData, `📊 METRIC: ${metricName} = ${value} ${unit}`);
   }
 }
 
@@ -406,17 +407,21 @@ export function correlationMiddleware() {
     res.on('finish', () => {
       // Log API call
       const responseTime = Date.now() - req.startTime;
-      StructuredLogger.apiCall(
-        req.method,
-        req.route?.path || req.path,
-        res.statusCode,
-        responseTime,
-        correlationId,
-        {
-          userAgent: req.get('User-Agent'),
-          contentLength: res.get('Content-Length')
-        }
-      );
+      const path = req.route?.path || req.path;
+      // Filter out noisy polling endpoints to keep console clean for debugging
+      if (path !== '/' && path !== '/api/user') {
+        StructuredLogger.apiCall(
+          req.method,
+          path,
+          res.statusCode,
+          responseTime,
+          correlationId,
+          {
+            userAgent: req.get('User-Agent'),
+            contentLength: res.get('Content-Length')
+          }
+        );
+      }
 
       // Cleanup correlation context after delay
       setTimeout(() => {

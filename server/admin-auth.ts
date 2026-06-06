@@ -5,7 +5,11 @@ import { Request, Response, NextFunction } from 'express';
 import { storage } from './storage';
 import type { Admin, InsertAdmin } from '@shared/schema';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'admin-secret-key';
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL ERROR: JWT_SECRET environment variable is missing.');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '24h';
 
 export interface AdminRequest extends Request {
@@ -45,7 +49,7 @@ export function generateSessionToken(): string {
 // Verify JWT token
 export function verifyToken(token: string): any {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
   } catch (error) {
     return null;
   }
@@ -62,7 +66,7 @@ export async function requireAdminAuth(req: AdminRequest, res: Response, next: N
     const token = authHeader.substring(7);
     const decoded = verifyToken(token);
     
-    if (!decoded) {
+    if (!decoded || typeof decoded === 'string' || !decoded.id || !decoded.role) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
@@ -127,7 +131,13 @@ export async function createDefaultAdmin() {
   try {
     const admins = await storage.getAllAdmins();
     if (admins.length === 0) {
-      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
+      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+      
+      if (!defaultPassword) {
+        console.warn('[ADMIN SETUP] DEFAULT_ADMIN_PASSWORD not set. Skipping default admin creation.');
+        return;
+      }
+
       const hashedPassword = await hashPassword(defaultPassword);
       
       const defaultAdmin: InsertAdmin = {
@@ -142,7 +152,7 @@ export async function createDefaultAdmin() {
       console.log('[ADMIN SETUP] Default admin created with credentials:');
       console.log('Email: admin@veefore.com');
       console.log('Username: admin');
-      console.log('Password:', defaultPassword);
+      console.log('Password: [REDACTED]');
     }
   } catch (error) {
     console.error('[ADMIN SETUP] Error creating default admin:', error);

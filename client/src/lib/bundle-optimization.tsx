@@ -9,7 +9,7 @@ import { lazy, Suspense, ReactNode } from 'react';
 // Removed unused lazy dashboard import
 // Removed unused lazy analytics import
 const LazyAutomation = lazy(() => import('../pages/AutomationStepByStep').catch(() => ({ default: () => <div>Automation loading...</div> })));
-const LazyIntegration = lazy(() => import('../pages/Integration').catch(() => ({ default: () => <div>Integration loading...</div> })));
+
 const LazyProfile = lazy(() => import('../pages/Profile').catch(() => ({ default: () => <div>Profile loading...</div> })));
 
 // P7-6.3.2: Component-level Code Splitting for Heavy Components
@@ -97,12 +97,7 @@ export const LazyComponents = {
     </LazyWrapper>
   ),
   
-  Integration: () => (
-    <LazyWrapper componentName="Integration" priority="medium">
-      <LazyIntegration />
-    </LazyWrapper>
-  ),
-  
+
   Profile: () => (
     <LazyWrapper componentName="Profile" priority="low">
       <LazyProfile />
@@ -155,7 +150,6 @@ export class PreloadManager {
         case 'Dashboard':
         case 'Analytics':
         case 'Automation':
-        case 'Integration':
         case 'Profile':
           console.log(`[P7-6.3] Preloading ${componentName}`);
           break;
@@ -203,8 +197,7 @@ export class PreloadManager {
     const preloadMap: Record<string, Array<keyof typeof LazyComponents>> = {
       '/dashboard': ['Analytics', 'AnalyticsDashboard'],
       '/analytics': ['Dashboard', 'AnalyticsDashboard'],
-      '/automation': ['Integration', 'Dashboard'],
-      '/integration': ['Automation', 'Dashboard'],
+      '/automation': ['Dashboard'],
       '/profile': ['Dashboard']
     };
 

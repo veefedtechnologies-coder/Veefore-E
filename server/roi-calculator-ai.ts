@@ -149,24 +149,16 @@ Focus on:
 - Benchmark comparisons for context
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert digital marketing ROI analyst with deep understanding of campaign performance, customer lifetime value, and strategic optimization across all major platforms and industries."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 2000
-    });
+    const promptStr = `System: You are an expert digital marketing ROI analyst with deep understanding of campaign performance, customer lifetime value, and strategic optimization across all major platforms and industries. Always return valid JSON.\n\nUser: ${prompt}`;
 
-    const analysisResults = JSON.parse(response.choices[0].message.content || '{}');
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let analysisResults: any = {};
+    try {
+      analysisResults = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[ROI CALCULATOR] Failed to generate JSON using AIServiceManager', e);
+      throw new Error('Failed to parse AI response');
+    }
     
     // Calculate final metrics
     const totalInvestment = Object.values(request.costs).reduce((sum, cost) => sum + cost, 0) + request.investment;

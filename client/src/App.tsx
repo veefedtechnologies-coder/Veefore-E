@@ -61,7 +61,7 @@ const protectedRoutes = [
   '/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator',
   '/workspaces', '/profile', '/automation', '/veegpt', '/admin', '/settings',
   '/security-dashboard', '/integrations', '/test-fixtures', '/encryption-health',
-  '/best-time'
+  '/best-time', '/social-listening'
 ]
 
 function App() {
@@ -150,9 +150,10 @@ function App() {
     }
 
     // EARLY ACCESS GATING (UX Only)
-    // 1. If trying to access signin/signup but NOT approved -> Go to waitlist
+    // 1. If trying to access signup but NOT approved -> Go to waitlist
+    // (We do not gate /signin because returning users on new devices/domains won't have the localStorage flag)
     if (!loading && !user && !earlyAccessLoading && !hasEarlyAccess) {
-      if (effectiveLocation === '/signin' || effectiveLocation === '/signup') {
+      if (effectiveLocation === '/signup') {
         setLocation('/waitlist')
       }
     }
@@ -160,6 +161,11 @@ function App() {
     // 2. If visiting waitlist but ALREADY approved -> Go to signup
     if (!loading && !earlyAccessLoading && hasEarlyAccess && effectiveLocation === '/waitlist') {
       setLocation('/signup')
+    }
+
+    // PHASE 1 REVIEW GUARD: Prevent direct access to locked features
+    if (import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true' && (effectiveLocation === '/automation' || effectiveLocation === '/inbox')) {
+      setLocation('/')
     }
   }, [loading, user, isProtectedRoute, setLocation, hasEarlyAccess, earlyAccessLoading, effectiveLocation])
 

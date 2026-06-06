@@ -5,6 +5,8 @@ import { RefreshCw, Users, MessageSquare, Repeat, ArrowRight, Instagram, Bell, E
 import WorkflowBuilderMockup from '../mockups/WorkflowBuilderMockup';
 
 export const AutomationSection = React.memo(() => {
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
     return (
 
         <section className="py-24 md:py-36 px-4 sm:px-6 relative overflow-hidden" style={{ contain: 'content' }}>
@@ -27,14 +29,16 @@ export const AutomationSection = React.memo(() => {
                 >
                     <span className="inline-flex items-center px-5 py-2.5 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-400 text-sm mb-6">
                         <RefreshCw className="w-4 h-4 mr-2" />
-                        ⚡ Automation Workflows
+                        {isPhase1 ? '⚡ Publishing Workflows' : '⚡ Automation Workflows'}
                     </span>
                     <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6">
-                        <span className="text-white">Build Relationships </span>
+                        <span className="text-white">{isPhase1 ? 'Publish Content ' : 'Build Relationships '}</span>
                         <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 bg-clip-text text-transparent">on Autopilot</span>
                     </h2>
                     <p className="text-lg md:text-xl text-white/60 max-w-3xl mx-auto leading-relaxed">
-                        Create powerful automation workflows that run 24/7. Set triggers, define actions, and let
+                        {isPhase1
+                            ? 'Create powerful publishing workflows that run 24/7. Set schedules, define content queues, and let'
+                            : 'Create powerful automation workflows that run 24/7. Set triggers, define actions, and let'}
                         <span className="text-purple-400 font-semibold"> Veefore handle the rest</span> while you focus on creating.
                     </p>
                 </motion.div>
@@ -56,9 +60,36 @@ export const AutomationSection = React.memo(() => {
                     viewport={{ once: true }}
                     className="mb-16"
                 >
-                    <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-white text-center mb-6 md:mb-10">Pre-Built Automation Templates</h3>
+                    <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-white text-center mb-6 md:mb-10">
+                        {isPhase1 ? 'Pre-Built Publishing Templates' : 'Pre-Built Automation Templates'}
+                    </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                        {[
+                        {(isPhase1 ? [
+                            {
+                                title: 'Cross-Platform Posting',
+                                desc: 'Automatically adapt and publish your content across all connected platforms',
+                                trigger: 'Content Approved',
+                                actions: ['Format for Platform', 'Publish Now'],
+                                runs: '2.4K',
+                                icon: Users
+                            },
+                            {
+                                title: 'Best Time Publishing',
+                                desc: 'Schedule your content to automatically go live when your audience is most active',
+                                trigger: 'Scheduled Time',
+                                actions: ['Check Network Status', 'Publish Post'],
+                                runs: '8.1K',
+                                icon: Clock
+                            },
+                            {
+                                title: 'Evergreen Content Loop',
+                                desc: 'Automatically republish your highest-performing content on a set schedule',
+                                trigger: '30 Days Passed',
+                                actions: ['Select Top Post', 'Republish Content'],
+                                runs: '956',
+                                icon: Repeat
+                            },
+                        ] : [
                             {
                                 title: 'Welcome New Followers',
                                 desc: 'Automatically send personalized DMs to new followers within minutes of follow',
@@ -83,7 +114,7 @@ export const AutomationSection = React.memo(() => {
                                 runs: '956',
                                 icon: Repeat
                             },
-                        ].map((template, i) => (
+                        ]).map((template, i) => (
                             <motion.div
                                 key={i}
                                 initial={{ opacity: 0 }}
@@ -126,10 +157,23 @@ export const AutomationSection = React.memo(() => {
                 >
                     <div className="text-center mb-6 md:mb-8">
                         <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3">Powerful Trigger Options</h3>
-                        <p className="text-white/50">Start automations based on any event</p>
+                        <p className="text-white/50">{isPhase1 ? 'Start publishing based on any event' : 'Start automations based on any event'}</p>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 md:gap-3">
-                        {[
+                        {(isPhase1 ? [
+                            { label: 'Content Approved', icon: Target },
+                            { label: 'Scheduled Time', icon: Clock },
+                            { label: 'Post Published', icon: Instagram },
+                            { label: 'Campaign End', icon: Bell },
+                            { label: 'Story Live', icon: Eye },
+                            { label: 'Metric Reached', icon: TrendingUp },
+                            { label: 'Keyword Match', icon: Brain },
+                            { label: 'Time-Based', icon: Clock },
+                            { label: 'Audience Peak', icon: Users },
+                            { label: 'New Like', icon: Heart },
+                            { label: 'Custom Event', icon: Zap },
+                            { label: 'API Trigger', icon: Repeat },
+                        ] : [
                             { label: 'New Comment', icon: MessageSquare },
                             { label: 'New Follower', icon: Users },
                             { label: 'New DM', icon: Send },
@@ -142,7 +186,7 @@ export const AutomationSection = React.memo(() => {
                             { label: 'Engagement Drop', icon: TrendingUp },
                             { label: 'New Like', icon: Heart },
                             { label: 'Custom Event', icon: Zap },
-                        ].map((trigger, i) => (
+                        ]).map((trigger, i) => (
                             <motion.div
                                 key={i}
                                 initial={{ opacity: 0 }}

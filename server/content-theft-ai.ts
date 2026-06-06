@@ -133,24 +133,16 @@ Focus on:
 - Timeline analysis for theft propagation
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert content protection analyst with deep knowledge of plagiarism detection, copyright law, and social media monitoring. Provide accurate theft detection analysis and actionable protection strategies."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 2500
-    });
+    const promptStr = `System: You are an expert content protection analyst with deep knowledge of plagiarism detection, copyright law, and social media monitoring. Provide accurate theft detection analysis and actionable protection strategies. Always return valid JSON.\n\nUser: ${prompt}`;
 
-    const analysisResults = JSON.parse(response.choices[0].message.content || '{}');
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let analysisResults: any = {};
+    try {
+      analysisResults = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[CONTENT THEFT] Failed to generate JSON using AIServiceManager', e);
+      throw new Error('Failed to parse AI response');
+    }
     
     console.log(`[CONTENT THEFT] ✅ Analysis completed`);
     console.log(`[CONTENT THEFT] Total matches: ${analysisResults.summary?.totalMatches || 0}`);

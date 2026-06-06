@@ -184,8 +184,9 @@ export class ComprehensiveInstagramWebhook {
         }
       }
 
-      // Update account metrics after processing events
-      await this.updateAccountMetrics(socialAccount);
+      // Update account metrics after processing events (REMOVED to prevent excessive API calls)
+      // We rely entirely on the webhook data or background smart polling instead.
+      // await this.updateAccountMetrics(socialAccount);
 
     } catch (error) {
       console.error('[COMPREHENSIVE WEBHOOK] ❌ Error processing entry:', error);
@@ -303,8 +304,8 @@ export class ComprehensiveInstagramWebhook {
         // Store post data for analytics
         await this.storePostData(value, socialAccount);
         
-        // Trigger sync to get latest post metrics
-        await this.triggerAccountSync(socialAccount, 'new post created');
+        // Trigger sync to get latest post metrics (REMOVED to prevent excessive API calls)
+        // await this.triggerAccountSync(socialAccount, 'new post created');
       }
     } catch (error) {
       console.error('[COMPREHENSIVE WEBHOOK] ❌ Error handling media event:', error);
@@ -324,8 +325,8 @@ export class ComprehensiveInstagramWebhook {
         // Update account follower count
         await this.updateAccountFollowers(socialAccount, value.followers_count);
         
-        // Trigger sync for updated metrics
-        await this.triggerAccountSync(socialAccount, 'follower count changed');
+        // Trigger sync for updated metrics (REMOVED to prevent excessive API calls)
+        // await this.triggerAccountSync(socialAccount, 'follower count changed');
       }
     } catch (error) {
       console.error('[COMPREHENSIVE WEBHOOK] ❌ Error handling follower event:', error);
@@ -641,11 +642,11 @@ export class ComprehensiveInstagramWebhook {
    */
   private async updateAccountMetrics(socialAccount: any): Promise<void> {
     try {
-      console.log('[COMPREHENSIVE WEBHOOK] 📊 Updating comprehensive account metrics');
+      console.log('[COMPREHENSIVE WEBHOOK] 📊 Skipping comprehensive account metrics update to save API limits');
       
-      // Trigger account sync to get latest data from Instagram API
-      // This ensures all metrics are up-to-date after webhook events
-      await this.triggerAccountSync(socialAccount, 'webhook event processed');
+      // We no longer trigger a full account sync here to avoid rate limits.
+      // The background metrics worker (Smart Polling) handles this safely.
+      // await this.triggerAccountSync(socialAccount, 'webhook event processed');
       
     } catch (error) {
       console.error('[COMPREHENSIVE WEBHOOK] ❌ Error updating account metrics:', error);

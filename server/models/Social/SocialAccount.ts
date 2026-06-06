@@ -29,6 +29,7 @@ export interface ISocialAccount extends Document {
   totalLikes?: number;
   totalComments?: number;
   totalReach?: number;
+  totalViews?: number;
   avgEngagement?: number;
   totalShares?: number;
   totalSaves?: number;
@@ -103,6 +104,7 @@ export const SocialAccountSchema = new Schema<ISocialAccount>({
   totalLikes: { type: Number, default: 0 },
   totalComments: { type: Number, default: 0 },
   totalReach: { type: Number, default: 0 },
+  totalViews: { type: Number, default: 0 },
   avgEngagement: { type: Number, default: 0 },
   totalShares: { type: Number, default: 0 },
   totalSaves: { type: Number, default: 0 },

@@ -169,7 +169,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       }
     } catch { }
 
-    console.log(`[AUTH-TRACE] Request: ${req.method} ${req.path} | FirebaseUID: ${firebaseUid} | UserID: ${user.id} | Email: ${user.email}`);
+    // console.log(`[AUTH-TRACE] Request: ${req.method} ${req.path} | FirebaseUID: ${firebaseUid} | UserID: ${user.id} | Email: ${user.email}`);
     req.user = user;
     next();
   } catch (error) {

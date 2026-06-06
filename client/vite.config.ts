@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -7,7 +7,14 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
+  
+  return {
+    envDir: '../',
+    define: {
+      'import.meta.env.VITE_META_PHASE_1_REVIEW_MODE': JSON.stringify(env.VITE_META_PHASE_1_REVIEW_MODE || env.META_PHASE_1_REVIEW_MODE || 'false')
+    },
   plugins: [react()],
   resolve: {
     alias: {
@@ -25,5 +32,6 @@ export default defineConfig({
         secure: false,
       }
     }
+  }
   }
 })

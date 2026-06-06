@@ -14,6 +14,7 @@ interface CreateUserInput {
 
 interface UpdateProfileInput {
   displayName?: string;
+  username?: string;
   avatar?: string;
   niche?: string;
   targetAudience?: string;
@@ -22,6 +23,7 @@ interface UpdateProfileInput {
   businessType?: string;
   experienceLevel?: string;
   primaryObjective?: string;
+  preferences?: Record<string, any>;
 }
 
 export class UserService extends BaseService {
@@ -240,9 +242,10 @@ export class UserService extends BaseService {
 
   private generateReferralCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const { randomInt } = require('crypto');
     let code = '';
     for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+      code += chars.charAt(randomInt(chars.length));
     }
     return code;
   }

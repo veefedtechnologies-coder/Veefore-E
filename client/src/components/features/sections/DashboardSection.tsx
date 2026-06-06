@@ -5,6 +5,8 @@ import { BarChart3, Bell, Target, Sparkles, Zap, Calendar, Eye, Play } from 'luc
 import MainDashboardMockup from '../mockups/MainDashboardMockup';
 
 export const DashboardSection = React.memo(() => {
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
     return (
 
         <section className="py-24 md:py-36 px-4 sm:px-6 relative overflow-hidden" style={{ contain: 'content' }}>
@@ -66,7 +68,7 @@ export const DashboardSection = React.memo(() => {
                             { title: 'Smart Notifications', desc: 'Stay informed with intelligent alerts', icon: Bell },
                             { title: 'Goal Tracking', desc: 'Set, monitor, and achieve your targets', icon: Target },
                             { title: 'AI Insights', desc: 'Actionable recommendations for growth', icon: Sparkles },
-                            { title: 'Automation Hub', desc: 'Manage all your automations in one place', icon: Zap },
+                            { title: isPhase1 ? 'Publishing Hub' : 'Automation Hub', desc: isPhase1 ? 'Manage all your content workflows in one place' : 'Manage all your automations in one place', icon: Zap },
                             { title: 'Content Calendar', desc: 'Visual overview of scheduled content', icon: Calendar },
                             { title: 'Activity Feed', desc: 'Track everything happening on your account', icon: Eye },
                             { title: 'Quick Actions', desc: 'One-click shortcuts for common tasks', icon: Play },

@@ -5,6 +5,8 @@ import { BarChart3, Users, Heart, Eye, Instagram, Target, Clock, TrendingUp, Spa
 import AnalyticsDashboardMockup from '../mockups/AnalyticsDashboardMockup';
 
 export const AnalyticsSection = React.memo(() => {
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
     return (
 
         <section className="py-24 md:py-36 px-4 sm:px-6 relative overflow-hidden" style={{ contain: 'content' }}>
@@ -60,7 +62,7 @@ export const AnalyticsSection = React.memo(() => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                         {[
                             { title: 'Follower Growth', desc: 'Track daily, weekly, monthly follower trends', icon: Users, value: '+1.2K/week' },
-                            { title: 'Engagement Rate', desc: 'Likes, comments, shares per post', icon: Heart, value: '8.7%' },
+                            { title: 'Engagement Rate', desc: isPhase1 ? 'Likes, saves, shares per post' : 'Likes, comments, shares per post', icon: Heart, value: '8.7%' },
                             { title: 'Reach & Impressions', desc: 'How far your content travels', icon: Eye, value: '45.2K avg' },
                             { title: 'Story Performance', desc: 'Views, replies, exits on stories', icon: Instagram, value: '12K views' },
                             { title: 'Post Performance', desc: 'Which content types work best', icon: BarChart3, value: 'Reels +32%' },
@@ -105,7 +107,7 @@ export const AnalyticsSection = React.memo(() => {
                         {[
                             { insight: 'Your Reels get 3.2x more engagement than static posts. Consider posting more Reels.', type: 'tip' },
                             { insight: 'Engagement drops 40% on Mondays. Try shifting Monday content to Tuesday.', type: 'warning' },
-                            { insight: 'Posts with questions get 2x more comments. Add CTAs to boost engagement.', type: 'tip' },
+                            { insight: isPhase1 ? 'Posts with questions get 2x more engagement. Add CTAs to boost interaction.' : 'Posts with questions get 2x more comments. Add CTAs to boost engagement.', type: 'tip' },
                             { insight: 'Your 6 PM posts perform 52% better than morning posts.', type: 'success' },
                             { insight: 'Carousel posts have highest save rate (4.2%). Great for evergreen content.', type: 'success' },
                             { insight: 'Hashtag #productivity drives 28% of your discovery reach.', type: 'tip' },

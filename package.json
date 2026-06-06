@@ -4,7 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development tsx watch --ignore \"client/**\" --ignore \"uploads/**\" --ignore \"**/vite.config.ts.timestamp-*\" server/index.ts",
+    "redis:start": "cd ~/Downloads/redis-stable && src/redis-server --daemonize yes || true",
+    "redis:stop": "pkill redis-server || true",
+    "dev:local": "npm run redis:start && npm run dev",
+    "dev": "cross-env NODE_ENV=development tsx watch --ignore \"client/**\" --ignore \"uploads/**\" --ignore \"logs/**\" --ignore \"**/vite.config.ts.timestamp-*\" server/index.ts",
     "client:dev": "vite --config vite.client.config.ts --port 5173 --host",
     "client:install": "cd client && npm install",
     "client:build": "npm run client:install && vite build --config vite.client.config.ts",
@@ -19,6 +22,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
+    "@bull-board/api": "^7.1.5",
+    "@bull-board/express": "^7.1.5",
     "@google/genai": "^1.15.0",
     "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-avatar": "^1.1.11",
@@ -34,6 +39,7 @@
     "@react-three/fiber": "^9.4.2",
     "@sendgrid/mail": "^8.1.5",
     "@sentry/node": "10.28.0",
+    "@socket.io/redis-adapter": "^8.3.0",
     "@tailwindcss/postcss": "^4.1.17",
     "@tanstack/query-sync-storage-persister": "^5.90.14",
     "@tanstack/react-query": "^5.90.12",

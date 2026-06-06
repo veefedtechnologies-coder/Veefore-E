@@ -1,6 +1,5 @@
 import { IStorage } from '../storage';
-import { InstagramSmartPolling } from '../instagram-smart-polling';
-import { InstagramAccountMonitor } from '../instagram-account-monitor';
+// Legacy memory-bound polling removed - Handled by BullMQ now
 import {
   distributedLock,
   waitForMongoDBAndAcquireLock,
@@ -81,10 +80,8 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
       console.log('[SMART POLLING] 🚀 Activating hybrid system - webhooks + smart polling');
 
       try {
-        const smartPolling = new InstagramSmartPolling(storage);
-        new InstagramAccountMonitor(storage, smartPolling);
-
-        console.log('[SMART POLLING] ✅ Hybrid system active - webhooks for comments/mentions, polling for likes/followers');
+        console.log('[SMART POLLING] ✅ Initializing polling system');
+        startFallbackSmartPolling();
       } catch (pollingError) {
         console.error('[LEADER ELECTION] Error starting polling services:', pollingError);
       }
@@ -95,12 +92,92 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
   } catch (error) {
     console.error('[LEADER ELECTION] Failed to acquire polling locks:', error);
     console.log('[SMART POLLING] ⚠️ Starting polling as fallback due to lock error');
+    startFallbackSmartPolling();
+  }
+}
 
-    try {
-      const smartPolling = new InstagramSmartPolling(storage);
-      new InstagramAccountMonitor(storage, smartPolling);
-    } catch (fallbackError) {
-      console.error('[SMART POLLING] Fallback polling failed:', fallbackError);
+let isPollingExecuting = false;
+
+export async function startFallbackSmartPolling() {
+  console.log('[SMART POLLING] Initializing BullMQ Smart Polling system...');
+  
+  try {
+    // Dynamic import to avoid circular dependencies
+    const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+    const { isRedisAvailable, MetricsQueueManager } = await import('../queues/metricsQueue');
+
+    const activeAccounts = await SocialAccountModel.find({
+      platform: 'instagram',
+      $or: [{ accessToken: { $exists: true, $ne: '' } }, { encryptedAccessToken: { $exists: true, $ne: '' } }]
+    });
+
+    if (!isRedisAvailable()) {
+      console.log('[SMART POLLING] ⚠️ Redis unavailable. System is configured to ONLY use BullMQ. Smart Polling is PAUSED.');
+      return;
     }
+
+    console.log('[SMART POLLING] ✅ Redis available - Activating distributed BullMQ polling workers');
+    
+    for (const acc of activeAccounts) {
+      try {
+         const accountId = (acc as any)._id.toString();
+         
+         // Calculate dynamic activity level based on engagement rate
+         let activityLevel: 'high' | 'medium' | 'low' = 'low';
+         const engagementRate = acc.engagementRate || 0;
+         
+         if (engagementRate >= 5.0) {
+           activityLevel = 'high';
+         } else if (engagementRate >= 1.0) {
+           activityLevel = 'medium';
+         }
+
+         // BullMQ schedule true smart granular polling
+         await MetricsQueueManager.scheduleSmartPolling(
+           acc.workspaceId.toString(),
+           acc.username || 'system',
+           accountId,
+           acc.accessToken || '',
+           activityLevel
+         );
+      } catch (err: any) {
+        console.error(`[SMART POLLING] Failed to schedule BullMQ job for ${acc.username}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[SMART POLLING] Initialization error:', err);
+  }
+}
+
+export async function triggerImmediateSmartPoll() {
+  console.log('[SMART POLLING] Manual trigger for immediate smart poll received');
+  
+  try {
+    const { isRedisAvailable, MetricsQueueManager } = await import('../queues/metricsQueue');
+    const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+    
+    if (isRedisAvailable()) {
+      console.log('[SMART POLLING] Dispatching immediate BullMQ jobs...');
+      const activeAccounts = await SocialAccountModel.find({
+        platform: 'instagram',
+        $or: [{ accessToken: { $exists: true, $ne: '' } }, { encryptedAccessToken: { $exists: true, $ne: '' } }]
+      });
+      
+      for (const acc of activeAccounts) {
+         // Dispatch an immediate fetch-metrics job for ALL metrics
+         await MetricsQueueManager.scheduleMetricsFetch(
+           acc.workspaceId.toString(),
+           acc.username || 'system',
+           (acc as any)._id.toString(),
+           acc.accessToken || '',
+           'all',
+           { priority: 1, forceRefresh: true } // Priority 1 = Highest
+         );
+      }
+    } else {
+       console.log('[SMART POLLING] ⚠️ Redis unavailable, cannot trigger immediate sync. Please check Redis connection.');
+    }
+  } catch (err) {
+    console.error('[SMART POLLING] Failed to dispatch BullMQ immediate sync:', err);
   }
 }

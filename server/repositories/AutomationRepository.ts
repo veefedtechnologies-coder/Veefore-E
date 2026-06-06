@@ -62,9 +62,10 @@ export interface FormattedAutomationRule {
   trigger: Record<string, any>;
   triggers?: Record<string, any>;
   action: Record<string, any>;
-  keywords?: string[];
   responses?: any[];
   dmResponses?: any[];
+  dmButtons?: any[];
+  followerGate?: any;
   targetMediaIds?: string[];
   lastRun: Date | null;
   nextRun: Date | null;
@@ -83,6 +84,9 @@ export interface CreateAutomationRuleData {
   keywords?: string[];
   responses?: any;
   targetMediaIds?: string[];
+  matchMode?: string;
+  negativeKeywords?: string[];
+  aiIntents?: string[];
   nextRun?: Date | null;
 }
 
@@ -185,11 +189,15 @@ export class AutomationRuleRepository extends BaseRepository<IAutomationRule> {
       postInteraction: rule.postInteraction,
       trigger: trigger,
       triggers: rule.triggers || trigger,
-      action: action,
       keywords: rule.keywords || [],
       responses: displayResponses,
       dmResponses: displayDmResponses,
+      dmButtons: action.dmButtons || [],
+      followerGate: rule.followerGate,
       targetMediaIds: targetMediaIds,
+      matchMode: rule.matchMode || 'contains',
+      negativeKeywords: rule.negativeKeywords || [],
+      aiIntents: rule.aiIntents || [],
       lastRun: rule.lastRun ? new Date(rule.lastRun) : null,
       nextRun: rule.nextRun ? new Date(rule.nextRun) : null,
       createdAt: rule.createdAt ? new Date(rule.createdAt) : new Date(),
@@ -206,6 +214,8 @@ export class AutomationRuleRepository extends BaseRepository<IAutomationRule> {
       isActive: rule.isActive !== false,
       trigger: rule.trigger || {},
       action: rule.action || {},
+      dmButtons: rule.action?.dmButtons || [],
+      followerGate: rule.followerGate,
       lastRun: rule.lastRun ? new Date(rule.lastRun) : null,
       nextRun: rule.nextRun ? new Date(rule.nextRun) : null,
       createdAt: rule.createdAt ? new Date(rule.createdAt) : new Date(),
@@ -226,6 +236,8 @@ export class AutomationRuleRepository extends BaseRepository<IAutomationRule> {
       type: trigger.type || action.type || rule.type || type,
       trigger: trigger,
       action: action,
+      dmButtons: action.dmButtons || [],
+      followerGate: rule.followerGate,
       lastRun: rule.lastRun ? new Date(rule.lastRun) : null,
       nextRun: rule.nextRun ? new Date(rule.nextRun) : null,
       createdAt: rule.createdAt ? new Date(rule.createdAt) : new Date(),
@@ -307,6 +319,9 @@ export class AutomationRuleRepository extends BaseRepository<IAutomationRule> {
       keywords: data.keywords || [],
       responses: data.responses || {},
       targetMediaIds: data.targetMediaIds || [],
+      matchMode: data.matchMode || 'contains',
+      negativeKeywords: data.negativeKeywords || [],
+      aiIntents: data.aiIntents || [],
       lastRun: null,
       nextRun: data.nextRun || null,
       createdAt: new Date(),
@@ -327,6 +342,9 @@ export class AutomationRuleRepository extends BaseRepository<IAutomationRule> {
       keywords: savedRule.keywords,
       responses: savedRule.responses,
       targetMediaIds: savedRule.targetMediaIds,
+      matchMode: savedRule.matchMode || 'contains',
+      negativeKeywords: savedRule.negativeKeywords || [],
+      aiIntents: savedRule.aiIntents || [],
       lastRun: savedRule.lastRun || null,
       nextRun: savedRule.nextRun || null,
       createdAt: savedRule.createdAt,

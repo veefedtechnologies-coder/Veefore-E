@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
-import { MessageSquare, Bot, User, ArrowRight, Sparkles, TrendingUp, Zap, CheckCircle2, BarChart3, Share2, Bookmark } from 'lucide-react';
+import { MessageSquare, Bot, User, ArrowRight, Sparkles, TrendingUp, Zap, CheckCircle2, BarChart3, Share2, Bookmark, Calendar, Clock, Eye, Activity } from 'lucide-react';
+
+const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
 export const EngagementVisual = () => {
   return (
@@ -222,3 +224,128 @@ export const HookVisual = () => {
     </div>
   );
 };
+
+// ─── Phase 1 Safe Visuals ─────────────────────────────────────────────────────
+
+export const SchedulerVisual = () => {
+  const posts = [
+    { time: 'Mon 9:00 AM', label: 'Product Reel', status: 'scheduled', color: 'from-blue-500 to-cyan-500', score: 94 },
+    { time: 'Wed 12:00 PM', label: 'Carousel Post', status: 'optimal', color: 'from-purple-500 to-indigo-500', score: 91 },
+    { time: 'Fri 6:00 PM', label: 'Story Series', status: 'scheduled', color: 'from-pink-500 to-rose-500', score: 88 },
+  ];
+  return (
+    <div className="relative w-full h-auto min-h-[220px] md:min-h-[320px] bg-neutral-950 rounded-xl border border-white/10 p-2 md:p-4 overflow-hidden flex flex-col justify-center shadow-2xl">
+      <motion.div style={MOBILE_OPTIMIZED_LAYER} className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent" />
+      <div className="relative z-10 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Calendar className="w-3.5 h-3.5 text-blue-400" />
+          <span className="text-[10px] md:text-xs font-bold text-blue-400 uppercase tracking-wider">AI Best-Time Scheduler</span>
+        </div>
+        {posts.map((post, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -15 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 + i * 0.2, duration: 0.5 }}
+            style={MOBILE_OPTIMIZED_LAYER}
+            className="bg-neutral-900/80 rounded-xl p-2.5 md:p-3.5 border border-white/5"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${post.color} flex items-center justify-center shrink-0`}>
+                  <Clock className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-[11px] md:text-sm font-semibold text-white">{post.label}</p>
+                  <p className="text-[9px] md:text-[10px] text-white/40">{post.time}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${post.status === 'optimal' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                  {post.status === 'optimal' ? '⚡ Optimal' : '✓ Scheduled'}
+                </span>
+                <p className="text-[9px] text-white/30 mt-0.5">Score: {post.score}</p>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.9 }}
+          className="flex items-center gap-2 pt-1"
+        >
+          <Sparkles className="w-3 h-3 text-blue-400 animate-pulse" />
+          <span className="text-[10px] text-blue-400/80 font-medium">AI analyzing peak engagement windows...</span>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export const AnalyticsVisual = () => {
+  return (
+    <div className="relative w-full h-auto min-h-[220px] md:min-h-[320px] bg-neutral-950 rounded-xl border border-white/10 p-2 md:p-6 overflow-hidden flex items-center justify-center shadow-2xl">
+      <motion.div style={MOBILE_OPTIMIZED_LAYER} className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black" />
+      <div className="relative z-10 w-full space-y-3 md:space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Activity className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="text-[10px] md:text-xs font-bold text-indigo-400 uppercase tracking-wider">Growth Analytics</span>
+        </div>
+        {[
+          { label: 'Reach', value: '+247%', bar: 94, color: 'from-blue-500 to-cyan-400', textColor: 'text-blue-400' },
+          { label: 'Impressions', value: '+189%', bar: 78, color: 'from-purple-500 to-indigo-400', textColor: 'text-purple-400' },
+          { label: 'Saves', value: '+312%', bar: 88, color: 'from-green-500 to-emerald-400', textColor: 'text-green-400' },
+        ].map((stat, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 + i * 0.15, duration: 0.5 }}
+            className="space-y-1.5"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] md:text-xs text-white/50 font-medium">{stat.label}</span>
+              <span className={`text-[10px] md:text-xs font-bold ${stat.textColor}`}>{stat.value}</span>
+            </div>
+            <div className="h-1.5 md:h-2 bg-white/5 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                whileInView={{ width: `${stat.bar}%` }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.4 + i * 0.15, duration: 0.8, ease: 'easeOut' }}
+                className={`h-full bg-gradient-to-r ${stat.color} rounded-full`}
+              />
+            </div>
+          </motion.div>
+        ))}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.8 }}
+          className="pt-1 grid grid-cols-3 gap-2"
+        >
+          {[
+            { icon: Eye, label: 'Views', val: '248K' },
+            { icon: TrendingUp, label: 'Growth', val: '+2.4K' },
+            { icon: BarChart3, label: 'Score', val: '94/100' },
+          ].map((s, i) => (
+            <div key={i} className="bg-white/[0.03] border border-white/5 rounded-lg p-2 text-center">
+              <s.icon className="w-3.5 h-3.5 text-indigo-400 mx-auto mb-1" />
+              <p className="text-[8px] md:text-[9px] text-white/30 uppercase tracking-wide">{s.label}</p>
+              <p className="text-[10px] md:text-xs font-bold text-white">{s.val}</p>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+// Phase 1 aware exports — these are what Landing.tsx imports
+export const Phase1EngagementVisual = isPhase1 ? SchedulerVisual : EngagementVisual;
+export const Phase1DMVisual = isPhase1 ? AnalyticsVisual : DMVisual;

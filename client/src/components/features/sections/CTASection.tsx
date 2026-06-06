@@ -4,6 +4,8 @@ import { Zap, ArrowRight } from 'lucide-react';
 import { Link } from 'wouter';
 
 export const CTASection = React.memo(() => {
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
     return (
         <section className="py-24 md:py-32 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto text-center">
@@ -31,7 +33,9 @@ export const CTASection = React.memo(() => {
                             Ready to Transform Your Growth?
                         </h2>
                         <p className="text-lg text-white/60 mb-10 max-w-xl mx-auto">
-                            Join thousands of creators using Veefore to automate their engagement and grow 10x faster.
+                            {isPhase1 
+                                ? 'Join thousands of creators using Veefore to optimize their content strategy and grow 10x faster.' 
+                                : 'Join thousands of creators using Veefore to automate their engagement and grow 10x faster.'}
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">

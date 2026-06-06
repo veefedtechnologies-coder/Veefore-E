@@ -67,7 +67,9 @@ interface Feature {
     };
 }
 
-const features: Feature[] = [
+const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
+const featuresDefault: Feature[] = [
     {
         title: "Stop Guessing. Know Exactly What Works.",
         description: "Expertly analyze top-performing competitor content. We tell you the emotional hooks, structural patterns, and why it went viral.",
@@ -115,6 +117,58 @@ const features: Feature[] = [
         }
     }
 ];
+
+const featuresPhase1: Feature[] = [
+    {
+        title: "Stop Guessing. Know Exactly What Works.",
+        description: "Expertly analyze top-performing competitor content. We tell you the emotional hooks, structural patterns, and why it went viral.",
+        highlight: "140+ Viral Patterns Detected",
+        icon: Search,
+        color: "blue",
+        screen: {
+            type: "analysis",
+            title: "Viral Hook Intelligence",
+            stats: [
+                { label: "Viral Probability", value: "98%", color: "text-green-400" },
+                { label: "Emotional Trigger", value: "FOMO", color: "text-blue-400" }
+            ],
+            points: ["Competitor Analysis", "Hook Extraction", "Trend Prediction"]
+        }
+    },
+    {
+        title: "Publish at the Perfect Moment.",
+        description: "AI analyzes your audience's activity patterns and recommends the exact times to post for maximum reach and engagement.",
+        highlight: "Peak-Time Publishing",
+        icon: MessageSquare,
+        color: "purple",
+        screen: {
+            type: "chat",
+            messages: [
+                { user: "fan", text: "When should I post for max reach?", time: "2m" },
+                { user: "me", text: "Tuesday 9AM is your sweet spot — 94% higher reach! 📊", time: "Just now" }
+            ]
+        }
+    },
+    {
+        title: "Understand Your Growth. Double Down.",
+        description: "Deep analytics reveal what content drives real growth. Know your top hooks, best formats, and highest-performing content.",
+        highlight: "Deep Content Analytics",
+        icon: DollarSign,
+        color: "green",
+        screen: {
+            type: "sales",
+            title: "Content Performance",
+            steps: [
+                { text: "Top Hook Identified", status: "complete" },
+                { text: "Audience Pattern Analyzed", status: "complete" },
+                { text: "Growth Strategy Generated", status: "active" }
+            ]
+        }
+    }
+];
+
+const features: Feature[] = isPhase1 ? featuresPhase1 : featuresDefault;
+
 
 
 function lerp(start: number, end: number, t: number): number {

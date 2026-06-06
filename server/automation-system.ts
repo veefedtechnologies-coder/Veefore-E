@@ -29,6 +29,11 @@ export interface AutomationRule {
   commentReplies?: string[];  // For comment automation
   dmMessage?: string;         // For DM automation
   
+  // Advanced Triggers
+  matchMode?: string;
+  negativeKeywords?: string[];
+  aiIntents?: string[];
+  
   // Metadata
   createdAt: Date;
   updatedAt: Date;
@@ -250,11 +255,11 @@ export class AutomationSystem {
   /**
    * Send comment reply via Instagram API
    */
-  private async sendCommentReply(commentId: string, replyText: string, accessToken: string): Promise<boolean> {
+  public async sendCommentReply(commentId: string, replyText: string, accessToken: string): Promise<boolean> {
     try {
       console.log('[AUTOMATION] Sending comment reply:', replyText);
       
-      const response = await fetch(`https://graph.instagram.com/v23.0/${commentId}/replies`, {
+      const response = await fetch(`https://graph.facebook.com/v21.0/${commentId}/replies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -284,13 +289,6 @@ export class AutomationSystem {
   private async refreshInstagramToken(instagramAccount: any): Promise<{ accessToken: string } | null> {
     try {
       console.log('[AUTOMATION] 🔄 Attempting to refresh Instagram token...');
-      
-      // Use the environment PAGE_ACCESS_TOKEN if available (it's usually fresh)
-      const envToken = process.env.PAGE_ACCESS_TOKEN;
-      if (envToken) {
-        console.log('[AUTOMATION] ✅ Using fresh PAGE_ACCESS_TOKEN from environment');
-        return { accessToken: envToken };
-      }
       
       // Fallback: Try Facebook's token refresh endpoint for long-lived tokens
       if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
@@ -329,7 +327,7 @@ export class AutomationSystem {
    * Send Private Reply via Instagram Private Replies API (Official)
    * Based on Instagram documentation: https://developers.facebook.com/docs/messenger-platform/instagram/private-replies
    */
-  private async sendPrivateReply(commentId: string, message: string, accessToken: string): Promise<boolean> {
+  public async sendPrivateReply(commentId: string, message: string, accessToken: string, customButtons?: {text: string, url: string, payload?: string}[], recipientType: 'comment_id' | 'id' = 'comment_id'): Promise<boolean> {
     console.log('[AUTOMATION] 🎯 Sending Private Reply using official Instagram API...');
     console.log('[AUTOMATION] Comment ID:', commentId);
     console.log('[AUTOMATION] Message:', message);
@@ -368,21 +366,11 @@ export class AutomationSystem {
           });
         });
         
-        // 🎯 CRITICAL FIX: Use environment PAGE_ACCESS_TOKEN instead of database token
-        const envToken = process.env.PAGE_ACCESS_TOKEN;
-        console.log('[AUTOMATION] 🔧 Environment token available:', envToken ? 'YES' : 'NO');
-        
         // Try to find account by accessToken first, then fallback to any account with pageId
         let instagramAccount = accounts.find(acc => acc.accessToken === accessToken);
         if (!instagramAccount && accounts.length > 0) {
           instagramAccount = accounts[0]; // Use first account with pageId as fallback
           console.log('[AUTOMATION] 🔄 Using fallback account:', instagramAccount.username);
-        }
-        
-        // Override the accessToken with the environment variable if available
-        if (envToken) {
-          console.log('[AUTOMATION] ✅ Using fresh PAGE_ACCESS_TOKEN from environment');
-          accessToken = envToken;
         }
         
         const pageId = instagramAccount?.pageId;
@@ -406,38 +394,60 @@ export class AutomationSystem {
 
         // 🎯 STRUCTURED MESSAGE TEMPLATES for Private Replies API
         // Use Button Template (officially supported format)
-        const buttonTemplate = {
-          recipient: { comment_id: commentId },
-          message: {
-            attachment: {
-              type: "template",
-              payload: {
-                template_type: "button",
-                text: message,
-                buttons: [
-                  {
-                    type: "web_url",
-                    url: "https://instagram.com/rahulc1020",
-                    title: "Visit Profile"
-                  },
-                  {
-                    type: "postback",
-                    title: "Start Chat",
-                    payload: "START_CHAT_" + commentId
-                  }
-                ]
-              }
+        
+        // Dynamically build buttons array based on provided config
+        const buttons = [];
+        
+        if (customButtons && customButtons.length > 0) {
+          customButtons.forEach(btn => {
+            if (btn.text && btn.url) {
+              buttons.push({
+                type: "web_url",
+                url: btn.url,
+                title: btn.text
+              });
+            } else if (btn.text && !btn.url) {
+              // If text but no URL, treat it as a conversational button (postback)
+              buttons.push({
+                type: "postback",
+                title: btn.text,
+                payload: btn.payload || ("START_CHAT_" + commentId)
+              });
             }
-          },
-          access_token: accessToken
-        };
+          });
+        }
+
+        // Ensure we don't exceed the 3 button limit for Facebook/Instagram templates
+        const finalButtons = buttons.slice(0, 3);
         
-        // Use Button Template as primary (simpler and more reliable)
-        const requestBody = buttonTemplate;
+        let requestBody;
+        if (finalButtons.length > 0) {
+          requestBody = {
+            recipient: { [recipientType]: commentId },
+            message: {
+              attachment: {
+                type: "template",
+                payload: {
+                  template_type: "button",
+                  text: message,
+                  buttons: finalButtons
+                }
+              }
+            },
+            access_token: accessToken
+          };
+        } else {
+          // Send plain text without any button templates
+          requestBody = {
+            recipient: { [recipientType]: commentId },
+            message: { text: message },
+            access_token: accessToken
+          };
+        }
         
-        console.log('[AUTOMATION] 📝 Private Reply API Request (STRUCTURED TEMPLATE):');
+        console.log('[AUTOMATION] 📝 Private Reply API Request:');
         console.log('[AUTOMATION] URL:', `https://graph.facebook.com/${pageId}/messages`);
-        console.log('[AUTOMATION] Template Type:', requestBody.message.attachment.payload.template_type);
+        console.log('[AUTOMATION] Has Buttons:', finalButtons.length > 0);
         console.log('[AUTOMATION] Body:', JSON.stringify(requestBody, null, 2));
         
         const response = await fetch(`https://graph.facebook.com/${pageId}/messages`, {
@@ -458,8 +468,8 @@ export class AutomationSystem {
           const errorText = await response.text();
           console.error('[AUTOMATION] ❌ Structured Private Reply failed:', errorText);
           
-          // Handle token expiration/invalidation
-          if (errorText.includes('invalidated') || errorText.includes('OAuthException') || errorText.includes('code":190')) {
+          // Handle token expiration/invalidation (Code 190 means expired/invalid token)
+          if (errorText.includes('invalidated') || errorText.includes('"code":190') || errorText.includes('"code": 190')) {
             console.log('[AUTOMATION] 🔄 Access token expired/invalid - attempting refresh...');
             const refreshed = await this.refreshInstagramToken(instagramAccount);
             if (refreshed) {
@@ -812,7 +822,7 @@ export class AutomationSystem {
   /**
    * Log automation action
    */
-  private async logAction(
+  public async logAction(
     ruleId: string,
     workspaceId: string,
     type: 'comment' | 'dm',

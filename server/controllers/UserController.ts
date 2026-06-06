@@ -6,6 +6,7 @@ import { storage } from '../mongodb-storage';
 
 const UpdateProfileSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
+  username: z.string().min(3).max(30).optional(),
   avatar: z.string().url().optional(),
   niche: z.string().max(100).optional(),
   targetAudience: z.string().max(200).optional(),
@@ -14,7 +15,8 @@ const UpdateProfileSchema = z.object({
   businessType: z.string().max(100).optional(),
   experienceLevel: z.string().max(50).optional(),
   primaryObjective: z.string().max(200).optional(),
-});
+  preferences: z.record(z.any()).optional(),
+}).passthrough();
 
 const CompleteOnboardingSchema = z.object({
   niche: z.string().max(100).optional(),

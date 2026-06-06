@@ -39,7 +39,8 @@ import {
   Play,
   Pause,
   Trash2,
-  Reply
+  Reply,
+  Zap
 } from 'lucide-react'
 
 // Instagram Comment Icon Component - Authentic rounded speech bubble
@@ -58,29 +59,7 @@ const InstagramCommentIcon = ({ className = "w-6 h-6", ...props }: { className?:
   </svg>
 )
 
-// Debug component to track when the component mounts/unmounts
-const RefreshDetector = () => {
-  const mountTime = useRef(Date.now())
-  const renderCount = useRef(0)
-  
-  renderCount.current++
-  
-  // Log every render
-  console.log(`🔍 AUTOMATION PAGE RENDER #${renderCount.current} at ${new Date().toISOString()}`)
-  
-  // Check if this is a new mount (component was destroyed and recreated)
-  const currentTime = Date.now()
-  if (currentTime - mountTime.current < 100) {
-    console.log(`🚨 AUTOMATION PAGE MOUNTED at ${new Date().toISOString()}`)
-    console.trace('Mount stack trace:')
-  }
-  
-  return (
-    <div className="fixed top-4 right-4 bg-red-500 text-white px-3 py-1 rounded text-xs z-50">
-      Renders: {renderCount.current} | Mount: {new Date(mountTime.current).toLocaleTimeString()}
-    </div>
-  )
-}
+// Debug component removed
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '@/lib/queryClient'
@@ -500,7 +479,7 @@ interface Comment {
   replies: CommentReply[];
 }
 
-const CommentScreen = ({ isVisible, onClose, triggerKeywords, automationType, commentReplies, dmMessage, selectedAccount, realAccounts, newKeyword, commentInputText, setCommentInputText, getCurrentKeywords, setSelectedKeywords, updateSourceRef, currentTime }: {
+const CommentScreen = ({ isVisible, onClose, triggerKeywords, automationType, commentReplies, dmMessage, selectedAccount, realAccounts, newKeyword, commentInputText, setCommentInputText, getCurrentKeywords, setSelectedKeywords, updateSourceRef, currentTime, keywords, setKeywords, dmKeywords, setDmKeywords, commentKeywords, setCommentKeywords }: {
   isVisible: boolean;
   onClose: () => void;
   triggerKeywords: string[]
@@ -516,6 +495,12 @@ const CommentScreen = ({ isVisible, onClose, triggerKeywords, automationType, co
   setSelectedKeywords: (keywords: string[]) => void
   updateSourceRef: React.MutableRefObject<'trigger' | 'comment' | null>
   currentTime: Date
+  keywords: string[]
+  setKeywords: (keywords: string[]) => void
+  dmKeywords: string[]
+  setDmKeywords: (keywords: string[]) => void
+  commentKeywords: string[]
+  setCommentKeywords: (keywords: string[]) => void
 }) => {
   const [commentText, setCommentText] = useState('');
   const { user, loading: authLoading } = useAuth();
@@ -1144,6 +1129,175 @@ const PreviewVideo = forwardRef<HTMLVideoElement, PreviewVideoProps>(
   }
 );
 
+
+
+interface RecursiveDMButton {
+  type: 'quick_reply' | 'web_url' | 'flow' | 'copy_code';
+  text: string;
+  url: string;
+  payload?: string;
+  followUp?: {
+    message: string;
+    buttons: RecursiveDMButton[];
+  };
+}
+
+const RecursiveButtonBuilder = ({
+  buttons,
+  onChange,
+  level = 0
+}: {
+  buttons: RecursiveDMButton[];
+  onChange: (newBtns: RecursiveDMButton[]) => void;
+  level?: number;
+}) => {
+  return (
+    <div className={`space-y-3 ${level > 0 ? 'mt-2 pl-3 border-l-2 border-indigo-200' : ''}`}>
+      {buttons.map((btn, index) => (
+        <div key={index} className="flex gap-3 items-start border border-gray-200 p-3 rounded-lg bg-gray-50/50 relative group">
+          <div className="flex-1 space-y-3">
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <select
+                  value={btn.type}
+                  onChange={(e) => {
+                    const newBtns = [...buttons];
+                    newBtns[index].type = e.target.value as any;
+                    
+                    // Initialize followUp structure for custom types
+                    if (e.target.value === 'quick_reply' || e.target.value === 'copy_code') {
+                      if (!newBtns[index].followUp) {
+                        newBtns[index].followUp = { message: '', buttons: [] };
+                      }
+                      // Auto-generate payload if none exists
+                      if (!newBtns[index].payload) {
+                        newBtns[index].payload = `PAYLOAD_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                      }
+                    }
+                    onChange(newBtns);
+                  }}
+                  className="p-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="web_url">URL Button</option>
+                  <option value="quick_reply">Quick Reply (Text)</option>
+                  <option value="flow">Flow Trigger (Advanced)</option>
+                  <option value="copy_code">Copy Code</option>
+                </select>
+                <input
+                  type="text"
+                  value={btn.text}
+                  onChange={(e) => {
+                    const newBtns = [...buttons];
+                    newBtns[index].text = e.target.value;
+                    onChange(newBtns);
+                  }}
+                  placeholder={btn.type === 'copy_code' ? "Coupon Code (e.g. SAVE20)" : "Button Text"}
+                  className="p-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                  maxLength={20}
+                />
+              </div>
+            <div>
+              {btn.type === 'web_url' && (
+                <input
+                  type="text"
+                  value={btn.url}
+                  onChange={(e) => {
+                    const newBtns = [...buttons];
+                    newBtns[index].url = e.target.value;
+                    onChange(newBtns);
+                  }}
+                  placeholder="URL (https://...)"
+                  className="w-full p-2.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                />
+              )}
+              {btn.type === 'flow' && (
+                <input
+                  type="text"
+                  value={btn.payload || ''}
+                  onChange={(e) => {
+                    const newBtns = [...buttons];
+                    newBtns[index].payload = e.target.value;
+                    onChange(newBtns);
+                  }}
+                  placeholder="Flow Trigger ID"
+                  className="w-full p-2.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 mb-2"
+                />
+              )}
+              {(btn.type === 'quick_reply' || btn.type === 'copy_code') && (
+                <div className="mt-2 pl-3 border-l-2 border-indigo-300 bg-white p-3 rounded-md shadow-sm">
+                  <label className="block text-xs font-semibold text-indigo-700 mb-1 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    Follow-up Message (Sent after they tap)
+                  </label>
+                  <textarea
+                    value={btn.followUp?.message || ''}
+                    onChange={(e) => {
+                      const newBtns = [...buttons];
+                      if (!newBtns[index].followUp) newBtns[index].followUp = { message: '', buttons: [] };
+                      newBtns[index].followUp!.message = e.target.value;
+                      onChange(newBtns);
+                    }}
+                    placeholder="Awesome! Here is your next question..."
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 min-h-[60px] mb-3"
+                    rows={2}
+                  />
+                  
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-gray-500">Nested Buttons (Optional)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newBtns = [...buttons];
+                        if (!newBtns[index].followUp) newBtns[index].followUp = { message: '', buttons: [] };
+                        if (newBtns[index].followUp!.buttons.length < 3) {
+                          newBtns[index].followUp!.buttons.push({
+                            type: 'quick_reply',
+                            text: 'Next Step',
+                            url: '',
+                            payload: `PAYLOAD_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                            followUp: { message: '', buttons: [] }
+                          });
+                          onChange(newBtns);
+                        }
+                      }}
+                      disabled={btn.followUp?.buttons && btn.followUp.buttons.length >= 3}
+                      className="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-md disabled:opacity-50"
+                    >
+                      + Add Nested Button
+                    </button>
+                  </div>
+                  
+                  {btn.followUp?.buttons && btn.followUp.buttons.length > 0 && (
+                    <RecursiveButtonBuilder 
+                      buttons={btn.followUp.buttons}
+                      onChange={(newNestedBtns) => {
+                        const newBtns = [...buttons];
+                        newBtns[index].followUp!.buttons = newNestedBtns;
+                        onChange(newBtns);
+                      }}
+                      level={level + 1}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const newBtns = buttons.filter((_, i) => i !== index);
+              onChange(newBtns);
+            }}
+            className="text-gray-400 p-2 hover:bg-red-50 hover:text-red-500 rounded-md transition-colors"
+            title="Remove button"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function AutomationStepByStep() {
   console.log('AutomationStepByStep component loaded successfully')
   
@@ -1170,8 +1324,8 @@ function AutomationStepByStepContent() {
   const [selectedPlatform, setSelectedPlatform] = useState('')
   const [selectedAccount, setSelectedAccount] = useState('')
   const [contentType, setContentType] = useState('')
-  const [automationType, setAutomationType] = useState('')
-  const [selectedAutomationType, setSelectedAutomationType] = useState<string>('')
+  const [automationType, setAutomationType] = useState('comment_dm')
+  const [selectedAutomationType, setSelectedAutomationType] = useState<string>('comment_dm')
   const [selectedPost, setSelectedPost] = useState<any>(null)
   
   // Get current workspace and user
@@ -1380,8 +1534,11 @@ function AutomationStepByStepContent() {
       name: `${automationType === 'comment_only' ? 'Comment' : automationType === 'dm_only' ? 'DM' : 'Comment to DM'} Automation`,
       workspaceId: workspaceId,
       type: automationType, // Use exact automation type (comment_dm, dm_only, comment_only)
+      matchMode: matchMode,
+      negativeKeywords: negativeKeywords,
+      aiIntents: aiIntents,
       keywords: currentKeywords,
-             targetMediaIds: selectedPost ? [selectedPost.id] : [],
+      targetMediaIds: selectedPost ? [selectedPost.id] : [],
       responses: currentResponses,
       isActive: true
     }
@@ -1402,8 +1559,21 @@ function AutomationStepByStepContent() {
   const [commentDelayUnit, setCommentDelayUnit] = useState('minutes')
   
   // DM configuration fields
-  const [dmButtonText, setDmButtonText] = useState('See products')
-  const [dmWebsiteUrl, setDmWebsiteUrl] = useState('')
+  const [dmButtons, setDmButtons] = useState<{type: 'quick_reply' | 'web_url' | 'flow' | 'copy_code', text: string, url: string, payload: string, followUpMessage?: string}[]>([{ type: 'web_url', text: 'See products', url: '', payload: '', followUpMessage: '' }])
+  
+  // Follower Gate Configuration
+  const [followerGateEnabled, setFollowerGateEnabled] = useState(false);
+  const [followerGateMessage, setFollowerGateMessage] = useState("Please follow the page first to unlock the link 🔓");
+  const [followerGateVisitLabel, setFollowerGateVisitLabel] = useState("Visit Profile");
+  const [followerGateConfirmLabel, setFollowerGateConfirmLabel] = useState("I'm Following ✅");
+  const [followerGateRetryMessage, setFollowerGateRetryMessage] = useState("Looks like you still haven't followed the page yet 👀 Follow first to unlock the content 🚀");
+  const [followerGateDelay, setFollowerGateDelay] = useState("instant");
+  
+  const applyTemplate = (template: any) => {
+    setFollowerGateMessage(template.message);
+    setFollowerGateVisitLabel(template.visitLabel);
+    setFollowerGateConfirmLabel(template.confirmLabel);
+  };
   
   // DM-only automation
   const [dmKeywords, setDmKeywords] = useState<string[]>([])
@@ -1413,10 +1583,37 @@ function AutomationStepByStepContent() {
   const [commentKeywords, setCommentKeywords] = useState<string[]>([])
   const [publicReply, setPublicReply] = useState('')
   
+  // Advanced Triggers
+  const [matchMode, setMatchMode] = useState<'exact' | 'contains' | 'intent' | 'any'>('contains')
+  const [negativeKeywords, setNegativeKeywords] = useState<string[]>([])
+  const [aiIntents, setAiIntents] = useState<string[]>([])
+  
   // New state for comment input synchronization
   const [commentInputText, setCommentInputText] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const updateSourceRef = useRef<'trigger' | 'comment' | null>(null);
+
+  // Template Editor Variable Injection
+  const dmTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertVariable = (variable: string) => {
+    if (dmTextareaRef.current) {
+      const start = dmTextareaRef.current.selectionStart;
+      const end = dmTextareaRef.current.selectionEnd;
+      const newValue = dmMessage.substring(0, start) + variable + dmMessage.substring(end);
+      setDmMessage(newValue);
+      
+      // Reset cursor position after React re-renders
+      setTimeout(() => {
+        if (dmTextareaRef.current) {
+          dmTextareaRef.current.selectionStart = dmTextareaRef.current.selectionEnd = start + variable.length;
+          dmTextareaRef.current.focus();
+        }
+      }, 0);
+    } else {
+      setDmMessage(prev => prev + variable);
+    }
+  };
   
   // Note: Removed automatic timestamp updates to prevent page refreshes
   // Timestamps will be static to avoid any refresh triggers
@@ -1484,28 +1681,43 @@ function AutomationStepByStepContent() {
 
   // Helper function to get current responses based on automation type
   const getCurrentResponses = () => {
+    const validButtons = dmButtons.filter(b => b.text.trim());
+    
+    // Format rule data properly
+    const ruleData: any = {};
+    
     switch (automationType) {
       case 'comment_dm':
-        return {
-          responses: commentReplies.filter(reply => reply.trim().length > 0),
-          dmResponses: dmMessage ? [dmMessage] : []
-        }
+        ruleData.responses = commentReplies.filter(reply => reply.trim().length > 0);
+        ruleData.dmResponses = dmMessage ? [dmMessage] : [];
+        ruleData.dmButtons = validButtons;
+        break;
       case 'dm_only':
-        return {
-          responses: [],
-          dmResponses: dmAutoReply ? [dmAutoReply] : []
-        }
+        ruleData.responses = [];
+        ruleData.dmResponses = dmAutoReply ? [dmAutoReply] : [];
+        ruleData.dmButtons = validButtons;
+        break;
       case 'comment_only':
-        return {
-          responses: publicReply ? [publicReply] : [],
-          dmResponses: []
-        }
-      default:
-        return {
-          responses: [],
-          dmResponses: []
-        }
+        ruleData.responses = [publicReply].filter(Boolean);
+        ruleData.dmResponses = [];
+        ruleData.dmButtons = [];
+        break;
     }
+    
+    // Append follower gate config
+    if (followerGateEnabled) {
+      ruleData.followerGate = {
+        enabled: true,
+        lockedMessage: followerGateMessage,
+        visitProfileLabel: followerGateVisitLabel,
+        confirmLabel: followerGateConfirmLabel,
+        retryMessage: followerGateRetryMessage,
+        delay: followerGateDelay,
+        maxRetries: 3
+      };
+    }
+    
+    return ruleData;
   }
   
 
@@ -1984,9 +2196,9 @@ function AutomationStepByStepContent() {
         }
         return automationType && getCurrentKeywords().length > 0 // Automation type and keywords required for configuration
       case 3:
-        // For comment_dm automation, step 3 is DM configuration - require DM message and button text
+        // For comment_dm automation, step 3 is DM configuration - require DM message only
         if (automationType === 'comment_dm') {
-          return dmMessage.trim().length > 0 && dmButtonText.trim().length > 0
+          return dmMessage.trim().length > 0
         }
         // For other automation types, step 3 is Advanced settings - optional
         return true
@@ -2155,192 +2367,204 @@ function AutomationStepByStepContent() {
               </div>
             </div>
 
-            {/* Step 2: Select Content Type (only shown when account is selected) */}
-            {selectedAccount && (
-              <div className="animate-fadeIn">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg shadow-md dark:shadow-purple-500/30">
-                    <FileText className="w-4 h-4 text-white" />
-                  </div>
-                  Select Content Type
-                </h3>
-                <div className="relative" ref={contentTypeDropdownRef}>
-                  <button
-                    onClick={() => setContentTypeDropdownOpen(!contentTypeDropdownOpen)}
-                    className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 hover:border-purple-300 dark:hover:border-purple-400 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none transition-all duration-200 text-gray-800 dark:text-gray-200 font-medium text-left flex items-center justify-between group"
-                    disabled={!selectedAccount}
-                  >
-                    <span className={contentType ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}>
-                      {contentType 
+            {/* Step 2: Select Content Type - always visible, disabled until account selected */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+                <div className={`p-1.5 rounded-lg shadow-md transition-all duration-200 ${selectedAccount ? 'bg-gradient-to-r from-purple-500 to-pink-600 dark:shadow-purple-500/30' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                  <FileText className="w-4 h-4 text-white" />
+                </div>
+                Select Content Type
+                {!selectedAccount && (
+                  <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">(Select account first)</span>
+                )}
+              </h3>
+              <div className="relative" ref={contentTypeDropdownRef}>
+                <button
+                  onClick={() => selectedAccount && setContentTypeDropdownOpen(!contentTypeDropdownOpen)}
+                  className={`w-full p-4 border-2 rounded-xl font-medium text-left flex items-center justify-between transition-all duration-200 ${
+                    !selectedAccount
+                      ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-purple-300 dark:hover:border-purple-400 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none text-gray-800 dark:text-gray-200 cursor-pointer'
+                  }`}
+                  disabled={!selectedAccount}
+                >
+                  <span className={contentType ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}>
+                    {!selectedAccount
+                      ? 'Select an account to choose content type'
+                      : contentType
                         ? getContentTypesForPlatform(selectedAccount).find(type => type.id === contentType)?.name + ' - ' + getContentTypesForPlatform(selectedAccount).find(type => type.id === contentType)?.description
                         : 'Choose content type for your automation...'
-                      }
-                    </span>
-                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${contentTypeDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {contentTypeDropdownOpen && selectedAccount && (
-                    <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-xl max-h-60 overflow-y-auto dropdown-enter">
-                      <div className="py-1">
-                        {getContentTypesForPlatform(selectedAccount).map(type => (
-                          <button
-                            key={type.id}
-                            onClick={() => {
-                              setContentType(type.id)
-                              setContentTypeDropdownOpen(false)
-                            }}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 flex items-center justify-between group"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white">
-                                {type.icon}
-                              </div>
-                              <div>
-                                <div className="font-medium text-gray-900 dark:text-gray-100">{type.name}</div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
-                              </div>
-                            </div>
-                            {contentType === type.id && (
-                              <Check className="w-4 h-4 text-purple-600" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Select Post (only shown when content type is selected) */}
-            {selectedAccount && contentType && (
-              <div className="animate-fadeIn">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg shadow-md dark:shadow-emerald-500/30">
-                    <Eye className="w-4 h-4 text-white" />
-                  </div>
-                  Select Post
-                </h3>
+                    }
+                  </span>
+                  <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${contentTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
                 
+                {contentTypeDropdownOpen && selectedAccount && (
+                  <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-xl max-h-60 overflow-y-auto dropdown-enter">
+                    <div className="py-1">
+                      {getContentTypesForPlatform(selectedAccount).map(type => (
+                        <button
+                          key={type.id}
+                          onClick={() => {
+                            setContentType(type.id)
+                            setSelectedPost(null)
+                            setContentTypeDropdownOpen(false)
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 flex items-center justify-between group"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white">
+                              {type.icon}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 dark:text-gray-100">{type.name}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
+                            </div>
+                          </div>
+                          {contentType === type.id && (
+                            <Check className="w-4 h-4 text-purple-600" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {/* Debug info */}
+            {/* Step 3: Select Post - always visible, shows placeholder until content type is chosen */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+                <div className={`p-1.5 rounded-lg shadow-md transition-all duration-200 ${contentType ? 'bg-gradient-to-r from-emerald-500 to-teal-600 dark:shadow-emerald-500/30' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                  <Eye className="w-4 h-4 text-white" />
+                </div>
+                Select Post
+                {!contentType && (
+                  <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">(Select content type first)</span>
+                )}
+              </h3>
 
-
-                  {realPosts.filter((post: any) => post.type === contentType).map((post: any) => (
-                    <div
-                      key={post.id}
-                      className={`cursor-pointer rounded-lg border-2 transition-all hover:shadow-md ${
-                        selectedPost?.id === post.id
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                      }`}
-                      onClick={() => setSelectedPost(post)}
-                    >
-                      <div className="p-3">
-                      <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-lg mb-2 overflow-hidden">
-                          {post.type === 'reel' && post.image ? (
-                            // Video player for reels
-                            <div className="relative w-full h-full group">
-                              {/* Test video URL accessibility */}
-                              {(() => {
-                                const videoUrl = post.mediaUrl || post.image || post.thumbnailUrl;
-                                if (videoUrl) {
-                                  testVideoUrl(videoUrl, post.id);
-                                }
-                                return null;
-                              })()}
-                              <PreviewVideo 
-                                src={post.mediaUrl || post.image || post.thumbnailUrl || ''} 
-                                poster={post.thumbnailUrl || post.image}
-                                alt={post.caption || post.title || 'Post'}
-                                id={post.id}
-                              />
-                              
-                              {/* Mute/Unmute button - only visible on hover */}
-                              <button
-                                className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const video = e.currentTarget.parentElement?.querySelector('video');
-                                  if (video) {
-                                    video.muted = !video.muted;
-                                    // Update button icon
-                                    const icon = e.currentTarget.querySelector('svg');
-                                    if (icon) {
-                                      if (video.muted) {
-                                        icon.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>';
-                                      } else {
-                                        icon.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><line x1="1" y1="1" x2="23" y2="23"/>';
+              {!contentType ? (
+                /* Placeholder shown when no content type selected */
+                <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-10 flex flex-col items-center justify-center text-center bg-gray-50/50 dark:bg-gray-800/30">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center mb-4">
+                    <Camera className="w-7 h-7 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <p className="text-gray-500 dark:text-gray-400 font-medium text-sm">
+                    Please select your content type first
+                  </p>
+                  <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+                    Choose Post, Reel, or Story above to see your content here
+                  </p>
+                </div>
+              ) : (
+                <div className="animate-fadeIn">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {realPosts.filter((post: any) => post.type === contentType).map((post: any) => (
+                      <div
+                        key={post.id}
+                        className={`cursor-pointer rounded-lg border-2 transition-all hover:shadow-md ${
+                          selectedPost?.id === post.id
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                        }`}
+                        onClick={() => setSelectedPost(post)}
+                      >
+                        <div className="p-3">
+                          <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-lg mb-2 overflow-hidden">
+                            {post.type === 'reel' && post.image ? (
+                              <div className="relative w-full h-full group">
+                                {(() => {
+                                  const videoUrl = post.mediaUrl || post.image || post.thumbnailUrl;
+                                  if (videoUrl) { testVideoUrl(videoUrl, post.id); }
+                                  return null;
+                                })()}
+                                <PreviewVideo 
+                                  src={post.mediaUrl || post.image || post.thumbnailUrl || ''} 
+                                  poster={post.thumbnailUrl || post.image}
+                                  alt={post.caption || post.title || 'Post'}
+                                  id={post.id}
+                                />
+                                <button
+                                  className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const video = e.currentTarget.parentElement?.querySelector('video');
+                                    if (video) {
+                                      video.muted = !video.muted;
+                                      const icon = e.currentTarget.querySelector('svg');
+                                      if (icon) {
+                                        if (video.muted) {
+                                          icon.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>';
+                                        } else {
+                                          icon.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><line x1="1" y1="1" x2="23" y2="23"/>';
+                                        }
                                       }
                                     }
-                                  }
-                                }}
-                                title="Toggle mute"
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-                                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                                  <line x1="1" y1="1" x2="23" y2="23"/>
-                                </svg>
-                              </button>
-                              
-                              <div className="absolute top-3 left-3 bg-black/50 text-white px-2 py-1 rounded-full text-xs font-medium">
-                                🎬 Reel
+                                  }}
+                                  title="Toggle mute"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                  </svg>
+                                </button>
+                                <div className="absolute top-3 left-3 bg-black/50 text-white px-2 py-1 rounded-full text-xs font-medium">
+                                  🎬 Reel
+                                </div>
+                              </div>
+                            ) : post.image ? (
+                              <img 
+                                src={post.image} 
+                                alt={post.caption || post.title} 
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.src = 'https://picsum.photos/300/300?random=1'; }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Camera className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{post.title}</h4>
+                            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                              <span className="capitalize flex items-center gap-1">
+                                {post.type === 'reel' && <PlayCircle className="w-3 h-3 text-purple-500" />}
+                                {post.type}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="flex items-center gap-1">
+                                  <Heart className="w-3 h-3 text-red-500" />
+                                  <span className="font-medium">{post.likes || 0}</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <InstagramCommentIcon className="w-3 h-3 text-blue-500" />
+                                  <span className="font-medium">{post.comments || 0}</span>
+                                </span>
                               </div>
                             </div>
-                          ) : post.image ? (
-                          <img 
-                            src={post.image} 
-                            alt={post.caption || post.title} 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Fallback to placeholder if image fails
-                              e.currentTarget.src = 'https://picsum.photos/300/300?random=1';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Camera className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{post.title}</h4>
-                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                            <span className="capitalize flex items-center gap-1">
-                              {post.type === 'reel' && <PlayCircle className="w-3 h-3 text-purple-500" />}
-                              {post.type}
-                            </span>
-                          <div className="flex items-center gap-2">
-                            <span className="flex items-center gap-1">
-                              <Heart className="w-3 h-3 text-red-500" />
-                              <span className="font-medium">{post.likes || 0}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <InstagramCommentIcon className="w-3 h-3 text-blue-500" />
-                              <span className="font-medium">{post.comments || 0}</span>
-                            </span>
                           </div>
                         </div>
                       </div>
-                        </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
 
-                {realPosts.filter((post: any) => post.type === contentType).length === 0 && (
-                    <div className="col-span-full text-center py-8 text-gray-500">
-                      No {contentType}s found for this account
-                    <div className="text-sm text-gray-400 mt-2">
-                      Available content: {[...new Set(realPosts.map((p: any) => p.type))].join(', ')}
-                    </div>
+                  {realPosts.filter((post: any) => post.type === contentType).length === 0 && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <Camera className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                      <div className="font-medium">No {contentType}s found for this account</div>
+                      <div className="text-sm text-gray-400 mt-1">
+                        Available content: {[...new Set(realPosts.map((p: any) => p.type))].join(', ') || 'None yet'}
+                      </div>
                     </div>
                   )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         )
 
@@ -2358,7 +2582,9 @@ function AutomationStepByStepContent() {
               <div className="relative" ref={automationTypeDropdownRef}>
                 <button
                   onClick={() => setAutomationTypeDropdownOpen(!automationTypeDropdownOpen)}
-                  className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 hover:border-emerald-300 dark:hover:border-emerald-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:outline-none transition-all duration-200 text-gray-800 dark:text-gray-200 font-medium text-left flex items-center justify-between group"
+                  className={`w-full p-4 border-2 rounded-xl bg-white dark:bg-gray-800 hover:border-emerald-400 dark:hover:border-emerald-500 focus:border-emerald-500 dark:focus:border-emerald-400 focus:outline-none transition-all duration-200 text-gray-800 dark:text-gray-200 font-medium text-left flex items-center justify-between group ${
+                    automationType ? 'border-emerald-500/50 dark:border-emerald-500/50 shadow-sm' : 'border-gray-300 dark:border-gray-600'
+                  }`}
                 >
                   <span className={automationType ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}>
                     {automationType 
@@ -2433,35 +2659,129 @@ function AutomationStepByStepContent() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Direct message</label>
                     <p className="text-sm text-gray-600 mb-3">We'll send this DM to the user who included your keyword in their comment.</p>
+                    
+                    {/* Variable Injection Chips */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {['{{username}}', '{{first_name}}', '{{keyword}}', '{{link}}'].map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => insertVariable(v)}
+                          className="px-2 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 border border-indigo-200 transition-colors flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> {v}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Follower Gate Settings */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Check className="w-4 h-4 text-indigo-500" />
+                            Follower Gate (Advanced)
+                          </h4>
+                          <p className="text-xs text-gray-500 mt-1">Require users to follow your account before they receive the final DM content.</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={followerGateEnabled} onChange={(e) => setFollowerGateEnabled(e.target.checked)} />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                      </div>
+
+                      {followerGateEnabled && (
+                        <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+                          <div className="flex justify-end mb-2">
+                            <button
+                              type="button"
+                              onClick={() => applyTemplate({ message: "Hey 👋 Thanks for your interest! Please follow the page first and then tap 'I'm Following' to unlock the link 🔓", visitLabel: "Visit Profile", confirmLabel: "I'm Following ✅" })}
+                              className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                            >
+                              Use "Soft Follow Unlock" Template
+                            </button>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Locked Message</label>
+                            <textarea
+                              value={followerGateMessage}
+                              onChange={(e) => setFollowerGateMessage(e.target.value)}
+                              className="w-full p-2.5 text-sm border border-gray-300 rounded-md"
+                              rows={3}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Visit Profile Button</label>
+                              <input
+                                type="text"
+                                value={followerGateVisitLabel}
+                                onChange={(e) => setFollowerGateVisitLabel(e.target.value)}
+                                className="w-full p-2 text-sm border border-gray-300 rounded-md"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Confirmation Button</label>
+                              <input
+                                type="text"
+                                value={followerGateConfirmLabel}
+                                onChange={(e) => setFollowerGateConfirmLabel(e.target.value)}
+                                className="w-full p-2 text-sm border border-gray-300 rounded-md"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Retry Message (If they didn't follow)</label>
+                            <input
+                              type="text"
+                              value={followerGateRetryMessage}
+                              onChange={(e) => setFollowerGateRetryMessage(e.target.value)}
+                              className="w-full p-2 text-sm border border-gray-300 rounded-md"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <textarea
+                      ref={dmTextareaRef}
                       value={dmMessage}
                       onChange={(e) => setDmMessage(e.target.value)}
-                      placeholder="Enter your DM text here"
-                      className="w-full p-3 border border-gray-300 rounded-lg"
-                      rows={4}
+                      placeholder="Hey {{username}}! Here is the info you requested..."
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      rows={5}
                     />
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Button text</label>
-                    <input
-                      type="text"
-                      value={dmButtonText}
-                      onChange={(e) => setDmButtonText(e.target.value)}
-                      placeholder="Choose a short and clear button text"
-                      className="w-full p-3 border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
-                    <input
-                      type="text"
-                      value={dmWebsiteUrl}
-                      onChange={(e) => setDmWebsiteUrl(e.target.value)}
-                      placeholder="Enter the destination URL for your button"
-                      className="w-full p-3 border border-gray-300 rounded-lg"
-                    />
+                  <div className="space-y-4 mt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Buttons</label>
+                        <p className="text-xs text-gray-500 mt-1">Optional. Add up to 3 buttons. Leave empty for a plain text DM.</p>
+                      </div>
+                      {dmButtons.length < 3 && (
+                        <button
+                          type="button"
+                          onClick={() => setDmButtons([...dmButtons, { type: 'web_url', text: '', url: '', payload: '' }])}
+                          className="text-sm px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-md font-medium hover:bg-indigo-100 transition-colors"
+                        >
+                          + Add Button
+                        </button>
+                      )}
+                    </div>
+                    
+                    {dmButtons.length === 0 ? (
+                      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-center text-sm text-gray-500">
+                        No buttons added. The DM will be sent as a standard text message.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <RecursiveButtonBuilder 
+                          buttons={dmButtons as any}
+                          onChange={(newBtns) => setDmButtons(newBtns as any)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2788,22 +3108,79 @@ function AutomationStepByStepContent() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Configure the public comment that will be posted when keywords are detected. DM settings will be configured in the next step.</p>
               
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Trigger Keywords</label>
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    value={newKeyword}
-                    onChange={(e) => setNewKeyword(e.target.value)}
-                    placeholder="Enter keyword"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={addKeyword}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    Add
-                  </button>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Trigger Settings</label>
+                
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 space-y-4 mb-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Match Mode</label>
+                    <select
+                      value={matchMode}
+                      onChange={(e) => setMatchMode(e.target.value as any)}
+                      className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                    >
+                      <option value="contains">Contains (Broad Match)</option>
+                      <option value="exact">Exact Match Only</option>
+                      <option value="intent">AI Intent Match</option>
+                      <option value="any">Any Comment</option>
+                    </select>
+                  </div>
+                  
+                  {matchMode === 'intent' && (
+                    <div className="animate-fadeIn">
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">AI Intent Description</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newKeyword}
+                          onChange={(e) => setNewKeyword(e.target.value)}
+                          placeholder="e.g. 'asking for pricing'"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={() => {
+                            if (newKeyword.trim()) {
+                              setAiIntents([...aiIntents, newKeyword.trim()]);
+                              setNewKeyword('');
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                          Add Intent
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {aiIntents.map((intent, index) => (
+                          <span key={index} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm flex items-center gap-2">
+                            {intent}
+                            <button onClick={() => setAiIntents(aiIntents.filter((_, i) => i !== index))} className="hover:text-purple-900">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(matchMode === 'contains' || matchMode === 'exact') && (
+                    <div className="animate-fadeIn">
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Keywords</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newKeyword}
+                          onChange={(e) => setNewKeyword(e.target.value)}
+                          placeholder="Enter keyword"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={addKeyword}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
                 <div className="flex flex-wrap gap-2">
                   {keywords.map((keyword, index) => (
                     <span
@@ -3075,17 +3452,23 @@ function AutomationStepByStepContent() {
               <div className="relative mb-4">
                 <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-bl-sm p-4 max-w-[280px] ml-6">
                   <div className="text-sm text-gray-400 dark:text-gray-300">
-                    {dmMessage || "I'm so excited you'd like to see what I've got on offer!"}
+                    {followerGateEnabled ? followerGateMessage : (dmMessage || "I'm so excited you'd like to see what I've got on offer!")}
                   </div>
                   
-                  {/* Button inside message bubble - white background */}
-                  {dmButtonText && (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center mt-3">
-                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                        {dmButtonText}
+                  {/* Buttons inside message bubble - stacked */}
+                  {(followerGateEnabled 
+                    ? [
+                        ...(followerGateVisitLabel ? [{ text: followerGateVisitLabel, type: 'web_url' }] : []),
+                        { text: followerGateConfirmLabel || "I'm Following ✅", type: 'postback' }
+                      ]
+                    : dmButtons.filter(b => b.text.trim())
+                  ).map((btn: any, idx) => (
+                    <div key={idx} className={`rounded-lg p-3 text-center mt-3 cursor-pointer transition-colors border ${btn.type === 'quick_reply' ? 'bg-indigo-50 border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-50'}`}>
+                      <div className={`text-sm font-medium ${btn.type === 'quick_reply' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-800 dark:text-gray-200'}`}>
+                        {btn.text} {btn.type === 'quick_reply' ? '(Quick Reply)' : btn.type === 'copy_code' ? '(Copy)' : btn.type === 'flow' ? '(Flow)' : ''}
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
                 
                 {/* Profile picture positioned at bottom-left corner overlapping the message bubble */}
@@ -3558,6 +3941,12 @@ function AutomationStepByStepContent() {
                     setSelectedKeywords={setSelectedKeywords}
                     updateSourceRef={updateSourceRef}
                     currentTime={currentTime}
+                    keywords={keywords}
+                    setKeywords={setKeywords}
+                    dmKeywords={dmKeywords}
+                    setDmKeywords={setDmKeywords}
+                    commentKeywords={commentKeywords}
+                    setCommentKeywords={setCommentKeywords}
                   />
                 </div>
               ) : (
@@ -3664,18 +4053,25 @@ function AutomationStepByStepContent() {
                 {/* Message bubble with profile picture at bottom-left corner */}
                 <div className="relative mb-4">
                   <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-bl-sm p-4 max-w-[280px] ml-6">
-                    <div className="text-sm text-gray-400 dark:text-gray-300">
-                      {dmMessage || "I'm so excited you'd like to see what I've got on offer!"}
+                    <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                      {(() => {
+                        let text = dmMessage || "I'm so excited you'd like to see what I've got on offer!";
+                        text = text.replace(/\{\{username\}\}/g, 'john_smith');
+                        text = text.replace(/\{\{first_name\}\}/g, 'John');
+                        text = text.replace(/\{\{keyword\}\}/g, currentKeywords[0] || 'guide');
+                        text = text.replace(/\{\{link\}\}/g, (dmButtons.length > 0 && dmButtons[0].url) ? dmButtons[0].url : 'https://link...');
+                        return text;
+                      })()}
                     </div>
                     
-                    {/* Button inside message bubble - white background */}
-                    {dmButtonText && (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center mt-3">
+                    {/* Buttons inside message bubble - stacked */}
+                    {dmButtons.filter(b => b.text.trim()).map((btn, idx) => (
+                      <div key={idx} className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center mt-3 cursor-pointer hover:bg-gray-50 transition-colors border border-gray-100 dark:border-gray-700">
                         <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                          {dmButtonText}
+                          {btn.text}
                         </div>
                       </div>
-                    )}
+                    ))}
                   </div>
                   
                   {/* Profile picture positioned at bottom-left corner overlapping the message bubble */}
@@ -3724,22 +4120,22 @@ function AutomationStepByStepContent() {
         )}
 
         {/* Automation Status Indicator */}
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 rounded-b-3xl">
+        <div className={`p-4 rounded-b-3xl ${currentStep >= 2 && automationType ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-emerald-500'}`}>
           <div className="flex items-center justify-between text-white">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4" />
               <span className="text-sm font-medium">
-                {automationType ? `${automationTypes.find(t => t.id === automationType)?.name} Active` : 'Select Automation Type'}
+                {currentStep >= 2 && automationType ? `${automationTypes.find(t => t.id === automationType)?.name} Active` : 'Select Automation Type'}
               </span>
             </div>
-            {currentKeywords.length > 0 && (
+            {currentStep >= 2 && currentKeywords.length > 0 && (
               <div className="flex items-center gap-1">
                 <Hash className="w-3 h-3" />
                 <span className="text-xs">{currentKeywords.length} triggers</span>
               </div>
             )}
           </div>
-          {automationType && (
+          {currentStep >= 2 && automationType && (
             <div className="mt-2 text-xs text-emerald-100">
               Monitoring: {currentKeywords.join(', ') || 'All comments'}
             </div>
@@ -3767,46 +4163,45 @@ function AutomationStepByStepContent() {
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 min-h-full transition-colors duration-300">
-      {/* Debug Component - Remove after testing */}
-      <RefreshDetector />
       
-      {/* Sleek Management Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 w-full shadow-sm transition-colors duration-300">
-        <div className="flex items-center justify-between">
+      {/* Premium Management Header */}
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 px-8 py-5 w-full shadow-sm sticky top-0 z-30 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  Automation Studio
-                </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Smart social media automation</p>
-              </div>
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                Automation Studio
+              </h1>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                Smart social media automation
+              </p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
             {/* Cache Status Indicator */}
-                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span>Auto-saved (persistent)</span>
-        </div>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-full text-xs font-semibold border border-emerald-100 dark:border-emerald-800/30">
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Auto-saved</span>
+            </div>
             
             <button
               onClick={() => setShowAutomationList(!showAutomationList)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 shadow-sm transition-all duration-200 font-medium text-sm"
             >
               <Settings className="w-4 h-4" />
-              Manage Automations
+              Manage
             </button>
             <button
               onClick={() => {
                 setCurrentStep(1)
                 setShowAutomationList(false)
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-md dark:shadow-blue-500/30"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition-all shadow-md shadow-blue-500/20 font-medium text-sm transform hover:-translate-y-0.5"
             >
               <Plus className="w-4 h-4" />
               New Automation
@@ -3828,43 +4223,65 @@ function AutomationStepByStepContent() {
       ) : (
         <div className="max-w-7xl mx-auto p-6 pb-20">
 
-          {/* Progress Steps */}
-          <div className="mb-12">
-            <div className="flex items-center justify-between max-w-5xl mx-auto">
-              {steps.map((step, index) => (
-                <div key={step.id} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center group">
-                    <div className={`flex items-center justify-center w-14 h-14 rounded-full border-3 transition-all duration-300 shadow-lg ${
-                      currentStep >= step.id 
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 border-blue-500 text-white transform scale-110 shadow-blue-200 dark:shadow-blue-500/30' 
-                        : currentStep === step.id
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 border-blue-500 text-white transform scale-110 shadow-blue-200 dark:shadow-blue-500/30'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-md'
-                    }`}>
-                      {currentStep > step.id ? (
-                        <CheckCircle className="w-7 h-7" />
-                      ) : (
-                        <span className="text-sm font-bold">{step.id}</span>
-                      )}
+          {/* Premium Progress Steps */}
+          <div className="mb-14 mt-6">
+            <div className="relative max-w-4xl mx-auto">
+              {/* Background Line */}
+              <div className="absolute top-7 left-0 w-full h-1.5 bg-gray-200 dark:bg-gray-700/50 rounded-full" />
+              
+              {/* Active Line */}
+              <div 
+                className="absolute top-7 left-0 h-1.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)]" 
+                style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }} 
+              />
+              
+              <div className="relative flex justify-between">
+                {steps.map((step) => {
+                  const isActive = currentStep >= step.id;
+                  const isCurrent = currentStep === step.id;
+                  const isCompleted = currentStep > step.id;
+                  
+                  return (
+                    <div key={step.id} className="flex flex-col items-center group w-24 sm:w-32">
+                      <div className={`relative flex items-center justify-center w-14 h-14 rounded-full border-[3px] transition-all duration-500 z-10 bg-white dark:bg-gray-900 ${
+                        isActive
+                          ? 'border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.3)] dark:shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                          : 'border-gray-200 dark:border-gray-700'
+                      }`}>
+                        {/* Inner Fill for Active State */}
+                        <div className={`absolute inset-1 rounded-full transition-all duration-500 ${
+                          isActive ? 'bg-gradient-to-br from-blue-500 to-indigo-600 opacity-100 scale-100' : 'bg-transparent opacity-0 scale-0'
+                        }`} />
+                        
+                        {/* Icon or Number */}
+                        <div className={`relative z-10 flex items-center justify-center transition-colors duration-300 ${
+                          isActive ? 'text-white' : 'text-gray-400 dark:text-gray-500 font-semibold'
+                        }`}>
+                          {isCompleted ? (
+                            <Check className="w-6 h-6 stroke-[3]" />
+                          ) : (
+                            <span className="text-lg font-bold">{step.id}</span>
+                          )}
+                        </div>
+                        
+                        {/* Pulse Effect for Current Step */}
+                        {isCurrent && (
+                          <div className="absolute inset-0 rounded-full border-2 border-blue-400 animate-ping opacity-20" />
+                        )}
+                      </div>
+                      
+                      <div className="mt-4 text-center">
+                        <div className={`text-sm font-bold tracking-tight transition-colors duration-300 ${
+                          isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'
+                        }`}>{step.title}</div>
+                        <div className={`text-[11px] font-medium mt-1 leading-snug transition-colors duration-300 hidden sm:block ${
+                          isCurrent ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-600'
+                        }`}>{step.description}</div>
+                      </div>
                     </div>
-                    <div className="mt-3 text-center transition-all duration-300">
-                      <div className={`text-sm font-semibold ${
-                        currentStep >= step.id ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                      }`}>{step.title}</div>
-                      <div className={`text-xs mt-1 ${
-                        currentStep >= step.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
-                      }`}>{step.description}</div>
-                    </div>
-                  </div>
-                  {index < steps.length - 1 && (
-                    <div className={`flex-1 h-1 mx-6 mt-[-25px] rounded-full transition-all duration-500 ${
-                      currentStep > step.id 
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 shadow-sm' 
-                        : 'bg-gray-200 dark:bg-gray-600'
-                    }`} />
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           </div>
 

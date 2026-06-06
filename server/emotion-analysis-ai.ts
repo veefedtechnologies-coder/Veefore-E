@@ -145,24 +145,16 @@ Focus on:
 - Viral content psychology and shareability factors
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert emotional intelligence analyst with advanced knowledge of psychology, neuroscience, and social media behavior. Provide scientifically-grounded emotional analysis with actionable insights for content optimization."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 2500
-    });
+    const promptStr = `System: You are an expert emotional intelligence analyst with advanced knowledge of psychology, neuroscience, and social media behavior. Provide scientifically-grounded emotional analysis with actionable insights for content optimization. Always return valid JSON.\n\nUser: ${prompt}`;
 
-    const analysisResults = JSON.parse(response.choices[0].message.content || '{}');
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let analysisResults: any = {};
+    try {
+      analysisResults = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[EMOTION ANALYSIS] Failed to generate JSON using AIServiceManager', e);
+      throw new Error('Failed to parse AI response');
+    }
     
     console.log(`[EMOTION ANALYSIS] ✅ Analysis completed`);
     console.log(`[EMOTION ANALYSIS] Primary emotion: ${analysisResults.primaryEmotion?.emotion || 'unknown'} (${analysisResults.primaryEmotion?.intensity || 0}%)`);

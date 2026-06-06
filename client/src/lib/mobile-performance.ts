@@ -18,10 +18,15 @@ export class MobilePerformance {
     return MobilePerformance.instance;
   }
 
+  private isInitialized = false;
+
   /**
    * Initialize mobile performance optimization
    */
   async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+    
     await this.setupNetworkDetection();
     await this.setupBatteryMonitoring();
     this.setupPerformanceMonitoring();

@@ -2,6 +2,9 @@ import express from 'express';
 import { SocialAccount } from '@shared/schema';
 import Metrics from '../models/Metrics';
 import { MetricsQueueManager } from '../queues/metricsQueue';
+import { dashboardRefreshLimiter, syncRateLimiter } from '../middleware/rate-limiting-working';
+import { requireAuth } from '../middleware/require-auth';
+import { validateWorkspace } from '../middleware/workspace-validation';
 
 // Define minimal interfaces for MVP
 interface IMetrics {
@@ -25,7 +28,7 @@ const router = express.Router();
  * GET /api/workspaces/:workspaceId/metrics
  * Returns cached metrics instantly and schedules background refresh
  */
-router.get('/workspaces/:workspaceId/metrics', async (req: express.Request, res: express.Response) => {
+router.get('/workspaces/:workspaceId/metrics', requireAuth, validateWorkspace(), dashboardRefreshLimiter, async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId } = req.params;
     const { refresh = 'false', period = 'day', days = '7', checkForUpdates = 'false' } = req.query;
@@ -193,21 +196,22 @@ router.get('/workspaces/:workspaceId/metrics', async (req: express.Request, res:
       impressions: calculatePercentageChange(summary.totalImpressions, yesterdaySummary.totalImpressions),
     };
 
-    // Schedule background refresh if requested or if data is stale
-    const shouldScheduleRefresh = refresh === 'true' || hasStaleData(latestMetrics);
+    // SMART POLLING POLICY: Only schedule a background refresh if EXPLICITLY requested via ?refresh=true.
+    // Do NOT auto-trigger based on stale data — that bypasses Smart Polling and causes unexpected updates.
+    const shouldScheduleRefresh = refresh === 'true';
 
     if (shouldScheduleRefresh) {
-      console.log(`🔄 Scheduling background metrics refresh for workspace ${workspaceId}`);
+      console.log(`🔄 Scheduling explicit background metrics refresh for workspace ${workspaceId}`);
 
       for (const acc of instagramAccounts) {
-        if (acc.accountId && acc.hasAccessToken) {
+        if (acc.accountId && acc.accessToken) {
           await MetricsQueueManager.scheduleMetricsFetch(
             workspaceId,
-            'system', // Use system as default user ID for auto-refresh
+            'system', // Use system as default user ID for manual refresh
             acc.accountId,
             '', // Token will be retrieved by queue if not provided
             'all',
-            { priority: refresh === 'true' ? 5 : 15 } // Higher priority for manual refresh
+            { priority: 5, forceRefresh: true } // Manual refresh always gets high priority + cache bypass
           );
         }
       }
@@ -245,10 +249,31 @@ router.get('/workspaces/:workspaceId/metrics', async (req: express.Request, res:
 });
 
 /**
+ * GET /api/workspaces/:workspaceId/metrics/followers
+ * Get daily/weekly/monthly follower analytics from snapshots
+ */
+router.get('/workspaces/:workspaceId/metrics/followers', requireAuth, validateWorkspace(), async (req: express.Request, res: express.Response) => {
+  try {
+    const { workspaceId } = req.params;
+    const { analyticsService } = await import('../services');
+    
+    const followerData = await analyticsService.getFollowerAnalytics(workspaceId);
+    
+    res.json(followerData);
+  } catch (error) {
+    console.error('🚨 Error fetching follower analytics:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to fetch follower analytics'
+    });
+  }
+});
+
+/**
  * GET /api/workspaces/:workspaceId/metrics/account/:accountId
  * Get detailed metrics for a specific Instagram account
  */
-router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req: express.Request, res: express.Response) => {
+router.get('/workspaces/:workspaceId/metrics/account/:accountId', requireAuth, validateWorkspace(), dashboardRefreshLimiter, async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId, accountId } = req.params;
     const { period = 'day', limit = '30' } = req.query;
@@ -270,25 +295,18 @@ router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req: ex
       return res.status(404).json({ error: 'Account not found in this workspace' });
     }
 
-    // MVP: Return sample historical metrics data
-    const metrics: IMetrics[] = Array.from({ length: Math.min(parseInt(limit as string), 10) }, (_, i) => ({
+    // Fetch real historical metrics data from DB
+    const metrics = await Metrics.find({
       workspaceId,
-      instagramAccountId: accountId,
-      instagramUsername: account.username || 'unknown',
-      followers: (account.followersCount || 1000) - (i * 50),
-      likes: Math.floor(Math.random() * 500) + 50,
-      comments: Math.floor(Math.random() * 100) + 10,
-      reach: account.totalReach || 0,
-      impressions: account.totalImpressions || 0,
-      engagementRate: account.avgEngagement || 0,
-      lastUpdated: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
-      fetchedAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
-      dataStatus: 'active'
-    }));
+      instagramAccountId: accountId
+    })
+    .sort({ startDate: -1 })
+    .limit(Math.min(parseInt(limit as string) || 30, 90))
+    .lean();
 
     if (metrics.length === 0) {
       // MVP: Log that refresh would be scheduled
-      if (account.hasAccessToken) {
+      if (account.accessToken) {
         console.log(`📊 Would schedule metrics fetch for account ${accountId} (MVP mode)`);
       }
 
@@ -336,7 +354,7 @@ router.get('/workspaces/:workspaceId/metrics/account/:accountId', async (req: ex
  * POST /api/workspaces/:workspaceId/metrics/refresh
  * Force refresh metrics for all accounts in workspace
  */
-router.post('/workspaces/:workspaceId/metrics/refresh', async (req: express.Request, res: express.Response) => {
+router.post('/workspaces/:workspaceId/metrics/refresh', requireAuth, validateWorkspace(), async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId } = req.params;
     const { accounts } = req.body; // Optional: specific account IDs to refresh
@@ -368,11 +386,20 @@ router.post('/workspaces/:workspaceId/metrics/refresh', async (req: express.Requ
       return res.status(400).json({ error: 'No Instagram accounts found to refresh' });
     }
 
-    // MVP: Log scheduled jobs without actual queue processing
+    // Schedule jobs in BullMQ worker queue
     const scheduledJobs: Array<{ accountId: string; username: string }> = [];
     for (const acc of instagramAccounts) {
-      if (acc.accountId && acc.hasAccessToken) {
-        console.log(`📊 Would schedule refresh for account ${acc.accountId} (MVP mode)`);
+      if (acc.accountId && acc.accessToken) {
+        console.log(`📊 Scheduling bulk refresh for account ${acc.accountId} via BullMQ`);
+        
+        await MetricsQueueManager.scheduleMetricsFetch(
+          workspaceId,
+          'system',
+          acc.accountId,
+          '',
+          'all',
+          { priority: 5, forceRefresh: true }
+        );
 
         scheduledJobs.push({
           accountId: acc.accountId,
@@ -380,6 +407,11 @@ router.post('/workspaces/:workspaceId/metrics/refresh', async (req: express.Requ
         });
       }
     }
+
+    console.log(`\n======================================================`);
+    console.log(`[FRONTEND DECOUPLED API] ✅ Bulk refresh jobs queued for ${scheduledJobs.length} accounts!`);
+    console.log(`[FRONTEND DECOUPLED API] Sending immediate 200 response to frontend without waiting for Meta API.`);
+    console.log(`======================================================\n`);
 
     res.json({
       message: `Scheduled refresh for ${scheduledJobs.length} accounts`,
@@ -400,7 +432,7 @@ router.post('/workspaces/:workspaceId/metrics/refresh', async (req: express.Requ
  * GET /api/workspaces/:workspaceId/metrics/status
  * Get refresh status and token statistics
  */
-router.get('/workspaces/:workspaceId/metrics/status', async (req: express.Request, res: express.Response) => {
+router.get('/workspaces/:workspaceId/metrics/status', requireAuth, validateWorkspace(), dashboardRefreshLimiter, async (req: express.Request, res: express.Response) => {
   try {
     const { workspaceId } = req.params;
 

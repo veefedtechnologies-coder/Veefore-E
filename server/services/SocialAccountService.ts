@@ -10,6 +10,7 @@ import * as path from 'path';
 import { checkInstagramAccountExists, validateInstagramConnection } from '../utils/instagram-validation';
 import { MongoStorage } from '../mongodb-storage';
 import { InstagramOAuthService } from '../instagram-oauth';
+import { MetricsQueueManager } from '../queues/metricsQueue';
 
 const traceLog = (msg: string, data?: any) => {
   try {
@@ -180,6 +181,25 @@ export class SocialAccountService extends BaseService {
         workspaceId: input.workspaceId
       });
       traceLog('New account created', { id: account._id?.toString() });
+
+      // PHASE 4: Hook up BullMQ smart polling automatically
+      if (input.platform === 'instagram' || input.platform === 'instagram_advanced') {
+        const tokenToUse = input.accessToken || account.accessToken;
+        const instAccountId = input.accountId || account.accountId;
+        if (tokenToUse && instAccountId) {
+          // Fire and forget - schedule the background jobs
+          MetricsQueueManager.scheduleSmartPolling(
+            input.workspaceId.toString(),
+            'system', // UserId not strictly required for backend polling
+            instAccountId,
+            tokenToUse,
+            'medium'
+          ).catch(err => {
+            console.error('Failed to schedule smart polling on connect:', err);
+          });
+        }
+      }
+
       return account;
     });
   }
@@ -345,9 +365,10 @@ export class SocialAccountService extends BaseService {
     });
   }
 
-  async syncAccount(accountId: string): Promise<ISocialAccount> {
+  async syncAccount(accountId: string, options?: { metricsType?: 'followers' | 'likes' | 'comments' | 'reach' | 'views' | 'stories' | 'profile_views' | 'all', forceRefresh?: boolean }): Promise<ISocialAccount> {
     return this.withErrorHandling('syncAccount', async () => {
-      console.log(`[SYNC] syncAccount called for ${accountId}`);
+      const metricsType = options?.metricsType || 'all';
+      console.log(`[SYNC] syncAccount called for ${accountId} with type: ${metricsType}`);
       const account = await this.getAccountById(accountId);
 
       if (account.platform !== 'instagram') {
@@ -360,18 +381,37 @@ export class SocialAccountService extends BaseService {
         throw new ValidationError('Access token not found or expired');
       }
 
+      // Determine what to fetch based on metricsType
+      let fetchMedia = false;
+      let fetchInsights = false;
+
+      if (metricsType === 'all') {
+        fetchMedia = true;
+        fetchInsights = true;
+      } else if (metricsType === 'likes' || metricsType === 'comments' || metricsType === 'views' || metricsType === 'stories' || metricsType === 'shares' || metricsType === 'saves') {
+        fetchMedia = true;
+      } else if (metricsType === 'reach' || metricsType === 'profile_views') {
+        fetchInsights = true;
+      }
+      // if metricsType is 'followers', both remain false (only account profile is fetched)
+
       try {
         traceLog(`Starting sync for Instagram account: @${account.username}`, {
           accountId,
           tokenLen: accessToken?.length,
-          tokenStart: accessToken?.substring(0, 10)
+          tokenStart: accessToken?.substring(0, 10),
+          fetchMedia,
+          fetchInsights
         });
 
-        // 1. Fetch comprehensive metrics from Instagram
-        // Uses standardized centralized limits (90 days / 100 limit / lifetime fallback)
+        // 1. Fetch metrics from Instagram (Granular)
+        const daysLimit = options?.forceRefresh ? 90 : 14;
+        const minPosts = options?.forceRefresh ? 100 : 10;
+        
         const data = await InstagramApiService.getComprehensiveMetrics(
           accessToken,
-          account.accountId
+          account.accountId,
+          { fetchMedia, fetchInsights, forceRefresh: options?.forceRefresh, daysLimit, minPosts }
         );
 
         traceLog('Sync data received', {
@@ -379,53 +419,99 @@ export class SocialAccountService extends BaseService {
           followers: data.account?.followers_count,
           totalMediaOnProfile: data.account?.media_count
         });
-        if (data.recentMedia?.length > 0) {
-          console.log(`[DEBUG] Sample media timestamp: ${data.recentMedia[0].timestamp}`);
+
+        // 1.5 Save recent media as Content documents FIRST so we can query lifetime metrics accurately
+        if (fetchMedia && data.recentMedia.length > 0) {
+          console.log(`[SYNC] Preparing to save ${data.recentMedia.length} posts to ContentModel`);
+          const { ContentModel } = await import('../models/Content/Content');
+          for (const media of data.recentMedia) {
+            await ContentModel.findOneAndUpdate(
+              {
+                workspaceId: account.workspaceId,
+                'contentData.id': media.id
+              },
+              {
+                workspaceId: account.workspaceId,
+                accountId: account.accountId || accountId,
+                type: media.media_type.toLowerCase() === 'carousel_album' ? 'carousel' : media.media_type.toLowerCase(),
+                title: media.caption?.substring(0, 50) || 'Instagram Post',
+                description: media.caption,
+                contentData: {
+                  ...media,
+                  platform: 'instagram'
+                },
+                platform: 'instagram',
+                status: 'published',
+                isImported: true,
+                publishedAt: new Date(media.timestamp),
+                metrics: {
+                  likes: media.like_count || 0,
+                  comments: media.comments_count || 0,
+                  shares: media.insights?.shares || 0,
+                  saves: media.insights?.saves || 0,
+                  reach: media.insights?.reach || 0,
+                  views: media.insights?.video_views || 0,
+                  engagement: ((media.like_count || 0) + (media.comments_count || 0)) / (data.account.followers_count || 1) * 100
+                }
+              },
+              { upsert: true, new: true }
+            );
+          }
+          console.log(`[SYNC] Finished saving ${data.recentMedia.length} posts to ContentModel.`);
         }
 
-        // 2. Calculate deltas for growth tracking
+        // 2. Query the entire database to calculate true lifetime metrics (regardless of daysLimit)
+        const { contentRepository } = await import('../repositories/ContentRepository');
+        const dbMetrics = await contentRepository.getAggregatedMetrics(account.workspaceId.toString(), account.accountId || accountId);
+        
         const oldTotalLikes = account.totalLikes || 0;
         const oldTotalComments = account.totalComments || 0;
         const oldTotalShares = account.totalShares || 0;
+        const oldTotalReach = account.totalReach || 0;
+        const oldTotalSaves = account.totalSaves || 0;
+        const oldAvgEngagementRate = account.engagementRate || 0;
         const oldMediaCount = account.mediaCount || 0;
 
-        // Calculate deltas (daily growth)
-        const deltaLikes = Math.max(0, data.aggregated.totalLikes - oldTotalLikes);
-        const deltaComments = Math.max(0, data.aggregated.totalComments - oldTotalComments);
-        const deltaShares = Math.max(0, data.aggregated.totalShares - oldTotalShares);
-        const deltaPosts = Math.max(0, data.account.media_count - oldMediaCount);
-
-        const postCount = data.recentMedia.length;
-        const primaryReach = data.aggregated.totalReach || 0;
-
-        const { contentRepository } = await import('../repositories/ContentRepository');
-        const dbMetrics = await contentRepository.getAggregatedMetrics(account.workspaceId.toString(), account.accountId || accountId);
-
-        traceLog('DB Aggregated metrics', {
-          dbReach: dbMetrics.totalReach,
-          apiAggregatedReach: primaryReach
-        });
-
-        // P2-FIX: Use DB-summed reach for Lifetime totals.
-        // This ensures reach is never capped/lost due to API snapshot limitations.
+        const primaryReach = fetchInsights ? (data.aggregated.totalReach || 0) : oldTotalReach;
         const lifetimeReach = Math.max(dbMetrics.totalReach, primaryReach);
+
+        // Use database sums if we fetched media, otherwise fallback to old values
+        const totalLikes = fetchMedia ? dbMetrics.totalLikes : oldTotalLikes;
+        const totalComments = fetchMedia ? dbMetrics.totalComments : oldTotalComments;
+        const totalShares = fetchMedia ? dbMetrics.totalShares : oldTotalShares;
+        const totalSaves = fetchMedia ? dbMetrics.totalSaves : oldTotalSaves;
+        
+        const totalPostsDb = dbMetrics.totalVideos + dbMetrics.totalImages + dbMetrics.totalCarousels;
+        const postCount = fetchMedia ? Math.max(totalPostsDb, data.account.media_count || 1) : (account.mediaCount || 1);
+
+        let engagementRate = oldAvgEngagementRate;
+        if (fetchMedia && postCount > 0 && data.account.followers_count > 0) {
+          const totalEngagements = totalLikes + totalComments + totalShares + totalSaves;
+          const denominator = data.account.followers_count * postCount;
+          engagementRate = denominator > 0 ? (totalEngagements / denominator) * 100 : 0;
+        }
+
+        const deltaLikes = Math.max(0, totalLikes - oldTotalLikes);
+        const deltaComments = Math.max(0, totalComments - oldTotalComments);
+        const deltaShares = Math.max(0, totalShares - oldTotalShares);
 
         const updatedAccount = await socialAccountRepository.updateMetrics(accountId, {
           followersCount: data.account.followers_count,
           followingCount: data.account.follows_count,
           mediaCount: data.account.media_count,
-          totalLikes: data.aggregated.totalLikes,
-          totalComments: data.aggregated.totalComments,
+          totalLikes,
+          totalComments,
           totalReach: lifetimeReach,
-          totalSaves: data.aggregated.totalSaves,
-          totalShares: data.aggregated.totalShares,
-          engagementRate: data.aggregated.averageEngagementRate,
-          avgLikes: data.aggregated.totalLikes / (postCount || 1),
-          avgComments: data.aggregated.totalComments / (postCount || 1),
+          totalViews: fetchInsights ? (data.insights.impressions_days_28 || data.insights.impressions || account.totalViews || 0) : account.totalViews,
+          totalSaves,
+          totalShares,
+          engagementRate,
+          avgLikes: totalLikes / (postCount || 1),
+          avgComments: totalComments / (postCount || 1),
           avgReach: lifetimeReach / (postCount || 1),
-          audienceCity: data.demographics?.audienceCity,
-          audienceCountry: data.demographics?.audienceCountry,
-          audienceGenderAge: data.demographics?.audienceGenderAge,
+          audienceCity: fetchInsights ? data.demographics?.audienceCity : account.audienceCity,
+          audienceCountry: fetchInsights ? data.demographics?.audienceCountry : account.audienceCountry,
+          audienceGenderAge: fetchInsights ? data.demographics?.audienceGenderAge : account.audienceGenderAge,
         });
         traceLog('Repository update successful');
 
@@ -433,7 +519,6 @@ export class SocialAccountService extends BaseService {
         traceLog('Analytics update starting');
         const { analyticsService } = await import('./AnalyticsService');
 
-        // P2-FIX: Record DELTAS in analytics for aggregation, but snapshot for followers/posts-total
         await analyticsService.recordMetrics({
           workspaceId: account.workspaceId.toString(),
           accountId: account.accountId || account._id.toString(),
@@ -443,100 +528,104 @@ export class SocialAccountService extends BaseService {
           likes: deltaLikes,                      // growth delta
           comments: deltaComments,                // growth delta
           shares: deltaShares,                    // growth delta
-          reach: primaryReach,                    // 28d or media sum
-          reachDay: data.insights.reach_day,
-          reachWeek: data.insights.reach_week,
-          reachDays28: data.insights.reach_days_28,
-          engagement: data.aggregated.averageEngagementRate, // Authentic snapshot (e.g. 18%)
+          views: fetchInsights ? data.insights.impressions : 0, // daily views
+          reach: fetchInsights ? primaryReach : undefined,
+          reachDay: fetchInsights ? data.insights.reach_day : undefined,
+          reachWeek: fetchInsights ? data.insights.reach_week : undefined,
+          reachDays28: fetchInsights ? data.insights.reach_days_28 : undefined,
+          engagement: engagementRate, // Authentic snapshot (e.g. 18%)
           customMetrics: {
-            posts: data.aggregated.totalPosts || 0
+            posts: fetchMedia ? data.aggregated.totalPosts : undefined,
+            views: fetchInsights ? data.insights.impressions : undefined,
+            viewsDay: fetchInsights ? data.insights.impressions_day : undefined,
+            viewsWeek: fetchInsights ? data.insights.impressions_week : undefined,
+            viewsDays28: fetchInsights ? data.insights.impressions_days_28 : undefined,
+            profileViews: fetchInsights ? data.insights.profile_views : undefined
           },
-          audienceCity: data.insights.audience_city,
-          audienceCountry: data.insights.audience_country,
-          audienceGenderAge: data.insights.audience_gender_age
+          audienceCity: fetchInsights ? data.insights.audience_city : undefined,
+          audienceCountry: fetchInsights ? data.insights.audience_country : undefined,
+          audienceGenderAge: fetchInsights ? data.insights.audience_gender_age : undefined
         });
         traceLog('Analytics update successful');
+
+        // 3b. Record follower snapshot for growth tracking
+        try {
+          const { InstagramFollowerSnapshotModel } = await import('../models/Analytics');
+          const snapshotDate = new Date();
+          snapshotDate.setUTCHours(0, 0, 0, 0);
+          
+          await InstagramFollowerSnapshotModel.findOneAndUpdate(
+            {
+              accountId: account._id,
+              instagramUserId: account.accountId || accountId,
+              snapshotDate
+            },
+            { followerCount: data.account.followers_count },
+            { upsert: true, new: true }
+          );
+          traceLog(`Follower snapshot recorded: ${data.account.followers_count} followers`);
+        } catch (snapErr: any) {
+          console.error(`[SYNC] Failed to record follower snapshot:`, snapErr.message);
+        }
 
         // 4. Save historical snapshot in Metrics collection
         traceLog('Historical metrics storage starting');
         const Metrics = (await import('../models/Metrics')).default;
-        await Metrics.create({
-          workspaceId: account.workspaceId.toString(),
-          instagramAccountId: account.accountId,
-          instagramUsername: account.username,
-          metricsType: 'account',
-          followers: data.account.followers_count,
-          following: data.account.follows_count,
-          mediaCount: data.account.media_count,
-          likes: data.aggregated.totalLikes,
-          comments: data.aggregated.totalComments,
-          shares: data.aggregated.totalShares,
-          saves: data.aggregated.totalSaves,
-          reach: data.aggregated.totalReach,
-          impressions: data.aggregated.totalImpressions,
-          engagementRate: data.aggregated.averageEngagementRate,
-          period: 'day',
-          startDate: new Date(),
-          endDate: new Date(),
-          source: 'api',
-          dataStatus: 'fresh'
-        });
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-        // 5. Save recent media as Content documents (for Top Performing Posts)
-        console.log(`[SYNC] Preparing to save ${data.recentMedia.length} posts to ContentModel`);
-        const { ContentModel } = await import('../models/Content/Content');
-        for (const media of data.recentMedia) {
-          await ContentModel.findOneAndUpdate(
-            {
-              workspaceId: account.workspaceId,
-              'contentData.id': media.id
-            },
-            {
-              workspaceId: account.workspaceId,
-              type: media.media_type.toLowerCase() === 'carousel_album' ? 'carousel' : media.media_type.toLowerCase(),
-              title: media.caption?.substring(0, 50) || 'Instagram Post',
-              description: media.caption,
-              contentData: {
-                ...media,
-                platform: 'instagram'
-              },
-              platform: 'instagram',
-              status: 'published',
-              publishedAt: new Date(media.timestamp),
-              metrics: {
-                likes: media.like_count || 0,
-                comments: media.comments_count || 0,
-                shares: media.insights?.shares || 0,
-                saves: media.insights?.saves || 0,
-                reach: media.insights?.reach || 0,
-                views: media.insights?.video_views || 0,
-                engagement: ((media.like_count || 0) + (media.comments_count || 0)) / (data.account.followers_count || 1) * 100
-              }
-            },
-            { upsert: true, new: true }
-          );
-          console.log(`[SYNC] Saved content: ${media.id} (Status: published)`);
-        }
+        await Metrics.findOneAndUpdate(
+          {
+            workspaceId: account.workspaceId.toString(),
+            instagramAccountId: account.accountId,
+            metricsType: 'account',
+            period: 'day',
+            startDate: startOfDay
+          },
+          {
+            $set: {
+              instagramUsername: account.username,
+              followers: data.account.followers_count,
+              following: data.account.follows_count,
+              mediaCount: data.account.media_count,
+              likes: totalLikes,
+              comments: totalComments,
+              shares: totalShares,
+              saves: totalSaves,
+              reach: lifetimeReach,
+              totalViews: fetchInsights ? (data.insights.impressions_days_28 || data.insights.impressions || account.totalViews || 0) : account.totalViews,
+              impressions: fetchInsights ? (data.aggregated.totalImpressions || data.insights.impressions || data.insights.profile_views || 0) : account.totalViews, // graceful fallback
+              engagementRate: engagementRate,
+              endDate: endOfDay,
+              source: 'api',
+              dataStatus: fetchMedia || fetchInsights ? 'fresh' : 'partial'
+            }
+          },
+          { upsert: true, new: true }
+        );
 
-        console.log(`[SYNC] Sync completed: @${account.username}. Synced ${data.recentMedia.length} posts.`);
-
-        this.log('syncAccount', 'Account synced successfully', {
-          accountId,
-          platform: account.platform,
-          mediaSynced: data.recentMedia.length
-        });
-
-        // Trigger AI Best Active Time calculation in background after sync
-        const logFile = path.join(process.cwd(), 'debug-trace.log');
-        fs.appendFileSync(logFile, `[${new Date().toISOString()}] [DEBUG] Triggering AI calculation for @${account.username}\n`);
-
-        BestActiveTimeService.calculateBestActiveTime(accountId, accessToken)
-          .then(() => {
-            fs.appendFileSync(logFile, `[${new Date().toISOString()}] [DEBUG] ✅ AI calculation triggered for @${account.username}\n`);
-          })
-          .catch(err => {
-            fs.appendFileSync(logFile, `[${new Date().toISOString()}] [DEBUG] ❌ AI calculation failed for @${account.username}: ${err.message}\n`);
+        if (fetchMedia) {
+          console.log(`[SYNC] Sync completed: @${account.username}. Synced ${data.recentMedia.length} posts.`);
+          
+          this.log('syncAccount', 'Account synced successfully', {
+            accountId,
+            platform: account.platform,
+            mediaSynced: data.recentMedia.length
           });
+
+          // Trigger AI Best Active Time calculation in background after sync
+          const logFile = path.join(process.cwd(), 'debug-trace.log');
+          fs.appendFileSync(logFile, `[${new Date().toISOString()}] [DEBUG] Triggering AI calculation for @${account.username}\n`);
+
+          BestActiveTimeService.calculateBestActiveTime(accountId, accessToken)
+            .then(() => {
+              fs.appendFileSync(logFile, `[${new Date().toISOString()}] [DEBUG] ✅ AI calculation triggered for @${account.username}\n`);
+            })
+            .catch(err => {
+              fs.appendFileSync(logFile, `[${new Date().toISOString()}] [DEBUG] ❌ AI calculation failed for @${account.username}: ${err.message}\n`);
+            });
+        }
 
         return updatedAccount!;
       } catch (error: any) {

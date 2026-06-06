@@ -105,24 +105,16 @@ Consider these key viral factors:
 Provide actionable insights for maximizing viral potential.
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert viral content analyst with deep understanding of social media algorithms, user psychology, and viral content patterns. Provide data-driven predictions and optimization strategies."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 2000
-    });
+    const promptStr = `System: You are an expert viral content analyst with deep understanding of social media algorithms, user psychology, and viral content patterns. Provide data-driven predictions and optimization strategies. Always return valid JSON.\n\nUser: ${prompt}`;
 
-    const analysisResults = JSON.parse(response.choices[0].message.content || '{}');
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let analysisResults: any = {};
+    try {
+      analysisResults = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[VIRAL PREDICTOR] Failed to generate JSON using AIServiceManager', e);
+      throw new Error('Failed to parse AI response');
+    }
     
     // Calculate final metrics
     const viralScore = Math.min(Math.max(analysisResults.viralScore || 50, 0), 100);

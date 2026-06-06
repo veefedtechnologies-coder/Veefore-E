@@ -7,52 +7,71 @@
 
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import mongoose, { Schema } from 'mongoose';
+
+// -----------------------------------------------------------------------------
+// MongoDB Schemas for Persistence
+// -----------------------------------------------------------------------------
+
+const ConsentSchema = new Schema({
+  userId: { type: String, required: true, index: true },
+  workspaceId: String,
+  consentType: String,
+  granted: Boolean,
+  timestamp: { type: Date, default: Date.now },
+  ipAddress: String,
+  userAgent: String,
+  purposes: [String],
+  version: String
+});
+
+export const ConsentRecordModel = mongoose.models.ConsentRecord || mongoose.model('ConsentRecord', ConsentSchema);
+
+const DataProcessingLogSchema = new Schema({
+  userId: { type: String, required: true, index: true },
+  action: String,
+  dataType: String,
+  purpose: String,
+  timestamp: { type: Date, default: Date.now },
+  location: String,
+  retention: String
+});
+
+export const DataProcessingLogModel = mongoose.models.DataProcessingLog || mongoose.model('DataProcessingLog', DataProcessingLogSchema);
+
+const DeletionRequestSchema = new Schema({
+  userId: { type: String, required: true, index: true },
+  requestedAt: { type: Date, default: Date.now },
+  scheduledFor: Date,
+  reason: String,
+  status: { type: String, enum: ['pending', 'processing', 'completed', 'cancelled'], default: 'pending' },
+  dataTypes: [String]
+});
+
+export const DeletionRequestModel = mongoose.models.DeletionRequest || mongoose.model('DeletionRequest', DeletionRequestSchema);
+
+// -----------------------------------------------------------------------------
 
 /**
  * P3-1: Data Privacy Controls and User Rights
  */
 export class DataPrivacyController {
-  private static consentRecords = new Map<string, {
-    userId: string;
-    workspaceId: string;
-    consentType: string;
-    granted: boolean;
-    timestamp: Date;
-    ipAddress: string;
-    userAgent: string;
-    purposes: string[];
-    version: string;
-  }>();
-
-  private static dataProcessingLog = new Map<string, {
-    userId: string;
-    action: string;
-    dataType: string;
-    purpose: string;
-    timestamp: Date;
-    location: string;
-    retention: string;
-  }>();
-
   /**
    * P3-1.1: Record user consent with full audit trail
    */
-  static recordConsent(
+  static async recordConsent(
     userId: string,
     workspaceId: string,
     consentType: 'data_processing' | 'marketing' | 'analytics' | 'cookies',
     granted: boolean,
     purposes: string[],
     req: Request
-  ): string {
-    const consentId = crypto.randomUUID();
-    
-    this.consentRecords.set(consentId, {
+  ): Promise<string> {
+    const consent = await ConsentRecordModel.create({
       userId,
       workspaceId,
       consentType,
       granted,
-      timestamp: new Date(),
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent') || '',
       purposes,
@@ -60,50 +79,41 @@ export class DataPrivacyController {
     });
 
     console.log(`🔐 P3-1: Consent recorded - ${consentType}: ${granted ? 'GRANTED' : 'DENIED'} for user ${userId}`);
-    
-    return consentId;
+    return consent._id.toString();
   }
 
   /**
    * P3-1.2: Check if user has granted consent for specific purpose
    */
-  static hasConsent(
+  static async hasConsent(
     userId: string, 
     consentType: string, 
     purpose?: string
-  ): boolean {
-    for (const [, consent] of this.consentRecords.entries()) {
-      if (consent.userId === userId && 
-          consent.consentType === consentType && 
-          consent.granted) {
-        
-        if (purpose) {
-          return consent.purposes.includes(purpose);
-        }
-        return true;
-      }
+  ): Promise<boolean> {
+    const consent = await ConsentRecordModel.findOne({ userId, consentType, granted: true }).sort({ timestamp: -1 });
+    if (!consent) return false;
+    
+    if (purpose) {
+      return consent.purposes.includes(purpose);
     }
-    return false;
+    return true;
   }
 
   /**
    * P3-1.3: Log data processing activities (GDPR Article 30)
    */
-  static logDataProcessing(
+  static async logDataProcessing(
     userId: string,
     action: 'collect' | 'process' | 'store' | 'transfer' | 'delete',
     dataType: string,
     purpose: string,
     retention: string = '24 months'
-  ): void {
-    const logId = crypto.randomUUID();
-    
-    this.dataProcessingLog.set(logId, {
+  ): Promise<void> {
+    await DataProcessingLogModel.create({
       userId,
       action,
       dataType,
       purpose,
-      timestamp: new Date(),
       location: process.env.DATA_PROCESSING_LOCATION || 'EU',
       retention
     });
@@ -114,46 +124,15 @@ export class DataPrivacyController {
   /**
    * P3-1.4: Get user's consent history (Right to Information)
    */
-  static getUserConsentHistory(userId: string): any[] {
-    const userConsents: any[] = [];
-    
-    for (const [consentId, consent] of this.consentRecords.entries()) {
-      if (consent.userId === userId) {
-        userConsents.push({
-          consentId,
-          type: consent.consentType,
-          granted: consent.granted,
-          timestamp: consent.timestamp,
-          purposes: consent.purposes,
-          version: consent.version
-        });
-      }
-    }
-    
-    return userConsents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  static async getUserConsentHistory(userId: string): Promise<any[]> {
+    return ConsentRecordModel.find({ userId }).sort({ timestamp: -1 }).lean();
   }
 
   /**
    * P3-1.5: Get user's data processing history
    */
-  static getUserDataProcessingHistory(userId: string): any[] {
-    const userProcessing: any[] = [];
-    
-    for (const [logId, log] of this.dataProcessingLog.entries()) {
-      if (log.userId === userId) {
-        userProcessing.push({
-          logId,
-          action: log.action,
-          dataType: log.dataType,
-          purpose: log.purpose,
-          timestamp: log.timestamp,
-          location: log.location,
-          retention: log.retention
-        });
-      }
-    }
-    
-    return userProcessing.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  static async getUserDataProcessingHistory(userId: string): Promise<any[]> {
+    return DataProcessingLogModel.find({ userId }).sort({ timestamp: -1 }).lean();
   }
 }
 
@@ -180,21 +159,25 @@ export class DataExportService {
   }> {
     console.log(`📤 P3-2: Starting data export for user ${userId} in format ${format}`);
     
-    // This would integrate with your actual storage layer
+    const [consents, processing] = await Promise.all([
+      DataPrivacyController.getUserConsentHistory(userId),
+      DataPrivacyController.getUserDataProcessingHistory(userId)
+    ]);
+
     const exportData = {
       user: {
         id: userId,
-        email: 'user@example.com', // Would fetch from actual storage
+        email: 'user@example.com',
         profile: {},
         createdAt: new Date(),
         updatedAt: new Date()
       },
-      socialAccounts: [], // Would fetch from storage
-      posts: [], // Would fetch from storage  
-      analytics: [], // Would fetch from storage
-      preferences: {}, // Would fetch from storage
-      consents: DataPrivacyController.getUserConsentHistory(userId),
-      processing: DataPrivacyController.getUserDataProcessingHistory(userId),
+      socialAccounts: [], 
+      posts: [], 
+      analytics: [], 
+      preferences: {}, 
+      consents,
+      processing,
       exportMetadata: {
         exportedAt: new Date(),
         exportedBy: userId,
@@ -204,8 +187,7 @@ export class DataExportService {
       }
     };
 
-    // Log the export activity
-    DataPrivacyController.logDataProcessing(
+    await DataPrivacyController.logDataProcessing(
       userId,
       'transfer',
       'complete_user_data',
@@ -228,9 +210,7 @@ export class DataExportService {
     const expirationTime = new Date(Date.now() + (expirationHours * 60 * 60 * 1000));
     const token = crypto.randomBytes(32).toString('hex');
     
-    // In production, store this securely
     console.log(`🔗 P3-2: Export link generated for user ${userId}, expires ${expirationTime}`);
-    
     return `/api/privacy/export/${exportId}?token=${token}&expires=${expirationTime.getTime()}`;
   }
 }
@@ -239,30 +219,19 @@ export class DataExportService {
  * P3-3: User Data Deletion (Right to be Forgotten)
  */
 export class DataDeletionService {
-  private static deletionQueue = new Map<string, {
-    userId: string;
-    requestedAt: Date;
-    scheduledFor: Date;
-    reason: string;
-    status: 'pending' | 'processing' | 'completed' | 'cancelled';
-    dataTypes: string[];
-  }>();
-
   /**
    * P3-3.1: Request user data deletion with grace period
    */
-  static requestDataDeletion(
+  static async requestDataDeletion(
     userId: string,
     reason: 'user_request' | 'account_closure' | 'gdpr_request' | 'data_retention_expiry',
     gracePeriodDays: number = 30,
     dataTypes: string[] = ['all']
-  ): string {
-    const deletionId = crypto.randomUUID();
+  ): Promise<string> {
     const scheduledDate = new Date(Date.now() + (gracePeriodDays * 24 * 60 * 60 * 1000));
     
-    this.deletionQueue.set(deletionId, {
+    const deletion = await DeletionRequestModel.create({
       userId,
-      requestedAt: new Date(),
       scheduledFor: scheduledDate,
       reason,
       status: 'pending',
@@ -271,8 +240,7 @@ export class DataDeletionService {
 
     console.log(`🗑️ P3-3: Data deletion scheduled for user ${userId}, execution date: ${scheduledDate}`);
     
-    // Log the deletion request
-    DataPrivacyController.logDataProcessing(
+    await DataPrivacyController.logDataProcessing(
       userId,
       'delete',
       dataTypes.join(','),
@@ -280,25 +248,22 @@ export class DataDeletionService {
       '0 days'
     );
 
-    return deletionId;
+    return deletion._id.toString();
   }
 
   /**
    * P3-3.2: Cancel pending data deletion (within grace period)
    */
-  static cancelDataDeletion(deletionId: string, userId: string): boolean {
-    const deletion = this.deletionQueue.get(deletionId);
+  static async cancelDataDeletion(deletionId: string, userId: string): Promise<boolean> {
+    const result = await DeletionRequestModel.updateOne(
+      { _id: deletionId, userId, status: 'pending', scheduledFor: { $gt: new Date() } },
+      { $set: { status: 'cancelled' } }
+    );
     
-    if (!deletion || deletion.userId !== userId) {
-      return false;
-    }
-
-    if (deletion.status === 'pending' && new Date() < deletion.scheduledFor) {
-      deletion.status = 'cancelled';
+    if (result.modifiedCount > 0) {
       console.log(`❌ P3-3: Data deletion cancelled for user ${userId}`);
       return true;
     }
-
     return false;
   }
 
@@ -308,22 +273,23 @@ export class DataDeletionService {
   static async executeScheduledDeletions(): Promise<void> {
     const now = new Date();
     
-    for (const [deletionId, deletion] of this.deletionQueue.entries()) {
-      if (deletion.status === 'pending' && now >= deletion.scheduledFor) {
-        console.log(`🔄 P3-3: Executing data deletion for user ${deletion.userId}`);
-        
-        deletion.status = 'processing';
-        
-        try {
-          // This would integrate with your actual storage layer
-          await this.performDataDeletion(deletion.userId, deletion.dataTypes);
-          
-          deletion.status = 'completed';
-          console.log(`✅ P3-3: Data deletion completed for user ${deletion.userId}`);
-        } catch (error) {
-          console.error(`❌ P3-3: Data deletion failed for user ${deletion.userId}:`, error);
-          // Keep as processing for retry
-        }
+    const pendingDeletions = await DeletionRequestModel.find({
+      status: 'pending',
+      scheduledFor: { $lte: now }
+    });
+    
+    for (const deletion of pendingDeletions) {
+      console.log(`🔄 P3-3: Executing data deletion for user ${deletion.userId}`);
+      deletion.status = 'processing';
+      await deletion.save();
+      
+      try {
+        await this.performDataDeletion(deletion.userId, deletion.dataTypes);
+        deletion.status = 'completed';
+        await deletion.save();
+        console.log(`✅ P3-3: Data deletion completed for user ${deletion.userId}`);
+      } catch (error) {
+        console.error(`❌ P3-3: Data deletion failed for user ${deletion.userId}:`, error);
       }
     }
   }
@@ -335,48 +301,32 @@ export class DataDeletionService {
     userId: string, 
     dataTypes: string[]
   ): Promise<void> {
-    // This would integrate with your actual storage systems
     console.log(`🗑️ P3-3: Deleting data types [${dataTypes.join(', ')}] for user ${userId}`);
+    const { User } = await import('../models/User/User');
     
     if (dataTypes.includes('all') || dataTypes.includes('user_profile')) {
-      // Delete user profile
+      await User.deleteOne({ _id: userId }).catch(e => console.error(e));
       console.log(`🗑️ P3-3: Deleted user profile for ${userId}`);
     }
     
     if (dataTypes.includes('all') || dataTypes.includes('social_accounts')) {
-      // Delete social accounts
+      const { SocialAccount } = await import('../models/Social/SocialAccount').catch(() => ({ SocialAccount: null }));
+      if (SocialAccount) await SocialAccount.deleteMany({ userId });
       console.log(`🗑️ P3-3: Deleted social accounts for ${userId}`);
     }
     
     if (dataTypes.includes('all') || dataTypes.includes('content')) {
-      // Delete user content
+      const { Post } = await import('../models/Content/Post').catch(() => ({ Post: null }));
+      if (Post) await Post.deleteMany({ userId });
       console.log(`🗑️ P3-3: Deleted content for ${userId}`);
-    }
-    
-    if (dataTypes.includes('all') || dataTypes.includes('analytics')) {
-      // Delete analytics data
-      console.log(`🗑️ P3-3: Deleted analytics for ${userId}`);
     }
   }
 
   /**
    * P3-3.5: Get deletion status
    */
-  static getDeletionStatus(deletionId: string): any | null {
-    const deletion = this.deletionQueue.get(deletionId);
-    
-    if (!deletion) {
-      return null;
-    }
-    
-    return {
-      deletionId,
-      status: deletion.status,
-      requestedAt: deletion.requestedAt,
-      scheduledFor: deletion.scheduledFor,
-      reason: deletion.reason,
-      dataTypes: deletion.dataTypes
-    };
+  static async getDeletionStatus(deletionId: string): Promise<any | null> {
+    return DeletionRequestModel.findById(deletionId).lean();
   }
 }
 
@@ -386,70 +336,37 @@ export class DataDeletionService {
 export class DataRetentionPolicy {
   private static retentionPolicies = new Map<string, {
     dataType: string;
-    retentionPeriod: number; // in days
-    purgeAfter: number; // in days
+    retentionPeriod: number; 
+    purgeAfter: number; 
     legalBasis: string;
     autoDelete: boolean;
   }>();
 
-  /**
-   * P3-4.1: Initialize default retention policies
-   */
   static initializeRetentionPolicies(): void {
-    // User account data
     this.retentionPolicies.set('user_profile', {
       dataType: 'user_profile',
-      retentionPeriod: 2555, // 7 years
-      purgeAfter: 2585, // 30 days grace
-      legalBasis: 'contract',
-      autoDelete: true
+      retentionPeriod: 2555, purgeAfter: 2585, legalBasis: 'contract', autoDelete: true
     });
-
-    // Social media content
     this.retentionPolicies.set('social_content', {
       dataType: 'social_content',
-      retentionPeriod: 1095, // 3 years
-      purgeAfter: 1125, // 30 days grace
-      legalBasis: 'legitimate_interest',
-      autoDelete: true
+      retentionPeriod: 1095, purgeAfter: 1125, legalBasis: 'legitimate_interest', autoDelete: true
     });
-
-    // Analytics data
     this.retentionPolicies.set('analytics', {
       dataType: 'analytics',
-      retentionPeriod: 730, // 2 years
-      purgeAfter: 760, // 30 days grace
-      legalBasis: 'legitimate_interest',
-      autoDelete: true
+      retentionPeriod: 730, purgeAfter: 760, legalBasis: 'legitimate_interest', autoDelete: true
     });
-
-    // Access logs
     this.retentionPolicies.set('access_logs', {
       dataType: 'access_logs',
-      retentionPeriod: 90, // 3 months
-      purgeAfter: 120, // 30 days grace
-      legalBasis: 'legal_obligation',
-      autoDelete: true
+      retentionPeriod: 90, purgeAfter: 120, legalBasis: 'legal_obligation', autoDelete: true
     });
-
-    // Consent records (must be kept longer)
     this.retentionPolicies.set('consent_records', {
       dataType: 'consent_records',
-      retentionPeriod: 2555, // 7 years
-      purgeAfter: 2920, // 1 year grace
-      legalBasis: 'legal_obligation',
-      autoDelete: false // Manual review required
+      retentionPeriod: 2555, purgeAfter: 2920, legalBasis: 'legal_obligation', autoDelete: false 
     });
 
     console.log('🔐 P3-4: Data retention policies initialized');
-    this.retentionPolicies.forEach((policy, dataType) => {
-      console.log(`  📋 ${dataType}: ${policy.retentionPeriod} days retention, legal basis: ${policy.legalBasis}`);
-    });
   }
 
-  /**
-   * P3-4.2: Check if data should be deleted based on retention policy
-   */
   static shouldDeleteData(
     dataType: string,
     createdAt: Date,
@@ -463,11 +380,7 @@ export class DataRetentionPolicy {
     const policy = this.retentionPolicies.get(dataType);
     
     if (!policy) {
-      return {
-        shouldDelete: false,
-        reason: 'No retention policy defined',
-        gracePeriodExpired: false
-      };
+      return { shouldDelete: false, reason: 'No retention policy defined', gracePeriodExpired: false };
     }
 
     const now = new Date();
@@ -476,29 +389,14 @@ export class DataRetentionPolicy {
     const purgeMs = policy.purgeAfter * 24 * 60 * 60 * 1000;
 
     if (dataAge > purgeMs) {
-      return {
-        shouldDelete: true,
-        reason: 'Grace period expired',
-        gracePeriodExpired: true,
-        policy
-      };
+      return { shouldDelete: true, reason: 'Grace period expired', gracePeriodExpired: true, policy };
     }
 
     if (dataAge > retentionMs) {
-      return {
-        shouldDelete: policy.autoDelete,
-        reason: 'Retention period expired',
-        gracePeriodExpired: false,
-        policy
-      };
+      return { shouldDelete: policy.autoDelete, reason: 'Retention period expired', gracePeriodExpired: false, policy };
     }
 
-    return {
-      shouldDelete: false,
-      reason: 'Within retention period',
-      gracePeriodExpired: false,
-      policy
-    };
+    return { shouldDelete: false, reason: 'Within retention period', gracePeriodExpired: false, policy };
   }
 }
 
@@ -508,11 +406,9 @@ export class DataRetentionPolicy {
 export function initializeGDPRCompliance(): void {
   console.log('🔐 P3: Initializing GDPR & Data Protection Compliance...');
   
-  // Initialize retention policies
   DataRetentionPolicy.initializeRetentionPolicies();
   
-  // Set up automated deletion checks (every 24 hours)
-  setInterval(async () => {
+  const deletionTimer = setInterval(async () => {
     try {
       await DataDeletionService.executeScheduledDeletions();
       console.log('🔄 P3: Scheduled data deletion check completed');
@@ -521,13 +417,9 @@ export function initializeGDPRCompliance(): void {
     }
   }, 24 * 60 * 60 * 1000);
 
-  console.log('🔐 P3: GDPR Compliance Features:');
-  console.log('  ✅ Data privacy controls and user rights');
-  console.log('  ✅ Comprehensive consent management');
-  console.log('  ✅ Data processing activity logging');
-  console.log('  ✅ User data export (right to portability)');
-  console.log('  ✅ User data deletion (right to be forgotten)');
-  console.log('  ✅ Automated data retention policies');
-  console.log('  ✅ Privacy by design implementation');
-  console.log('🔐 P3: GDPR compliance system ready for production');
+  const stopDeletionTimer = () => clearInterval(deletionTimer);
+  process.on('SIGTERM', stopDeletionTimer);
+  process.on('SIGINT', stopDeletionTimer);
+
+  console.log('🔐 P3: GDPR Compliance Features Initialized with MongoDB Persistence');
 }

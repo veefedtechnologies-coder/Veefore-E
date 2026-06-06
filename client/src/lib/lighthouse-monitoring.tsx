@@ -42,8 +42,12 @@ export class LighthouseMonitor {
     return LighthouseMonitor.instance;
   }
 
+  private isInitialized = false;
+
   // P7-6.5.2: Initialize Core Web Vitals Monitoring
   public initializeMonitoring(): void {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
     this.monitorFCP();
     this.monitorLCP();
     this.monitorFID();

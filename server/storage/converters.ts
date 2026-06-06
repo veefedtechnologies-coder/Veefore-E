@@ -151,6 +151,7 @@ export function convertUser(mongoUser: any): User {
     welcomeBonusClaimedAt: mongoUser.welcomeBonusClaimedAt || null,
     onboardingStep: mongoUser.onboardingStep || 1,
     onboardingData: mongoUser.onboardingData || {},
+    niche: mongoUser.niche || null,
     instagramToken: mongoUser.instagramToken || null,
     instagramRefreshToken: mongoUser.instagramRefreshToken || null,
     instagramTokenExpiry: mongoUser.instagramTokenExpiry || null,

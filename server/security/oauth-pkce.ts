@@ -18,14 +18,15 @@ export class PKCEManager {
    * Generate cryptographically secure code verifier
    */
   static generateCodeVerifier(): string {
-    const array = new Uint8Array(PKCEManager.CODE_VERIFIER_LENGTH);
+    const bytes = randomBytes(PKCEManager.CODE_VERIFIER_LENGTH);
+    const array = new Array(PKCEManager.CODE_VERIFIER_LENGTH);
     
-    // Use crypto.getRandomValues for secure randomness
-    for (let i = 0; i < array.length; i++) {
-      array[i] = Math.floor(Math.random() * PKCEManager.VALID_CHARS.length);
+    // Use crypto.randomBytes for secure randomness instead of Math.random()
+    for (let i = 0; i < bytes.length; i++) {
+      array[i] = PKCEManager.VALID_CHARS[bytes[i] % PKCEManager.VALID_CHARS.length];
     }
     
-    return Array.from(array, byte => PKCEManager.VALID_CHARS[byte]).join('');
+    return array.join('');
   }
 
   /**
@@ -45,7 +46,15 @@ export class PKCEManager {
    */
   static verifyCodeChallenge(verifier: string, challenge: string): boolean {
     const computedChallenge = PKCEManager.generateCodeChallenge(verifier);
-    return computedChallenge === challenge;
+    try {
+      const { timingSafeEqual } = require('crypto');
+      const buf1 = Buffer.from(computedChallenge);
+      const buf2 = Buffer.from(challenge);
+      if (buf1.length !== buf2.length) return false;
+      return timingSafeEqual(buf1, buf2);
+    } catch (e) {
+      return computedChallenge === challenge;
+    }
   }
 
   /**
@@ -80,34 +89,43 @@ export class OAuthStateManager {
     nonce: string;
   }>();
 
-  private static readonly STATE_EXPIRY = 10 * 60 * 1000; // 10 minutes
+  private static readonly STATE_EXPIRY = 10 * 60; // 10 minutes in seconds
   private static readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
   /**
    * Generate secure OAuth state with PKCE integration
    */
-  static generateState(options: {
+  static async generateState(options: {
     userId?: string;
     workspaceId?: string;
     platform: string;
-  }): {
+  }): Promise<{
     state: string;
     codeVerifier: string;
     codeChallenge: string;
     nonce: string;
-  } {
+  }> {
     const state = randomBytes(32).toString('hex');
     const nonce = randomBytes(16).toString('hex');
     const pkceParams = PKCEManager.generatePKCEParams();
 
-    OAuthStateManager.states.set(state, {
+    const stateData = {
       timestamp: Date.now(),
       userId: options.userId,
       workspaceId: options.workspaceId,
       platform: options.platform,
       codeVerifier: pkceParams.codeVerifier,
       nonce
-    });
+    };
+
+    try {
+      const { getRedisClient } = await import('../lib/redis');
+      const redis = getRedisClient();
+      await redis.setex(`oauth:state:${state}`, OAuthStateManager.STATE_EXPIRY, JSON.stringify(stateData));
+    } catch (e) {
+      console.warn('⚠️ Redis unavailable, falling back to in-memory state');
+      OAuthStateManager.states.set(state, stateData);
+    }
 
     return {
       state,
@@ -120,7 +138,7 @@ export class OAuthStateManager {
   /**
    * Validate and consume OAuth state
    */
-  static validateState(state: string): {
+  static async validateState(state: string): Promise<{
     isValid: boolean;
     data?: {
       userId?: string;
@@ -129,21 +147,38 @@ export class OAuthStateManager {
       codeVerifier: string;
       nonce: string;
     };
-  } {
-    const stateData = OAuthStateManager.states.get(state);
-    
+  }> {
+    let stateData: any;
+    let usedRedis = false;
+
+    try {
+      const { getRedisClient } = await import('../lib/redis');
+      const redis = getRedisClient();
+      const rawData = await redis.get(`oauth:state:${state}`);
+      if (rawData) {
+        stateData = JSON.parse(rawData);
+        usedRedis = true;
+        await redis.del(`oauth:state:${state}`); // Consume state
+      }
+    } catch (e) {
+      console.warn('⚠️ Redis unavailable, using in-memory state fallback');
+    }
+
+    if (!stateData) {
+      stateData = OAuthStateManager.states.get(state);
+      if (stateData) {
+        OAuthStateManager.states.delete(state);
+      }
+    }
+
     if (!stateData) {
       return { isValid: false };
     }
 
     // Check expiry
-    if (Date.now() - stateData.timestamp > OAuthStateManager.STATE_EXPIRY) {
-      OAuthStateManager.states.delete(state);
+    if (Date.now() - stateData.timestamp > (OAuthStateManager.STATE_EXPIRY * 1000)) {
       return { isValid: false };
     }
-
-    // Consume state (one-time use)
-    OAuthStateManager.states.delete(state);
 
     return {
       isValid: true,
@@ -158,24 +193,35 @@ export class OAuthStateManager {
   }
 
   /**
-   * Clean up expired states
+   * Clean up expired states (only for memory fallback)
    */
   static cleanupExpiredStates(): void {
     const now = Date.now();
     for (const [state, data] of OAuthStateManager.states.entries()) {
-      if (now - data.timestamp > OAuthStateManager.STATE_EXPIRY) {
+      if (now - data.timestamp > (OAuthStateManager.STATE_EXPIRY * 1000)) {
         OAuthStateManager.states.delete(state);
       }
     }
   }
 
+  private static cleanupTimer: NodeJS.Timeout | null = null;
+
   /**
    * Initialize cleanup scheduler
    */
   static initialize(): void {
-    setInterval(() => {
+    OAuthStateManager.cleanupTimer = setInterval(() => {
       OAuthStateManager.cleanupExpiredStates();
     }, OAuthStateManager.CLEANUP_INTERVAL);
+
+    // Ensure graceful shutdown
+    const stopCleanup = () => {
+      if (OAuthStateManager.cleanupTimer) {
+        clearInterval(OAuthStateManager.cleanupTimer);
+      }
+    };
+    process.on('SIGTERM', stopCleanup);
+    process.on('SIGINT', stopCleanup);
 
     console.log('🔐 P2-1: OAuth PKCE and state management initialized');
   }
@@ -191,17 +237,17 @@ export class SecureInstagramOAuth {
   /**
    * Generate secure Instagram OAuth URL with PKCE
    */
-  static generateAuthUrl(options: {
+  static async generateAuthUrl(options: {
     clientId: string;
     redirectUri: string;
     userId?: string;
     workspaceId?: string;
     scopes?: string[];
-  }): {
+  }): Promise<{
     authUrl: string;
     state: string;
-  } {
-    const stateData = OAuthStateManager.generateState({
+  }> {
+    const stateData = await OAuthStateManager.generateState({
       userId: options.userId,
       workspaceId: options.workspaceId,
       platform: 'instagram'

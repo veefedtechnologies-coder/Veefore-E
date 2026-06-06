@@ -93,6 +93,7 @@ const ChangelogEntry = ({ version, date, title, description, changes, isBeta }: 
 
 const Changelog = () => {
     const isMobile = useIsMobile()
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true'
 
     // Changelog entries
     const changelogEntries = [
@@ -102,7 +103,13 @@ const Changelog = () => {
             title: 'Public Beta Launch',
             description: 'The public beta release with core features available to all beta users.',
             isBeta: true,
-            changes: [
+            changes: isPhase1 ? [
+                { type: 'feature' as const, text: 'AI Content Scoring with smart optimization' },
+                { type: 'feature' as const, text: 'Cross-Platform Publishing with scheduling workflows' },
+                { type: 'feature' as const, text: 'Hook Intelligence with competitor analysis' },
+                { type: 'feature' as const, text: 'Growth-Aware Scheduler with best-time recommendations' },
+                { type: 'improvement' as const, text: 'Revamped dashboard with real-time analytics' },
+            ] : [
                 { type: 'feature' as const, text: 'AI Comment Automation with context-aware replies' },
                 { type: 'feature' as const, text: 'Smart DM Automation with keyword triggers' },
                 { type: 'feature' as const, text: 'Hook Intelligence with competitor analysis' },
@@ -140,7 +147,12 @@ const Changelog = () => {
     ]
 
     // Roadmap items
-    const roadmapItems = [
+    const roadmapItems = isPhase1 ? [
+        { title: 'Multi-platform Support', description: 'Twitter/X, LinkedIn, and TikTok integration', status: 'In Progress' },
+        { title: 'Advanced Publishing Hub', description: 'Multi-step content scheduling and approval flows', status: 'Planned' },
+        { title: 'Team Collaboration', description: 'Workspace sharing and role-based access', status: 'Planned' },
+        { title: 'Mobile App', description: 'iOS and Android companion apps', status: 'Planned' },
+    ] : [
         { title: 'Multi-platform Support', description: 'Twitter/X, LinkedIn, and TikTok integration', status: 'In Progress' },
         { title: 'Advanced DM Funnels', description: 'Multi-step automated conversation flows', status: 'Planned' },
         { title: 'Team Collaboration', description: 'Workspace sharing and role-based access', status: 'Planned' },

@@ -48,6 +48,7 @@ const TermsSection = ({ id, icon: Icon, title, children }: { id: string, icon: R
 
 const TermsOfService = () => {
   const isMobile = useIsMobile()
+  const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true'
 
   // Table of contents
   const sections = [
@@ -97,7 +98,7 @@ const TermsOfService = () => {
     <div className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
       <SEO
         title="Terms of Service - Veefore | User Agreement"
-        description="Read the Terms of Service for Veefore. These terms govern your use of our AI-powered engagement automation platform."
+        description={isPhase1 ? "Read the Terms of Service for Veefore. These terms govern your use of our AI-powered content optimization platform." : "Read the Terms of Service for Veefore. These terms govern your use of our AI-powered engagement automation platform."}
       />
 
       {/* Ambient Background */}
@@ -207,7 +208,7 @@ const TermsOfService = () => {
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-2">Our Services Include:</h4>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>AI-powered comment and DM automation</li>
+                  <li>{isPhase1 ? 'AI-powered content scheduling and optimization' : 'AI-powered comment and DM automation'}</li>
                   <li>Engagement analytics and insights</li>
                   <li>Content scheduling and management</li>
                   <li>Audience growth tools and strategies</li>

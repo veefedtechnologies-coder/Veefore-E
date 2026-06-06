@@ -3,17 +3,33 @@ import { ContentModel, IContent } from '../models/Content';
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
 
-export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'failed' | 'archived';
+export type ContentStatus = 'draft' | 'scheduled' | 'queued' | 'published' | 'failed' | 'archived';
 
 export class ContentRepository extends BaseRepository<IContent> {
   constructor() {
     super(ContentModel, 'Content');
   }
 
-  async findByWorkspaceId(workspaceId: string, options?: PaginationOptions, accountId?: string) {
+  async findByWorkspaceId(workspaceId: string, options?: PaginationOptions, accountId?: string, excludeImported?: boolean) {
     const filter: any = { workspaceId };
     if (accountId) filter.accountId = accountId;
+    if (excludeImported) {
+      filter.isImported = { $ne: true };
+      filter['contentData.media_type'] = { $exists: false }; // Legacy check
+    }
     return this.findMany(filter, options);
+  }
+
+  async findHistoricalPosts(workspaceId: string, type: string, currentPostId: string): Promise<IContent[]> {
+    return this.model.find({
+      workspaceId,
+      type,
+      status: 'published',
+      _id: { $ne: currentPostId }
+    })
+    .sort({ publishedAt: -1, createdAt: -1 })
+    .limit(10)
+    .lean();
   }
 
   async findByWorkspaceAndStatus(
@@ -33,7 +49,9 @@ export class ContentRepository extends BaseRepository<IContent> {
   }
 
   async findScheduledContent(workspaceId?: string): Promise<IContent[]> {
-    const filter: any = { status: 'scheduled' };
+    // Phase 5: Only pull active scheduled or queued content. 
+    // Do not load 'failed' items into memory during the 60s poll loop.
+    const filter: any = { status: { $in: ['scheduled', 'queued'] } };
     if (workspaceId) {
       filter.workspaceId = workspaceId;
     }
@@ -333,7 +351,10 @@ export class ContentRepository extends BaseRepository<IContent> {
     try {
       const matchFilter: any = { workspaceId: workspaceId.toString(), status: 'published' };
       if (accountId) {
-        matchFilter.accountId = accountId;
+        matchFilter.$or = [
+          { accountId: accountId },
+          { accountId: { $exists: false } } // Fallback for legacy posts saved before accountId was explicitly stored
+        ];
       }
       const result = await this.model.aggregate([
         { $match: matchFilter },
