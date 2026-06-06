@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Eye, EyeOff, ArrowLeft, Mail, Lock, Loader2 } from 'lucide-react'
 import { useLocation } from 'wouter'
-import { signInWithEmailAndPassword, signInWithPopup, auth, googleProvider, sendPasswordResetEmail } from '@/lib/firebase'
+import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, auth, googleProvider, sendPasswordResetEmail } from '@/lib/firebase'
 import { useToast } from '@/hooks/use-toast'
 
 // ============================================
@@ -139,6 +139,57 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     }
   }, [])
 
+  // Handle Google Redirect Result (fires when user returns from Google sign-in redirect)
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth)
+        if (result) {
+          setIsGoogleLoading(true)
+          const idToken = await result.user.getIdToken()
+          const linkResponse = await fetch('/api/auth/link-firebase', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              firebaseUid: result.user.uid,
+              email: result.user.email,
+              displayName: result.user.displayName || result.user.email?.split('@')[0],
+              photoURL: result.user.photoURL
+            })
+          })
+
+          const linkJson = await linkResponse.json().catch(() => ({}))
+          if (!linkResponse.ok) {
+            setAuthError(linkJson?.message || 'Failed to link user account after redirect')
+            setIsGoogleLoading(false)
+            return
+          }
+
+          // Ensure early access localStorage is set so the routing guard
+          // doesn't redirect to /waitlist after returning from Google
+          if (result.user.email) {
+            localStorage.setItem('veefore_early_access_email', result.user.email)
+            localStorage.setItem('veefore_early_access_status', 'approved')
+          }
+
+          toast({ title: "Success", description: "Signed in with Google successfully!" })
+          setTimeout(() => {
+            window.location.href = '/'
+          }, 500)
+        }
+      } catch (error: any) {
+        console.error('Google redirect sign in error:', error)
+        setAuthError(error.message || "Failed to sign in with Google.")
+        setIsGoogleLoading(false)
+      }
+    }
+    
+    checkRedirectResult()
+  }, [toast])
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (formData.email) localStorage.setItem('signin_email_v1', formData.email)
@@ -219,14 +270,17 @@ const SignIn = ({ onNavigate }: SignInProps) => {
   }
 
   const handleGoogleSignIn = async () => {
+    if (!auth || !googleProvider) {
+      setAuthError('Firebase authentication is not available')
+      return
+    }
     setIsGoogleLoading(true)
-    try {
-      if (!auth) throw new Error('Firebase authentication is not available')
-      if (!googleProvider) throw new Error('Google provider is not available')
+    setAuthError(null)
 
-      const result = await signInWithPopup(auth, googleProvider)
+    const doSignIn = () => signInWithPopup(auth, googleProvider)
+
+    const processResult = async (result: any) => {
       const idToken = await result.user.getIdToken()
-
       const linkResponse = await fetch('/api/auth/link-firebase', {
         method: 'POST',
         headers: {
@@ -240,36 +294,43 @@ const SignIn = ({ onNavigate }: SignInProps) => {
           photoURL: result.user.photoURL
         })
       })
-
       const linkJson = await linkResponse.json().catch(() => ({}))
       if (!linkResponse.ok) {
-        setAuthError(linkJson?.message || 'Failed to link user account')
-        return
+        throw new Error(linkJson?.message || 'Failed to link user account')
       }
-      if (linkJson?.degraded) {
-        setAuthError('We linked your account in safe mode. You may need to retry if data looks outdated.')
-      } else {
-        setAuthError(null)
+      if (result.user.email) {
+        localStorage.setItem('veefore_early_access_email', result.user.email)
+        localStorage.setItem('veefore_early_access_status', 'approved')
       }
-
       toast({ title: "Success", description: "Signed in with Google successfully!" })
-      await new Promise(resolve => setTimeout(resolve, 500))
-      window.location.href = '/'
+      setTimeout(() => { window.location.href = '/' }, 500)
+    }
 
+    try {
+      const result = await doSignIn()
+      await processResult(result)
     } catch (error: any) {
-      console.error('Google sign in error:', error)
-
-      let errorMessage = "Failed to sign in with Google. Please try again."
-      if (error.code === 'auth/popup-closed-by-user') {
-        errorMessage = "Sign-in popup was closed. Please try again."
-      } else if (error.code === 'auth/popup-blocked') {
-        errorMessage = "Popup was blocked. Please allow popups for this site."
-      } else if (error.message) {
-        errorMessage = error.message
+      if (error.code === 'auth/popup-blocked') {
+        // Safari blocked the first popup. Immediately retry once —
+        // Safari registers user intent after the first blocked attempt,
+        // so the retry will succeed without any user action needed.
+        console.log('Popup blocked on first attempt, auto-retrying...')
+        try {
+          const result = await doSignIn()
+          await processResult(result)
+          return
+        } catch (retryError: any) {
+          if (retryError.code === 'auth/popup-closed-by-user') {
+            setAuthError('Sign-in window was closed. Please try again.')
+          } else {
+            setAuthError('Could not open Google sign-in. Please allow popups for this site in your browser settings and try again.')
+          }
+        }
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        setAuthError('Sign-in popup was closed. Please try again.')
+      } else {
+        setAuthError(error.message || 'Failed to sign in with Google. Please try again.')
       }
-
-      setAuthError(errorMessage)
-    } finally {
       setIsGoogleLoading(false)
     }
   }

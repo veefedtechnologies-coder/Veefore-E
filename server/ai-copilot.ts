@@ -1,6 +1,7 @@
 import { Request, Response, Express } from 'express';
 import { IStorage } from './storage';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize OpenAI with the newest model gpt-4o which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
@@ -19,6 +20,7 @@ interface CopilotRequest {
     role: 'user' | 'assistant';
     content: string;
   }>;
+  preferences?: any;
 }
 
 interface CopilotResponse {

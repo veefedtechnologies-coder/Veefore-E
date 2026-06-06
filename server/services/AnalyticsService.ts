@@ -3,7 +3,7 @@ import { analyticsRepository } from '../repositories/AnalyticsRepository';
 import { socialAccountRepository } from '../repositories/SocialAccountRepository';
 import { getAccessTokenFromAccount } from '../storage/converters';
 import { ContentModel } from '../models/Content/Content';
-import { IAnalytics } from '../models/Analytics';
+import { IAnalytics, InstagramFollowerSnapshotModel } from '../models/Analytics';
 import { NotFoundError, ValidationError } from '../errors';
 
 interface RecordMetricsInput {
@@ -103,48 +103,21 @@ export class AnalyticsService extends BaseService {
         input.accountId
       );
 
-      // Determine the start-of-day baseline for followers.
-      // We only need to calculate this if the record was just created (followers === 0).
-      // Once set, we NEVER overwrite it — it is the "reference point" for the day.
-      let baselineFollowers = analytics.followers; // existing baseline (>0 means already set)
       let baselinePosts = analytics.posts;
 
-      if (analytics.followers === 0) {
-        // Brand new record for this day — set baseline from yesterday's final record
+      if (analytics.posts === 0) {
         const startOfDay = new Date(date);
         startOfDay.setUTCHours(0, 0, 0, 0);
-
         const priorRecord = await analyticsRepository.findOneBeforeDate(
           input.workspaceId,
           startOfDay,
           input.platform,
           input.accountId
         );
-
-        const MAX_GAP_MS = 2 * 24 * 60 * 60 * 1000; // 48 hours
+        const MAX_GAP_MS = 2 * 24 * 60 * 60 * 1000;
         const isRecent = priorRecord && (startOfDay.getTime() - new Date(priorRecord.date).getTime() <= MAX_GAP_MS);
-
-        if (isRecent && priorRecord.followers > 0) {
-          // Use prior day's follower count as the start-of-day baseline
-          baselineFollowers = priorRecord.followers;
-          this.log('recordMetrics', 'New day — inheriting prior-day follower baseline', {
-            workspaceId: input.workspaceId,
-            platform: input.platform,
-            priorFollowers: priorRecord.followers,
-            liveFollowers: input.followers
-          });
-        } else {
-          // No prior record or gap is too large. Use live count as baseline to reset growth tracking.
-          baselineFollowers = input.followers || 0;
-          if (priorRecord) {
-            this.log('recordMetrics', 'Gap too large — resetting baseline to live data', {
-              workspaceId: input.workspaceId,
-              platform: input.platform
-            });
-          }
-        }
-
-        if (analytics.posts === 0 && isRecent && priorRecord.posts > 0) {
+        
+        if (isRecent && priorRecord.posts > 0) {
           baselinePosts = priorRecord.posts;
         } else {
           baselinePosts = input.posts || 0;
@@ -153,17 +126,20 @@ export class AnalyticsService extends BaseService {
 
       const updated = await analyticsRepository.updateMetrics((analytics._id as any).toString(), {
         // Always update engagement metrics — these are live/cumulative values
-        views: input.views,
-        likes: input.likes,
-        comments: input.comments,
-        shares: input.shares,
-        reach: input.reach || analytics.reach,
-        reachDay: input.reachDay,
-        reachWeek: input.reachWeek,
-        reachDays28: input.reachDays28,
-        engagement: input.engagement || analytics.engagement,
-        // Followers and posts are START-OF-DAY baselines — only set on first sync of the day
-        followers: baselineFollowers,
+        views: input.views !== undefined ? input.views : analytics.views,
+        likes: input.likes !== undefined ? input.likes : analytics.likes,
+        comments: input.comments !== undefined ? input.comments : analytics.comments,
+        shares: input.shares !== undefined ? input.shares : analytics.shares,
+        reach: input.reach !== undefined ? input.reach : analytics.reach,
+        reachDay: input.reachDay !== undefined ? input.reachDay : analytics.reachDay,
+        reachWeek: input.reachWeek !== undefined ? input.reachWeek : analytics.reachWeek,
+        reachDays28: input.reachDays28 !== undefined ? input.reachDays28 : analytics.reachDays28,
+        viewsDay: input.customMetrics?.viewsDay !== undefined ? input.customMetrics.viewsDay : analytics.viewsDay,
+        viewsWeek: input.customMetrics?.viewsWeek !== undefined ? input.customMetrics.viewsWeek : analytics.viewsWeek,
+        viewsDays28: input.customMetrics?.viewsDays28 !== undefined ? input.customMetrics.viewsDays28 : analytics.viewsDays28,
+        engagement: input.engagement !== undefined ? input.engagement : analytics.engagement,
+        // Followers should reflect the latest end-of-day state
+        followers: input.followers !== undefined ? input.followers : analytics.followers,
         posts: baselinePosts,
         customMetrics: input.customMetrics,
         audienceCity: input.audienceCity,
@@ -180,7 +156,6 @@ export class AnalyticsService extends BaseService {
         workspaceId: input.workspaceId,
         platform: input.platform,
         date,
-        baselineFollowers,
         liveFollowers: input.followers
       });
       return updated;
@@ -256,9 +231,6 @@ export class AnalyticsService extends BaseService {
         platform,
         followers: account.followersCount || 0,
         posts: account.mediaCount || 0,
-        likes: account.totalLikes || 0,
-        comments: account.totalComments || 0,
-        shares: account.totalShares || 0,
         engagement: account.avgEngagement || 0,
         reach: account.totalReach || 0,
         audienceCity: account.audienceCity,
@@ -633,6 +605,100 @@ export class AnalyticsService extends BaseService {
         engagement: finalEngagement,
         period: days === 90 ? 'Lifetime' : `${days}D`,
         audience
+      };
+    });
+  }
+
+  async getFollowerAnalytics(workspaceId: string): Promise<{
+    currentFollowers: number;
+    dailyGrowth: number;
+    weeklyGrowth: number;
+    monthlyGrowth: number;
+    growthPercentage: number;
+    trend: 'up' | 'down' | 'flat';
+  }> {
+    return this.withErrorHandling('getFollowerAnalytics', async () => {
+      const accounts = await socialAccountRepository.findActiveByWorkspace(workspaceId);
+      const igAccounts = accounts.filter(a => a.platform === 'instagram');
+      
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const lastWeek = new Date(today);
+      lastWeek.setDate(lastWeek.getDate() - 7);
+
+      const lastMonth = new Date(today);
+      lastMonth.setDate(lastMonth.getDate() - 30);
+
+      let currentFollowers = 0;
+      let yesterdayFollowers = 0;
+      let lastWeekFollowers = 0;
+      let lastMonthFollowers = 0;
+
+      for (const account of igAccounts) {
+        if (!account.accountId && !account.username) continue;
+        
+        const current = account.followersCount || 0;
+        currentFollowers += current;
+
+        // Daily baseline: oldest snapshot in the last 1.5 days
+        const snapshotYesterday = await InstagramFollowerSnapshotModel.findOne({ 
+          accountId: account._id, 
+          snapshotDate: { $gte: new Date(today.getTime() - 1.5 * 24 * 60 * 60 * 1000) }
+        }).sort({ snapshotDate: 1 }).lean();
+        
+        // Weekly baseline: oldest snapshot in the last 7 days
+        const snapshotLastWeek = await InstagramFollowerSnapshotModel.findOne({ 
+          accountId: account._id, 
+          snapshotDate: { $gte: lastWeek }
+        }).sort({ snapshotDate: 1 }).lean();
+
+        // Monthly baseline: oldest snapshot in the last 30 days
+        const snapshotLastMonth = await InstagramFollowerSnapshotModel.findOne({ 
+          accountId: account._id, 
+          snapshotDate: { $gte: lastMonth }
+        }).sort({ snapshotDate: 1 }).lean();
+
+        // If no snapshot exists at all, try fallback from Metrics collection
+        let metricsBaseline: number | null = null;
+        if (!snapshotYesterday && !snapshotLastWeek && !snapshotLastMonth) {
+          const MetricsModel = (await import('../models/Metrics')).default;
+          const oldMetric = await MetricsModel.findOne({
+            instagramAccountId: account.accountId,
+            followers: { $exists: true, $gt: 0 }
+          }).sort({ startDate: 1 }).lean(); // get oldest available metric
+          if (oldMetric && (oldMetric as any).followers) {
+            metricsBaseline = (oldMetric as any).followers;
+          }
+        }
+
+        yesterdayFollowers += snapshotYesterday ? snapshotYesterday.followerCount : (metricsBaseline ?? current);
+        lastWeekFollowers += snapshotLastWeek ? snapshotLastWeek.followerCount : (metricsBaseline ?? current);
+        lastMonthFollowers += snapshotLastMonth ? snapshotLastMonth.followerCount : (metricsBaseline ?? current);
+      }
+
+      const dailyGrowth = currentFollowers - yesterdayFollowers;
+      const weeklyGrowth = currentFollowers - lastWeekFollowers;
+      const monthlyGrowth = currentFollowers - lastMonthFollowers;
+
+      const growthPercentage = lastMonthFollowers > 0 
+        ? Number(((monthlyGrowth / lastMonthFollowers) * 100).toFixed(2)) 
+        : 0;
+
+      let trend: 'up' | 'down' | 'flat' = 'flat';
+      if (growthPercentage > 0) trend = 'up';
+      else if (growthPercentage < 0) trend = 'down';
+
+      return {
+        currentFollowers,
+        dailyGrowth,
+        weeklyGrowth,
+        monthlyGrowth,
+        growthPercentage,
+        trend
       };
     });
   }

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Route, Switch, useLocation } from 'wouter'
+import { Route, Switch, useLocation, Redirect } from 'wouter'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
 import LoadingSpinner from './components/LoadingSpinner'
-import { SkeletonPageLoader } from './components/ui/skeleton'
+import { SkeletonPageLoader, SkeletonSidebarLayout } from './components/ui/skeleton'
 import { getAuth } from 'firebase/auth'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest, queryClient } from '@/lib/queryClient'
@@ -11,6 +11,7 @@ import { RealtimeProvider } from './contexts/RealtimeContext'
 
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
+
 
 const CreateDropdown = React.lazy(() => import('./components/layout/create-dropdown').then(m => ({ default: m.CreateDropdown })))
 const QuickActions = React.lazy(() => import('./components/dashboard/quick-actions').then(m => ({ default: m.QuickActions })))
@@ -34,9 +35,7 @@ const DraftsPage = React.lazy(() => import('./pages/DraftsPage'))
 const PublishedPostsPage = React.lazy(() => import('./pages/PublishedPostsPage'))
 const PostAnalyticsPage = React.lazy(() => import('./pages/PostAnalyticsPage'))
 const VeeGPT = React.lazy(() => import('./pages/VeeGPT'))
-const Workspaces = React.lazy(() => import('./pages/Workspaces'))
 const Profile = React.lazy(() => import('./pages/Profile'))
-const Integration = React.lazy(() => import('./pages/Integration'))
 const AutomationStepByStep = React.lazy(() => import('./pages/AutomationStepByStep'))
 const VideoGeneratorAdvanced = React.lazy(() => import('./pages/VideoGeneratorAdvanced'))
 const AdminPanel = React.lazy(() => import('./pages/AdminPanel'))
@@ -46,10 +45,7 @@ const BestTimeDetail = React.lazy(() => import('./pages/BestTimeDetail'))
 const SocialListeningPage = React.lazy(() => import('./pages/SocialListeningPage'))
 const TestFixtures = React.lazy(() => import('./pages/TestFixtures'))
 const EncryptionHealth = React.lazy(() => import('./pages/EncryptionHealth'))
-const Tabs = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.Tabs })))
-const TabsContent = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsContent })))
-const TabsList = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsList })))
-const TabsTrigger = React.lazy(() => import('./components/ui/tabs').then(m => ({ default: m.TabsTrigger })))
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 // OnboardingFlow removed - onboarding now happens inline during signup
 const AccountNotFoundBanner = React.lazy(() => import('./components/AccountNotFoundBanner'))
 const SectionErrorBoundary = React.lazy(() => import('./components/ErrorBoundary').then(m => ({ default: m.SectionErrorBoundary })))
@@ -159,8 +155,14 @@ export default function AuthenticatedApp() {
 
   const workspaces = normalizeWorkspaces(workspacesRaw)
   const [enforceHang, setEnforceHang] = useState(false)
-  const needEnforce = userData && !userData.isOnboarded && Array.isArray(workspaces) && workspaces.length === 0
-  const enforcing = workspacesLoading
+  
+  const workspacesLoaded = typeof workspacesRaw !== 'undefined'
+  const hasWorkspaces = workspacesLoaded && Array.isArray(workspaces) && workspaces.length > 0
+
+  // Only show the creation overlay if we KNOW they have 0 workspaces after loading
+  const needEnforce = userData && !userData.isOnboarded && workspacesLoaded && !hasWorkspaces
+  // We don't use workspacesLoading here because it flashes on every reload
+  const enforcing = needEnforce
   const enforceError = workspacesError
 
   useEffect(() => {
@@ -216,7 +218,6 @@ export default function AuthenticatedApp() {
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <div className="space-y-6">
-                <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
                   <Tabs defaultValue="calendar" className="w-full">
                     <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                       <TabsTrigger value="calendar">Calendar</TabsTrigger>
@@ -224,30 +225,37 @@ export default function AuthenticatedApp() {
                       <TabsTrigger value="content">Content</TabsTrigger>
                       <TabsTrigger value="dm-automation">DM automation</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="calendar" className="mt-6">
-                      <CalendarView />
+                    <TabsContent value="calendar" className="mt-6 tab-content-container" forceMount>
+                      <React.Suspense fallback={<SkeletonPageLoader type="plan" />}>
+                        <CalendarView />
+                      </React.Suspense>
                     </TabsContent>
-                    <TabsContent value="drafts" className="mt-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <ScheduledPosts />
-                        <Drafts />
-                        <PublishedPosts />
-                      </div>
+                    <TabsContent value="drafts" className="mt-6 tab-content-container" forceMount>
+                      <React.Suspense fallback={<SkeletonPageLoader type="posts" />}>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                          <ScheduledPosts />
+                          <Drafts />
+                          <PublishedPosts />
+                        </div>
+                      </React.Suspense>
                     </TabsContent>
-                    <TabsContent value="content" className="mt-6">
-                      <div className="text-center py-12">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Content Library</h3>
-                        <p className="text-gray-600 dark:text-gray-400">Manage your content library and templates here.</p>
-                      </div>
+                    <TabsContent value="content" className="mt-6 tab-content-container" forceMount>
+                      <React.Suspense fallback={<SkeletonPageLoader type="default" />}>
+                        <div className="text-center py-12">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Content Library</h3>
+                          <p className="text-gray-600 dark:text-gray-400">Manage your content library and templates here.</p>
+                        </div>
+                      </React.Suspense>
                     </TabsContent>
-                    <TabsContent value="dm-automation" className="mt-6">
-                      <div className="text-center py-12">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">DM Automation</h3>
-                        <p className="text-gray-600 dark:text-gray-400">Set up automated direct message responses.</p>
-                      </div>
+                    <TabsContent value="dm-automation" className="mt-6 tab-content-container" forceMount>
+                      <React.Suspense fallback={<SkeletonPageLoader type="default" />}>
+                        <div className="text-center py-12">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">DM Automation</h3>
+                          <p className="text-gray-600 dark:text-gray-400">Set up your automated direct messages here.</p>
+                        </div>
+                      </React.Suspense>
                     </TabsContent>
                   </Tabs>
-                </React.Suspense>
               </div>
             </DashboardLayout>
           </ProtectedRoute>
@@ -257,7 +265,7 @@ export default function AuthenticatedApp() {
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <div className="space-y-6">
-                <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+                <React.Suspense fallback={<SkeletonPageLoader type="posts" />}>
                   <div className="flex flex-col space-y-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Posts & Drafts</h2>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -275,7 +283,7 @@ export default function AuthenticatedApp() {
         <Route path="/posts/scheduled">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+              <React.Suspense fallback={<SkeletonPageLoader type="scheduled-page" />}>
                 <ScheduledPostsPage />
               </React.Suspense>
             </DashboardLayout>
@@ -285,7 +293,7 @@ export default function AuthenticatedApp() {
         <Route path="/posts/drafts">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+              <React.Suspense fallback={<SkeletonPageLoader type="drafts-page" />}>
                 <DraftsPage />
               </React.Suspense>
             </DashboardLayout>
@@ -295,7 +303,7 @@ export default function AuthenticatedApp() {
         <Route path="/posts/published">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+              <React.Suspense fallback={<SkeletonPageLoader type="published-page" />}>
                 <PublishedPostsPage />
               </React.Suspense>
             </DashboardLayout>
@@ -316,7 +324,7 @@ export default function AuthenticatedApp() {
         <Route path="/analytics">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+              <React.Suspense fallback={<SkeletonPageLoader type="analytics" />}>
                 <InstagramWebhookListener />
                 <AnalyticsDashboard />
               </React.Suspense>
@@ -327,7 +335,7 @@ export default function AuthenticatedApp() {
         <Route path="/analytics/post/:contentId">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
+              <React.Suspense fallback={<SkeletonPageLoader type="analytics" />}>
                 <PostAnalyticsPage />
               </React.Suspense>
             </DashboardLayout>
@@ -377,43 +385,11 @@ export default function AuthenticatedApp() {
           </ProtectedRoute>
         </Route>
 
-        <Route path="/workspaces">
-          <ProtectedRoute>
-            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="workspaces" />}>
-                <Workspaces />
-              </React.Suspense>
-            </DashboardLayout>
-          </ProtectedRoute>
-        </Route>
-
         <Route path="/profile">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
               <React.Suspense fallback={<SkeletonPageLoader type="profile" />}>
                 <Profile />
-              </React.Suspense>
-            </DashboardLayout>
-          </ProtectedRoute>
-        </Route>
-
-        <Route path="/integration">
-          <ProtectedRoute>
-            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
-                <InstagramWebhookListener />
-                <Integration />
-              </React.Suspense>
-            </DashboardLayout>
-          </ProtectedRoute>
-        </Route>
-
-        <Route path="/integrations">
-          <ProtectedRoute>
-            <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<SkeletonPageLoader type="integration" />}>
-                <InstagramWebhookListener />
-                <Integration />
               </React.Suspense>
             </DashboardLayout>
           </ProtectedRoute>
@@ -517,7 +493,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/security-dashboard">
           <ProtectedRoute>
-            <React.Suspense fallback={<LoadingSpinner type="security" />}>
+            <React.Suspense fallback={<SkeletonSidebarLayout><SkeletonPageLoader type="default" /></SkeletonSidebarLayout>}>
               <SecurityDashboard />
             </React.Suspense>
           </ProtectedRoute>
@@ -550,7 +526,7 @@ export default function AuthenticatedApp() {
                   </React.Suspense>
                 )}
                 <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                  <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
+                  <React.Suspense fallback={<SkeletonPageLoader type="dashboard" />}>
                     <BestTimeDetail />
                   </React.Suspense>
                 </main>
@@ -562,7 +538,7 @@ export default function AuthenticatedApp() {
         <Route path="/test-fixtures">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<LoadingSpinner type="default" />}>
+              <React.Suspense fallback={<SkeletonPageLoader type="default" />}>
                 <TestFixtures />
               </React.Suspense>
             </DashboardLayout>
@@ -572,7 +548,7 @@ export default function AuthenticatedApp() {
         <Route path="/encryption-health">
           <ProtectedRoute>
             <DashboardLayout isCreateDropdownOpen={isCreateDropdownOpen} setIsCreateDropdownOpen={setIsCreateDropdownOpen} handleCreateOptionSelect={handleCreateOptionSelect}>
-              <React.Suspense fallback={<LoadingSpinner type="security" />}>
+              <React.Suspense fallback={<SkeletonPageLoader type="default" />}>
                 <EncryptionHealth />
               </React.Suspense>
             </DashboardLayout>
@@ -659,7 +635,7 @@ export default function AuthenticatedApp() {
             <LoadingSpinner type="dashboard" />
           ) : user && !userData && !userDataLoading && userDataError ? (
             String(userDataError).includes('404') ? (
-              <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
+              <React.Suspense fallback={<SkeletonSidebarLayout><SkeletonPageLoader type="default" /></SkeletonSidebarLayout>}>
                 <AccountNotFoundBanner
                   onSignup={() => setLocation('/signup')}
                   onSignOut={() => { getAuth().signOut(); setLocation('/signin') }}
@@ -712,6 +688,10 @@ export default function AuthenticatedApp() {
           ) : (
             <LoadingSpinner type="dashboard" />
           )}
+        </Route>
+
+        <Route>
+          <Redirect to="/" />
         </Route>
       </Switch>
 

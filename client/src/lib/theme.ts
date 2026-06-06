@@ -47,8 +47,8 @@ export const THEME_CONFIGS: Record<Theme, ThemeConfig> = {
     }
   },
   dark: {
-    name: 'Dark Blue',
-    description: 'Classic dark theme with blue accents',
+    name: 'Dark Slate',
+    description: 'Classic dark theme with professional slate tones',
     colors: {
       background: '#0f172a',
       backgroundSecondary: '#1e293b',

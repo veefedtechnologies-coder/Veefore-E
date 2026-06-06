@@ -3,6 +3,7 @@ import mongoose, { Document, Schema, Model } from 'mongoose';
 export interface IContent extends Document {
   workspaceId: any;
   accountId?: string;
+  instagramPostId?: string;
   type: string;
   title: string;
   description?: string;
@@ -11,8 +12,16 @@ export interface IContent extends Document {
   status: string;
   scheduledAt?: Date;
   publishedAt?: Date;
+  processingStartedAt?: Date;
+  failedAt?: Date;
+  retryAt?: Date;
+  publishAttempts?: number;
+  metaCreationId?: string;
+  metaPublishedId?: string;
+  lastError?: string;
   creditsUsed: number;
   prompt?: string;
+  isImported?: boolean;
   metrics?: {
     likes?: number;
     comments?: number;
@@ -30,16 +39,29 @@ export interface IContent extends Document {
 const ContentSchema = new Schema<IContent>({
   workspaceId: { type: Schema.Types.Mixed, required: true },
   accountId: { type: String },
+  instagramPostId: { type: String },
   type: { type: String, required: true },
   title: { type: String, required: true },
   description: String,
   contentData: { type: Schema.Types.Mixed, default: {} },
   platform: String,
-  status: { type: String, default: 'draft' },
+  status: { 
+    type: String, 
+    default: 'draft',
+    enum: ['draft', 'scheduled', 'queued', 'publishing', 'processing', 'published', 'partially_published', 'retrying', 'failed', 'cancelled', 'expired', 'generating'] // 'generating' is a common state too
+  },
   scheduledAt: Date,
   publishedAt: Date,
+  processingStartedAt: Date,
+  failedAt: Date,
+  retryAt: Date,
+  publishAttempts: { type: Number, default: 0 },
+  metaCreationId: String,
+  metaPublishedId: String,
+  lastError: String,
   creditsUsed: { type: Number, default: 0 },
   prompt: String,
+  isImported: { type: Boolean, default: false },
   metrics: {
     likes: { type: Number, default: 0 },
     comments: { type: Number, default: 0 },

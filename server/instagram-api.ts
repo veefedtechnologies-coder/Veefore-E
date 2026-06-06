@@ -2,6 +2,9 @@ import axios from 'axios';
 import { VideoCompressor } from './video-compression';
 import fs from 'fs';
 import path from 'path';
+import { RequestDeduplicator } from './services/request-deduplicator';
+import { CacheService } from './services/cache-service';
+import crypto from 'crypto';
 
 interface InstagramUser {
   id: string;
@@ -52,7 +55,7 @@ export class InstagramAPI {
     return process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5000';
   }
 
-  private getPublishApiBase(accountId?: string): string {
+  getPublishApiBase(accountId?: string): string {
     if (accountId) {
       return `https://graph.facebook.com/v22.0/${accountId}`;
     }
@@ -61,16 +64,25 @@ export class InstagramAPI {
 
   // Generate Instagram Business Login OAuth URL (Direct Instagram API)
   generateAuthUrl(redirectUri: string, state?: string): string {
+    // When in Phase 1 Review mode, only request safe publishing/insights scopes.
+    // DM (instagram_business_manage_messages) and Comment (instagram_business_manage_comments)
+    // permissions are EXCLUDED to comply with Meta's Phase 1 App Review policy.
+    const isPhase1Review = process.env.META_PHASE_1_REVIEW_MODE === 'true';
+
+    const scope = isPhase1Review
+      ? 'instagram_business_basic,instagram_business_content_publish'
+      : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+
     const params = new URLSearchParams({
       client_id: process.env.INSTAGRAM_APP_ID!,
       redirect_uri: redirectUri,
-      scope: 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish',
+      scope,
       response_type: 'code',
       ...(state && { state })
     });
 
     const authUrl = `https://api.instagram.com/oauth/authorize?${params.toString()}`;
-    console.log(`[INSTAGRAM API] Generated Business API auth URL: ${authUrl}`);
+    console.log(`[INSTAGRAM API] Generated Business API auth URL. Phase1Review=${isPhase1Review}. Scope: ${scope}`);
     console.log(`[INSTAGRAM API] Redirect URI: ${redirectUri}`);
     console.log(`[INSTAGRAM API] Client ID: ${process.env.INSTAGRAM_APP_ID}`);
 
@@ -136,21 +148,43 @@ export class InstagramAPI {
   // Get user profile information with Business API
   async getUserProfile(accessToken: string): Promise<InstagramUser> {
     try {
+      const cache = CacheService.getInstance();
+      
+      // Hash the access token to use as a cache key so we don't expose it
+      const tokenHash = crypto.createHash('md5').update(accessToken).digest('hex');
+      const cacheKey = `api_user_profile_${tokenHash}`;
+      
+      const cachedProfile = await cache.get<InstagramUser>(cacheKey);
+      if (cachedProfile) {
+        console.log(`[CACHE] ✅ HIT for user profile`);
+        return cachedProfile;
+      }
+      
+      console.log(`[CACHE] ❌ MISS for user profile (Fetching from Meta API...)`);
+
       // Try comprehensive fields first, then fallback if needed
       let fields = 'id,username,account_type,media_count,followers_count,name,biography,profile_picture_url,website';
       let response;
 
+      const deduplicator = RequestDeduplicator.getInstance();
+      
       try {
-        response = await axios.get(`${this.baseUrl}/me`, {
-          params: { fields, access_token: accessToken }
+        const url = `${this.baseUrl}/me`;
+        const { data } = await deduplicator.execute(`${url}?fields=${fields}`, async () => {
+          const res = await axios.get(url, { params: { fields, access_token: accessToken } });
+          return res;
         });
+        response = data;
       } catch (primaryError: any) {
         console.log(`[INSTAGRAM BUSINESS API] Trying basic profile fields due to:`, primaryError.response?.data?.error?.message);
         // Fallback to basic fields if permissions are limited
         fields = 'id,username,account_type,media_count';
-        response = await axios.get(`${this.baseUrl}/me`, {
-          params: { fields, access_token: accessToken }
+        const url = `${this.baseUrl}/me`;
+        const { data } = await deduplicator.execute(`${url}?fields=${fields}`, async () => {
+          const res = await axios.get(url, { params: { fields, access_token: accessToken } });
+          return res;
         });
+        response = data;
       }
 
       console.log(`[INSTAGRAM BUSINESS API] User profile:`, response.data);
@@ -164,6 +198,9 @@ export class InstagramAPI {
         followers_count: response.data.followers_count || 0,
         ...response.data
       };
+
+      // Cache the profile for 3 hours (10800 seconds)
+      await cache.set(cacheKey, profile, 10800);
 
       return profile;
     } catch (error: any) {
@@ -250,7 +287,7 @@ export class InstagramAPI {
   }
 
   // Publish photo to Instagram
-  async publishPhoto(accessToken: string, imageUrl: string, caption: string, accountId?: string, mentions?: string[]): Promise<{
+  async publishPhoto(accessToken: string, imageUrl: string, caption: string, accountId?: string, mentions?: string[], collaborators?: string[]): Promise<{
     id: string;
     permalink?: string;
   }> {
@@ -302,6 +339,10 @@ export class InstagramAPI {
         );
       }
 
+      if (collaborators && collaborators.length > 0) {
+        payload.collaborators = JSON.stringify(collaborators.map(c => c.replace(/^@+/, '')));
+      }
+
       const containerResponse = await axios.post(`${publishBaseUrl}/media`, payload);
 
       const containerId = containerResponse.data.id;
@@ -326,9 +367,10 @@ export class InstagramAPI {
   }
 
   // Publish reel to Instagram
-  async publishReel(accessToken: string, videoUrl: string, caption: string, accountId?: string, mentions?: string[]): Promise<{
+  async publishReel(accessToken: string, videoUrl: string, caption: string, accountId?: string, mentions?: string[], collaborators?: string[]): Promise<{
     id: string;
     permalink?: string;
+    processing?: boolean;
   }> {
     try {
       console.log(`[INSTAGRAM PUBLISH] Starting reel upload process`);
@@ -375,55 +417,24 @@ export class InstagramAPI {
         access_token: accessToken
       };
 
+      if (collaborators && collaborators.length > 0) {
+        payload.collaborators = JSON.stringify(collaborators.map(c => c.replace(/^@+/, '')));
+      }
+
       const containerResponse = await axios.post(`${publishBaseUrl}/media`, payload);
 
       const containerId = containerResponse.data.id;
       console.log(`[INSTAGRAM PUBLISH] Reel container created: ${containerId}`);
 
       // Step 2 & 3: Publish the reel container (with polling if not ready)
-      let published = false;
-      let attempts = 0;
-      const maxAttempts = 36; // 6 minutes total wait time (36 attempts * 10s)
-      let publishResponseData;
-
-      while (!published && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds for reels
-
-        try {
-          console.log(`[INSTAGRAM PUBLISH] Reel publish attempt ${attempts + 1}...`);
-          const publishResponse = await axios.post(`${publishBaseUrl}/media_publish`, {
-            creation_id: containerId,
-            access_token: accessToken
-          });
-          
-          publishResponseData = publishResponse.data;
-          published = true;
-          console.log(`[INSTAGRAM PUBLISH] Reel published successfully:`, publishResponseData);
-        } catch (error: any) {
-          const errData = error.response?.data?.error;
-          
-          // Code 9007 means the media is still processing
-          if (errData && errData.code === 9007) {
-            console.log(`[INSTAGRAM PUBLISH] Reel processing... waiting (${attempts + 1}/${maxAttempts})`);
-          } else {
-            // Fatal error during publish
-            console.log(`[INSTAGRAM PUBLISH] Reel publish failed fatally:`, errData || error.message);
-            const { InstagramPermissionHelper } = await import('./instagram-permission-helper');
-            const errorInfo = InstagramPermissionHelper.getVideoPublishingError();
-            throw new Error(`${errorInfo.error}: ${errorInfo.technicalReason}. Solution: ${errorInfo.solution}. Detail: ${errData?.message || error.message}`);
-          }
-        }
-        attempts++;
-      }
-
-      if (!published) {
-        console.log(`[INSTAGRAM PUBLISH] Reel processing timeout`);
-        const { InstagramPermissionHelper } = await import('./instagram-permission-helper');
-        const errorInfo = InstagramPermissionHelper.getVideoPublishingError();
-        throw new Error(`${errorInfo.error}: ${errorInfo.technicalReason}. Solution: ${errorInfo.solution}`);
-      }
-
-      return publishResponseData;
+      // NEW ENTERPRISE ARCHITECTURE: No aggressive polling. 
+      // Handled by the background verification queue.
+      console.log(`[INSTAGRAM PUBLISH] Reel container ${containerId} created. Deferring to background verify queue.`);
+      
+      return { 
+        id: containerId, 
+        processing: true 
+      };
     } catch (error: any) {
       console.error(`[INSTAGRAM PUBLISH] Reel publish failed:`, error.response?.data || error.message);
 
@@ -465,7 +476,7 @@ export class InstagramAPI {
 
                 const compressedUrl = compressionResult.outputPath.replace(process.cwd(), '').replace(/\\/g, '/');
                 const finalUrl = compressedUrl.startsWith('/') ? compressedUrl : '/' + compressedUrl;
-                return this.publishReel(accessToken, finalUrl, caption, accountId, mentions);
+                return this.publishReel(accessToken, finalUrl, caption, accountId, mentions, collaborators);
               }
             } catch (compressionError: any) {
               console.error(`[INSTAGRAM PUBLISH] Video compression failed:`, compressionError.message);
@@ -483,6 +494,7 @@ export class InstagramAPI {
   async publishStory(accessToken: string, mediaUrl: string, isVideo: boolean = false, accountId?: string): Promise<{
     id: string;
     permalink?: string;
+    processing?: boolean;
   }> {
     try {
       console.log(`[INSTAGRAM PUBLISH] Starting story upload process (${isVideo ? 'video' : 'image'})`);
@@ -536,37 +548,12 @@ export class InstagramAPI {
       // Step 2 & 3: For video stories, check processing status by polling media_publish
       let publishResponseData;
       if (isVideo) {
-        let published = false;
-        let attempts = 0;
-        const maxAttempts = 24; // 2 minutes total wait time (24 attempts * 5s)
-
-        while (!published && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          try {
-            console.log(`[INSTAGRAM PUBLISH] Story publish attempt ${attempts + 1}...`);
-            const publishResponse = await axios.post(`${publishBaseUrl}/media_publish`, {
-              creation_id: containerId,
-              access_token: accessToken
-            });
-            
-            publishResponseData = publishResponse.data;
-            published = true;
-          } catch (error: any) {
-            const errData = error.response?.data?.error;
-            if (errData && errData.code === 9007) {
-              console.log(`[INSTAGRAM PUBLISH] Story processing... waiting (${attempts + 1}/${maxAttempts})`);
-            } else {
-              console.log(`[INSTAGRAM PUBLISH] Story publish failed fatally:`, errData || error.message);
-              throw new Error(`Story video processing failed: ${errData?.message || error.message}`);
-            }
-          }
-          attempts++;
-        }
-
-        if (!published) {
-          throw new Error('Story video processing timeout');
-        }
+        // NEW ENTERPRISE ARCHITECTURE: No aggressive polling. 
+        console.log(`[INSTAGRAM PUBLISH] Story video container ${containerId} created. Deferring to background verify queue.`);
+        return { 
+          id: containerId, 
+          processing: true 
+        };
       } else {
         // Step 3: Publish the image story container immediately
         const publishResponse = await axios.post(`${publishBaseUrl}/media_publish`, {
@@ -585,11 +572,12 @@ export class InstagramAPI {
   }
 
   // Intelligent video publishing with automatic compression when Instagram rejects due to file size
-  async publishVideo(accessToken: string, videoUrl: string, caption: string, accountId?: string, mentions?: string[]): Promise<{
+  async publishVideo(accessToken: string, videoUrl: string, caption: string, accountId?: string, mentions?: string[], collaborators?: string[]): Promise<{
     id: string;
     permalink?: string;
+    processing?: boolean;
   }> {
-    return this.publishVideoWithCompression(accessToken, videoUrl, caption, false, accountId, mentions);
+    return this.publishVideoWithCompression(accessToken, videoUrl, caption, false, accountId, mentions, collaborators);
   }
 
   private async publishVideoWithCompression(
@@ -598,8 +586,9 @@ export class InstagramAPI {
     caption: string,
     isRetryWithCompression: boolean = false,
     accountId?: string,
-    mentions?: string[]
-  ): Promise<{ id: string; permalink?: string; }> {
+    mentions?: string[],
+    collaborators?: string[]
+  ): Promise<{ id: string; permalink?: string; processing?: boolean; }> {
     try {
       let currentVideoUrl = videoUrl;
 
@@ -668,12 +657,16 @@ export class InstagramAPI {
         console.log(`[INSTAGRAM API] Cleaned video URL: ${fullVideoUrl}`);
       }
 
-      const containerPayload = {
+      const containerPayload: any = {
         video_url: fullVideoUrl,
         caption: caption,
         media_type: 'REELS',
         access_token: accessToken
       };
+
+      if (collaborators && collaborators.length > 0) {
+        containerPayload.collaborators = JSON.stringify(collaborators.map(c => c.replace(/^@+/, '')));
+      }
 
       console.log(`[INSTAGRAM API] Using corrected video URL: ${fullVideoUrl}`);
 
@@ -723,123 +716,13 @@ export class InstagramAPI {
       console.log(`[INSTAGRAM PUBLISH] Video container created: ${containerId}`);
 
       // Step 2 & 3: Publish the video container (with polling if not ready)
-      let published = false;
-      let attempts = 0;
-      const maxAttempts = 120; // 10 minutes for large video files (54MB+)
-      let publishResponseData;
-
-      while (!published && attempts < maxAttempts) {
-        // Much longer wait times to avoid rate limiting: 30s initially, then 60s
-        const waitTime = attempts < 5 ? 30000 : 60000;
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-
-        try {
-          console.log(`[INSTAGRAM PUBLISH] Video publish attempt ${attempts + 1}...`);
-          const publishResponse = await axios.post(`${publishBaseUrl}/media_publish`, {
-            creation_id: containerId,
-            access_token: accessToken
-          });
-          
-          publishResponseData = publishResponse.data;
-          published = true;
-          console.log(`[INSTAGRAM PUBLISH] Video published successfully:`, publishResponseData);
-        } catch (error: any) {
-          const errData = error.response?.data?.error;
-          
-          if (errData && errData.code === 9007) {
-            console.log(`[INSTAGRAM PUBLISH] Video processing... waiting (${attempts + 1}/${maxAttempts})`);
-          } else {
-            console.log(`[INSTAGRAM PUBLISH] Video publish failed fatally:`, errData || error.message);
-            
-            // Handle rate limiting - STOP making calls when rate limited
-            if (errData?.code === 4 && errData?.error_subcode === 1349210) {
-              console.log(`[INSTAGRAM PUBLISH] Rate limit hit - stopping API calls to prevent further rate limit exhaustion`);
-              throw new Error('Instagram API rate limit exceeded. Please wait 60 minutes before attempting to publish again. The issue is resolved by reducing API call frequency in the codebase.');
-            }
-
-            // Detect Instagram file processing failures and trigger intelligent compression
-            if (!isRetryWithCompression) {
-              const isFileSizeIssue = errData?.message?.includes('processing failed') ||
-                errData?.message?.includes('Media ID is not available') ||
-                errData?.message?.includes('video could not be processed') ||
-                errData?.code === -1; // -1 is often Internal Server Error for large file processing failures
-
-              if (isFileSizeIssue) {
-                console.log(`[INSTAGRAM PUBLISH] Instagram processing failed - activating intelligent video compression`);
-
-                const isLocalFile = videoUrl.includes('/uploads/') && !videoUrl.startsWith('http');
-                if (isLocalFile) {
-                  const localPath = path.join(process.cwd(), videoUrl.startsWith('/') ? videoUrl.slice(1) : videoUrl);
-
-                  if (fs.existsSync(localPath)) {
-                    console.log(`[INSTAGRAM PUBLISH] Attempting video compression for file: ${localPath}`);
-
-                    try {
-                      // Try VideoCompressor (standard compression) first since FastVideoCompressor might not be available or imported correctly
-                      const compressionResult = await VideoCompressor.compressForInstagram(localPath);
-
-                      if (compressionResult.success && compressionResult.outputPath) {
-                        const originalSizeMB = (compressionResult.originalSize || 0) / 1024 / 1024;
-                        const compressedSizeMB = (compressionResult.compressedSize || 0) / 1024 / 1024;
-
-                        console.log(`[INSTAGRAM PUBLISH] Video compressed successfully: ${originalSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB`);
-
-                        const compressedUrl = compressionResult.outputPath.replace(process.cwd(), '').replace(/\\/g, '/');
-                        const finalUrl = compressedUrl.startsWith('/') ? compressedUrl : '/' + compressedUrl;
-
-                        console.log(`[INSTAGRAM PUBLISH] Retrying with compressed video: ${finalUrl}`);
-                        return await this.publishVideoWithCompression(accessToken, finalUrl, caption, true, accountId);
-                      } else {
-                        console.error(`[INSTAGRAM PUBLISH] Compression failed:`, compressionResult.error);
-                      }
-                    } catch (compressionError: any) {
-                      console.error(`[INSTAGRAM PUBLISH] Video compression error:`, compressionError.message);
-                      console.error(`[INSTAGRAM PUBLISH] Compression stack:`, compressionError.stack);
-                    }
-                  }
-                }
-              }
-            }
-            
-            // Import permission helper for better error handling
-            const { InstagramPermissionHelper } = await import('./instagram-permission-helper');
-            const errorInfo = InstagramPermissionHelper.getVideoPublishingError();
-
-            throw new Error(`${errorInfo.error}: ${errorInfo.technicalReason}. Solution: ${errorInfo.solution}. Detail: ${errData?.message || error.message}`);
-          }
-        }
-        attempts++;
-      }
-
-      if (!published) {
-        if (!isRetryWithCompression) {
-          // Try compression as a last resort
-          const isLocalFile = videoUrl.includes('/uploads/') && !videoUrl.startsWith('http');
-          if (isLocalFile) {
-            const localPath = path.join(process.cwd(), videoUrl.startsWith('/') ? videoUrl.slice(1) : videoUrl);
-
-            if (fs.existsSync(localPath)) {
-              console.log(`[INSTAGRAM PUBLISH] Timeout reached - attempting emergency video compression as final attempt`);
-
-              try {
-                const compressionResult = await VideoCompressor.compressForInstagram(localPath);
-
-                if (compressionResult.success && compressionResult.outputPath) {
-                  console.log(`[INSTAGRAM PUBLISH] Emergency compression successful - retrying with compressed video`);
-                  const compressedUrl = compressionResult.outputPath.replace(process.cwd(), '').replace(/\\/g, '/');
-                  return this.publishVideoWithCompression(accessToken, compressedUrl, caption, true, accountId);
-                }
-              } catch (compressionError: any) {
-                console.error(`[INSTAGRAM PUBLISH] Emergency compression failed:`, compressionError.message);
-              }
-            }
-          }
-        }
-
-        throw new Error(`Instagram video processing failed after all attempts including intelligent compression. The video file could not be processed within Instagram's limitations.\n\nThis may be due to:\n• File format incompatibility\n• Video specifications exceeding Instagram's processing capacity\n• Network or API limitations\n\nThe intelligent compression system attempted to optimize your video but Instagram's servers could not complete processing. Please try:\n1. Converting to MP4 format with H.264 codec\n2. Reducing video duration or resolution manually\n3. Ensuring stable network connectivity\n4. Retrying after some time`);
-      }
-
-      return publishResponseData;
+      // NEW ENTERPRISE ARCHITECTURE: No aggressive polling. 
+      console.log(`[INSTAGRAM PUBLISH] Video container ${containerId} created. Deferring to background verify queue.`);
+      
+      return { 
+        id: containerId, 
+        processing: true 
+      };
     } catch (error: any) {
       console.error(`[INSTAGRAM PUBLISH] Video publish failed:`, error.response?.data || error.message);
       throw new Error(`Instagram video publish failed: ${error.response?.data?.error?.message || error.message}`);

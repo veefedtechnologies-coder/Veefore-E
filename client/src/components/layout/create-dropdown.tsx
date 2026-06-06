@@ -37,14 +37,14 @@ const createOptions: CreateOption[] = [
     color: 'text-slate-500',
     hoverColor: 'hover:bg-gray-50'
   },
-  {
+  ...(import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true' ? [] : [{
     icon: MessageSquareText,
     label: 'DM automation',
     description: 'Set up automated direct messages',
     action: 'dm-automation',
     color: 'text-slate-500',
     hoverColor: 'hover:bg-gray-50'
-  },
+  }]),
   {
     icon: Megaphone,
     label: 'Ad',

@@ -86,6 +86,7 @@ const TrialCard = ({ type, days, features, badge, gradient, highlight }: {
 
 const FreeTrial = () => {
     const isMobile = useIsMobile()
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true'
 
     // What's included in trial
     const trialFeatures = [
@@ -99,7 +100,7 @@ const FreeTrial = () => {
         <div className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
             <SEO
                 title="Free Trial - Veefore | Start Growing Today"
-                description="Try Veefore free for 7 days. Beta users get 30 days free! No credit card required. Full access to AI-powered engagement automation."
+                description={isPhase1 ? "Try Veefore free for 7 days. Beta users get 30 days free! No credit card required. Full access to AI-powered content scheduling and optimization." : "Try Veefore free for 7 days. Beta users get 30 days free! No credit card required. Full access to AI-powered engagement automation."}
             />
 
             {/* Ambient Background */}
@@ -144,7 +145,9 @@ const FreeTrial = () => {
                         transition={{ duration: 0.6, delay: 0.2 }}
                         className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto"
                     >
-                        Experience the full power of AI-driven growth automation. Start with a free trial and see the results for yourself.
+                        {isPhase1
+                            ? 'Experience the full power of AI-driven content optimization and scheduling. Start with a free trial and see the results for yourself.'
+                            : 'Experience the full power of AI-driven growth automation. Start with a free trial and see the results for yourself.'}
                     </motion.p>
                 </div>
             </section>
@@ -157,7 +160,7 @@ const FreeTrial = () => {
                         days={7}
                         features={[
                             'Full access to Growth plan features',
-                            'AI Comment & DM Automation',
+                            isPhase1 ? 'Cross-Platform Publishing & Scheduling' : 'AI Comment & DM Automation',
                             'Hook Intelligence & Analytics',
                             '150 AI credits included',
                             'Email support',
@@ -241,7 +244,9 @@ const FreeTrial = () => {
                                 Get 30 Days Free as a Beta User
                             </h2>
                             <p className="text-white/60 mb-8 max-w-lg mx-auto">
-                                Join our exclusive beta program. Be among the first to experience Veefore and help shape the future of AI-powered growth automation.
+                                {isPhase1
+                                    ? 'Join our exclusive beta program. Be among the first to experience Veefore and help shape the future of AI-powered content tools.'
+                                    : 'Join our exclusive beta program. Be among the first to experience Veefore and help shape the future of AI-powered growth automation.'}
                             </p>
 
                             <Link

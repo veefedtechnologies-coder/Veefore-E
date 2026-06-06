@@ -72,6 +72,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
       console.log('[Realtime] Connecting to:', socketUrl)
 
       const newSocket = io(socketUrl, {
+        path: '/ws/metrics',
         auth: authToken ? { token: authToken } : undefined,
         transports: ['websocket', 'polling'],
         reconnection: false,

@@ -2,9 +2,20 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, User, setPersistence, browserLocalPersistence, getRedirectResult, sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth'
 
 // Firebase configuration
+// authDomain: Use app.veefore.com in production since:
+// 1. The Express server proxies /__/auth/* → veefore-b84c8.firebaseapp.com
+// 2. https://app.veefore.com/__/auth/handler is registered in Google Cloud Console
+// This makes the popup same-origin, bypassing Safari's ITP cross-origin block.
+const getAuthDomain = () => {
+  if (typeof window !== 'undefined' && window.location.hostname.includes('veefore.com')) {
+    return window.location.hostname // e.g. app.veefore.com
+  }
+  return 'veefore-b84c8.firebaseapp.com' // localhost / dev fallback
+}
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'demo-api-key',
-  authDomain: 'veefore-b84c8.firebaseapp.com', // Use Firebase's default domain for OAuth
+  authDomain: getAuthDomain(),
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'veefore-b84c8',
   storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'veefore-b84c8'}.firebasestorage.app`,
   appId: import.meta.env.VITE_FIREBASE_APP_ID || 'demo-app-id'
@@ -33,16 +44,8 @@ console.log('🔧 Using authDomain:', firebaseConfig.authDomain)
 console.log('🔧 Full URL:', window.location.href)
 
 // Validate the authDomain configuration
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-  console.log('✅ Running on localhost - Firebase authDomain configured correctly')
-  console.log('ℹ️ Firebase will handle OAuth on firebaseapp.com, then redirect back to', window.location.origin)
-} else if (window.location.hostname.includes('veefore.com')) {
-  console.log('✅ Running on production domain - Firebase authDomain configured correctly')
-  console.log('ℹ️ Firebase will handle OAuth on firebaseapp.com, then redirect back to', window.location.origin)
-} else {
-  console.log('ℹ️ Running on custom domain:', window.location.hostname)
-  console.log('ℹ️ Firebase authDomain is always firebaseapp.com for OAuth flows')
-}
+console.log('🔧 Using authDomain:', firebaseConfig.authDomain, '| App domain:', window.location.hostname)
+console.log('ℹ️ Google sign-in uses signInWithRedirect via Firebase\'s hosted handler endpoint')
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
@@ -52,15 +55,11 @@ console.log('🔥 Firebase App Initialized:', app)
 export const auth = getAuth(app)
 console.log('🔥 Firebase Auth Initialized:', auth)
 
-// Set persistence - Must be awaited to ensure auth state persists across page refreshes
-setPersistence(auth, browserLocalPersistence)
-  .then(() => {
-    console.log('🔥 Firebase Persistence Set Successfully')
-  })
-  .catch((error) => {
-    console.error('❌ Failed to set Firebase persistence:', error)
-  })
-
+// Explicitly set persistence to LOCAL to prevent users from being logged out when the browser closes.
+// This is critical for preventing "2 times a day" automatic logouts caused by default session fallback.
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('🔥 Firebase Persistence Error:', error);
+});
 // Create Google Provider
 export const googleProvider = new GoogleAuthProvider()
 googleProvider.setCustomParameters({

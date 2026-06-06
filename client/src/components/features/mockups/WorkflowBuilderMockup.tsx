@@ -18,6 +18,7 @@ export const WorkflowBuilderMockup = React.memo(() => {
 
 const WorkflowContent = () => {
     const isInView = React.useContext(MockupAnimationContext);
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
     return (
         <div className="p-6 h-full flex flex-col">
@@ -29,7 +30,7 @@ const WorkflowContent = () => {
                     </div>
                     <div>
                         <h3 className="font-semibold text-white">Workflow Builder</h3>
-                        <p className="text-xs text-white/50">Create automations visually</p>
+                        <p className="text-xs text-white/50">{isPhase1 ? 'Create workflows visually' : 'Create automations visually'}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -45,12 +46,17 @@ const WorkflowContent = () => {
 
                 {/* Workflow Steps */}
                 <div className="space-y-6">
-                    {[
+                    {(isPhase1 ? [
+                        { type: 'trigger', label: 'TRIGGER', title: 'Content Approved', desc: 'When a draft is marked ready', icon: Bell, color: 'from-purple-500 to-violet-500' },
+                        { type: 'condition', label: 'CONDITION', title: 'Check Format', desc: 'Does the post have media attached?', icon: Brain, color: 'from-blue-500 to-cyan-500' },
+                        { type: 'action', label: 'ACTION', title: 'Format for Feed', desc: 'Adjust aspect ratio automatically', icon: Sparkles, color: 'from-pink-500 to-rose-500' },
+                        { type: 'action', label: 'ACTION', title: 'Schedule Post', desc: 'Publish at audience peak time', icon: Send, color: 'from-green-500 to-emerald-500' },
+                    ] : [
                         { type: 'trigger', label: 'TRIGGER', title: 'New Comment Received', desc: 'When someone comments on any post', icon: Bell, color: 'from-purple-500 to-violet-500' },
                         { type: 'condition', label: 'CONDITION', title: 'Check Sentiment', desc: 'Is the comment positive or question?', icon: Brain, color: 'from-blue-500 to-cyan-500' },
                         { type: 'action', label: 'ACTION', title: 'AI Generates Reply', desc: 'Create personalized response', icon: Sparkles, color: 'from-pink-500 to-rose-500' },
                         { type: 'action', label: 'ACTION', title: 'Post Reply', desc: 'Send reply after 2-5 min delay', icon: Send, color: 'from-green-500 to-emerald-500' },
-                    ].map((step, i) => (
+                    ]).map((step, i) => (
                         <motion.div
                             key={i}
                             initial={{ opacity: 0 }}

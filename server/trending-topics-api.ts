@@ -40,7 +40,7 @@ export class TrendingTopicsAPI {
     return TrendingTopicsAPI.instance;
   }
 
-  async getTrendingTopics(category: string = 'Business and Finance'): Promise<TrendingTopicsResponse> {
+  async getTrendingTopics(category: string = 'Business and Finance', preferences: any = {}): Promise<TrendingTopicsResponse> {
     console.log(`[TRENDING TOPICS] Fetching trending topics for category: ${category}`);
 
     // Check cache first
@@ -112,24 +112,15 @@ export class TrendingTopicsAPI {
     - Include variety in platform distribution
     - Focus on ${category} topics that content creators would want to engage with`;
 
-    const response = await getOpenAI().chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a social media trends analyst with access to real-time trending data across all major platforms. Generate authentic, current trending topics with realistic engagement metrics."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 1500
-    });
-
-    const result = JSON.parse(response.choices[0].message.content || '{}');
+    const promptStr = `System: You are a social media trends analyst with access to real-time trending data across all major platforms. Generate authentic, current trending topics with realistic engagement metrics.\n\nUser: ${prompt}`;
+    
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let result = {};
+    try {
+      result = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[TRENDING TOPICS] Failed to generate JSON using AIServiceManager', e);
+    }
 
     // Validate and ensure proper structure
     if (!result.topics || !Array.isArray(result.topics)) {

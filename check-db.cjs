@@ -1,23 +1,16 @@
-const { MongoStorage } = require('./server/mongodb-storage.js');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-(async () => {
-  try {
-    const storage = new MongoStorage();
-    const accounts = await storage.getAllSocialAccounts();
-    console.log('=== SOCIAL ACCOUNTS DATABASE VALUES ===');
-    accounts.forEach(account => {
-      console.log(`Account: ${account.username} (${account.platform})`);
-      console.log(`  totalShares: ${account.totalShares}`);
-      console.log(`  totalSaves: ${account.totalSaves}`);
-      console.log(`  totalLikes: ${account.totalLikes}`);
-      console.log(`  totalComments: ${account.totalComments}`);
-      console.log(`  postsAnalyzed: ${account.postsAnalyzed}`);
-      console.log(`  lastSyncAt: ${account.lastSyncAt}`);
-      console.log('---');
-    });
-    process.exit(0);
-  } catch (error) {
-    console.error('Error:', error);
-    process.exit(1);
-  }
-})();
+async function check() {
+  await mongoose.connect(process.env.MONGODB_URI);
+  console.log('Connected to DB');
+
+  const db = mongoose.connection.db;
+  
+  const post = await db.collection('contents').findOne({ platform: 'instagram' });
+  console.log(JSON.stringify(post, null, 2));
+
+  process.exit(0);
+}
+
+check().catch(console.error);

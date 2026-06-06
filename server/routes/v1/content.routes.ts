@@ -27,6 +27,8 @@ const PaginationQuery = z.object({
   workspaceId: z.string().optional(),
 });
 
+router.get('/debug-counts', contentController.debugCounts);
+
 router.get('/workspace/:workspaceId/drafts',
   requireAuth,
   validateRequest({ params: WorkspaceIdParams, query: PaginationQuery }),
@@ -62,6 +64,18 @@ router.get('/:contentId',
   requireAuth,
   validateRequest({ params: ContentIdParams }),
   contentController.getContent
+);
+
+router.get('/:contentId/analytics',
+  validateRequest({ params: ContentIdParams }),
+  contentController.getAnalytics
+);
+
+router.post('/:contentId/sync-id',
+  requireAuth,
+  validateRequest({ params: ContentIdParams }),
+  auditMiddleware(AuditActions.CONTENT.UPDATE, { resource: 'content' }),
+  contentController.syncInstagramId
 );
 
 router.put('/:contentId',

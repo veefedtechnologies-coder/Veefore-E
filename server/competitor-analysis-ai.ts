@@ -4,6 +4,7 @@ interface CompetitorAnalysisRequest {
   competitorUsername: string;
   platform: string;
   analysisType: string;
+  preferences?: any;
 }
 
 interface CompetitorAnalysisResult {
@@ -100,25 +101,8 @@ Also provide:
 
 Focus on actionable insights that can be immediately implemented to gain competitive advantage.
 `;
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert competitive intelligence analyst specializing in social media strategy. Provide detailed, actionable insights based on competitor data analysis."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 2000
-    });
-
-    const analysisResults = JSON.parse(response.choices[0].message.content || '{}');
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    const analysisResults = await aiServiceManager.generateJSON(prompt, request.preferences);
     
     // Generate top performing posts analysis
     const topPerformingPosts = generateTopPerformingPosts(mockCompetitorData);

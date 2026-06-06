@@ -65,7 +65,21 @@ const getAllowedOrigins = (): string[] => {
     });
   }
 
-  console.log(`🔒 CORS: Configured ${allowedOrigins.length} allowed origins for ${process.env.NODE_ENV} environment`);
+  // Add standard frontend and deployment URLs
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (frontendUrl && !allowedOrigins.includes(frontendUrl)) {
+    allowedOrigins.push(frontendUrl);
+  }
+
+  const vercelUrl = process.env.VERCEL_URL;
+  if (vercelUrl) {
+    const fullVercelUrl = vercelUrl.startsWith('http') ? vercelUrl : `https://${vercelUrl}`;
+    if (!allowedOrigins.includes(fullVercelUrl)) {
+      allowedOrigins.push(fullVercelUrl);
+    }
+  }
+
+  // console.log(`🔒 CORS: Configured ${allowedOrigins.length} allowed origins for ${process.env.NODE_ENV} environment`);
   return allowedOrigins;
 };
 

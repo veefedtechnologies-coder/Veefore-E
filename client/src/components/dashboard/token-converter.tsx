@@ -162,7 +162,7 @@ export function TokenConverter() {
                 >
                   Graph API Explorer
                 </a>{' '}
-                with permissions: <strong>pages_manage_metadata, pages_read_engagement, pages_show_list, instagram_basic, instagram_manage_comments</strong>
+                with permissions: <strong>pages_manage_metadata, pages_read_engagement, pages_show_list, instagram_basic, instagram_manage_comments, instagram_manage_messages</strong>
               </p>
             </div>
 
@@ -208,7 +208,7 @@ export function TokenConverter() {
                       Graph API Explorer
                     </a><br/>
                     2. Select your app → Get User Access Token<br/>
-                    3. Add permissions: <code className="bg-gray-100 px-1">pages_manage_metadata, pages_read_engagement, pages_show_list, instagram_basic</code><br/>
+                    3. Add permissions: <code className="bg-gray-100 px-1">pages_manage_metadata, pages_read_engagement, pages_show_list, instagram_basic, instagram_manage_comments, instagram_manage_messages</code><br/>
                     4. Generate token and try again
                   </p>
                 </div>

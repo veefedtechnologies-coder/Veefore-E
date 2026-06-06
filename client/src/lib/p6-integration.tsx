@@ -43,10 +43,15 @@ export interface P6Config {
   };
 }
 
+let isInitialized = false;
+
 /**
  * P6: Initialize complete frontend optimization system
  */
 export async function initializeP6System(config?: P6Config): Promise<void> {
+  if (isInitialized) return;
+  isInitialized = true;
+  
   console.log('🚀 P6: Initializing Frontend SEO, Accessibility & UX System...');
 
   try {
@@ -72,6 +77,7 @@ export async function initializeP6System(config?: P6Config): Promise<void> {
 
   } catch (error) {
     console.error('❌ P6: Frontend system initialization failed:', error);
+    isInitialized = false;
     throw error;
   }
 }
@@ -82,6 +88,7 @@ export async function initializeP6System(config?: P6Config): Promise<void> {
 function setupGlobalOptimizations(): void {
   // Add global CSS for optimization
   const style = document.createElement('style');
+  style.id = 'p6-global-styles';
   style.textContent = `
     /* P6: Global Frontend Optimization Styles */
     

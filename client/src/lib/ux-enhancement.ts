@@ -72,10 +72,15 @@ export class UXManager {
     return UXManager.instance;
   }
 
+  private isInitialized = false;
+
   /**
    * P6-3.3a: Initialize UX enhancement system
    */
   initialize(config?: Partial<UXConfig>): void {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+    
     this.config = { ...DEFAULT_UX_CONFIG, ...config };
     
     this.setupErrorBoundaries();

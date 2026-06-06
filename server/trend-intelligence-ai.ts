@@ -113,24 +113,16 @@ Focus on:
 - Risk assessment for trend adoption
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert trend intelligence analyst with access to real-time social media data across all major platforms. Provide data-driven insights and accurate trend predictions."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 2000
-    });
+    const promptStr = `System: You are an expert trend intelligence analyst with access to global social media data. Provide actionable recommendations in valid JSON format only.\n\nUser: ${prompt}`;
 
-    const analysisResults = JSON.parse(response.choices[0].message.content || '{}');
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let analysisResults: any = {};
+    try {
+      analysisResults = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[TREND INTELLIGENCE] Failed to generate JSON using AIServiceManager', e);
+      throw new Error('Failed to parse AI response');
+    }
     
     // Calculate trend scores
     const viralPotential = calculateViralPotential(analysisResults, trendData);

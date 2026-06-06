@@ -145,7 +145,7 @@ export class RealVideoProcessor {
               width: videoStream.width,
               height: videoStream.height,
               bitrate: parseInt(metadata.format.bit_rate || '0'),
-              fps: eval(videoStream.r_frame_rate), // Convert fraction to decimal
+              fps: videoStream.r_frame_rate.includes('/') ? (parseInt(videoStream.r_frame_rate.split('/')[0]) / parseInt(videoStream.r_frame_rate.split('/')[1])) : parseFloat(videoStream.r_frame_rate), // Safe parsing instead of eval
               format: metadata.format.format_name,
               title: metadata.format.tags?.title
             });

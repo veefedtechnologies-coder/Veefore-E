@@ -94,18 +94,18 @@ async function getRateLimitInfo(key: string, windowMs: number, maxRequests: numb
     const now = Date.now();
     const windowStart = now - windowMs;
 
-    // OPTIMIZATION: Pipeline 4 commands into 1 round-trip
-    // This reduces network latency impact by 4x
-    const pipeline = redisClient.pipeline();
-    pipeline.zremrangebyscore(key, 0, windowStart);
-    pipeline.zcard(key);
-    pipeline.zadd(key, now, `${now}-${Math.random()}`);
-    pipeline.expire(key, Math.ceil(windowMs / 1000));
+    // OPTIMIZATION: Use multi() instead of pipeline() to guarantee ATOMIC execution.
+    // This prevents race conditions where concurrent requests get the same zcard count
+    const transaction = redisClient.multi();
+    transaction.zremrangebyscore(key, 0, windowStart);
+    transaction.zcard(key);
+    transaction.zadd(key, now, `${now}-${Math.random()}`);
+    transaction.expire(key, Math.ceil(windowMs / 1000));
 
-    const results = await pipeline.exec();
+    const results = await transaction.exec();
 
-    // Check for pipeline errors
-    if (!results) throw new Error("Redis pipeline failed");
+    // Check for transaction errors
+    if (!results) throw new Error("Redis transaction failed");
 
     // results is [[err, res], [err, res], ...]
     // result[1] is zcard count
@@ -119,7 +119,7 @@ async function getRateLimitInfo(key: string, windowMs: number, maxRequests: numb
     const duration = Date.now() - startTimer;
 
     // VERIFICATION LOG: Show redis success + timing
-    console.log(`[RATE-LIMIT] ✅ Redis: ${key} | Count: ${requests}/${maxRequests} | Time: ${duration}ms`);
+    // console.log(`[RATE-LIMIT] ✅ Redis: ${key} | Count: ${requests}/${maxRequests} | Time: ${duration}ms`);
 
     return {
       requests,
@@ -171,12 +171,12 @@ export const globalRateLimiter = async (req: Request, res: Response, next: NextF
   }
 
   // Detailed API logging for debugging
-  console.log(`[API-DEBUG] ${req.method} ${req.url} | IP: ${req.ip}`);
+  // console.log(`[API-DEBUG] ${req.method} ${req.url} | IP: ${req.ip}`);
 
   const key = `global_rl:${req.ip}`;
   const windowMs = 60 * 1000; // 1 minute
-  // Stricter limit: 120 requests per minute (2 req/sec)
-  const maxRequests = 120;
+  // Stricter limit: 120 requests per minute (2 req/sec) in production, 1000 for development polling
+  const maxRequests = process.env.NODE_ENV === 'development' ? 1000 : 120;
 
   const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
 
@@ -308,7 +308,7 @@ export const apiRateLimiter = async (req: Request, res: Response, next: NextFunc
 
   // Debug log to confirm Redis usage (remove in production if too noisy)
   if (redisClient) {
-    console.log(`[REDIS] Rate Limit Check (${key}): ${rateLimitInfo.requests}/${maxRequests} requests`);
+    // console.log(`[REDIS] Rate Limit Check (${key}): ${rateLimitInfo.requests}/${maxRequests} requests`);
   }
 
   if (rateLimitInfo.blocked) {
@@ -430,6 +430,93 @@ export const aiRateLimiter = async (req: Request, res: Response, next: NextFunct
       message: 'Too many AI requests. Please wait 5 minutes before generating more content.',
       retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
       securityNote: 'This limit protects against excessive AI usage and helps manage costs.'
+    });
+  }
+
+  next();
+};
+
+/**
+ * P7: Dashboard Refresh Limiter - 10 manual refreshes per minute
+ */
+export const dashboardRefreshLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  const user = req.user;
+  const key = user?.id ? `dash_rl:user:${user.id}` : `dash_rl:ip:${req.ip}`;
+  const windowMs = 60 * 1000;
+  const maxRequests = 10;
+
+  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
+
+  if (rateLimitInfo.blocked) {
+    console.log(`🚨 DASHBOARD RATE LIMIT: Blocked ${user?.id || req.ip}`);
+    return res.status(429).json({
+      error: 'Refresh rate limit exceeded',
+      message: 'Too many manual dashboard refreshes. Please wait 1 minute.',
+      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000)
+    });
+  }
+
+  next();
+};
+
+/**
+ * P7: Webhook Rate Limiter - 1000 requests per minute per source IP
+ */
+export const webhookRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  const key = `webhook_rl:ip:${req.ip}`;
+  const windowMs = 60 * 1000;
+  const maxRequests = 1000; // Generous for Meta's high-throughput webhooks, but stops DDoS
+
+  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
+
+  if (rateLimitInfo.blocked) {
+    console.warn(`🚨 WEBHOOK RATE LIMIT: Blocked IP ${req.ip} (Flood detected)`);
+    return res.status(429).send('Too Many Requests');
+  }
+
+  next();
+};
+
+/**
+ * P7: Automation Loop Limiter - 50 automation triggers per minute per user
+ */
+export const automationRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  const user = req.user;
+  const key = user?.id ? `auto_rl:user:${user.id}` : `auto_rl:ip:${req.ip}`;
+  const windowMs = 60 * 1000;
+  const maxRequests = 50;
+
+  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
+
+  if (rateLimitInfo.blocked) {
+    console.log(`🚨 AUTOMATION RATE LIMIT: Blocked ${user?.id || req.ip} (${rateLimitInfo.requests}/${maxRequests})`);
+    return res.status(429).json({
+      error: 'Automation rate limit exceeded',
+      message: 'Too many automation triggers running simultaneously. Please wait.',
+      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000)
+    });
+  }
+
+  next();
+};
+
+/**
+ * P7: Background Sync Limiter - 5 manual syncs per minute per user
+ */
+export const syncRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  const user = req.user;
+  const key = user?.id ? `sync_rl:user:${user.id}` : `sync_rl:ip:${req.ip}`;
+  const windowMs = 60 * 1000;
+  const maxRequests = 5;
+
+  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
+
+  if (rateLimitInfo.blocked) {
+    console.log(`🚨 SYNC RATE LIMIT: Blocked ${user?.id || req.ip}`);
+    return res.status(429).json({
+      error: 'Sync rate limit exceeded',
+      message: 'Too many manual sync requests. Please wait 1 minute.',
+      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000)
     });
   }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Home, Calendar, BarChart3, MessageSquare, Settings, Globe, LogOut, Users, Link, Plus, Zap, Video, Shield } from 'lucide-react'
+import { Home, Calendar, BarChart3, MessageSquare, Settings, Globe, LogOut, Users, Link, Plus, Zap, Video, Shield, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CreateDropdown } from './create-dropdown'
 import { logout } from '@/lib/auth'
@@ -15,29 +15,25 @@ const sidebarGroups = [
       { icon: Home, label: 'Home', key: 'home', url: '/' },
       { icon: Calendar, label: 'Plan', key: 'plan', url: '/plan' },
       { icon: Plus, label: 'Create', key: 'create', isCreateButton: true },
-      { icon: Video, label: 'Video Gen', key: 'video-generator', url: '/video-generator' },
     ]
   },
   {
     title: "Communication",
     items: [
-      { icon: MessageSquare, label: 'Inbox 2.0', key: 'inbox', url: '/inbox' },
+      ...(import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true' ? [] : [{ icon: MessageSquare, label: 'Inbox 2.0', key: 'inbox', url: '/inbox' }]),
     ]
   },
   {
     title: "Analytics & Automation",
     items: [
       { icon: BarChart3, label: 'Analytics', key: 'analytics', url: '/analytics' },
-      { icon: Zap, label: 'Automation', key: 'automation', url: '/automation' },
+      ...(import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true' ? [] : [{ icon: Zap, label: 'Automation', key: 'automation', url: '/automation' }]),
+      { icon: Activity, label: 'Listening', key: 'social-listening', url: '/social-listening' },
     ]
   },
   {
     title: "Management",
     items: [
-      { icon: Link, label: 'Integration', key: 'integration', url: '/integration' },
-      { icon: Users, label: 'Workspaces', key: 'workspaces', url: '/workspaces' },
-      { icon: Shield, label: 'Admin Panel', key: 'admin', url: '/admin' },
-      { icon: Globe, label: 'Landing', key: 'landing', url: '/landing' },
       { icon: Shield, label: 'Security Health', key: 'encryption-health', url: '/encryption-health' },
       { icon: Settings, label: 'Test Fixtures', key: 'test-fixtures', url: '/test-fixtures' },
     ]
@@ -70,8 +66,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
     if (loc === '/inbox') return 'inbox'
     if (loc === '/analytics') return 'analytics'
     if (loc === '/automation') return 'automation'
-    if (loc === '/integration') return 'integration'
-    if (loc === '/workspaces') return 'workspaces'
+    if (loc === '/social-listening') return 'social-listening'
     if (loc === '/settings') return 'settings'
     if (loc === '/admin') return 'admin'
     if (loc === '/landing') return 'landing'
@@ -130,7 +125,9 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
   const handleCreateOptionSelect = (option: string) => {
     setDropdownOpen(false)
     console.log('Selected create option:', option)
-    // Handle the selected option here
+    if (option === 'post') setLocation('/posts')
+    if (option === 'automation') setLocation('/automation')
+    if (option === 'video') setLocation('/video-generator')
   }
 
   const handleLogout = async () => {
@@ -195,15 +192,11 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
         {item.label}
       </span>
       
-      {/* Active indicator */}
-      {activeView === item.key && (
-        <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
-      )}
     </div>
   )
 
   return (
-    <div className={cn("w-24 bg-white dark:bg-slate-800 flex flex-col min-h-full relative transition-colors duration-300", className)}>
+    <div className={cn("w-24 bg-white dark:bg-slate-800 flex flex-col h-full min-h-full overflow-y-auto [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-500 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 relative transition-colors duration-300", className)}>
       {/* VeeGPT Logo Section */}
       <div className="flex flex-col items-center py-6 bg-white dark:bg-slate-800">
         <div 
@@ -272,23 +265,14 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
             />
           </div>
           
-          {/* Active indicator with enhanced animation */}
-          {activeView === 'veegpt' && (
-            <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-1.5 h-10 bg-gradient-to-b from-blue-400 via-blue-600 to-purple-600 rounded-full animate-pulse shadow-lg"></div>
-          )}
-          
           {/* Glow effect when active - removed for consistency */}
         </div>
       </div>
 
       {/* Main Navigation Section */}
       <div className="flex-1 flex flex-col justify-center bg-white dark:bg-slate-800">
-        <nav className="flex flex-col space-y-6">
-          {sidebarGroups.map((group, groupIndex) => (
-            <div key={group.title} className="flex flex-col space-y-4">
-              {group.items.map((item) => renderNavItem(item))}
-            </div>
-          ))}
+        <nav className="flex flex-col space-y-4">
+          {sidebarGroups.flatMap(group => group.items).map((item) => renderNavItem(item))}
         </nav>
       </div>
 

@@ -9,6 +9,7 @@ import { TrendingUp, Users, RefreshCw, Instagram, Facebook, Twitter, Linkedin, Y
 import { usePerformanceData } from '@/hooks/usePerformanceData'
 import { useSocialAccounts } from '@/hooks/useSocialAccounts'
 import { useHistoricalData } from '@/hooks/useHistoricalData'
+import { useFollowerAnalytics } from '@/hooks/useFollowerAnalytics'
 import { DataStory } from './DataStory'
 import { MetricsGrid, MetricsGridSkeleton } from './MetricsGrid'
 import { PlatformCard } from './PlatformCard'
@@ -87,35 +88,59 @@ export function PerformanceScore() {
   const [storyAnimation, setStoryAnimation] = useState(0)
   const [reconnectVisible, setReconnectVisible] = useState(true)
   const [isClosingReconnect, setIsClosingReconnect] = useState(false)
+  const [dynamicInsight, setDynamicInsight] = useState<string | null>(null)
 
   const { analytics, isLoading: analyticsLoading } = usePerformanceData(currentWorkspace?.id)
-  const { socialAccounts: socialAccountsArray, validAccounts, invalidAccounts } = useSocialAccounts(currentWorkspace?.id)
-  const { historicalData } = useHistoricalData(currentWorkspace?.id, selectedPeriod)
+  const { socialAccounts: socialAccountsArray, validAccounts, invalidAccounts, isLoading: socialLoading } = useSocialAccounts(currentWorkspace?.id)
+  const { historicalData, isLoading: historicalLoading } = useHistoricalData(currentWorkspace?.id, selectedPeriod)
+  const { followerData, isLoading: followerLoading } = useFollowerAnalytics(currentWorkspace?.id)
 
   useEffect(() => {
     setShowDataStory(true)
     setStoryAnimation(prev => prev + 1)
   }, [selectedPeriod])
 
+  useEffect(() => {
+    if (!currentWorkspace?.id || !analytics) return;
+    const fetchInsight = async () => {
+      try {
+        const response = await fetch(`/api/v1/analytics/workspace/${currentWorkspace.id}/generate-insight`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ metricsData: analytics })
+        });
+        const data = await response.json();
+        if (data.success && data.insight) {
+          setDynamicInsight(data.insight);
+        }
+      } catch (err) {
+        console.error('Failed to fetch AI insight for banner:', err);
+      }
+    };
+    fetchInsight();
+  }, [currentWorkspace?.id, analytics]);
+
   const generateDataStory = (currentData: any) => {
-    const followerCount = Number(currentData?.followers) || 4
-    const engagement = Number(currentData?.engagement) || 0
-    const reach = Number(currentData?.reach) || 135
-    const posts = Number(currentData?.posts) || 15
+    const followerCount = currentData?.followers ?? 0;
+    const likes = currentData?.likes ?? 0;
+    const reach = currentData?.reach ?? 0;
+    const views = currentData?.views ?? 0;
     const period = currentData?.period || selectedPeriod
 
-    const safeEngagementStr = engagement.toFixed(0)
-    const safePostsPerDay = posts > 0 ? (posts / 30).toFixed(1) : '0.0'
+    const safeViewsPerDay = views > 0 ? (views / 30).toFixed(0) : '0'
     const safeAmplification = followerCount > 0 ? Math.round(reach / followerCount) : 0
 
     const stories = {
       day: {
         emoji: "⚡",
         title: "Right Now Mode",
-        story: engagement > 100 
-          ? `🔥 Your content is ON FIRE today! ${safeEngagementStr}% engagement means every post gets massive love`
+        story: likes > 50 
+          ? `🔥 Your content is ON FIRE today! ${likes} likes means every post gets massive love`
           : `📊 Today's snapshot: ${followerCount} followers are watching. Time to drop that viral content!`,
-        insight: posts > 0 ? "Peak activity detected! Your audience is most active right now." : "Perfect timing to post - your audience is waiting!",
+        insight: views > 100 ? "Peak activity detected! Your audience is highly active right now." : "Perfect timing to post - your audience is waiting!",
         color: "bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600",
         textColor: "text-gray-100 dark:text-gray-200"
       },
@@ -124,7 +149,7 @@ export function PerformanceScore() {
         title: "Weekly Pulse",
         story: reach > followerCount 
           ? `🚀 VIRAL ALERT! You reached ${reach} people with just ${followerCount} followers. That's ${safeAmplification}x amplification!`
-          : `📈 This week: ${posts} posts, ${followerCount} loyal followers, building your empire one post at a time`,
+          : `📈 This week: ${views} views, ${followerCount} loyal followers, building your empire one post at a time`,
         insight: "Weekly patterns reveal your content's true impact. Consistency is key!",
         color: "bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600", 
         textColor: "text-gray-100 dark:text-gray-200"
@@ -132,15 +157,24 @@ export function PerformanceScore() {
       month: {
         emoji: "💎",
         title: "Growth Journey", 
-        story: posts >= 10 
-          ? `🏆 CONTENT MACHINE! ${posts} posts this month = ${safePostsPerDay} posts/day. You're building a media empire!`
-          : `💪 ${posts} quality posts, ${followerCount} engaged followers. Quality > Quantity strategy in action!`,
-        insight: engagement > 300 ? "Your content strategy is working! Keep this momentum going." : "Steady growth foundation set. Ready to scale up?",
+        story: views >= 1000 
+          ? `🏆 CONTENT MACHINE! ${views} views this month = ${safeViewsPerDay} views/day. You're building a media empire!`
+          : `💪 ${likes} likes, ${followerCount} engaged followers. Quality > Quantity strategy in action!`,
+        insight: likes > 1000 ? "Your content strategy is working! Keep this momentum going." : "Steady growth foundation set. Ready to scale up?",
         color: "bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600",
         textColor: "text-gray-100 dark:text-gray-200"  
       }
     }
-    return stories[period]
+    const storyResult = stories[period as 'day' | 'week' | 'month'] || stories.month
+    
+    if (dynamicInsight) {
+      return {
+        ...storyResult,
+        insight: dynamicInsight
+      }
+    }
+    
+    return storyResult;
   }
 
   useEffect(() => {
@@ -163,41 +197,75 @@ export function PerformanceScore() {
     if (!historicalData || !historicalData.length) {
       return {
         followers: { value: '+0.0%', isPositive: true },
+        likes: { value: '+100%', isPositive: true },
         engagement: { value: '+100%', isPositive: true },
-        reach: { value: '+100%', isPositive: true },
-        posts: { value: `+${currentData.posts}`, isPositive: currentData.posts > 0 },
+        reach: { value: '+0.0%', isPositive: true },
+        views: { value: `+${currentData.views || 0}`, isPositive: (currentData.views || 0) > 0 },
+        posts: { value: `+${currentData.posts || 0}`, isPositive: (currentData.posts || 0) > 0 },
         contentScore: { value: '+100%', isPositive: true }
       }
     }
 
     const sortedData = historicalData.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
     const oldestRecord = sortedData[0]
+    const newestRecord = sortedData[sortedData.length - 1]
 
-    const followerGrowth = oldestRecord.followers === 0 ? 0 : ((currentData.followers - oldestRecord.followers) / oldestRecord.followers) * 100
-    const engagementGrowth = oldestRecord.engagement === 0 ? 0 : ((currentData.engagement - oldestRecord.engagement) / oldestRecord.engagement) * 100
-    const reachGrowth = oldestRecord.reach === 0 ? 0 : ((currentData.reach - oldestRecord.reach) / oldestRecord.reach) * 100
-    const oldPosts = oldestRecord.posts || oldestRecord.metrics?.posts || 0
-    const postGrowth = oldPosts === 0 ? 0 : ((currentData.posts - oldPosts) / (oldPosts || 1)) * 100
+    const oldFollowers = oldestRecord.followers === 0 ? (currentData.followers || 0) : oldestRecord.followers;
+    const oldLikes = (oldestRecord.likes || 0) === 0 ? (currentData.likes || 0) : oldestRecord.likes;
+    const oldEngagement = oldestRecord.engagement === 0 ? (currentData.engagement || 0) : oldestRecord.engagement;
+    const oldViews = (oldestRecord.views || 0) === 0 ? (currentData.views || 0) : oldestRecord.views;
+    const oldPosts = (oldestRecord.posts || oldestRecord.metrics?.posts || 0) === 0 ? (currentData.posts || 0) : (oldestRecord.posts || oldestRecord.metrics?.posts);
+
+    let followerGrowth = 0;
+    if (oldFollowers === 0 && currentData.followers > 0) followerGrowth = 100;
+    else if (oldFollowers > 0) followerGrowth = ((currentData.followers - oldFollowers) / oldFollowers) * 100;
+    
+    // Calculate Reach Growth using actual total reach for the snapshot period
+    const currentReachPeriod = currentData.reach || newestRecord.reach || 0;
+    const oldReachPeriod = oldestRecord.reach || 0;
+
+    let reachGrowth = 0;
+    if (oldReachPeriod === 0 && currentReachPeriod > 0) reachGrowth = 100;
+    else if (oldReachPeriod > 0) reachGrowth = ((currentReachPeriod - oldReachPeriod) / oldReachPeriod) * 100;
+
+    let likesGrowth = 0;
+    if (oldLikes === 0 && currentData.likes > 0) likesGrowth = 100;
+    else if (oldLikes > 0) likesGrowth = ((currentData.likes - oldLikes) / oldLikes) * 100;
+
+    let engagementGrowth = 0;
+    if (oldEngagement === 0 && currentData.engagement > 0) engagementGrowth = 100;
+    else if (oldEngagement > 0) engagementGrowth = ((currentData.engagement - oldEngagement) / oldEngagement) * 100;
+
+    let viewsGrowth = 0;
+    if (oldViews === 0 && currentData.views > 0) viewsGrowth = 100;
+    else if (oldViews > 0) viewsGrowth = ((currentData.views - oldViews) / oldViews) * 100;
+
+    let postGrowth = 0;
+    if (oldPosts === 0 && currentData.posts > 0) postGrowth = 100;
+    else if (oldPosts > 0) postGrowth = ((currentData.posts - oldPosts) / oldPosts) * 100;
     const oldContentScore = oldestRecord.metrics?.contentScore?.score || 5
     const currentContentScore = 7.5
     const contentScoreGrowth = ((currentContentScore - oldContentScore) / oldContentScore) * 100
 
     return {
       followers: { value: `${followerGrowth >= 0 ? '+' : ''}${followerGrowth.toFixed(1)}%`, isPositive: followerGrowth >= 0 },
+      likes: { value: `${likesGrowth >= 0 ? '+' : ''}${Math.abs(likesGrowth) > 999 ? '999+' : likesGrowth.toFixed(1)}%`, isPositive: likesGrowth >= 0 },
       engagement: { value: `${engagementGrowth >= 0 ? '+' : ''}${Math.abs(engagementGrowth) > 999 ? '999+' : engagementGrowth.toFixed(1)}%`, isPositive: engagementGrowth >= 0 },
       reach: { value: `${reachGrowth >= 0 ? '+' : ''}${Math.abs(reachGrowth) > 999 ? '999+' : reachGrowth.toFixed(1)}%`, isPositive: reachGrowth >= 0 },
+      views: { value: `${viewsGrowth >= 0 ? '+' : ''}${viewsGrowth.toFixed(1)}%`, isPositive: viewsGrowth >= 0 },
       posts: { value: `${postGrowth >= 0 ? '+' : ''}${postGrowth.toFixed(1)}%`, isPositive: postGrowth >= 0 },
       contentScore: { value: `${contentScoreGrowth >= 0 ? '+' : ''}${contentScoreGrowth.toFixed(1)}%`, isPositive: contentScoreGrowth >= 0 }
     }
   }
 
-  const isInitialLoading = analyticsLoading && !analytics
+  // isInitialLoading moved to after connectedPlatforms calculation
   const ICON_LIMIT = 6
   const invalidIconList = invalidAccounts.slice(0, ICON_LIMIT)
   const invalidRemainder = Math.max(0, invalidAccounts.length - ICON_LIMIT)
 
   const connectedPlatforms = validAccounts.map((account: any, index: number) => ({
     id: account.id || `platform-${index}`,
+    accountId: account.accountId,
     name: account.platform === 'instagram' ? 'Instagram' : 
           account.platform === 'youtube' ? 'YouTube' : 
           account.platform === 'twitter' ? 'Twitter' : 
@@ -214,9 +282,11 @@ export function PerformanceScore() {
            account.platform === 'linkedin' ? 'from-blue-700 to-blue-900' : 
            account.platform === 'facebook' ? 'from-blue-600 to-blue-700' : 'from-gray-700 to-black',
     followers: account.followersCount || account.followers || 0,
-    engagement: account.avgEngagement ? `${account.avgEngagement.toFixed(1)}%` : '0%',
+    engagement: account.engagementRate ? `${account.engagementRate.toFixed(1)}%` : '0%',
     reach: account.totalReach || 0,
     posts: account.mediaCount || account.posts || 0,
+    likes: account.totalLikes || account.likes || 0,
+    views: account.totalViews || account.views || 0,
     username: account.username
   }))
 
@@ -224,6 +294,8 @@ export function PerformanceScore() {
   const totalReach = connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.reach, 0)
   const avgEngagement = connectedPlatforms.length > 0 ? parseFloat(connectedPlatforms[0].engagement) || 0 : 0
   const totalPosts = connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.posts, 0)
+  
+  const isInitialLoading = socialLoading && connectedPlatforms.length === 0
 
   const calculateContentScore = () => {
     if (connectedPlatforms.length === 0) return { score: 0, rating: 'No Data' }
@@ -255,28 +327,98 @@ export function PerformanceScore() {
     const realEngagementRate = analytics?.engagementRate || 0
     const avgEngagementBase = realEngagementRate > 0 ? realEngagementRate : avgEngagement || 0
 
-    const sortedData = historicalData && historicalData.length > 0 
-       ? [...historicalData].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
-       : [];
-       
-    const oldestRecord = sortedData.length > 0 ? sortedData[0] : null;
+    let followerGains = 0;
+    let reachGains = 0;
+    let likesGains = 0;
+    let viewsGains = 0;
+    
+    // Group historical data by accountId to support multiple platforms properly
+    const accountData: Record<string, any[]> = {};
+    if (historicalData) {
+      historicalData.forEach((record: any) => {
+        // Fallback to platform if accountId is missing
+        const key = record.accountId || record.platform || 'unknown'; 
+        if (!accountData[key]) accountData[key] = [];
+        accountData[key].push(record);
+      });
+    }
 
-    const followerGains = oldestRecord 
-      ? totalFollowersBase - oldestRecord.followers
-      : 0;
-
-    const postGains = oldestRecord 
-      ? totalPostsBase - (oldestRecord.posts || oldestRecord.metrics?.posts || 0)
-      : 0;
-
-    const reachGains = oldestRecord 
-      ? totalReachBase - oldestRecord.reach
-      : totalReachBase;
+    connectedPlatforms.forEach((platform) => {
+      const key = platform.accountId || platform.name.toLowerCase();
+      let records = accountData[key] || [];
+      
+      // Filter records based on selected period
+      const now = new Date();
+      let cutoffDate = new Date();
+      if (period === 'day') {
+        cutoffDate.setDate(now.getDate() - 1);
+        cutoffDate.setHours(0, 0, 0, 0);
+      } else if (period === 'week') {
+        cutoffDate.setDate(now.getDate() - 7);
+      } else {
+        cutoffDate.setDate(now.getDate() - 30);
+      }
+      
+      records = records.filter(r => new Date(r.date).getTime() >= cutoffDate.getTime());
+      records.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      const oldestRecord = records.length > 0 ? records[0] : null;
+      const newestRecord = records.length > 0 ? records[records.length - 1] : null;
+      
+      // Accumulate gains from each platform's live value vs oldest value
+      if (oldestRecord) {
+        const oldFollowers = oldestRecord.followers === 0 ? (platform.followers || 0) : oldestRecord.followers;
+        const oldLikes = (oldestRecord.likes || 0) === 0 ? (platform.likes || 0) : oldestRecord.likes;
+        const oldViews = (oldestRecord.views || 0) === 0 ? (platform.views || 0) : oldestRecord.views;
+        const oldReach = (oldestRecord.reach || 0) === 0 ? (platform.reach || 0) : oldestRecord.reach;
+        
+        followerGains += Math.max(0, (platform.followers || 0) - oldFollowers);
+        likesGains += Math.max(0, (platform.likes || 0) - oldLikes);
+        
+        // Try to use period-specific views from the API if available, otherwise fallback to delta
+        if (period === 'day' && newestRecord && newestRecord.viewsDay !== undefined) viewsGains += newestRecord.viewsDay;
+        else if (period === 'week' && newestRecord && newestRecord.viewsWeek !== undefined) viewsGains += newestRecord.viewsWeek;
+        else if (period === 'month' && newestRecord && newestRecord.viewsDays28 !== undefined) viewsGains += newestRecord.viewsDays28;
+        else viewsGains += 0;
+      } else {
+        // If no history in this period, check if we have period-specific API data in the latest record
+        // (Even if there's no history, a fresh sync might have viewsDay/Week/Days28)
+        if (newestRecord) {
+           if (period === 'day' && newestRecord.viewsDay !== undefined) viewsGains += newestRecord.viewsDay;
+           else if (period === 'week' && newestRecord.viewsWeek !== undefined) viewsGains += newestRecord.viewsWeek;
+           else if (period === 'month' && newestRecord.viewsDays28 !== undefined) viewsGains += newestRecord.viewsDays28;
+           else viewsGains += 0;
+        } else {
+           viewsGains += 0;
+        }
+        
+        // For followers/likes without history, we can't reliably compute a gain, so default to 0
+        // to prevent lifetime totals from appearing as daily/weekly gains.
+        followerGains += 0;
+        likesGains += 0;
+      }
+      // Reach is fundamentally not cumulative (unique accounts), so we MUST use period snapshots
+      if (newestRecord) {
+        const rDay = newestRecord.reachDay || newestRecord.reach || 0;
+        const rWeek = newestRecord.reachWeek || newestRecord.reach || 0;
+        const rMonth = newestRecord.reachDays28 || newestRecord.reach || 0;
+        
+        let finalReachGain = 0;
+        if (period === 'day') finalReachGain = rDay;
+        else if (period === 'week') finalReachGain = Math.max(rWeek, rDay);
+        else finalReachGain = Math.max(rMonth, rWeek, rDay);
+        
+        reachGains += finalReachGain;
+      } else {
+        // Absolute fallback if no history
+        reachGains += (platform.reach || 0);
+      }
+    });
 
     const periodData = {
       reach: reachGains,
-      posts: postGains,
-      engagement: avgEngagementBase,
+      likes: likesGains,
+      views: viewsGains,
       followerGains: followerGains,
       followerTotal: totalFollowersBase
     }
@@ -285,6 +427,8 @@ export function PerformanceScore() {
       followers: totalFollowersBase,
       engagement: avgEngagementBase,
       reach: totalReachBase,
+      likes: connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.likes, 0),
+      views: connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.views, 0),
       posts: totalPostsBase
     }, period)
 
@@ -292,6 +436,30 @@ export function PerformanceScore() {
   }
 
   const { periodData, growthPercentages } = calculateTimeBasedData(selectedPeriod)
+
+  // Inject true Instagram follower snapshot analytics
+  if (followerData) {
+    periodData.followerTotal = followerData.currentFollowers || periodData.followerTotal;
+    
+    let currentFollowerGrowthPercentage = 0;
+    if (selectedPeriod === 'day') {
+      periodData.followerGains = followerData.dailyGrowth || 0;
+      const yesterdayFollowers = periodData.followerTotal - periodData.followerGains;
+      currentFollowerGrowthPercentage = yesterdayFollowers > 0 ? (periodData.followerGains / yesterdayFollowers) * 100 : 0;
+    } else if (selectedPeriod === 'week') {
+      periodData.followerGains = followerData.weeklyGrowth || 0;
+      const lastWeekFollowers = periodData.followerTotal - periodData.followerGains;
+      currentFollowerGrowthPercentage = lastWeekFollowers > 0 ? (periodData.followerGains / lastWeekFollowers) * 100 : 0;
+    } else if (selectedPeriod === 'month') {
+      periodData.followerGains = followerData.monthlyGrowth || 0;
+      currentFollowerGrowthPercentage = followerData.growthPercentage || 0;
+    }
+    
+    growthPercentages.followers = {
+      value: `${currentFollowerGrowthPercentage >= 0 ? '+' : ''}${currentFollowerGrowthPercentage.toFixed(1)}%`,
+      isPositive: currentFollowerGrowthPercentage >= 0
+    };
+  }
 
   const formatNumber = (num: number) => {
     const absNum = Math.abs(num);
@@ -343,18 +511,18 @@ export function PerformanceScore() {
       </CardHeader>
 
       {showDataStory && (() => {
+        const { periodData } = calculateTimeBasedData(selectedPeriod)
         const currentStory = generateDataStory({
-          followers: totalFollowers,
-          engagement: avgEngagement, 
-          reach: totalReach,
-          posts: totalPosts,
+          followers: periodData.followerTotal,
+          likes: periodData.likes, 
+          reach: periodData.reach,
+          views: periodData.views,
           period: selectedPeriod
         })
         return <DataStory story={currentStory} onClose={() => setShowDataStory(false)} storyAnimation={storyAnimation} />
       })()}
 
       <CardContent className="space-y-8">
-        {isInitialLoading && <MetricsGridSkeleton />}
         
         {!(hasAnyInvalid && reconnectVisible) && (
           <div className="flex items-center justify-between mb-6">
@@ -469,12 +637,15 @@ export function PerformanceScore() {
           </div>
         ) : (
           <>
-            {connectedPlatforms.length > 0 ? (
+            {isInitialLoading ? (
+              <MetricsGridSkeleton />
+            ) : connectedPlatforms.length > 0 ? (
               <MetricsGrid 
                 periodData={periodData} 
                 growthPercentages={growthPercentages} 
                 selectedPeriod={selectedPeriod}
                 formatNumber={formatNumber}
+                isLoading={historicalLoading || analyticsLoading || followerLoading}
               />
             ) : (
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-3xl p-12 text-center mb-8 border-2 border-dashed border-gray-300 dark:border-gray-600">

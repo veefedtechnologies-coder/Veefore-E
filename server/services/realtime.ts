@@ -1,7 +1,8 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
-// Removed User and Workspace imports - using mongodb-storage directly
+import { createAdapter } from '@socket.io/redis-adapter';
+import { getRedisClient } from '../lib/redis';
 
 export interface SocketWithWorkspace extends Socket {
   workspaceId?: string;
@@ -24,9 +25,11 @@ export class RealtimeService {
       cors: {
         origin: [
           process.env.CLIENT_URL || "http://localhost:3000",
+          process.env.FRONTEND_URL || "http://localhost:5173",
           "http://localhost:3000",
           "http://localhost:5173",
-          "https://veefore-webhook.veefore.com"
+          "https://veefore-webhook.veefore.com",
+          /\.vercel\.app$/
         ],
         methods: ["GET", "POST"],
         credentials: true
@@ -39,35 +42,61 @@ export class RealtimeService {
       pingInterval: 10000
     });
 
+    const pubClient = getRedisClient();
+    const subClient = pubClient.duplicate();
+    if (pubClient && pubClient.status === 'ready') {
+      this.io.adapter(createAdapter(pubClient, subClient));
+      console.log('🔗 WebSocket Redis adapter initialized for multi-node clustering.');
+    } else {
+      console.warn('⚠️ WebSocket Redis adapter skipped - Redis not available.');
+    }
+
     // Authentication middleware
     this.io.use(async (socket: SocketWithWorkspace, next) => {
       try {
         const token = socket.handshake.auth?.token || socket.handshake.query?.token;
         
-        // For development, allow connections without strict token validation
         if (!token) {
-          console.warn('⚠️ WebSocket connection attempt without authentication token - allowing for development');
+          throw new Error('Authentication error');
         }
 
-        // For development/testing, accept any token (including Firebase tokens)
-        // In production, you should verify Firebase tokens properly
-        console.log('🔐 WebSocket authentication token received:', token ? 'present' : 'missing');
+        let cleanToken = token.trim();
+        if (cleanToken.startsWith('Bearer ')) {
+          cleanToken = cleanToken.substring(7).trim();
+        }
         
-                  // For development, use default values without MongoDB dependency
-          socket.userId = token || 'anonymous';
-          socket.workspaceId = '684402c2fd2cd4eb6521b386'; // Use workspace ID that matches frontend
-        console.log(`✅ WebSocket authenticated (development mode): user=${socket.userId}, workspace=${socket.workspaceId}`);
+        const parts = cleanToken.split('.');
+        if (parts.length !== 3) {
+           throw new Error(`Invalid token format`);
+        }
+
+        const { safeParseJWTPayload } = await import('../middleware/unsafe-json-replacements');
+        const payloadResult = safeParseJWTPayload(parts[1]);
         
+        if (!payloadResult.success) {
+           throw new Error('Invalid token payload');
+        }
+        
+        const payload = payloadResult.data;
+        const firebaseUid = payload.user_id || payload.sub;
+        
+        if (!firebaseUid) {
+          throw new Error('No user ID found in token');
+        }
+
+        const { storage } = await import('../mongodb-storage');
+        const user = await storage.getUserByFirebaseUid(firebaseUid);
+        
+        if (!user) {
+           throw new Error('User not found');
+        }
+
+        socket.userId = String(user.id);
         socket.authenticated = true;
         next();
-      } catch (error) {
-        console.error('🚨 WebSocket authentication failed:', error);
-                  // For development, allow connection even on error
-          socket.userId = 'anonymous';
-          socket.workspaceId = '684402c2fd2cd4eb6521b386';
-        socket.authenticated = true;
-        console.log(`✅ WebSocket authenticated (error fallback): user=${socket.userId}, workspace=${socket.workspaceId}`);
-        next();
+      } catch (error: any) {
+        // Silently reject connection without spamming logs
+        next(new Error('Authentication failed'));
       }
     });
 
@@ -189,10 +218,23 @@ export class RealtimeService {
    */
   private static async handleWorkspaceJoin(socket: SocketWithWorkspace, requestedWorkspaceId: string): Promise<void> {
     try {
-      // For now, allow access to any workspace the user is in
-      // TODO: Add proper workspace access validation
       if (!requestedWorkspaceId) {
         socket.emit('error', { message: 'Invalid workspace ID' });
+        return;
+      }
+
+      if (!socket.userId) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+
+      const { storage } = await import('../mongodb-storage');
+      const workspaces = await storage.getWorkspacesByUserId(socket.userId);
+      const isMember = workspaces.some((w: any) => String(w.id) === requestedWorkspaceId);
+      
+      if (!isMember) {
+        console.error(`🚨 Unauthorized workspace join attempt: user ${socket.userId} to workspace ${requestedWorkspaceId}`);
+        socket.emit('error', { message: 'Unauthorized workspace access' });
         return;
       }
 

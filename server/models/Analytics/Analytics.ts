@@ -16,6 +16,9 @@ export interface IAnalytics extends Document {
   reachDay: number;
   reachWeek: number;
   reachDays28: number;
+  viewsDay?: number;
+  viewsWeek?: number;
+  viewsDays28?: number;
   engagement: number;
 
   // Audience Demographics
@@ -51,6 +54,9 @@ export const AnalyticsSchema = new Schema<IAnalytics>({
   reachDay: { type: Number, default: 0 },
   reachWeek: { type: Number, default: 0 },
   reachDays28: { type: Number, default: 0 },
+  viewsDay: { type: Number, default: 0 },
+  viewsWeek: { type: Number, default: 0 },
+  viewsDays28: { type: Number, default: 0 },
 
   // Audience Demographics
   audienceCity: { type: Map, of: Number, default: {} },

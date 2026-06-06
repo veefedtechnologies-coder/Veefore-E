@@ -7,6 +7,8 @@ import HybridAIMockup from '../mockups/HybridAIMockup';
 import AgentTasksMockup from '../mockups/AgentTasksMockup';
 
 export const VeeGPTSection = React.memo(() => {
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
     return (
 
         <section className="py-24 md:py-36 px-4 sm:px-6 relative overflow-hidden" id="veegpt" style={{ contain: 'content' }}>
@@ -122,7 +124,20 @@ export const VeeGPTSection = React.memo(() => {
                         <p className="text-white/50">Ask VeeGPT anything about growth — it understands and acts</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                        {[
+                        {(isPhase1 ? [
+                            "Analyze your content performance",
+                            "Create weekly content strategies",
+                            "Write engaging captions & hashtags",
+                            "Suggest content improvements",
+                            "Schedule posts at optimal times",
+                            "Research competitor strategies",
+                            "Generate viral content ideas",
+                            "Build publishing workflows",
+                            "Track and report growth metrics",
+                            "Optimize your profile & bio",
+                            "Plan product launch campaigns",
+                            "Answer any growth question",
+                        ] : [
                             "Analyze your content performance",
                             "Create weekly content strategies",
                             "Write engaging captions & hashtags",
@@ -135,7 +150,7 @@ export const VeeGPTSection = React.memo(() => {
                             "Optimize your profile & bio",
                             "Plan product launch campaigns",
                             "Answer any growth question",
-                        ].map((text, i) => (
+                        ]).map((text, i) => (
                             <motion.div
                                 key={i}
                                 initial={{ opacity: 0 }}

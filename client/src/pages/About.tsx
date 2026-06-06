@@ -82,13 +82,14 @@ const TimelineItem = ({ year, title, description, isLast }: { year: string, titl
 
 const About = () => {
     const isMobile = useIsMobile()
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true'
 
     // Company values
     const values = [
         { icon: Target, title: 'Growth First', description: 'We believe engagement drives growth. Every feature we build prioritizes active growth over passive presence.' },
         { icon: Lightbulb, title: 'Innovation', description: 'We push the boundaries of AI to create tools that genuinely transform how creators engage with their audience.' },
         { icon: Users, title: 'Creator Success', description: 'Your success is our success. We measure our impact by the growth stories of our users.' },
-        { icon: Heart, title: 'Authenticity', description: 'AI should enhance human connection, not replace it. Our automation maintains your unique voice and style.' },
+        { icon: Heart, title: 'Authenticity', description: isPhase1 ? 'AI should enhance human connection, not replace it. Our scheduling tools maintain your unique voice and style.' : 'AI should enhance human connection, not replace it. Our automation maintains your unique voice and style.' },
     ]
 
     // Leadership team
@@ -96,7 +97,7 @@ const About = () => {
         {
             name: 'Arpit Choudhary',
             role: 'Founder & Director',
-            description: 'Visionary entrepreneur with a passion for leveraging AI to solve real-world problems. Leading Veefed Technologies to revolutionize creator growth automation.'
+            description: isPhase1 ? 'Visionary entrepreneur with a passion for leveraging AI to solve real-world problems. Leading Veefed Technologies to revolutionize creator content growth.' : 'Visionary entrepreneur with a passion for leveraging AI to solve real-world problems. Leading Veefed Technologies to revolutionize creator growth automation.'
         },
         {
             name: 'Kavita',
@@ -108,9 +109,9 @@ const About = () => {
     // Company timeline
     const timeline = [
         { year: 'July 2025', title: 'Company Incorporated', description: 'Veefed Technologies Private Limited was officially incorporated on 22nd July 2025, marking the beginning of our journey.' },
-        { year: 'August 2025', title: 'Vision & Research', description: 'Extensive market research and product ideation. Identified the gap in AI-powered engagement automation for creators.' },
-        { year: 'November 2025', title: 'Development Begins', description: 'Started building the core infrastructure and AI models that power Veefore\'s engagement automation engine.' },
-        { year: 'December 2025', title: 'Private Alpha', description: 'Launched private alpha testing with select creators to validate our AI automation capabilities.' },
+        { year: 'August 2025', title: 'Vision & Research', description: isPhase1 ? 'Extensive market research and product ideation. Identified the gap in AI-powered content optimization tools for creators.' : 'Extensive market research and product ideation. Identified the gap in AI-powered engagement automation for creators.' },
+        { year: 'November 2025', title: 'Development Begins', description: isPhase1 ? 'Started building the core infrastructure and AI models that power Veefore\'s content optimization engine.' : 'Started building the core infrastructure and AI models that power Veefore\'s engagement automation engine.' },
+        { year: 'December 2025', title: 'Private Alpha', description: isPhase1 ? 'Launched private alpha testing with select creators to validate our AI content optimization capabilities.' : 'Launched private alpha testing with select creators to validate our AI automation capabilities.' },
         { year: '2026', title: 'Public Beta Launch', description: 'Opening Veefore to the public with a limited beta program. Building the future of creator growth, together.' },
     ]
 
@@ -118,7 +119,7 @@ const About = () => {
         <div className="min-h-screen bg-[#030303] text-white font-sans selection:bg-blue-500/30 relative w-full overflow-x-clip">
             <SEO
                 title="About Us - Veefed Technologies | The Company Behind Veefore"
-                description="Learn about Veefed Technologies, the creators of Veefore. Our mission is to empower creators with AI-powered growth automation technology."
+                description={isPhase1 ? "Learn about Veefed Technologies, the creators of Veefore. Our mission is to empower creators with AI-powered content optimization technology." : "Learn about Veefed Technologies, the creators of Veefore. Our mission is to empower creators with AI-powered growth automation technology."}
             />
 
             {/* Ambient Background */}
@@ -220,7 +221,9 @@ const About = () => {
                             <div className="relative z-10">
                                 <h3 className="text-xl font-bold text-white mb-4">Our Vision</h3>
                                 <p className="text-white/70 leading-relaxed mb-6">
-                                    "To become the trusted AI partner for every creator's growth journey—making intelligent engagement automation accessible, effective, and authentic."
+                                    {isPhase1
+                                        ? '"To become the trusted AI partner for every creator\'s growth journey—making intelligent content optimization accessible, effective, and authentic."'
+                                        : '"To become the trusted AI partner for every creator\'s growth journey—making intelligent engagement automation accessible, effective, and authentic."'}
                                 </p>
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">

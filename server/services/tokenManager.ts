@@ -1,5 +1,5 @@
 import InstagramApiService, { InstagramApiError } from './instagramApi';
-import { UserModel } from '../mongodb-storage';
+import { User as UserModel } from '../models/User/User';
 // import { MetricsQueueManager } from '../queues/metricsQueue';
 
 // Token status tracking
@@ -185,6 +185,21 @@ export class TokenManager {
         }
       );
 
+      // P6-FIX: Keep SocialAccountModel strictly synchronized with the new token
+      if (user.instagramAccountId) {
+        try {
+          const { socialAccountRepository } = await import('../repositories');
+          await socialAccountRepository.updateWithEncryptedTokens(user.instagramAccountId, {
+            accessToken: refreshResult.access_token,
+            tokenStatus: 'valid',
+            expiresAt: new Date(Date.now() + (60 * 24 * 60 * 60 * 1000)),
+          } as any);
+          console.log(`[TOKEN MANAGER] Synchronized refreshed token to SocialAccountModel ${user.instagramAccountId}`);
+        } catch (repoErr) {
+          console.error(`[TOKEN MANAGER] Failed to sync refreshed token to SocialAccountModel`, repoErr);
+        }
+      }
+
       // Update token pool
       const pool = this.tokenPools.get(workspaceId);
       if (pool) {
@@ -218,6 +233,36 @@ export class TokenManager {
       }
 
       return false;
+    }
+  }
+
+  /**
+   * Refresh an expired token by its old token string
+   * This is used by lower-level services (like InstagramApiService) that only have the token string
+   */
+  static async refreshTokenByOldToken(oldToken: string): Promise<string | null> {
+    try {
+      // Find the user holding this specific token
+      const user = await UserModel.findOne({ instagramToken: oldToken });
+      
+      if (!user || !user.workspaceId) {
+        console.warn(`[TOKEN MANAGER] Cannot auto-refresh: No user found for the provided token.`);
+        return null;
+      }
+
+      console.log(`[TOKEN MANAGER] Auto-refresh triggered for user ${user._id} in workspace ${user.workspaceId}`);
+      
+      const success = await this.refreshToken(user._id.toString(), user.workspaceId.toString());
+      if (success) {
+        // Fetch the updated token from the database since refreshToken doesn't return it
+        const updatedUser = await UserModel.findById(user._id);
+        return updatedUser?.instagramToken || null;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`[TOKEN MANAGER] Auto-refresh by old token failed:`, error);
+      return null;
     }
   }
 
@@ -432,15 +477,5 @@ export class TokenManager {
     }
   }
 }
-
-// Cleanup expired rate limits every 5 minutes
-setInterval(() => {
-  TokenManager.cleanupExpiredRateLimits();
-}, 5 * 60 * 1000);
-
-// Schedule token refresh checks every hour
-setInterval(() => {
-  TokenManager.scheduleTokenRefresh();
-}, 60 * 60 * 1000);
 
 export default TokenManager;

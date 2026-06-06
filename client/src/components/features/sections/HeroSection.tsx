@@ -9,6 +9,7 @@ export const HeroSection = React.memo(() => {
     const { openWaitlist } = useWaitlist();
     const { hasEarlyAccess } = useEarlyAccessCheck();
     const [, setLocation] = useLocation();
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
     return (
         <section className="relative pt-28 pb-16 md:pt-40 md:pb-24 px-4 sm:px-6">
@@ -42,7 +43,9 @@ export const HeroSection = React.memo(() => {
                     transition={{ duration: 0.6, delay: 0.2 }}
                     className="text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-8 md:mb-10"
                 >
-                    AI-powered automation, intelligent engagement, and deep analytics working together to skyrocket your growth.
+                    {isPhase1 
+                        ? 'AI-powered optimization, intelligent scheduling, and deep analytics working together to skyrocket your growth.'
+                        : 'AI-powered automation, intelligent engagement, and deep analytics working together to skyrocket your growth.'}
                 </motion.p>
 
                 <motion.div

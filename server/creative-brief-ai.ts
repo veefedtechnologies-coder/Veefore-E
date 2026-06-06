@@ -37,25 +37,17 @@ export class CreativeBriefAI {
     try {
       const briefPrompt = this.buildBriefPrompt(input);
       
-      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert creative strategist and content planning specialist. Generate comprehensive, actionable creative briefs that drive results. Always output valid JSON with the specified structure.`
-          },
-          {
-            role: "user",
-            content: briefPrompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 2000
-      });
-
-      const generated = JSON.parse(response.choices[0].message.content || '{}');
+      const { aiServiceManager } = await import('./services/AIServiceManager');
+      const systemPrompt = `You are an expert creative strategist and content planning specialist. Generate comprehensive, actionable creative briefs that drive results. Always output valid JSON with the specified structure.`;
+      const promptStr = `System: ${systemPrompt}\n\nUser: ${briefPrompt}`;
+      
+      let generated: any = {};
+      try {
+        generated = await aiServiceManager.generateJSON(promptStr, preferences);
+      } catch (e) {
+        console.warn('[CREATIVE BRIEF] Failed to generate JSON using AIServiceManager', e);
+        throw new Error('Failed to parse AI response');
+      }
       
       console.log('[CREATIVE BRIEF AI] Successfully generated brief with', generated.keyMessages?.length || 0, 'key messages');
       

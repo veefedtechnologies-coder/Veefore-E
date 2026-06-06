@@ -96,7 +96,7 @@ export function validateWorkspaceAccess(options: {
           error: 'Database connection error',
           code: 'DATABASE_ERROR',
           details: error.message,
-          stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
       }
 
@@ -120,25 +120,20 @@ export function validateWorkspaceAccess(options: {
           error: 'Database connection error',
           code: 'DATABASE_ERROR',
           details: error.message,
-          stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
       }
 
       const hasAccess = userWorkspaces.some(w => w.id.toString() === workspaceId!.toString());
 
       if (!hasAccess) {
-        // Log potential security breach or sync issue
-        console.warn(`🚨 [WORKSPACE-DENIED] User ${userId} (${userEmail || 'unknown'}) attempted access to workspace ${workspaceId}`);
-        console.warn(`🚨 [WORKSPACE-DENIED] User's authorized workspaces: ${userWorkspaces.map(w => w.id).join(', ')}`);
+        // Log potential security breach or sync issue (redacted authorized list for privacy)
+        console.warn(`🚨 [WORKSPACE-DENIED] User ${userId} attempted access to workspace ${workspaceId}`);
 
         return res.status(403).json({
           error: 'Access denied to workspace',
           code: 'WORKSPACE_ACCESS_DENIED',
-          message: 'You do not have permission to access this workspace',
-          debug: {
-            requestedWorkspace: workspaceId,
-            authorizedCount: userWorkspaces.length
-          }
+          message: 'You do not have permission to access this workspace'
         });
       }
 
@@ -148,6 +143,60 @@ export function validateWorkspaceAccess(options: {
 
       // Log successful workspace validation for audit
       console.log(`✅ WORKSPACE ACCESS: User ${userId} validated for workspace ${workspaceId} (${workspace.name})`);
+
+      // Track user activity for smart polling hibernation (5 min debounce)
+      // If lastActivity is missing (e.g. legacy workspace), assume it's active right now to prevent 56-year hibernation bug
+      const lastActivity = workspace.lastActivity ? new Date(workspace.lastActivity).getTime() : Date.now();
+      const daysInactive = (Date.now() - lastActivity) / (1000 * 60 * 60 * 24);
+      const isHibernating = daysInactive > 7;
+      const needsActivityUpdate = !workspace.lastActivity || (Date.now() - lastActivity > 5 * 60 * 1000);
+
+      if (needsActivityUpdate) {
+        // Fire and forget - update last activity asynchronously to avoid blocking the API request
+        storage.updateWorkspace(workspaceId!, { lastActivity: new Date() }).catch(err => {
+          console.error(`[HIBERNATION] Failed to update lastActivity for workspace ${workspaceId}:`, err.message);
+        });
+      }
+
+      // WAKE-UP: If workspace was hibernating, immediately trigger a full sync + reset polling timers
+      if (isHibernating && workspaceId) {
+        (async () => {
+          try {
+            const { getRedisClient } = await import('../lib/redis');
+            const redis = getRedisClient();
+            const lockKey = `lock:wakeup:${workspaceId}`;
+            // Set lock for 30 seconds, only if it doesn't exist (NX)
+            const acquired = await redis.set(lockKey, 'locked', 'EX', 30, 'NX');
+            if (!acquired) return; // Another pod is already waking it up
+            
+            console.log(`[WAKE-UP] 🌅 Workspace ${workspaceId} returning from ${daysInactive.toFixed(1)} days inactivity. Triggering wake-up sync...`);
+            const { MetricsQueueManager } = await import('../queues/metricsQueue');
+            const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+            const accounts = await SocialAccountModel.find({
+              workspaceId: workspaceId,
+              platform: 'instagram'
+            });
+
+            // Need to correctly get the decrypted token or clear token
+            // Since metricsWorker delegates to SocialAccountService which fetches from DB natively,
+            // we just need to ensure the account has *some* token type to wake it up.
+            const validAccounts = accounts.filter(acc => acc.accessToken || acc.encryptedAccessToken);
+
+            if (validAccounts.length > 0) {
+              await MetricsQueueManager.wakeUpWorkspace(
+                workspaceId,
+                validAccounts.map(acc => ({
+                  instagramAccountId: (acc as any)._id.toString(),
+                  token: acc.accessToken || '',
+                  engagementRate: (acc as any).engagementRate || 0,
+                }))
+              );
+            }
+          } catch (err: any) {
+            console.error(`[WAKE-UP] Failed to trigger wake-up sync for workspace ${workspaceId}:`, err.message);
+          }
+        })();
+      }
 
       next();
     } catch (error) {
@@ -193,3 +242,50 @@ export const validateWorkspaceFromQuery = (paramName = 'workspaceId') =>
  */
 export const validateWorkspaceFromBody = (paramName = 'workspaceId') =>
   validateWorkspaceAccess({ source: 'body', paramName });
+
+/**
+ * Validates that the current user has access to the workspace that owns the given account.
+ * Crucial for preventing IDOR when modifying resources by ID directly.
+ */
+export function requireWorkspaceMember(idParam: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !(req.user as any).id) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const accountId = req.params[idParam];
+      if (!accountId) {
+        return res.status(400).json({ error: `Missing ${idParam} parameter` });
+      }
+
+      // We dynamically import to avoid circular dependencies
+      const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+      const account = await SocialAccountModel.findById(accountId).lean();
+      
+      if (!account) {
+        return res.status(404).json({ error: 'Resource not found' });
+      }
+
+      const workspaceId = account.workspaceId.toString();
+      const userId = (req.user as any).id;
+      
+      // Verify workspace membership
+      const userWorkspaces = await storage.getWorkspacesByUserId(userId);
+      const hasAccess = userWorkspaces.some(w => w.id.toString() === workspaceId);
+
+      if (!hasAccess) {
+        console.warn(`🚨 [IDOR PREVENTED] User ${userId} attempted unauthorized access to resource ${accountId} in workspace ${workspaceId}`);
+        return res.status(403).json({ error: 'Access denied to this resource' });
+      }
+
+      // Attach workspace details for downstream handlers
+      req.workspaceId = workspaceId;
+      
+      next();
+    } catch (error) {
+      console.error('🚨 requireWorkspaceMember Error:', error);
+      return res.status(500).json({ error: 'Resource authorization failed' });
+    }
+  };
+}

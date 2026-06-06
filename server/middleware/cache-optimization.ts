@@ -219,11 +219,17 @@ export class EnterpriseCache {
     this.stats.totalSize = this.cache.size;
   }
 
+  private maintenanceTimer: NodeJS.Timeout | null = null;
+
   /**
    * Periodic maintenance - remove expired entries
    */
   private startMaintenanceTimer(): void {
-    setInterval(() => {
+    if (this.maintenanceTimer) {
+      clearInterval(this.maintenanceTimer);
+    }
+    
+    this.maintenanceTimer = setInterval(() => {
       const now = Date.now();
       let expired = 0;
 
@@ -240,6 +246,13 @@ export class EnterpriseCache {
         this.updateStats();
       }
     }, CACHE_CONFIG.checkPeriod);
+
+    // Make sure we don't leak on hot reloads
+    const stopMaintenanceTimer = () => {
+      if (this.maintenanceTimer) clearInterval(this.maintenanceTimer);
+    };
+    process.once('SIGTERM', stopMaintenanceTimer);
+    process.once('SIGINT', stopMaintenanceTimer);
   }
 
   /**
@@ -289,7 +302,9 @@ export function cacheMiddleware(options?: {
   return (req: Request, res: Response, next: NextFunction) => {
     // Default key generator
     const generateKey = options?.keyGenerator || ((req: Request) => {
-      return `${req.method}:${req.originalUrl}:${JSON.stringify(req.query)}`;
+      const userId = req.user ? (req.user as any).id || (req.user as any).uid || 'anon' : 'anon';
+      const workspaceId = req.workspaceId || req.query.workspaceId || 'no-workspace';
+      return `${req.method}:${req.originalUrl}:${JSON.stringify(req.query)}:user:${userId}:ws:${workspaceId}`;
     });
 
     // Check if caching should be skipped
@@ -321,39 +336,11 @@ export function cacheMiddleware(options?: {
 }
 
 /**
- * Cache warming for critical endpoints
+ * Cache warming for critical endpoints (Disabled to prevent SSRF and unauthenticated internal requests)
  */
 export class CacheWarmer {
-  private static warmingUrls = [
-    '/api/dashboard/analytics',
-    '/api/social-accounts',
-    '/api/analytics/historical'
-  ];
-
   public static async warmCache(baseUrl = 'http://localhost:5000'): Promise<void> {
-    console.log('🔥 P9: Starting cache warming...');
-
-    for (const url of this.warmingUrls) {
-      try {
-        const response = await fetch(`${baseUrl}${url}`, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'CacheWarmer/1.0',
-            'Accept': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          console.log(`🔥 P9: Warmed cache for ${url}`);
-        } else {
-          console.log(`⚠️ P9: Failed to warm cache for ${url}: ${response.status}`);
-        }
-      } catch (error) {
-        console.error(`❌ P9: Error warming cache for ${url}:`, error);
-      }
-    }
-
-    console.log('✅ P9: Cache warming completed');
+    console.log('🔥 P9: Cache warming disabled for security (SSRF/Unauthenticated fetch prevention)');
   }
 }
 
@@ -365,7 +352,7 @@ export function staticCacheMiddleware() {
     // Set cache headers for static assets
     if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|otf)$/)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year
-      res.setHeader('ETag', `"${Date.now()}"`);
+      // ETag with Date.now() defeats caching. Removed.
     } else if (req.path.match(/\.(json|xml)$/)) {
       res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour
     } else {

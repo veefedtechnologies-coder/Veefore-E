@@ -19,6 +19,9 @@ export interface IMetrics extends mongoose.Document {
   
   // Reach and impression metrics
   reach: number;
+  reachDay?: number;
+  reachWeek?: number;
+  reachDays28?: number;
   impressions: number;
   profileViews: number;
   websiteClicks: number;
@@ -136,6 +139,18 @@ const MetricsSchema = new mongoose.Schema({
   reach: {
     type: Number,
     default: 0
+  },
+  reachDay: {
+    type: Number,
+    default: undefined
+  },
+  reachWeek: {
+    type: Number,
+    default: undefined
+  },
+  reachDays28: {
+    type: Number,
+    default: undefined
   },
   impressions: {
     type: Number,

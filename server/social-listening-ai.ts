@@ -147,24 +147,16 @@ Focus on:
 - Geographic and demographic insights where relevant
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert social media analyst with access to comprehensive social listening data. Provide actionable insights based on real-time social media monitoring across all major platforms."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 2500
-    });
+    const promptStr = `System: You are an expert social media analyst with access to comprehensive social listening data. Provide actionable insights based on real-time social media monitoring across all major platforms. Always return valid JSON.\n\nUser: ${prompt}`;
 
-    const analysisResults = JSON.parse(response.choices[0].message.content || '{}');
+    const { aiServiceManager } = await import('./services/AIServiceManager');
+    let analysisResults: any = {};
+    try {
+      analysisResults = await aiServiceManager.generateJSON(promptStr, preferences);
+    } catch (e) {
+      console.warn('[SOCIAL LISTENING] Failed to generate JSON using AIServiceManager', e);
+      throw new Error('Failed to parse AI response');
+    }
     
     console.log(`[SOCIAL LISTENING] ✅ Analysis completed`);
     console.log(`[SOCIAL LISTENING] Total mentions: ${analysisResults.summary?.totalMentions || 0}`);

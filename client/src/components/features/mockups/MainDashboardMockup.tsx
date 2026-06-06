@@ -17,6 +17,7 @@ export const MainDashboardMockup = React.memo(() => {
 
 const DashboardContent = () => {
     const isInView = React.useContext(MockupAnimationContext);
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
     return (
         <>
@@ -56,7 +57,7 @@ const DashboardContent = () => {
                         {[
                             { label: 'Total Followers', value: '24.5K', change: '+12.3%', icon: Users, color: 'blue' },
                             { label: 'Engagement', value: '8.7%', change: '+2.1%', icon: Heart, color: 'pink' },
-                            { label: 'Comments', value: '847', change: '+34%', icon: MessageSquare, color: 'purple' },
+                            { label: isPhase1 ? 'Saves' : 'Comments', value: '847', change: '+34%', icon: isPhase1 ? Target : MessageSquare, color: 'purple' },
                             { label: 'Reach', value: '156K', change: '+18%', icon: Eye, color: 'green' },
                         ].map((metric, i) => (
 
@@ -111,12 +112,17 @@ const DashboardContent = () => {
                         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                             <h4 className="text-sm font-medium text-white mb-3">Recent Activity</h4>
                             <div className="space-y-3">
-                                {[
+                                {(isPhase1 ? [
+                                    { text: 'New follower milestone: 24K', time: '2m ago', icon: Users },
+                                    { text: 'AI analyzed post format', time: '15m ago', icon: Target },
+                                    { text: 'Publishing workflow triggered', time: '1h ago', icon: Zap },
+                                    { text: 'Post scheduled', time: '2h ago', icon: Clock },
+                                ] : [
                                     { text: 'New follower milestone: 24K', time: '2m ago', icon: Users },
                                     { text: 'AI replied to 5 comments', time: '15m ago', icon: MessageSquare },
                                     { text: 'Automation triggered', time: '1h ago', icon: Zap },
                                     { text: 'Post scheduled', time: '2h ago', icon: Clock },
-                                ].map((activity, i) => (
+                                ]).map((activity, i) => (
                                     <div key={i} className="flex items-start gap-2">
                                         <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                                             <activity.icon className="w-3 h-3 text-blue-400" />
@@ -164,13 +170,17 @@ const DashboardContent = () => {
 
                         {/* Automations Status */}
                         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                            <h4 className="text-sm font-medium text-white mb-3">Active Automations</h4>
+                            <h4 className="text-sm font-medium text-white mb-3">{isPhase1 ? 'Active Workflows' : 'Active Automations'}</h4>
                             <div className="space-y-2">
-                                {[
+                                {(isPhase1 ? [
+                                    { name: 'Cross-Platform Publishing', status: 'active', runs: '12 today' },
+                                    { name: 'Analytics Sync', status: 'active', runs: '24 today' },
+                                    { name: 'Content Scoring', status: 'active', runs: '34 today' },
+                                ] : [
                                     { name: 'Comment Auto-Reply', status: 'active', runs: '247 today' },
                                     { name: 'DM Responder', status: 'active', runs: '89 today' },
                                     { name: 'Welcome Messages', status: 'active', runs: '34 today' },
-                                ].map((auto, i) => (
+                                ]).map((auto, i) => (
                                     <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
                                         <div className="flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />

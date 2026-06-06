@@ -35,7 +35,10 @@ import BetaLaunchSection from '../components/BetaLaunchSection';
 
 
 // Visuals for Hero section
-import { EngagementVisual, DMVisual, HookVisual } from '../components/USPVisuals';
+import { Phase1EngagementVisual, Phase1DMVisual, HookVisual } from '../components/USPVisuals';
+
+// Phase 1 Review Mode flag
+const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
 // Only keep 3D component lazy as it's truly optional and heavy (WebGL)
 const Landing3D = React.lazy(() => import('./Landing3D'))
@@ -122,7 +125,14 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
   )
 }
 
-const taglines = [
+const taglines = isPhase1 ? [
+  { top: "Posting is not growth.", bottom: "Engagement is." },
+  { top: "Schedule smarter.", bottom: "Grow faster." },
+  { top: "Publish with precision.", bottom: "Grow with data." },
+  { top: "Turn attention", bottom: "into interaction." },
+  { top: "AI that actively", bottom: "grows your account." },
+  { top: "Content at scale.", bottom: "Analytics at depth." }
+] : [
   { top: "Posting is not growth.", bottom: "Engagement is." },
   { top: "Respond faster.", bottom: "Engage at scale." },
   { top: "Automate engagement.", bottom: "Maintain momentum." },
@@ -275,7 +285,9 @@ const DashboardPageContent = memo(() => (
     <div className="grid grid-cols-4 gap-3">
       {[
         { label: 'Total Engagements', value: '24,847', change: '+18%', color: 'text-blue-400' },
-        { label: 'DMs Processed', value: '3,291', change: '+42%', color: 'text-purple-400' },
+        isPhase1
+          ? { label: 'Posts Scheduled', value: '3,291', change: '+42%', color: 'text-purple-400' }
+          : { label: 'DMs Processed', value: '3,291', change: '+42%', color: 'text-purple-400' },
         { label: 'Hooks Created', value: '847', change: '+28%', color: 'text-pink-400' },
         { label: 'Credits Used', value: '892/1200', change: '74%', color: 'text-amber-400' }
       ].map((stat) => (
@@ -292,8 +304,8 @@ const DashboardPageContent = memo(() => (
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm font-medium">Engagement Velocity</h4>
         <div className="flex items-center space-x-2 text-xs text-white/40">
-          <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-1.5" />Comments</span>
-          <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-purple-500 mr-1.5" />DMs</span>
+          <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-1.5" />{isPhase1 ? 'Posts' : 'Comments'}</span>
+          <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-purple-500 mr-1.5" />{isPhase1 ? 'Saves' : 'DMs'}</span>
         </div>
       </div>
       <div className="h-32 flex items-end space-x-2">
@@ -306,8 +318,8 @@ const DashboardPageContent = memo(() => (
       <h4 className="text-sm font-medium mb-3">Recent AI Activity</h4>
       <div className="space-y-2">
         {[
-          { text: 'Replied to 12 comments on latest post', time: '2m ago' },
-          { text: 'Processed 8 DM inquiries automatically', time: '5m ago' },
+          isPhase1 ? { text: 'Scheduled 3 posts for peak engagement windows', time: '2m ago' } : { text: 'Replied to 12 comments on latest post', time: '2m ago' },
+          isPhase1 ? { text: 'Hook score improved by 12 points this week', time: '5m ago' } : { text: 'Processed 8 DM inquiries automatically', time: '5m ago' },
           { text: 'Generated 3 hook variations for carousel', time: '8m ago' }
         ].map((activity, i) => (
           <div key={i} className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0">
@@ -320,7 +332,67 @@ const DashboardPageContent = memo(() => (
   </div>
 ))
 
-const EngagementPageContent = memo(() => (
+const EngagementPageContent = memo(() => isPhase1 ? (
+  <div className="space-y-4">
+    <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+            <Clock className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold">AI Smart Scheduler</h4>
+            <p className="text-xs text-white/40">Best-time publishing active</p>
+          </div>
+        </div>
+        <div className="px-3 py-1.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium flex items-center space-x-1.5">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <span>Active</span>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {[
+          { time: 'Mon 9:00 AM', label: 'Product Reel', reach: '+94% reach', status: 'scheduled' },
+          { time: 'Wed 12:00 PM', label: 'Carousel Post', reach: '+87% reach', status: 'optimal' },
+          { time: 'Fri 6:00 PM', label: 'Story Series', reach: '+78% reach', status: 'scheduled' }
+        ].map((item, i) => (
+          <div key={i} className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+            <div className="flex items-start justify-between mb-1">
+              <span className="text-xs font-medium text-blue-400">{item.label}</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.status === 'optimal' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>{item.status}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-white/50">{item.time}</p>
+              <p className="text-[11px] text-green-400 font-medium">{item.reach}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="p-5 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+            <Brain className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold">Hook Intelligence</h4>
+            <p className="text-xs text-white/40">Viral patterns analyzed</p>
+          </div>
+        </div>
+        <span className="text-2xl font-bold text-purple-400">94</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {[{ label: 'Hooks Scored', value: '847' }, { label: 'Avg Score', value: '91%' }, { label: 'Top Hook', value: '#FOMO' }].map((s, i) => (
+          <div key={i} className="p-2 rounded-lg bg-white/[0.03]">
+            <p className="text-lg font-bold text-white">{s.value}</p>
+            <p className="text-[10px] text-white/40">{s.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+) : (
   <div className="space-y-4">
     <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
       <div className="flex items-center justify-between mb-4">
@@ -382,6 +454,7 @@ const EngagementPageContent = memo(() => (
     </div>
   </div>
 ))
+
 
 const HooksPageContent = memo(() => (
   <div className="space-y-4">
@@ -458,7 +531,13 @@ const AnimatedDashboard = memo(() => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  const sidebarItems = [
+  const sidebarItems = isPhase1 ? [
+    { name: 'Dashboard', pageIndex: 0 },
+    { name: 'Scheduler', pageIndex: 1 },
+    { name: 'Analytics', pageIndex: null },
+    { name: 'Hooks', pageIndex: 2 },
+    { name: 'Publish', pageIndex: null }
+  ] : [
     { name: 'Dashboard', pageIndex: 0 },
     { name: 'Engagement', pageIndex: 1 },
     { name: 'DM Funnels', pageIndex: null },
@@ -709,7 +788,38 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const heroScale = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0.95])
   const heroY = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [0, isMobile ? 0 : -50])
 
-  const heroFeatures = [
+  const heroFeatures = isPhase1 ? [
+    {
+      id: 'smart-scheduler',
+      icon: Clock,
+      title: 'Smart Content Scheduler',
+      tagline: 'Publish at the exact moment your audience is most active.',
+      description: 'AI analyzes your audience activity patterns and recommends optimal posting windows for maximum organic reach.',
+      details: ['AI best-time recommendations', 'Multi-platform queue management', 'Content calendar automation', 'Audience activity heatmaps'],
+      gradient: 'from-blue-500 to-cyan-500',
+      visual: <Phase1EngagementVisual />
+    },
+    {
+      id: 'analytics-engine',
+      icon: BarChart3,
+      title: 'Deep Analytics Engine',
+      tagline: 'Know exactly what is working and double down on it.',
+      description: 'Understand your top content formats, posting patterns, and growth drivers with AI-powered insight reports.',
+      details: ['Content performance scoring', 'Reach & impression tracking', 'Competitor benchmarking', 'AI growth recommendations'],
+      gradient: 'from-purple-500 to-pink-500',
+      visual: <Phase1DMVisual />
+    },
+    {
+      id: 'hook-intelligence',
+      icon: Brain,
+      title: 'AI Hook & Trend Intelligence',
+      tagline: 'Remove guesswork from content creation.',
+      description: 'Creators don\'t need trends. They need explanations. VeeFore provides intelligence, not noise.',
+      details: ['Competitor hook extraction', 'Emotional pattern analysis', 'Niche-specific suggestions', 'Viral pattern prediction'],
+      gradient: 'from-indigo-500 to-purple-500',
+      visual: <HookVisual />
+    }
+  ] : [
     {
       id: 'engagement-automation',
       icon: MessageSquare,
@@ -718,7 +828,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       description: 'Fast, meaningful engagement directly boosts algorithmic reach. This is VeeFore\'s strongest differentiator.',
       details: ['Context-aware comment replies', 'Priority handling of high-value comments', 'Human-like tone control', 'Platform-safe automation limits'],
       gradient: 'from-blue-500 to-cyan-500',
-      visual: <EngagementVisual />
+      visual: <Phase1EngagementVisual />
     },
     {
       id: 'dm-automation',
@@ -728,7 +838,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       description: 'Creators lose opportunities in DMs. VeeFore captures them without spam.',
       details: ['Keyword-triggered replies', 'Lead qualification logic', 'Creator-defined safety boundaries', 'Advanced follow-up funnels'],
       gradient: 'from-purple-500 to-pink-500',
-      visual: <DMVisual />
+      visual: <Phase1DMVisual />
     },
     {
       id: 'hook-intelligence',
@@ -742,10 +852,38 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     }
   ]
 
-  const pricingPlans = [
+  const pricingPlans = isPhase1 ? [
     {
       name: 'Starter',
-
+      credits: 300,
+      description: 'For new creators testing growth',
+      features: ['AI Hook Generator', 'Caption & CTA Engine', 'Basic Scheduler', '1 Competitor', 'Read-only Analytics'],
+      locked: ['Advanced Analytics', 'Bulk Scheduler', 'Adaptive AI'],
+      gradient: 'from-slate-500/20 to-slate-600/10',
+      border: 'border-white/10'
+    },
+    {
+      name: 'Growth',
+      credits: 1200,
+      description: 'For serious creators ready to scale',
+      features: ['Everything in Starter', 'AI Smart Scheduler', 'Social Listening', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics'],
+      locked: [],
+      gradient: 'from-blue-500/20 to-indigo-500/20',
+      border: 'border-blue-500/30',
+      popular: true
+    },
+    {
+      name: 'Pro',
+      credits: 3000,
+      description: 'For agencies and power users',
+      features: ['Everything in Growth', '3-5 Social Accounts', 'Multi-Account Management', 'Team Access (2-5)', 'Priority Processing', 'Dedicated Support'],
+      locked: [],
+      gradient: 'from-purple-500/20 to-pink-500/20',
+      border: 'border-purple-500/30'
+    }
+  ] : [
+    {
+      name: 'Starter',
       credits: 300,
       description: 'For new creators testing growth',
       features: ['AI Hook Generator', 'Caption & CTA Engine', 'Basic Scheduler', '1 Competitor', 'Read-only Analytics'],
@@ -755,7 +893,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     },
     {
       name: 'Growth',
-
       credits: 1200,
       description: 'For serious creators ready to scale',
       features: ['Everything in Starter', 'AI Comment Automation', 'Smart DM Replies', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics'],
@@ -766,7 +903,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     },
     {
       name: 'Pro',
-
       credits: 3000,
       description: 'For agencies and power users',
       features: ['Everything in Growth', '3-5 Social Accounts', 'Advanced DM Funnels', 'Team Access (2-5)', 'Priority Processing', 'Dedicated Support'],
@@ -776,7 +912,48 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     }
   ]
 
-  const faqs = [
+  const faqs = isPhase1 ? [
+    {
+      q: "What exactly is VeeFore?",
+      a: "VeeFore is an AI-powered Social Media Growth Platform for serious creators and brands. It supercharges your growth through three core systems: AI Hook Intelligence (viral content analysis), Smart Scheduler (best-time publishing), and Deep Analytics (performance insights). Think of it as having a 24/7 data-driven growth team.",
+      category: "About"
+    },
+    {
+      q: "How is VeeFore different from Hootsuite, Buffer, or Later?",
+      a: "Those tools help you schedule and publish content. VeeFore goes deeper — we analyze what content performs best, recommend the exact time to publish, and give you actionable hook intelligence to create content that actually reaches people. Our philosophy: data before guessing, insights before impressions.",
+      category: "Comparison"
+    },
+    {
+      q: "How does VeeFore's AI content system work?",
+      a: "VeeFore's AI continuously analyzes top-performing content in your niche, extracts the hook patterns and emotional triggers that drive viral reach, and uses your historical performance data to recommend what to create and when to post. The more you use it, the smarter it gets.",
+      category: "About"
+    },
+    {
+      q: "How does the credit system work?",
+      a: "1 Credit = 1 AI Action. Actions include: generating viral hooks, creating captions with CTAs, analyzing trends, scoring your content, or generating posting schedules. Credits reset monthly based on your plan. Starter gets 300 credits, Growth gets 1,200, and Pro gets 3,000 credits. Unused credits don't roll over, so use them!",
+      category: "Pricing"
+    },
+    {
+      q: "Which platforms does VeeFore support?",
+      a: "We're launching with full Instagram support (posts, reels, stories). TikTok, YouTube Shorts, and Twitter/X integrations are on our roadmap for Q2 2025. Beta users will get early access to new platform integrations as they roll out.",
+      category: "Platforms"
+    },
+    {
+      q: "What do I get by joining the beta waitlist?",
+      a: "Beta members receive exclusive perks: 500 bonus credits on launch, access to a surprise feature we haven't announced yet, 30 days free trial (vs. 14 days for regular users), founding member pricing locked in forever, and direct access to our team for feedback and support. Plus, you'll help shape the product roadmap.",
+      category: "Beta"
+    },
+    {
+      q: "Who is VeeFore built for?",
+      a: "VeeFore is designed for Instagram creators with 5K-500K followers, personal brands, coaches, agencies managing multiple accounts, and e-commerce brands using social for sales. If you're serious about growth and value your time, VeeFore is for you. Not ideal for casual posters or hobby accounts.",
+      category: "About"
+    },
+    {
+      q: "Can I cancel anytime?",
+      a: "Yes, absolutely. No contracts, no commitments. You can cancel your subscription at any time from your dashboard. Your access continues until the end of your billing period. We believe in earning your business every month, not locking you in.",
+      category: "Pricing"
+    }
+  ] : [
     {
       q: "What exactly is VeeFore?",
       a: "VeeFore is an AI-powered Social Media Growth Engine designed for serious creators and brands. Unlike basic scheduling tools, VeeFore actively participates in your growth through three core systems: AI Engagement Automation (smart comment replies), Hook Intelligence (trend analysis & viral hook suggestions), and Smart DM Funnels (converting followers into customers). Think of it as having a 24/7 growth team powered by AI.",
@@ -869,7 +1046,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </h1>
 
             <p className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4">
-              VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
+              {isPhase1
+                ? 'VeeFore supercharges your social media growth with AI-powered content creation, hook intelligence, and data-driven publishing.'
+                : 'VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.'}
             </p>
 
             <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4">
@@ -924,7 +1103,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               transition={{ duration: 0.8, delay: 0.8 }}
               className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4"
             >
-              VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.
+              {isPhase1
+                ? 'VeeFore supercharges your social media growth with AI-powered content creation, hook intelligence, and data-driven publishing.'
+                : 'VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.'}
             </motion.p>
 
             <motion.p
@@ -1026,13 +1207,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-[8px] lg:text-[10px] text-white/40">DM Responses</p>
+                      <p className="text-[8px] lg:text-[10px] text-white/40">{isPhase1 ? 'Posts Scheduled' : 'DM Responses'}</p>
                       <p className="text-sm lg:text-base xl:text-lg font-bold">1,847</p>
                     </div>
                   </div>
                   <div className="space-y-1 lg:space-y-1.5">
                     <div className="flex items-center justify-between text-[8px] lg:text-[10px]">
-                      <span className="text-white/40">Automated</span>
+                      <span className="text-white/40">{isPhase1 ? 'On-time' : 'Automated'}</span>
                       <span className="text-blue-400">94%</span>
                     </div>
                     <div className="h-1 lg:h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -1083,7 +1264,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       <p className="text-sm lg:text-base xl:text-lg font-bold text-amber-400">12.4x</p>
                     </div>
                   </div>
-                  <p className="text-[7px] lg:text-[10px] text-white/30">Faster than manual engagement</p>
+                  <p className="text-[7px] lg:text-[10px] text-white/30">{isPhase1 ? 'Faster than manual publishing' : 'Faster than manual engagement'}</p>
                 </GlassCard>
               </motion.div>
             </div>
@@ -1101,7 +1282,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               >
                 <div className="flex items-center space-x-1.5 sm:space-x-2">
                   <CheckCircle className="w-3 h-3 sm:w-5 sm:h-5 text-green-400" />
-                  <span className="text-[10px] sm:text-sm font-medium text-green-300">AI is actively engaging</span>
+                  <span className="text-[10px] sm:text-sm font-medium text-green-300">{isPhase1 ? 'AI is optimizing your content' : 'AI is actively engaging'}</span>
                 </div>
               </motion.div>
 
@@ -1113,7 +1294,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               >
                 <div className="flex items-center space-x-1.5 sm:space-x-2">
                   <Zap className="w-3 h-3 sm:w-5 sm:h-5 text-blue-400" />
-                  <span className="text-[10px] sm:text-sm font-medium text-blue-300">24/7 Automation Active</span>
+                  <span className="text-[10px] sm:text-sm font-medium text-blue-300">{isPhase1 ? 'Smart Scheduler Active' : '24/7 Automation Active'}</span>
                 </div>
               </motion.div>
             </div>
@@ -1324,7 +1505,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <div className="bg-white/[0.03] border border-white/5 rounded-xl px-4 py-3 mb-3">
               <div className="text-xs text-white/30 uppercase tracking-wider mb-1.5">Without AI</div>
               <div className="text-2xl font-bold text-red-400/60">2-4 hrs</div>
-              <div className="text-[10px] text-white/30">daily replies</div>
+              <div className="text-[10px] text-white/30">{isPhase1 ? 'manual content' : 'daily replies'}</div>
             </div>
             <svg className="w-8 h-12 mx-auto text-white/20" viewBox="0 0 24 40">
               <path d="M12 5 L12 30 M7 25 L12 30 L17 25" stroke="currentColor" strokeWidth="1.5" fill="none" />
@@ -1344,7 +1525,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           >
             <div className="flex items-center gap-2.5 mb-2">
               <Send className="w-4 h-4 text-purple-400" />
-              <span className="text-xs text-white/50">DM requests</span>
+              <span className="text-xs text-white/50">{isPhase1 ? 'Scheduled posts' : 'DM requests'}</span>
               <span className="text-[10px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">12</span>
             </div>
             <div className="space-y-1.5">
@@ -1367,7 +1548,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           >
             <div className="flex items-center gap-2.5 mb-2">
               <Bot className="w-4 h-4 text-green-400" />
-              <span className="text-xs text-green-400/80">AI Auto-replied</span>
+              <span className="text-xs text-green-400/80">{isPhase1 ? 'AI Published' : 'AI Auto-replied'}</span>
               <Check className="w-3.5 h-3.5 text-green-400" />
             </div>
             <div className="space-y-2">
@@ -1389,7 +1570,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </div>
             <div className="mt-2.5 text-[10px] text-green-400/70 flex items-center gap-1.5">
               <Zap className="w-3 h-3" />
-              <span>Replied in 2 seconds</span>
+              <span>{isPhase1 ? 'Published at optimal time' : 'Replied in 2 seconds'}</span>
             </div>
           </motion.div>
         </div>
@@ -1543,8 +1724,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   {
                     step: 2,
                     icon: Bot,
-                    title: 'AI Responds',
-                    desc: 'Instant comment & DM replies',
+                    title: isPhase1 ? 'AI Analyzes' : 'AI Responds',
+                    desc: isPhase1 ? 'AI finds trending hooks & best times' : 'Instant comment & DM replies',
                     metric: '+Speed',
                     color: 'text-purple-400',
                     bgColor: 'bg-purple-500',
@@ -1634,7 +1815,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               <div className="space-y-6 relative">
                 {[
                   { step: 1, icon: Send, title: 'You Post', desc: 'Create content as usual', metric: 'Content Live', color: 'text-blue-400', bgColor: 'bg-blue-500' },
-                  { step: 2, icon: Bot, title: 'AI Responds', desc: 'Instant comment & DM replies', metric: '+Speed', color: 'text-purple-400', bgColor: 'bg-purple-500' },
+                  { step: 2, icon: Bot, title: isPhase1 ? 'AI Analyzes' : 'AI Responds', desc: isPhase1 ? 'Finds trending hooks & best times' : 'Instant comment & DM replies', metric: '+Speed', color: 'text-purple-400', bgColor: 'bg-purple-500' },
                   { step: 3, icon: TrendingUp, title: 'Algorithm Boosts', desc: 'Engagement signals compound', metric: '+Reach', color: 'text-indigo-400', bgColor: 'bg-indigo-500' },
                   { step: 4, icon: RefreshCw, title: 'AI Improves', desc: 'Every interaction trains AI', metric: '+Growth', color: 'text-green-400', bgColor: 'bg-green-500' }
                 ].map((item, i) => (
@@ -1859,13 +2040,19 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-20 items-stretch">
             {/* Left Column: The Failures */}
             <div className="space-y-3 md:space-y-4 flex flex-col justify-center">
-              {[
+              {(isPhase1 ? [
+                { title: 'Content Burnout', desc: 'Spending too much time creating content manually' },
+                { title: 'Missed Peak Times', desc: 'Missing the best time to post for maximum reach' },
+                { title: 'Algorithm Momentum Loss', desc: 'Slow responses kill viral potential instantly' },
+                { title: 'Time Burnout', desc: 'Hours wasted on repetitive, low-value typing' },
+                { title: 'Blind Creation', desc: 'Posting without knowing what actually hooks' }
+              ] : [
                 { title: 'Inconsistent Engagement', desc: 'Cannot keep up with comments & DMs manually' },
                 { title: 'Missed Opportunities', desc: 'Leads slip through cracks in untracked DMs' },
                 { title: 'Algorithm Momentum Loss', desc: 'Slow responses kill viral potential instantly' },
                 { title: 'Time Burnout', desc: 'hours wasted on repetitive, low-value typing' },
                 { title: 'Blind Creation', desc: 'Posting without knowing what actually hooks' }
-              ].map((item, i) => (
+              ]).map((item, i) => (
                 <div key={i}>
                   <GlassCard
                     className="p-3 md:p-5 flex items-center space-x-3 md:space-x-5 !bg-red-500/[0.02] !border-red-500/10 group hover:!bg-red-500/[0.06] hover:!border-red-500/30 transition-all duration-300"
@@ -1989,8 +2176,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 oldTitle: "Leaking Bucket",
                 oldDesc: "Missed leads and forgotten follow-ups. Money left on the table daily.",
                 oldIcon: Lock,
-                newTitle: "Conversion Machine",
-                newDesc: "24/7 Sales Funnel that qualifies leads and sends payment links automatically.",
+                newTitle: isPhase1 ? 'Smart Publisher' : 'Conversion Machine',
+                newDesc: isPhase1 ? 'Post at the perfect time with AI scheduling that maximizes your content reach and impressions.' : '24/7 Sales Funnel that qualifies leads and sends payment links automatically.',
                 newIcon: DollarSign,
                 gradient: "from-emerald-600 to-green-500",
                 metric: "+24% Sales"
@@ -2074,7 +2261,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               Choose your <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth speed</span>
             </h2>
             <p className="text-sm sm:text-lg md:text-xl text-white/40 max-w-2xl mx-auto mb-6 sm:mb-10 px-4">
-              We don't sell features. We sell saved time, increased engagement, and automation leverage.
+              {isPhase1 ? "We don't sell features. We sell saved time, increased engagement, and AI-powered content growth." : "We don't sell features. We sell saved time, increased engagement, and automation leverage."}
             </p>
 
 

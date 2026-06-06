@@ -365,9 +365,13 @@ export function initializeResourceNamespacing(): void {
   console.log('🔐 P2-9: Initializing resource namespacing system...');
   
   // Initialize ACL cleanup
-  setInterval(() => {
+  const cleanupTimer = setInterval(() => {
     ResourceACL.cleanupExpiredACLs();
   }, 60 * 60 * 1000); // Clean every hour
+
+  const stopCleanup = () => clearInterval(cleanupTimer);
+  process.on('SIGTERM', stopCleanup);
+  process.on('SIGINT', stopCleanup);
 
   console.log('🔐 P2-9: Resource Namespacing Features:');
   console.log('  ✅ Workspace-specific resource identifiers');

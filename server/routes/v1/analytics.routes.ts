@@ -37,8 +37,8 @@ router.get('/workspace/:workspaceId/date-range',
 );
 
 router.get('/workspace/:workspaceId/performance-summary',
-  // requireAuth,
-  //  validateWorkspaceAccess({ source: 'params' }),
+  requireAuth,
+  validateWorkspaceAccess({ source: 'params' }),
   validateRequest({ params: WorkspaceIdParams }),
   analyticsController.getPerformanceSummary
 );
@@ -84,11 +84,19 @@ router.get('/historical',
 
       const historicalData = analytics.map((a: any) => ({
         date: a.date || a.createdAt,
+        platform: a.platform,
+        accountId: a.accountId,
         followers: a.followers || 0,
         likes: a.likes || 0,
         comments: a.comments || 0,
         shares: a.shares || 0,
         reach: a.reach || 0,
+        reachDay: a.reachDay || 0,
+        reachWeek: a.reachWeek || 0,
+        reachDays28: a.reachDays28 || 0,
+        viewsDay: a.viewsDay || 0,
+        viewsWeek: a.viewsWeek || 0,
+        viewsDays28: a.viewsDays28 || 0,
         engagement: a.engagement || 0,
         views: a.views || 0,
         posts: a.posts || 0,
@@ -107,6 +115,45 @@ router.get('/historical',
 
       console.error('[HISTORICAL] Error fetching historical analytics:', JSON.stringify(safeError));
       res.status(500).json({ success: false, error: safeError.message || 'Failed to fetch historical analytics' });
+    }
+  }
+);
+
+const GenerateInsightSchema = z.object({
+  metricsData: z.any()
+});
+
+router.post('/workspace/:workspaceId/generate-insight',
+  requireAuth,
+  validateWorkspaceAccess({ source: 'params' }),
+  validateRequest({ params: WorkspaceIdParams, body: GenerateInsightSchema }),
+  async (req: any, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const { metricsData } = req.body;
+      const userId = req.user.id;
+
+      const { storage } = await import('../../storage');
+      let preferences: any = {};
+      try {
+        const userObj = await storage.getUser(userId);
+        if (userObj && userObj.preferences) preferences = { ...userObj.preferences };
+        
+        const workspace = await storage.getWorkspace(workspaceId);
+        if (workspace && workspace.aiConfiguration) {
+          preferences = { ...preferences, ...workspace.aiConfiguration };
+        }
+      } catch (e) {
+        console.warn('Failed to load preferences');
+      }
+
+      const { aiServiceManager } = await import('../../services/AIServiceManager');
+      const insight = await aiServiceManager.generateAnalyticsInsight(metricsData, preferences);
+
+      res.json({ success: true, insight });
+    } catch (error: any) {
+      console.error('[ANALYTICS INSIGHT] Error generating insight:', error);
+      res.status(500).json({ success: false, error: 'Failed to generate insight' });
     }
   }
 );

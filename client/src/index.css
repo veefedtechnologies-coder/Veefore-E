@@ -693,3 +693,20 @@ a,
   will-change: opacity, transform;
   contain: layout paint;
 }
+/* Remove focus ring from PostPreviewDialog / Shadcn DialogContent */
+[role="dialog"]:focus,
+[role="dialog"]:focus-visible,
+[role="dialog"] *:focus,
+[role="dialog"] *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  ring: none !important;
+}
+
+/* Radix UI Tabs Fix */
+.tab-content-container[data-state="inactive"] {
+  display: none !important;
+}
+.tab-content-container[data-state="active"] {
+  display: block !important;
+}

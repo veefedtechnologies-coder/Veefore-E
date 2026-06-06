@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { storage } from '../../storage';
 import { MetaCompliantWebhook } from '../../meta-compliant-webhook';
+import { webhookRateLimiter } from '../../middleware/rate-limiting-working';
 
 const router = Router();
 
@@ -11,7 +12,7 @@ router.get('/instagram', async (req: Request, res: Response) => {
   await metaWebhook.handleVerification(req, res);
 });
 
-router.post('/instagram', async (req: Request, res: Response) => {
+router.post('/instagram', webhookRateLimiter, async (req: Request, res: Response) => {
   console.log('[META WEBHOOK] 🎯 Real Instagram webhook event from Meta');
   await metaWebhook.handleEvent(req, res);
 });

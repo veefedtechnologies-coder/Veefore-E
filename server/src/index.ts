@@ -129,7 +129,7 @@ app.get('/api/debug-config', async (_req, res) => {
   const maskedUri = uri.replace(/:([^:@]+)@/, ':****@');
 
   // Get list of collections
-  let collections = [];
+  let collections: string[] = [];
   try {
     if (mongoose.connection && mongoose.connection.db) {
       const cols = await mongoose.connection.db.listCollections().toArray();

@@ -254,29 +254,6 @@ export function SocialAccounts() {
     }
   }, [refetchAccounts, queryClient])
 
-  // Hybrid polling mutation - Webhooks for comments/mentions + Smart polling for other metrics
-  const startPollingMutation = useMutation({
-    mutationFn: () => currentWorkspace?.id ? apiRequest('/api/instagram/start-polling', {
-      method: 'POST',
-      body: JSON.stringify({ workspaceId: currentWorkspace.id })
-    }) : Promise.reject(new Error('No workspace selected')),
-    onSuccess: (data) => {
-      toast({
-        title: "🔄 Hybrid System Active",
-        description: "Webhooks for comments/mentions + Smart polling for likes/followers/engagement",
-      })
-    },
-    onError: (error: any) => {
-      // Gracefully handle AbortError (timeout) - don't spam console with these
-      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
-        console.debug('[Hybrid Polling] Request timed out - will retry on next activity')
-        return
-      }
-      // Only log non-abort errors as actual errors
-      console.warn('[Hybrid Polling] Failed to start:', error?.message || error)
-    }
-  })
-
   // Polling status query - Hybrid approach with smart polling
   const { data: pollingStatus } = useQuery({
     queryKey: ['/api/instagram/polling-status', currentWorkspace?.id],
@@ -291,7 +268,6 @@ export function SocialAccounts() {
 
   // State hooks - must be before early return
   const [selectedAccount, setSelectedAccount] = useState('instagram')
-  const [hasStartedPolling, setHasStartedPolling] = React.useState(false)
 
   // Early return if workspace not ready - placed AFTER all hooks but BEFORE calculations
   if (!isReady || workspaceLoading || !currentWorkspace) {
@@ -313,18 +289,6 @@ export function SocialAccounts() {
 
   const isInitialLoading = isLoading && !Array.isArray(socialAccounts)
   const currentAccount = connectedAccounts.find((acc: any) => acc.platform === selectedAccount) || connectedAccounts[0]
-
-  // Start polling once when Instagram account is first detected (now safe - workspace ready)
-  if (!hasStartedPolling) {
-    const instagramAccount = connectedAccounts.find((acc: any) => acc.platform === 'instagram')
-    if (instagramAccount && !startPollingMutation.isPending) {
-      setHasStartedPolling(true)
-      setTimeout(() => {
-        startPollingMutation.mutate()
-      }, 5000)
-    }
-  }
-
   // Debug logging (now safe - workspace ready)
   if (currentAccount) {
     console.log('[FRONTEND DEBUG] Current account being displayed:', {
@@ -598,19 +562,44 @@ export function SocialAccounts() {
                             currentAccount.lastSync ? new Date(currentAccount.lastSync).toLocaleDateString() : 'Never'
                           }
                         </span>
-
-                        {/* Real-time polling status for this account */}
-                        {pollingStatus?.accounts?.find((acc: any) => acc.username === currentAccount.username) && (
-                          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center space-x-1">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                            <span>Smart polling: next check in {
-                              Math.round(
-                                (pollingStatus.accounts.find((acc: any) => acc.username === currentAccount.username)?.nextPollIn || 0) / 1000 / 60
-                              )
-                            } min</span>
-                          </div>
-                        )}
                       </div>
+                      
+                      {/* Detailed Real-time polling status for this account */}
+                      {(() => {
+                         const status = pollingStatus?.accounts?.find((acc: any) => acc.username === currentAccount.username);
+                         if (!status || !status.metricsPollIn) return null;
+                         
+                         return (
+                           <div className="mt-3 bg-blue-50/80 dark:bg-blue-900/20 p-2.5 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                             <div className="text-xs text-blue-600 dark:text-blue-400 mb-2 flex items-center space-x-1.5 font-semibold">
+                               <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                               <span>Smart Polling Timers:</span>
+                             </div>
+                             <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-[11px]">
+                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
+                                  <span className="text-gray-500 dark:text-gray-400">Likes / Reach</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{Math.max(0, Math.round(status.metricsPollIn.likes / 1000 / 60))}m</span>
+                               </div>
+                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
+                                  <span className="text-gray-500 dark:text-gray-400">Views</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{Math.max(0, Math.round(status.metricsPollIn.views / 1000 / 60))}m</span>
+                               </div>
+                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
+                                  <span className="text-gray-500 dark:text-gray-400">Shares / Saves</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{Math.max(0, Math.round(status.metricsPollIn.shares / 1000 / 60))}m</span>
+                               </div>
+                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
+                                  <span className="text-gray-500 dark:text-gray-400">Stories</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{status.metricsPollIn.stories !== undefined ? Math.max(0, Math.round(status.metricsPollIn.stories / 1000 / 60)) + 'm' : 'N/A'}</span>
+                               </div>
+                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
+                                  <span className="text-gray-500 dark:text-gray-400">Profile Views</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{status.metricsPollIn.profile_views !== undefined ? Math.max(0, Math.round(status.metricsPollIn.profile_views / 1000 / 60)) + 'm' : 'N/A'}</span>
+                               </div>
+                             </div>
+                           </div>
+                         );
+                      })()}
                     </div>
                   </div>
                   <div className="text-right">
@@ -681,7 +670,7 @@ export function SocialAccounts() {
                     <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((currentAccount.totalReach || 0) / 500 * 100, 100)}%` }}></div>
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                    Performance: {currentAccount.avgComments || 0} avg comments per post
+                    Performance: {Number(currentAccount.avgComments || 0).toFixed(1)} avg comments per post
                   </div>
                 </div>
 

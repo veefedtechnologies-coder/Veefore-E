@@ -182,9 +182,10 @@ export class MetricsCollector {
     responseTime: number,
     userId?: string
   ): void {
+    const safeEndpoint = typeof endpoint === 'string' ? endpoint : String(endpoint);
     const labels = {
       method,
-      endpoint: endpoint.replace(/\/\d+/g, '/:id'), // Normalize dynamic paths
+      endpoint: safeEndpoint.replace(/\/\d+/g, '/:id'), // Normalize dynamic paths
       status_code: statusCode.toString(),
       status_class: `${Math.floor(statusCode / 100)}xx`
     };

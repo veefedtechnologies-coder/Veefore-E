@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils"
+import { ArrowLeft, CheckCircle2, Calendar, PenBox } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string
@@ -247,9 +249,9 @@ function SkeletonProfileCard() {
   )
 }
 
-function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integration' | 'workspaces' | 'profile' | 'dashboard' | 'veegpt' | 'video' | 'settings' | 'default' }) {
+function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integration' | 'workspaces' | 'profile' | 'dashboard' | 'veegpt' | 'video' | 'settings' | 'plan' | 'posts' | 'analytics' | 'default' | 'scheduled-page' | 'drafts-page' | 'published-page' }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
+    <div className="w-full h-full animate-in fade-in duration-300">
       <style>{`
         @keyframes shimmer {
           0% { background-position: 200% 0; }
@@ -282,6 +284,166 @@ function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integ
         </>
       )}
       
+      {type === 'plan' && (
+        <div className="w-full">
+          {/* Calendar Container */}
+          
+          {/* Calendar Container */}
+          <div className="bg-white dark:bg-gray-900 min-h-screen w-full">
+            {/* Header Controls */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                   <Skeleton className="h-9 w-9 rounded-md bg-gray-100 dark:bg-gray-800" />
+                   <Skeleton className="h-7 w-16" />
+                   <Skeleton className="h-9 w-9 rounded-md bg-gray-100 dark:bg-gray-800" />
+                </div>
+                <Skeleton className="h-5 w-40" />
+              </div>
+              <div className="flex items-center space-x-2">
+                 <Skeleton className="h-9 w-9 rounded-md" />
+                 <Skeleton className="h-9 w-9 rounded-md" />
+                 <Skeleton className="h-9 w-24 rounded-md" />
+                 <Skeleton className="h-9 w-28 rounded-md" />
+              </div>
+            </div>
+
+            {/* Calendar Header */}
+            <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              {[1,2,3,4,5,6,7].map(i => (
+                 <div key={i} className="p-4 text-center border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+                   <Skeleton className="h-4 w-10 mx-auto mb-2 opacity-60" />
+                   <Skeleton className="h-10 w-10 mx-auto rounded-full" />
+                 </div>
+              ))}
+            </div>
+            
+            {/* Calendar Body */}
+            <div className="grid grid-cols-7 min-h-[600px]">
+              {[1,2,3,4,5,6,7].map(i => (
+                 <div key={i} className="p-4 space-y-3 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+                   {i === 1 || i === 3 || i === 4 || i === 7 ? (
+                      <Skeleton className="h-[72px] w-full rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/50" />
+                   ) : null}
+                   {i === 6 && (
+                      <Skeleton className="h-6 w-full rounded-md bg-blue-600 dark:bg-blue-600" />
+                   )}
+                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {type === 'posts' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Scheduled Posts Skeleton */}
+            <div className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl">
+              <div className="flex flex-row items-center justify-between p-6 pb-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-8 w-36 rounded-lg" />
+              </div>
+              <div className="p-6 pt-0 space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center space-x-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                    <Skeleton className="w-16 h-16 rounded-lg flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <div className="flex items-center space-x-2">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-8 w-20 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Drafts Skeleton */}
+            <div className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl mt-0">
+              <div className="flex flex-row items-center justify-between p-6 pb-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-8 w-28 rounded-lg" />
+              </div>
+              <div className="p-6 pt-0 space-y-4">
+                {[1, 2].map((i) => (
+                  <div key={i} className="flex items-center space-x-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                    <Skeleton className="w-14 h-14 rounded-lg flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="h-8 w-16 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Published Posts Skeleton */}
+            <div className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl mt-0">
+              <div className="flex flex-row items-center justify-between p-6 pb-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-8 w-36 rounded-lg" />
+              </div>
+              <div className="p-6 pt-0 space-y-4">
+                {[1, 2].map((i) => (
+                  <div key={i} className="flex items-center space-x-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                    <Skeleton className="w-16 h-16 rounded-lg flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <div className="flex items-center space-x-2">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-8 w-20 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {type === 'analytics' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center mb-6">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                <Skeleton className="h-4 w-24 mb-4" />
+                <Skeleton className="h-8 w-32 mb-2" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 h-96">
+               <Skeleton className="h-6 w-48 mb-6" />
+               <Skeleton className="h-[280px] w-full rounded-md" />
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 h-96">
+               <Skeleton className="h-6 w-48 mb-6" />
+               <Skeleton className="h-[280px] w-full rounded-md" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {type === 'workspaces' && (
         <>
           <SkeletonPageHeader />
@@ -328,10 +490,12 @@ function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integ
                 <div className="flex flex-row items-center justify-between space-y-0 p-6 pb-6">
                   <div className="flex items-center space-x-3">
                     <Skeleton className="h-6 w-48" />
-                    <Skeleton className="w-8 h-8 rounded-full" />
+                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trending-up w-4 h-4 text-blue-600 dark:text-blue-400"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1 hidden sm:flex">
+                    <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                       <Skeleton className="h-8 w-16 rounded-md mx-1" />
                       <Skeleton className="h-8 w-20 rounded-md mx-1" />
                       <Skeleton className="h-8 w-24 rounded-md mx-1" />
@@ -368,30 +532,27 @@ function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integ
                       <Skeleton className="h-4 w-16" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30',
-                      'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30',
-                      'bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30',
-                      'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30'
-                    ].map((colorClass, i) => (
-                      <div key={i} className={`${colorClass} rounded-2xl p-4 relative overflow-hidden`}>
-                        <div className="absolute top-2 right-2 opacity-20">
-                          <Skeleton className="w-6 h-6 rounded-full" />
-                        </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="bg-white dark:bg-slate-900/50 rounded-xl p-6 border border-gray-100 dark:border-gray-800/60 relative overflow-hidden">
                         <div className="relative z-10">
-                          <Skeleton className="h-8 w-24 mb-1 rounded-lg" />
-                          <Skeleton className="h-3 w-20 mb-2 rounded" />
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="w-full bg-white/60 dark:bg-gray-600/60 rounded-full h-1.5 mr-2">
-                              <Skeleton className="h-1.5 rounded-full w-3/4" />
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <Skeleton className="h-3 w-24 mb-3 rounded" />
+                              <Skeleton className="h-8 w-20 rounded-lg" />
                             </div>
-                            <Skeleton className="h-4 w-12 rounded" />
+                            <Skeleton className="w-10 h-10 rounded-lg" />
+                          </div>
+                          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50 flex justify-between">
+                              <Skeleton className="h-3 w-28 rounded" />
+                              <Skeleton className="h-3 w-12 rounded" />
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
+
                 </div>
               </div>
               
@@ -432,16 +593,43 @@ function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integ
             
             <div className="space-y-6">
               {/* Best Time Widget */}
-              <div className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl transition-all duration-300 border-0 rounded-3xl p-6">
-                <div className="mb-6">
-                  <Skeleton className="h-6 w-48 mb-2" />
-                  <Skeleton className="h-4 w-64" />
-                </div>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-center py-6">
-                    <Skeleton className="w-32 h-32 rounded-full" />
+              <div className="relative overflow-hidden border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 border-0 rounded-3xl group mb-6">
+                <div className="flex flex-col space-y-1.5 p-6 pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-base font-bold flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                      <Skeleton className="w-4 h-4 rounded-full" />
+                      Optimal Posting Time
+                    </div>
+                    <Skeleton className="h-6 w-16 rounded-md" />
                   </div>
-                  <Skeleton className="h-10 w-full" />
+                </div>
+
+                <div className="p-6 pt-2 space-y-6">
+                  {/* Main Stat Skeleton */}
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <Skeleton className="h-4 w-28 mb-2" />
+                      <Skeleton className="h-10 md:h-12 w-32 mb-3" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                  </div>
+
+                  {/* Mini Stats Grid Skeleton */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                       <Skeleton className="h-3 w-20 mb-2" />
+                       <Skeleton className="h-6 w-12 mb-2" />
+                       <Skeleton className="h-2 w-16 mt-1" />
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                       <Skeleton className="h-3 w-16 mb-2" />
+                       <Skeleton className="h-6 w-16 mb-2" />
+                       <Skeleton className="h-2 w-20 mt-1" />
+                    </div>
+                  </div>
+
+                  {/* Action Button Skeleton */}
+                  <Skeleton className="h-10 w-full rounded-md" />
                 </div>
               </div>
               
@@ -597,6 +785,137 @@ function SkeletonPageLoader({ type = 'default' }: { type?: 'automation' | 'integ
         </div>
       )}
       
+      {type === 'published-page' && (
+        <div className="min-h-full pb-16">
+          <div className="relative mb-8 pb-8 border-b border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/50 via-teal-50/50 to-transparent dark:from-emerald-900/10 dark:via-teal-900/10 opacity-50 -z-10 blur-3xl"></div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center space-x-2 pt-6">
+                <Button variant="ghost" disabled className="p-2 -ml-2 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center space-x-3">
+                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+                      Published
+                    </h1>
+                    <span className="px-3 py-1 text-xs font-semibold tracking-wide bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 rounded-full shadow-sm flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <Skeleton className="w-8 h-4 bg-emerald-200/50" /> Live
+                    </span>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
+                    Your past successes. Review everything that has been sent out to the world.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-center mb-10">
+              <div className="inline-flex items-center p-2 space-x-2 bg-white/30 dark:bg-gray-900/30 backdrop-blur-xl border border-white/40 dark:border-gray-700/50 rounded-full shadow-lg shadow-gray-200/50 dark:shadow-none min-w-[400px] justify-between">
+                {['All', 'Post', 'Reel', 'Story'].map((tab) => (
+                  <button key={tab} disabled className={`flex-1 px-8 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${tab === 'All' ? 'bg-white/90 dark:bg-gray-800 text-gray-900 dark:text-white shadow-md ring-1 ring-gray-900/5 dark:ring-white/10' : 'text-gray-600 dark:text-gray-300'}`}>{tab}</button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="border border-gray-100 dark:border-gray-800 overflow-hidden bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-xl">
+                  <div className="aspect-[4/5] bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2 animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {type === 'scheduled-page' && (
+        <div className="min-h-full pb-16">
+          <div className="relative mb-8 pb-8 border-b border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-purple-50/50 to-transparent dark:from-blue-900/10 dark:via-purple-900/10 opacity-50 -z-10 blur-3xl"></div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center space-x-2 pt-6">
+                <Button variant="ghost" disabled className="p-2 -ml-2 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center space-x-3">
+                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+                      Scheduled Content
+                    </h1>
+                    <span className="px-3 py-1 text-xs font-semibold tracking-wide bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full shadow-sm">
+                      <Skeleton className="w-8 h-4 bg-blue-200/50 inline-block align-middle mr-1" /> Posts
+                    </span>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
+                    Your pipeline. Review, edit, or cancel upcoming posts.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="border border-gray-100 dark:border-gray-800 overflow-hidden bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-xl">
+                  <div className="aspect-[4/5] bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2 animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {type === 'drafts-page' && (
+        <div className="min-h-full pb-16">
+          <div className="relative mb-8 pb-8 border-b border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-purple-50/50 to-transparent dark:from-blue-900/10 dark:via-purple-900/10 opacity-50 -z-10 blur-3xl"></div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center space-x-2 pt-6">
+                <Button variant="ghost" disabled className="p-2 -ml-2 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center space-x-3">
+                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+                      Drafts
+                    </h1>
+                    <span className="px-3 py-1 text-xs font-semibold tracking-wide bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full shadow-sm">
+                      <Skeleton className="w-8 h-4 bg-blue-200/50 inline-block align-middle mr-1" /> Saved
+                    </span>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
+                    Unfinished masterpieces. Perfect them and publish when ready.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="border border-gray-100 dark:border-gray-800 overflow-hidden bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-xl">
+                  <div className="aspect-[4/5] bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2 animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {type === 'default' && (
         <>
           <SkeletonPageHeader />

@@ -99,6 +99,7 @@ const PopularArticle = ({ title, category, readTime }: { title: string, category
 const HelpCenter = () => {
     const isMobile = useIsMobile()
     const [searchQuery, setSearchQuery] = useState('')
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true'
 
     // Help categories
     const categories = [
@@ -155,8 +156,8 @@ const HelpCenter = () => {
     // Popular articles
     const popularArticles = [
         { title: 'How to connect your Instagram account', category: 'Integrations', readTime: '3 min' },
-        { title: 'Understanding the AI Comment Automation', category: 'AI Features', readTime: '5 min' },
-        { title: 'Setting up your first DM Funnel', category: 'Getting Started', readTime: '7 min' },
+        { title: isPhase1 ? 'Understanding AI Content Optimization' : 'Understanding the AI Comment Automation', category: 'AI Features', readTime: '5 min' },
+        { title: isPhase1 ? 'Setting up your first Publishing Workflow' : 'Setting up your first DM Funnel', category: 'Getting Started', readTime: '7 min' },
         { title: 'How credits work and when they renew', category: 'Billing', readTime: '4 min' },
         { title: 'Best practices for AI-generated hooks', category: 'AI Features', readTime: '6 min' },
         { title: 'Troubleshooting connection issues', category: 'Integrations', readTime: '4 min' },
@@ -337,7 +338,7 @@ const HelpCenter = () => {
                                             <Play className="w-5 h-5 text-blue-400" />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-white">DM Funnels</p>
+                                            <p className="text-sm font-medium text-white">{isPhase1 ? 'Publishing Workflows' : 'DM Funnels'}</p>
                                             <p className="text-xs text-white/40">12 min</p>
                                         </div>
                                     </div>

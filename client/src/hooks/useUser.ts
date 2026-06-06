@@ -10,10 +10,10 @@ export const useUser = () => {
     queryFn: () => apiRequest('/api/user'),
     enabled: !!user && !authLoading,
     retry: 2,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false,
     refetchOnReconnect: true,
-    refetchOnWindowFocus: true
+    refetchOnWindowFocus: false
   })
 
   const userData = response?.user || response?.data || response

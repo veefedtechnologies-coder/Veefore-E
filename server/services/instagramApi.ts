@@ -768,16 +768,17 @@ export class InstagramApiService {
   static async getRecentMediaWithInsights(
     token: string,
     accountId?: string,
-    totalMediaCount?: number
+    totalMediaCount?: number,
+    daysLimit: number = 90,
+    minPosts: number = 10
   ): Promise<Array<InstagramMediaItem & { insights?: InstagramMediaInsights }>> {
 
     try {
       const HARD_LIMIT = 100;
-      const DAYS_LIMIT = 90;
       
-      // Calculate sinceDate for 90 days window
+      // Calculate sinceDate for given days window
       const sinceDate = new Date();
-      sinceDate.setDate(sinceDate.getDate() - DAYS_LIMIT);
+      sinceDate.setDate(sinceDate.getDate() - daysLimit);
 
       // We need to know the total media count to determine if we should fetch lifetime
       let mediaCount = totalMediaCount;
@@ -785,9 +786,6 @@ export class InstagramApiService {
           const accInfo = await this.getAccountInfo(token, accountId || 'me');
           mediaCount = accInfo.media_count || 0;
       }
-
-      // EXCEPTION RULE: If < 50 posts lifetime, use all available lifetime posts
-      const useLifetime = mediaCount < 50;
 
       // Fetch media with pagination
       let recentMedia: InstagramMediaItem[] = [];
@@ -797,15 +795,15 @@ export class InstagramApiService {
 
       // Initial fetch
       let mediaResponse = await this.getUserMedia(token, perPage, accountId);
-      console.log(`[INSTAGRAM API] Initial fetch: ${mediaResponse.data.length} posts`);
+      console.log(`[INSTAGRAM API] Initial fetch: ${mediaResponse?.data?.length || 0} posts`);
 
       while (mediaResponse && !shouldStop) {
         for (let post of mediaResponse.data) {
           const postDate = new Date(post.timestamp);
           
-          // Apply date filter if not using lifetime exception
-          if (!useLifetime && postDate < sinceDate) {
-            console.log(`[INSTAGRAM API] Reached 90 days limit at post date ${post.timestamp}. Early termination.`);
+          // Apply strict date filter, but guarantee at least minPosts
+          if (postDate < sinceDate && recentMedia.length >= minPosts) {
+            console.log(`[INSTAGRAM API] Reached ${daysLimit} days limit at post date ${post.timestamp}. Fetched ${recentMedia.length} posts. Early termination.`);
             shouldStop = true;
             break;
           }
@@ -856,7 +854,8 @@ export class InstagramApiService {
    */
   static async getComprehensiveMetrics(
     token: string,
-    accountId?: string
+    accountId: string,
+    options?: { fetchMedia?: boolean; fetchInsights?: boolean; forceRefresh?: boolean; daysLimit?: number; minPosts?: number }
   ): Promise<{
     account: InstagramAccountInfo;
     insights: InstagramInsights;
@@ -885,7 +884,7 @@ export class InstagramApiService {
     let account: InstagramAccountInfo;
     let insights: InstagramInsights = {};
 
-    if (isProfessional) {
+    if (isProfessional && options?.fetchInsights !== false) {
       // 1 & 2. Consolidated Batch Fetch (Account Info + Insights)
       const batchResponse = await this.getBatchAccountInsights(accountId || 'me', token);
       insights = batchResponse.insights;
@@ -897,12 +896,15 @@ export class InstagramApiService {
         account = await this.getAccountInfo(token, accountId);
       }
     } else {
-      // Basic token flow (limited API)
+      // Basic token flow (limited API) or insights fetch is disabled
       account = await this.getAccountInfo(token, accountId);
     }
 
     // 3. Get recent media - passing media_count for standardized limit strategy
-    const recentMedia = await this.getRecentMediaWithInsights(token, accountId, account.media_count);
+    let recentMedia: any[] = [];
+    if (options?.fetchMedia !== false) {
+      recentMedia = await this.getRecentMediaWithInsights(token, accountId, account.media_count, options?.daysLimit, options?.minPosts);
+    }
 
     // 4. Aggregation
     const aggregated = recentMedia.reduce(
@@ -919,12 +921,12 @@ export class InstagramApiService {
       { totalLikes: 0, totalComments: 0, totalShares: 0, totalSaves: 0, totalReach: 0, totalImpressions: 0, averageEngagementRate: 0, totalPosts: 0 }
     );
 
-    // P2-FIX: Do NOT overwrite aggregated totalReach with account-level reach
+    // P2-FIX: Do NOT overwrite aggregated totalReach with account-level reach unless it's 0
     // Account-level reach (insights.reach) is for the last 28 days only
     // Media-aggregated reach (aggregated.totalReach) represents the total reach of media fetched (e.g., 90 days)
-    // if (insights.reach && insights.reach > 0) {
-    //   aggregated.totalReach = insights.reach;
-    // }
+    if (aggregated.totalReach === 0 && insights.reach && insights.reach > 0) {
+      aggregated.totalReach = insights.reach;
+    }
 
     if (recentMedia.length > 0 && account.followers_count > 0) {
       const totalEngagements = aggregated.totalLikes + aggregated.totalComments + aggregated.totalShares + aggregated.totalSaves;

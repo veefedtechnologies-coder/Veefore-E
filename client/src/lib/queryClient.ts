@@ -1,6 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { persistQueryClient } from '@tanstack/react-query-persist-client'
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+// Removed insecure localStorage persistence modules
 
 // Volatile query prefixes that should NEVER be persisted to localStorage.
 // These queries change frequently and stale cached data causes the dashboard
@@ -14,6 +13,8 @@ const VOLATILE_QUERY_PREFIXES = [
   '/api/instagram',
   'automation-social-accounts',
   'automation-instagram-content',
+  'social-listening-overview',
+  'social-listening-trends'
 ]
 
 // Create a client with optimized caching to prevent unnecessary refetches
@@ -32,35 +33,15 @@ export const queryClient = new QueryClient({
   },
 })
 
-// Create persister for localStorage
-const localStoragePersister = createSyncStoragePersister({
-  storage: window.localStorage,
-})
-
-// Persist the query client to localStorage, but EXCLUDE volatile queries
-// that change frequently (social accounts, dashboard, analytics).
-// Persisting these caused stale empty arrays to block fresh data from rendering.
-persistQueryClient({
-  queryClient,
-  persister: localStoragePersister,
-  maxAge: 1000 * 60 * 60 * 24, // 24 hours
-  dehydrateOptions: {
-    shouldDehydrateQuery: (query) => {
-      // Only persist queries that are NOT in the volatile list
-      const queryKey = query.queryKey[0]
-      if (typeof queryKey === 'string') {
-        return !VOLATILE_QUERY_PREFIXES.some(prefix => queryKey.startsWith(prefix))
-      }
-      return true
-    },
-  },
-})
-
+// REMOVED INSECURE PERSISTENCE: 
+// Previously, persistQueryClient was used here with localStoragePersister.
+// This exposed PII and auth tokens in plaintext localStorage.
+// All query caching is now strictly in-memory.
 // ONE-TIME MIGRATION: Purge stale persisted data from localStorage.
 // Previous versions persisted social-accounts and dashboard data which
 // caused stale empty arrays to block fresh API data from rendering.
 const CACHE_VERSION_KEY = 'REACT_QUERY_CACHE_VERSION'
-const CURRENT_CACHE_VERSION = '3' // Incremented to purge stale arpit.10 account data from automation
+const CURRENT_CACHE_VERSION = '4' // Incremented to purge stale social-listening zero data
 if (localStorage.getItem(CACHE_VERSION_KEY) !== CURRENT_CACHE_VERSION) {
   console.log('[QueryClient] Purging stale persisted cache (version upgrade)')
   localStorage.removeItem('REACT_QUERY_OFFLINE_CACHE')
@@ -159,7 +140,7 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
   clearTimeout(timeout)
 
   if (response.status === 304) {
-    return []
+    throw new Error('Not Modified') // Let React Query handle the error or HTTP cache handle it
   }
   if (!response.ok) {
     const errorData = await response.text()

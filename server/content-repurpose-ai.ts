@@ -75,25 +75,9 @@ export class ContentRepurposeAI {
       const culturalContext = LANGUAGE_CONTEXTS[input.targetLanguage as keyof typeof LANGUAGE_CONTEXTS];
       const repurposePrompt = this.buildRepurposePrompt(input, culturalContext);
       
-      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert multilingual content strategist and cultural adaptation specialist. You understand how to adapt content across cultures while maintaining authenticity and effectiveness. Always output valid JSON.`
-          },
-          {
-            role: "user",
-            content: repurposePrompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.3, // Lower temperature for more consistent translations
-        max_tokens: 1500
-      });
-
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const systemPrompt = "You are an expert multilingual content strategist and cultural adaptation specialist. You understand how to adapt content across cultures while maintaining authenticity and effectiveness. Always output valid JSON.";
+      const { aiServiceManager } = await import('./services/AIServiceManager');
+      const result = await aiServiceManager.generateJSON(`${systemPrompt}\n\nUser: ${repurposePrompt}`, preferences);
       
       console.log(`[CONTENT REPURPOSE AI] Successfully repurposed content with quality score: ${result.qualityScore || 'N/A'}`);
       

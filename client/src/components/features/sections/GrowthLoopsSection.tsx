@@ -4,6 +4,8 @@ import { RefreshCw, Sparkles, Share2, Heart, TrendingUp, Users, MessageSquare } 
 
 
 export const GrowthLoopsSection = React.memo(() => {
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
     return (
 
         <section className="py-24 md:py-36 px-4 sm:px-6 relative overflow-hidden" style={{ contain: 'content' }}>
@@ -145,7 +147,7 @@ export const GrowthLoopsSection = React.memo(() => {
                             <div className="space-y-3">
                                 {[
                                     { name: 'Share-to-Unlock', type: 'UGC Campaign', reach: '12.4K' },
-                                    { name: 'Comment Rewards', type: 'Engagement Loop', reach: '8.2K' },
+                                    { name: isPhase1 ? 'Series Content' : 'Comment Rewards', type: 'Engagement Loop', reach: '8.2K' },
                                     { name: 'Tag-a-Friend', type: 'Viral Challenge', reach: '5.7K' },
                                 ].map((loop, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02]">
@@ -210,14 +212,21 @@ export const GrowthLoopsSection = React.memo(() => {
                         <p className="text-white/50">Launch viral campaigns in minutes</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                        {[
+                        {(isPhase1 ? [
+                            { title: 'Share-to-Unlock', desc: 'Exclusive content unlocked after followers share your post', multiplier: '4.2x', icon: Share2 },
+                            { title: 'Series Content', desc: 'Part 2 hooks that bring audience back to your page', multiplier: '2.8x', icon: TrendingUp },
+                            { title: 'Tag Challenge', desc: 'Encourage tagging friends with prizes for participation', multiplier: '5.1x', icon: Users },
+                            { title: 'UGC Campaigns', desc: 'Fans create content about you for repost opportunities', multiplier: '3.5x', icon: Heart },
+                            { title: 'Milestone Celebrations', desc: 'Celebrate follower milestones with community shoutouts', multiplier: '2.3x', icon: TrendingUp },
+                            { title: 'Referral Program', desc: 'Reward followers who bring in new engaged followers', multiplier: '6.7x', icon: RefreshCw },
+                        ] : [
                             { title: 'Share-to-Unlock', desc: 'Exclusive content unlocked after followers share your post', multiplier: '4.2x', icon: Share2 },
                             { title: 'Comment Rewards', desc: 'Top commenters get featured in your stories or posts', multiplier: '2.8x', icon: MessageSquare },
                             { title: 'Tag Challenge', desc: 'Encourage tagging friends with prizes for participation', multiplier: '5.1x', icon: Users },
                             { title: 'UGC Campaigns', desc: 'Fans create content about you for repost opportunities', multiplier: '3.5x', icon: Heart },
                             { title: 'Milestone Celebrations', desc: 'Celebrate follower milestones with community shoutouts', multiplier: '2.3x', icon: TrendingUp },
                             { title: 'Referral Program', desc: 'Reward followers who bring in new engaged followers', multiplier: '6.7x', icon: RefreshCw },
-                        ].map((template, i) => (
+                        ]).map((template, i) => (
                             <motion.div
                                 key={i}
                                 initial={{ opacity: 0 }}

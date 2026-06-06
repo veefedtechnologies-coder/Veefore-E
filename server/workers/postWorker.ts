@@ -29,28 +29,17 @@ export class PostWorker {
       const { getRedisOptions } = await import('../lib/redis');
       const redisUrl = process.env.REDIS_URL || process.env.KV_URL || process.env.STORAGE_REDIS_URL;
 
-      let connectionConfig: any = {
+      if (!redisUrl) {
+        throw new Error('Redis URL not configured');
+      }
+
+      const connectionConfig: any = {
         ...getRedisOptions(redisUrl),
         maxRetriesPerRequest: null,
       };
 
-      if (redisUrl) {
-        try {
-          // Manually parse URL because passing it as part of options object doesn't work for BullMQ
-          // BullMQ expects { connection: { host, port, password } } or { connection: RedisInstance }
-          const url = new URL(redisUrl);
-          connectionConfig.host = url.hostname;
-          connectionConfig.port = parseInt(url.port || '6379');
-          connectionConfig.username = url.username;
-          connectionConfig.password = url.password;
-
-          if (url.protocol === 'rediss:') {
-            connectionConfig.tls = { rejectUnauthorized: false };
-          }
-        } catch (e) {
-          console.error('[POST_WORKER] Failed to parse Redis URL, falling back to basic options', e);
-        }
-      }
+      const IORedis = (await import('ioredis')).default;
+      const connection = new IORedis(redisUrl, connectionConfig);
 
       this.worker = new Worker(
         'post-scheduler',
@@ -58,11 +47,11 @@ export class PostWorker {
           return this.processPublishJob(job);
         },
         {
-          connection: connectionConfig,
+          connection,
           concurrency: 3,
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 50 },
-          lockDuration: 600000, // 10 minutes to allow for long Instagram video processing
+          lockDuration: 60000, // 1 minute - worker no longer blocks on video polling
         }
       );
 
@@ -88,6 +77,19 @@ export class PostWorker {
   }
 
   private static async processPublishJob(job: Job<ScheduledPostJobData>): Promise<any> {
+    const isFallbackCheck = job.name === 'fallback-checks' || (job.data as any).fallback === true;
+
+    if (isFallbackCheck) {
+      console.log(`[POST_WORKER] 🔄 Running global fallback content checks...`);
+      if (!this.storage) return { status: 'skipped', reason: 'No storage' };
+      
+      const { SchedulerService } = await import('../scheduler-service');
+      const scheduler = new SchedulerService(this.storage);
+      // We safely call processScheduledContent to pick up any missed items
+      await (scheduler as any).processScheduledContent();
+      return { status: 'success', type: 'fallback-checks' };
+    }
+
     const { contentId, workspaceId, platform, title } = job.data;
 
     console.log(`[POST_WORKER] Processing publish job for content ${contentId} (workspace: ${workspaceId})`);
@@ -192,7 +194,8 @@ export class PostWorker {
       
       // Ensure mediaUrl is absolute using finalBaseUrl if necessary
       let cleanUrl = mediaUrl;
-      const currentDomain = process.env.SOCIAL_AUTH_BASE_URL || process.env.VITE_APP_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      const devDomain = process.env.REPLIT_DEV_DOMAIN && process.env.REPLIT_DEV_DOMAIN !== 'your-replit-dev-domain-here' ? process.env.REPLIT_DEV_DOMAIN : null;
+      const currentDomain = process.env.SOCIAL_AUTH_BASE_URL || process.env.VITE_APP_URL || (devDomain ? `https://${devDomain}` : 'http://localhost:5000');
       
       if (cleanUrl.startsWith('/')) {
         cleanUrl = `${currentDomain}${cleanUrl}`;
@@ -212,13 +215,36 @@ export class PostWorker {
         caption,
         contentType,
         instagramAccount.accountId || (instagramAccount as any)._id?.toString(),
-        mentions
+        mentions,
+        content.contentData?.collaborators || []
       );
 
       if (directResult.success) {
-        console.log(`[POST_WORKER] ✅ Successfully published content ${contentId} (postId: ${directResult.id})`);
-        await this.updateContentStatus(contentId, 'published', '', directResult.id);
-        return { status: 'success', postId: directResult.id, approach: directResult.approach };
+        if (directResult.processing && directResult.id) {
+          console.log(`[POST_WORKER] ⏳ Content ${contentId} is processing (container: ${directResult.id}). Dispatching to verifyQueue.`);
+          
+          try {
+            const { verifyQueue } = await import('../queues/postQueue');
+            if (verifyQueue) {
+              await verifyQueue.add('verify-post', {
+                contentId,
+                workspaceId,
+                containerId: directResult.id,
+                accessToken: instagramAccount.accessToken,
+                accountId: instagramAccount.accountId || (instagramAccount as any)._id?.toString()
+              }, { delay: 30000 }); // initial delay 30s
+            }
+          } catch (err) {
+            console.error(`[POST_WORKER] Failed to dispatch to verifyQueue:`, err);
+          }
+          
+          await this.updateContentStatus(contentId, workspaceId, 'processing', '', directResult.id);
+          return { status: 'processing', containerId: directResult.id };
+        } else {
+          console.log(`[POST_WORKER] ✅ Successfully published content ${contentId} (postId: ${directResult.id})`);
+          await this.updateContentStatus(contentId, workspaceId, 'published', '', directResult.id);
+          return { status: 'success', postId: directResult.id };
+        }
       } else {
         console.error(`[POST_WORKER] ❌ Publishing failed for content ${contentId}: ${directResult.error}`);
 
@@ -226,7 +252,7 @@ export class PostWorker {
         const maxAttempts = job.opts?.attempts || 3;
 
         if (attemptsMade >= maxAttempts - 1) {
-          await this.updateContentStatus(contentId, 'failed', directResult.error || 'Publishing failed');
+          await this.updateContentStatus(contentId, workspaceId, 'failed', directResult.error || 'Publishing failed');
         }
 
         throw new Error(directResult.error || 'Publishing failed');
@@ -240,6 +266,7 @@ export class PostWorker {
 
   private static async updateContentStatus(
     contentId: number,
+    workspaceId: string,
     status: string,
     error?: string,
     instagramPostId?: string
@@ -265,6 +292,19 @@ export class PostWorker {
 
       await this.storage.updateContent(contentId, updates);
       console.log(`[POST_WORKER] Updated content ${contentId} status to ${status}`);
+      
+      try {
+        const { RealtimeService } = await import('../services/realtime');
+        RealtimeService.broadcastToWorkspace(workspaceId, 'post_status_updated', {
+          contentId,
+          status,
+          error,
+          instagramPostId,
+          timestamp: new Date()
+        });
+      } catch (wsErr) {
+        console.error('[POST_WORKER] Failed to emit websocket event:', wsErr);
+      }
     } catch (error) {
       console.error(`[POST_WORKER] Error updating content ${contentId} status:`, error);
     }

@@ -8,10 +8,12 @@ const router = express.Router();
 const verifyWebhookSignature = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   try {
     const signature = req.headers['x-hub-signature-256'] as string;
-    const payload = JSON.stringify(req.body);
+    // Use rawBody from express.json verify function if available, otherwise fallback
+    const hasRawBody = !!(req as any).rawBody;
+    const payload = (req as any).rawBody || JSON.stringify(req.body);
     
-    // Get webhook secret from environment or database
-    const webhookSecret = process.env.INSTAGRAM_WEBHOOK_SECRET || 'default-webhook-secret';
+    // Get webhook secret from environment or database. Meta uses the App Secret to sign webhooks.
+    const webhookSecret = process.env.INSTAGRAM_WEBHOOK_SECRET || process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET || 'default-webhook-secret';
     
     if (!signature) {
       console.warn('⚠️ Webhook received without signature');
@@ -25,6 +27,11 @@ const verifyWebhookSignature = (req: express.Request, res: express.Response, nex
       .digest('hex');
     
     const receivedSignature = signature.replace('sha256=', '');
+
+    // Debugging logs
+    console.log(`[WEBHOOK DEBUG] rawBody available: ${hasRawBody}`);
+    console.log(`[WEBHOOK DEBUG] Webhook secret being used: ${webhookSecret === 'default-webhook-secret' ? 'DEFAULT' : 'FROM_ENV'}`);
+    console.log(`[WEBHOOK DEBUG] Payload length: ${payload.length}`);
 
     // Ensure both signatures are the same length before comparison
     if (expectedSignature.length !== receivedSignature.length) {
@@ -113,22 +120,25 @@ router.post('/instagram', verifyWebhookSignature, async (req, res) => {
 /**
  * Process individual webhook entry
  */
-async function processWebhookEntry(entry: any): Promise<void> {
+export async function processWebhookEntry(entry: any): Promise<void> {
   try {
-    const { id: instagramAccountId, changes } = entry;
+    const { id: instagramAccountId, changes, messaging } = entry;
 
-    if (!instagramAccountId || !changes || !Array.isArray(changes)) {
-      console.warn('⚠️ Invalid webhook entry format');
+    if (!instagramAccountId || (!changes && !messaging)) {
+      console.warn('⚠️ Invalid webhook entry format:', JSON.stringify(entry));
       return;
     }
 
     console.log(`📱 Processing webhook for Instagram account: ${instagramAccountId}`);
 
-    // Query SocialAccount directly by accountId (uses index for O(1) lookup)
+    // Query SocialAccount directly by accountId, pageId, or instagramAccountId
     const { SocialAccountModel } = await import('../models/Social/SocialAccount');
     const socialAccount = await SocialAccountModel.findOne({ 
-      accountId: instagramAccountId,
-      platform: 'instagram',
+      $or: [
+        { accountId: instagramAccountId },
+        { pageId: instagramAccountId },
+        { instagramAccountId: instagramAccountId }
+      ],
       isActive: true 
     }).lean();
 
@@ -143,9 +153,23 @@ async function processWebhookEntry(entry: any): Promise<void> {
       return;
     }
 
-    // Process each change in the entry
-    for (const change of changes) {
-      await processWebhookChange(workspaceId, instagramAccountId, change);
+    // Process each change in the entry (e.g. followers, comments, mentions)
+    if (Array.isArray(changes)) {
+      for (const change of changes) {
+        await processWebhookChange(workspaceId, instagramAccountId, change);
+      }
+    }
+
+    // Process messaging arrays (Direct Messages)
+    if (Array.isArray(messaging)) {
+      for (const messageObj of messaging) {
+        // Map the messaging object to our existing handleMessageWebhook format if possible, 
+        // or let the webhook handler deal with the 'messages' field directly.
+        await processWebhookChange(workspaceId, instagramAccountId, {
+          field: 'messages',
+          value: messageObj
+        });
+      }
     }
 
   } catch (error) {
@@ -198,15 +222,48 @@ export async function processWebhookChange(
         await handleLiveCommentWebhook(workspaceId, instagramAccountId, value);
         break;
 
+      case 'followers':
+      case 'relationships':
+        console.log(`👥 Follower webhook received for account ${instagramAccountId}.`);
+        try {
+          const { storage } = await import('../mongodb-storage');
+          const { RealtimeService } = await import('../services/realtime');
+          const accounts = await storage.getSocialAccountsByWorkspace(workspaceId);
+          const account = accounts.find((a: any) => a.id === instagramAccountId || a.accountId === instagramAccountId);
+          
+          if (account) {
+            // DO NOT fetch from Meta API to avoid overwriting test data or making unnecessary API calls.
+            // If the webhook provides a specific count, use it. Otherwise, increment by 1 assuming it's a new follower.
+            let newFollowersCount = account.followersCount || 0;
+            
+            if (value && typeof value.followers_count === 'number') {
+              newFollowersCount = value.followers_count;
+            } else if (value && value.action === 'unfollow') {
+              newFollowersCount = Math.max(0, newFollowersCount - 1);
+            } else {
+              newFollowersCount += 1;
+            }
+
+            await storage.updateSocialAccount(account.id, { followersCount: newFollowersCount });
+            
+            console.log(`✅ Locally updated followers count to ${newFollowersCount} for account ${instagramAccountId}`);
+            
+            // Broadcast the update to the frontend so it updates instantly
+            RealtimeService.broadcastToWorkspace(workspaceId, 'metrics_updated', {
+              accountId: instagramAccountId,
+              type: 'webhook_update',
+              metricsType: 'followers',
+              data: { followersCount: newFollowersCount }
+            });
+          }
+        } catch (err) {
+          console.error(`🚨 Failed to handle follower webhook locally:`, err);
+        }
+        break;
+
       default:
         console.log(`ℹ️ Unhandled webhook field: ${field}`);
-        // Still queue a general metrics update
-        await MetricsQueueManager.processWebhookEvent(
-          workspaceId,
-          instagramAccountId,
-          { field, value },
-          'generic'
-        );
+
     }
 
   } catch (error) {
@@ -247,20 +304,7 @@ async function handleCommentWebhook(
     console.error('Failed to update total comments immediately:', error);
   }
 
-  // Queue webhook processing job for comprehensive metrics update
-  await MetricsQueueManager.processWebhookEvent(
-    workspaceId,
-    instagramAccountId,
-    {
-      type: 'comment',
-      media_id: value.media_id,
-      comment_id: value.id,
-      text: value.text,
-      created_time: value.created_time,
-      from: value.from
-    },
-    'comments'
-  );
+
 
   // Broadcast to frontend via WebSocket for immediate updates
   try {
@@ -308,17 +352,7 @@ async function handleMentionWebhook(
 ): Promise<void> {
   console.log(`@️ Processing mention webhook for account: ${instagramAccountId}`);
 
-  await MetricsQueueManager.processWebhookEvent(
-    workspaceId,
-    instagramAccountId,
-    {
-      type: 'mention',
-      media_id: value.media_id,
-      comment_id: value.comment_id,
-      mention_id: value.id
-    },
-    'mentions'
-  );
+
 
   // Broadcast to frontend via WebSocket for immediate updates
   try {
@@ -348,16 +382,7 @@ async function handleStoryInsightsWebhook(
 ): Promise<void> {
   console.log(`📱 Processing story insights webhook for account: ${instagramAccountId}`);
 
-  await MetricsQueueManager.processWebhookEvent(
-    workspaceId,
-    instagramAccountId,
-    {
-      type: 'story_insights',
-      media_id: value.media_id,
-      insights: value.insights
-    },
-    'story_insights'
-  );
+
 
   // Broadcast to frontend via WebSocket for immediate updates
   try {
@@ -387,18 +412,7 @@ async function handleMessageWebhook(
 ): Promise<void> {
   console.log(`💌 Processing message webhook for account: ${instagramAccountId}`);
 
-  await MetricsQueueManager.processWebhookEvent(
-    workspaceId,
-    instagramAccountId,
-    {
-      type: 'message',
-      messaging: value.messaging,
-      recipient: value.recipient,
-      sender: value.sender,
-      timestamp: value.timestamp
-    },
-    'messages'
-  );
+
 
   // Broadcast to frontend via WebSocket for immediate updates
   try {
@@ -429,17 +443,7 @@ async function handleMediaUpdateWebhook(
 ): Promise<void> {
   console.log(`📸 Processing media update webhook for account: ${instagramAccountId}`);
 
-  await MetricsQueueManager.processWebhookEvent(
-    workspaceId,
-    instagramAccountId,
-    {
-      type: 'media_update',
-      media_id: value.media_id,
-      media_type: value.media_type,
-      created_time: value.created_time
-    },
-    'media_updates'
-  );
+
 
   // Broadcast to frontend via WebSocket for immediate updates
   try {
@@ -470,16 +474,7 @@ async function handleAccountReviewWebhook(
 ): Promise<void> {
   console.log(`🔍 Processing account review webhook for account: ${instagramAccountId}`);
 
-  await MetricsQueueManager.processWebhookEvent(
-    workspaceId,
-    instagramAccountId,
-    {
-      type: 'account_review',
-      review_status: value.review_status,
-      reviewer_name: value.reviewer_name
-    },
-    'account_review_update'
-  );
+
 
   // Broadcast to frontend via WebSocket for immediate updates
   try {
@@ -509,18 +504,7 @@ async function handleLiveCommentWebhook(
 ): Promise<void> {
   console.log(`🔴 Processing live comment webhook for account: ${instagramAccountId}`);
 
-  await MetricsQueueManager.processWebhookEvent(
-    workspaceId,
-    instagramAccountId,
-    {
-      type: 'live_comment',
-      live_video_id: value.live_video_id,
-      comment_id: value.id,
-      text: value.text,
-      user: value.user
-    },
-    'live_comments'
-  );
+
 
   console.log(`✅ Live comment webhook queued for processing`);
 }

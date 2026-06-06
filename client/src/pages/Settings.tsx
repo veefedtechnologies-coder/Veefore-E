@@ -177,7 +177,7 @@ function SettingsContent() {
                     {group.items.map((tab) => {
                       const Icon = tab.icon
                       const isActive = activeTab === tab.id
-                      const isDanger = tab.danger
+                      const isDanger = (tab as any).danger
                       
                       return (
                         <button

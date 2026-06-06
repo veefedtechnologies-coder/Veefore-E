@@ -1,4 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
+import { GoogleGenerativeAI as _ } from '@google/generative-ai';
 
 interface MessageContext {
   message: string;
@@ -14,13 +16,19 @@ interface MessageContext {
 }
 
 interface AIResponseConfig {
-  personality: 'friendly' | 'professional' | 'casual' | 'enthusiastic' | 'helpful' | 'humorous';
-  responseLength: 'short' | 'medium' | 'long';
+  personality: 'friendly' | 'professional' | 'casual' | 'enthusiastic' | 'helpful' | 'humorous' | string;
+  responseLength: 'short' | 'medium' | 'long' | string;
   dailyLimit: number;
   responseDelay: number;
-  language: 'auto' | 'english' | 'hindi' | 'hinglish';
+  language: 'auto' | 'english' | 'hindi' | 'hinglish' | string;
   contextualMode: boolean;
   businessContext?: string;
+  creativityLevel?: number;
+  contentSafety?: string;
+  optimizationGoals?: string;
+  captionStyle?: string;
+  googleAiStudioKey?: string;
+  openAiKey?: string;
 }
 
 interface AIResponse {
@@ -66,15 +74,64 @@ class AIResponseGenerator {
 
   async generateContextualResponse(
     context: MessageContext,
-    config: AIResponseConfig
+    config: AIResponseConfig,
+    preferredModel: string = 'veegpt-hybrid'
   ): Promise<AIResponse> {
     try {
-      const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
       const prompt = this.buildPrompt(context, config);
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text();
+      let text = '';
+      
+      const activeGenAI = config.googleAiStudioKey ? new GoogleGenerativeAI(config.googleAiStudioKey) : this.genAI;
+
+      const tryGemini = async (modelName: string) => {
+        const generationConfig = { temperature: config.creativityLevel ?? 0.7 };
+        const safetySettings = [];
+        if (config.contentSafety === 'strict') {
+            safetySettings.push({ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_LOW_AND_ABOVE' });
+            safetySettings.push({ category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_LOW_AND_ABOVE' });
+            safetySettings.push({ category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' });
+            safetySettings.push({ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_LOW_AND_ABOVE' });
+        } else if (config.contentSafety === 'off') {
+            safetySettings.push({ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' });
+            safetySettings.push({ category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' });
+            safetySettings.push({ category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' });
+            safetySettings.push({ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' });
+        }
+        
+        const model = activeGenAI.getGenerativeModel({ model: modelName, generationConfig, safetySettings: safetySettings.length > 0 ? safetySettings : undefined });
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+      };
+
+      const tryOpenAI = async (modelName: string) => {
+        if (!process.env.OPENAI_API_KEY) throw new Error('OpenAI API key not configured');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const completion = await openai.chat.completions.create({
+          messages: [{ role: "user", content: prompt }],
+          model: modelName,
+          temperature: config.creativityLevel ?? 0.7,
+        });
+        return completion.choices[0]?.message?.content || '';
+      };
+
+      if (preferredModel === 'openai-gpt4o') {
+        text = await tryOpenAI('gpt-4o');
+      } else if (preferredModel === 'anthropic-claude-3-5') {
+        // Fallback to OpenAI since we don't have Anthropic SDK imported here yet
+        text = await tryOpenAI('gpt-4o');
+      } else if (preferredModel === 'gemini-2.0-flash-exp') {
+        text = await tryGemini('gemini-2.0-flash-exp');
+      } else if (preferredModel === 'gemini-1.5-flash') {
+        text = await tryGemini('gemini-1.5-flash');
+      } else {
+        // veegpt-hybrid or default
+        try {
+          text = await tryGemini('gemini-2.0-flash-exp');
+        } catch (e) {
+          console.warn('[AI RESPONSE] Gemini failed in hybrid mode, falling back to OpenAI');
+          text = await tryOpenAI('gpt-4o-mini'); // Fallback model
+        }
+      }
 
       // Apply anti-spam filtering and ensure uniqueness
       const cleanResponse = this.generateAntiSpamResponse(text, context.message);
@@ -83,7 +140,7 @@ class AIResponseGenerator {
         response: cleanResponse,
         detectedLanguage: this.detectLanguage(context.message),
         confidence: 0.85,
-        reasoning: "Generated with anti-spam optimization"
+        reasoning: "Generated with " + preferredModel
       };
     } catch (error) {
       console.error('[AI RESPONSE] Error generating response:', error);

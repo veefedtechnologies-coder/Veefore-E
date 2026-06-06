@@ -49,27 +49,40 @@ export class InstagramOAuthService {
 
   getAuthUrl(workspaceId: string): string {
     // STANDARD FLOW: Pure Instagram Login
-    const scopes = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights';
+    // When in Phase 1 Review mode, only request safe publishing/insights scopes.
+    // DM (instagram_business_manage_messages) and Comment (instagram_business_manage_comments)
+    // permissions are EXCLUDED to comply with Meta's Phase 1 App Review policy.
+    const isPhase1Review = process.env.META_PHASE_1_REVIEW_MODE === 'true';
+
+    const scopes = isPhase1Review
+      ? 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights'
+      : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights';
+
     const state = Buffer.from(JSON.stringify({ workspaceId, flow: 'standard' })).toString('base64');
 
     const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.appId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${state}`;
-    console.log('🔗 [INSTAGRAM OAUTH] Generated STANDARD auth URL');
+    console.log(`🔗 [INSTAGRAM OAUTH] Generated STANDARD auth URL. Phase1Review=${isPhase1Review}. Scopes: ${scopes}`);
 
     return authUrl;
   }
 
   getAdvancedAuthUrl(workspaceId: string): string {
     // ADVANCED FLOW: Facebook Login for Business
-    // Facebook Login for Business requires 'config_id' instead of 'scope' parameter
-    // Create a Configuration in: Facebook App > Facebook Login for Business > Configurations
-    // Then set the config_id in FACEBOOK_LOGIN_CONFIG_ID env var
+    // When in Phase 1 Review mode, only request safe publishing/insights scopes.
+    // DM (instagram_manage_messages, pages_messaging) and Comment (instagram_manage_comments)
+    // permissions are EXCLUDED to comply with Meta's Phase 1 App Review policy.
+    const isPhase1Review = process.env.META_PHASE_1_REVIEW_MODE === 'true';
+
     const state = Buffer.from(JSON.stringify({ workspaceId, flow: 'advanced' })).toString('base64');
+
     // Fallback to the classic scope-based Facebook Login
-    const scopes = 'public_profile,email,instagram_basic,instagram_manage_insights,instagram_content_publish,instagram_manage_comments,pages_read_engagement,pages_manage_posts,pages_show_list,business_management';
+    const scopes = isPhase1Review
+      ? 'public_profile,email,instagram_basic,instagram_manage_insights,instagram_content_publish,pages_read_engagement,pages_manage_posts,pages_show_list'
+      : 'public_profile,email,instagram_basic,instagram_manage_insights,instagram_content_publish,instagram_manage_comments,instagram_manage_messages,pages_read_engagement,pages_manage_posts,pages_show_list,pages_messaging';
+
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${this.fbAppId}&display=page&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${state}`;
     
-    console.log('🔗 [INSTAGRAM OAUTH] Generated ADVANCED auth URL with scopes:', scopes);
-
+    console.log(`🔗 [INSTAGRAM OAUTH] Generated ADVANCED auth URL. Phase1Review=${isPhase1Review}. Scopes: ${scopes}`);
     console.log('🔗 [INSTAGRAM OAUTH] Facebook App ID:', this.fbAppId);
     console.log('🔗 [INSTAGRAM OAUTH] Redirect URI:', this.redirectUri);
 
@@ -279,11 +292,17 @@ export class InstagramOAuthService {
       // P1-FIX: We no longer await this to prevent blocking the OAuth response and UI timeouts
       (async () => {
         try {
-          console.log('[INSTAGRAM OAUTH] 🔄 Triggering immediate sync for newly connected account (Background)...');
-          const { InstagramDirectSync } = await import('./instagram-direct-sync');
-          const sync = new InstagramDirectSync(this.storage);
-          await sync.updateAccountWithRealData(workspaceId, accessToken);
-          console.log('[INSTAGRAM OAUTH] ✅ Initial sync completed successfully');
+          console.log('[INSTAGRAM OAUTH] 🔄 Triggering immediate sync for newly connected account (Background via Queue)...');
+          const { MetricsQueueManager } = await import('./queues/metricsQueue');
+          await MetricsQueueManager.scheduleMetricsFetch(
+            workspaceId,
+            'system',
+            userProfile.accountId,
+            accessToken,
+            'all',
+            { priority: 5, forceRefresh: true }
+          );
+          console.log('[INSTAGRAM OAUTH] ✅ Initial sync queued successfully');
 
           // Invalidate performance cache for this workspace so dashboard/accounts refresh immediately
           try {

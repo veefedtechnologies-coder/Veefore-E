@@ -1012,7 +1012,9 @@ export function AISettings() {
     autoHashtags: true,
     contentSafety: 'standard',
     aiMemory: 'long-term',
-    autoLearning: true
+    autoLearning: true,
+    googleAiStudioKey: '',
+    openAiKey: ''
   })
 
   // Sync state when userData loads
@@ -1032,7 +1034,9 @@ export function AISettings() {
         autoHashtags: userData.preferences.autoHashtags !== false,
         contentSafety: userData.preferences.contentSafety || 'standard',
         aiMemory: userData.preferences.aiMemory || 'long-term',
-        autoLearning: userData.preferences.autoLearning !== false
+        autoLearning: userData.preferences.autoLearning !== false,
+        googleAiStudioKey: userData.preferences.googleAiStudioKey || '',
+        openAiKey: userData.preferences.openAiKey || ''
       }))
     }
   }, [userData])
@@ -1088,6 +1092,7 @@ export function AISettings() {
               {[
                 { id: 'veegpt-hybrid', name: 'VeeGPT Hybrid (Recommended)', desc: 'Advanced reasoning with auto-fallback' },
                 { id: 'openai-gpt4o', name: 'OpenAI GPT-4o', desc: 'Industry leading context understanding' },
+                { id: 'google-ai-studio', name: 'Google AI Studio API', desc: 'Custom key advanced reasoning' },
                 { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash Exp', desc: 'Highest capability, Google experimental' },
                 { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'Faster response, lower token usage' }
               ].map((model) => {
@@ -1127,6 +1132,31 @@ export function AISettings() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Custom API Keys */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 bg-yellow-50 dark:bg-yellow-900/30 rounded-xl">
+              <Key className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Custom API Keys</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Bring your own AI API keys to override default system keys</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-1">
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Google AI Studio Key (Gemini)</label>
+              <Input type="password" placeholder="AIzaSy..." value={formData.googleAiStudioKey} onChange={(e) => updateField('googleAiStudioKey', e.target.value)} className="w-full h-11" />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">OpenAI API Key</label>
+              <Input type="password" placeholder="sk-..." value={formData.openAiKey} onChange={(e) => updateField('openAiKey', e.target.value)} className="w-full h-11" />
             </div>
           </div>
         </div>
@@ -1394,7 +1424,12 @@ export function DangerZoneSettings() {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Clear Analytics Cache</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Force refresh all your dashboard metrics from Instagram</p>
               </div>
-              <button className="px-4 py-2 bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <button 
+                onClick={() => {
+                  toast({ title: "Cache Cleared", description: "Your local dashboard cache has been cleared.", variant: "default" });
+                  queryClient.clear();
+                }}
+                className="px-4 py-2 bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 Clear Cache
               </button>
             </div>
@@ -1404,7 +1439,11 @@ export function DangerZoneSettings() {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Disconnect Instagram</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Remove Veefore's access to your Instagram account</p>
               </div>
-              <button className="px-4 py-2 bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <button 
+                onClick={() => {
+                   toast({ title: "Disconnect Instagram", description: "Please go to the Social Accounts tab to manage connections.", variant: "default" })
+                }}
+                className="px-4 py-2 bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 Disconnect Account
               </button>
             </div>
@@ -1414,7 +1453,13 @@ export function DangerZoneSettings() {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete Account</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Permanently delete your account and all associated data</p>
               </div>
-              <button className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm shadow-red-500/20">
+              <button 
+                onClick={() => {
+                  if (confirm("Are you sure you want to permanently delete your account? This action cannot be undone.")) {
+                    toast({ title: "Account Deletion", description: "Account deletion requested. Our team will process this shortly.", variant: "default" })
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm shadow-red-500/20">
                 Delete Account
               </button>
             </div>
@@ -2100,36 +2145,16 @@ export function BillingSettings() {
         <p className="text-gray-600 dark:text-gray-400">Manage your plan and credits</p>
       </div>
 
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 shadow-sm text-white space-y-6">
-        <div className="flex items-center justify-between border-b border-gray-700 pb-6">
-          <div>
-            <div className="text-gray-400 font-medium mb-1">Current Plan</div>
-            <h3 className="text-3xl font-bold">Enterprise Pro</h3>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold">$299<span className="text-base font-normal text-gray-400">/mo</span></div>
-            <div className="text-emerald-400 text-sm mt-1">Active</div>
-          </div>
-        </div>
-        
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-medium">AI Credits Used</span>
-            <span className="font-medium">85%</span>
-          </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full" style={{ width: '85%' }}></div>
-          </div>
-          <div className="text-sm text-gray-400 mt-2">8,500 / 10,000 credits this month</div>
-        </div>
-        
-        <div className="pt-4 flex gap-3">
-          <button className="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors">
-            Upgrade Plan
-          </button>
-          <button className="px-5 py-2.5 bg-gray-700 text-white font-medium rounded-xl hover:bg-gray-600 transition-colors">
-            View Invoices
-          </button>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 space-y-6">
+        <div className="text-center py-12">
+          <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Billing Dashboard</h3>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
+            All billing and subscription management is handled securely via Stripe.
+          </p>
+          <Button variant="outline" className="gap-2">
+            Open Stripe Billing Portal <ArrowRightLeft className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </div>

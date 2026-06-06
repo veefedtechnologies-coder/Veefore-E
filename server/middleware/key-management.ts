@@ -77,7 +77,7 @@ export function auditEnvironmentVariables(): {
   const warnings: string[] = [];
   const recommendations: string[] = [];
 
-  console.log('🔍 P1-6.1: Starting comprehensive environment variable audit...');
+  // console.log('🔍 P1-6.1: Starting comprehensive environment variable audit...');
 
   for (const secret of SECRETS_INVENTORY) {
     const value = process.env[secret.name];
@@ -149,13 +149,17 @@ export class SecureTokenManager {
   constructor() {
     const key = process.env.TOKEN_ENCRYPTION_KEY;
     if (!key) {
-      if (Date.now() - lastAuditLog > 300000) {
-        console.warn('🚨 TOKEN_ENCRYPTION_KEY not set - generating temporary key');
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('CRITICAL: TOKEN_ENCRYPTION_KEY is required in production');
       }
-      // Generate a secure random key for development
+      if (Date.now() - lastAuditLog > 300000) {
+        console.warn('🚨 TOKEN_ENCRYPTION_KEY not set - generating temporary key for development');
+      }
       this.encryptionKey = randomBytes(32);
     } else {
-      // Use provided key or derive from string
+      if (key.length < 32 && process.env.NODE_ENV === 'production') {
+        throw new Error('CRITICAL: TOKEN_ENCRYPTION_KEY must be at least 32 characters in production');
+      }
       this.encryptionKey = key.length === 64
         ? Buffer.from(key, 'hex')
         : createHash('sha256').update(key).digest();
@@ -173,9 +177,9 @@ export class SecureTokenManager {
     encryptedAt: string;
   }> {
     try {
-      const { createCipher } = await import('crypto');
-      const iv = randomBytes(16);
-      const cipher = createCipher('aes-256-gcm', this.encryptionKey);
+      const { createCipheriv } = await import('crypto');
+      const iv = randomBytes(12); // GCM standard is 96-bit / 12-byte IV
+      const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv);
       cipher.setAAD(iv);
 
       let encrypted = cipher.update(token, 'utf8', 'hex');
@@ -217,11 +221,11 @@ export class SecureTokenManager {
         throw new Error('Invalid token metadata: iv and authTag must be strings');
       }
 
-      const { createDecipher } = await import('crypto');
+      const { createDecipheriv } = await import('crypto');
       const iv = Buffer.from(encryptedData.iv, 'hex');
       const authTag = Buffer.from(encryptedData.authTag, 'hex');
 
-      const decipher = createDecipher('aes-256-gcm', this.encryptionKey);
+      const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
       decipher.setAAD(iv);
       decipher.setAuthTag(authTag);
 
@@ -255,14 +259,26 @@ export class KeyRotationManager {
     this.tokenManager = new SecureTokenManager();
   }
 
+  private rotationTimer: NodeJS.Timeout | null = null;
+
   /**
    * P1-6.3: Schedule automatic key rotation
    */
   initializeKeyRotation() {
     // Run key rotation check every 24 hours
-    setInterval(async () => {
-      await this.performRotationCheck();
+    this.rotationTimer = setInterval(async () => {
+      try {
+        await this.performRotationCheck();
+      } catch (err) {
+        console.error('❌ KEY ROTATION SCHEDULER ERROR:', err);
+      }
     }, 24 * 60 * 60 * 1000);
+
+    const stopRotationTimer = () => {
+      if (this.rotationTimer) clearInterval(this.rotationTimer);
+    };
+    process.on('SIGTERM', stopRotationTimer);
+    process.on('SIGINT', stopRotationTimer);
 
     console.log('🔄 KEY ROTATION: Automatic rotation scheduler initialized');
   }
@@ -339,19 +355,18 @@ export class KeyRotationManager {
   }
 }
 
+let cachedSecretsAudit: any = null;
+
 /**
  * P1-6.4: Secrets validation middleware
  */
 export function secretsValidationMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
     // Add secrets audit info to request for monitoring
-    req.secretsAudit = auditEnvironmentVariables();
-
-    // Warn about missing critical secrets
-    if (req.secretsAudit.missing.length > 0) {
-      console.warn(`🚨 SECRETS: ${req.secretsAudit.missing.length} required secrets missing`);
+    if (!cachedSecretsAudit) {
+      cachedSecretsAudit = auditEnvironmentVariables();
     }
-
+    req.secretsAudit = cachedSecretsAudit;
     next();
   };
 }

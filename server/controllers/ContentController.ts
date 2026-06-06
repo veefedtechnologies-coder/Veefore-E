@@ -54,14 +54,36 @@ export class ContentController extends BaseController {
     this.sendSuccess(res, content);
   });
 
+  getAnalytics = this.wrapAsync(async (
+    req: TypedRequest<{ contentId: string }>,
+    res: Response
+  ) => {
+    const { contentId } = ContentIdParams.parse(req.params);
+    const analytics = await contentService.getContentAnalytics(contentId);
+    this.sendSuccess(res, analytics);
+  });
+
+  debugCounts = this.wrapAsync(async (req: TypedRequest, res: Response) => {
+    const total = await contentRepository.countAll();
+    const veefore = await contentRepository.model.countDocuments({ isImported: { $ne: true }, 'contentData.media_type': { $exists: false } });
+    const importedNew = await contentRepository.model.countDocuments({ isImported: true });
+    const importedOld = await contentRepository.model.countDocuments({ 'contentData.media_type': { $exists: true } });
+    
+    // Check without the legacy check
+    const veeforeNoLegacy = await contentRepository.model.countDocuments({ isImported: { $ne: true } });
+    
+    this.sendSuccess(res, { total, veefore, importedNew, importedOld, veeforeNoLegacy });
+  });
+
   getByWorkspace = this.wrapAsync(async (
-    req: TypedRequest<{ workspaceId: string }, {}, { page?: string; limit?: string; accountId?: string }>,
+    req: TypedRequest<{ workspaceId: string }, {}, { page?: string; limit?: string; accountId?: string; excludeImported?: string }>,
     res: Response
   ) => {
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
     const { page, limit } = PaginationQuery.parse(req.query);
     const accountId = req.query.accountId as string | undefined;
-    const result = await contentService.getContentByWorkspace(workspaceId, page, limit, accountId);
+    const excludeImported = req.query.excludeImported === 'true';
+    const result = await contentService.getContentByWorkspace(workspaceId, page, limit, accountId, excludeImported);
     this.sendPaginated(res, result.data, {
       page: result.page,
       limit: result.limit,
@@ -230,6 +252,16 @@ export class ContentController extends BaseController {
     const { contentId } = ContentIdParams.parse(req.params);
     await contentService.deleteContent(contentId);
     this.sendNoContent(res);
+  });
+
+  syncInstagramId = this.wrapAsync(async (
+    req: TypedRequest<{ contentId: string }>,
+    res: Response
+  ) => {
+    const { contentId } = ContentIdParams.parse(req.params);
+    // User is required via requireAuth middleware
+    const content = await contentService.syncMissingInstagramId(contentId, req.user!.id);
+    this.sendSuccess(res, content, 200, 'Instagram ID synced successfully');
   });
 }
 

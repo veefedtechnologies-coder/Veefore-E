@@ -153,6 +153,7 @@ export class InstagramStealthResponder {
       const responseLength = context?.responseLength || 'medium';
       const language = context?.language || 'auto';
       const contextualMode = context?.contextualMode !== false;
+      const preferredModel = context?.aiModel || 'veegpt-hybrid';
       
       console.log(`[STEALTH] Creating DM response with user config: personality=${personality}, length=${responseLength}, language=${language}`);
       
@@ -311,7 +312,7 @@ export class InstagramStealthResponder {
         contextualMode: true
       };
 
-      const aiResponse = await this.aiGenerator.generateContextualResponse(context, config);
+      const aiResponse = await this.aiGenerator.generateContextualResponse(context, config, preferredModel);
       
       // Make AI response ultra-brief and natural
       let response = this.makeResponseStealth(aiResponse.response);

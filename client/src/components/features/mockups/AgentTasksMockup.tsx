@@ -18,6 +18,7 @@ export const AgentTasksMockup = React.memo(() => {
 
 const TasksContent = () => {
     const isInView = React.useContext(MockupAnimationContext);
+    const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
     return (
         <div className="p-6 h-full flex flex-col">
@@ -37,12 +38,17 @@ const TasksContent = () => {
             </div>
 
             <div className="space-y-3">
-                {[
+                {(isPhase1 ? [
+                    { task: 'Analyzing cross-platform metrics', status: 'running', progress: 75 },
+                    { task: 'Scheduling posts for next week', status: 'done', progress: 100 },
+                    { task: 'Optimizing content strategy', status: 'running', progress: 45 },
+                    { task: 'Generating content ideas', status: 'queued', progress: 0 },
+                ] : [
                     { task: 'Responding to 12 new comments', status: 'running', progress: 75 },
                     { task: 'Scheduling posts for next week', status: 'done', progress: 100 },
                     { task: 'Analyzing competitor strategies', status: 'running', progress: 45 },
                     { task: 'Generating content ideas', status: 'queued', progress: 0 },
-                ].map((item, i) => (
+                ]).map((item, i) => (
                     <motion.div
                         key={i}
                         initial={{ opacity: 0 }}
