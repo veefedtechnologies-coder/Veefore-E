@@ -32,7 +32,7 @@ import { Progress } from '@/components/ui/progress';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useUser } from '@/hooks/useUser';
-import veeforceLogo from '@assets/output-onlinepngtools_1754815000405.png';
+
 import { 
   Video, 
   Play, 
