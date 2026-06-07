@@ -32,7 +32,6 @@ import { Progress } from '@/components/ui/progress';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useUser } from '@/hooks/useUser';
-import veeforceLogo from '@assets/output-onlinepngtools_1754815000405.png';
 import { 
   Video, 
   Play, 
@@ -705,7 +704,7 @@ const VideoGeneratorAdvanced = () => {
          <header className="flex items-center justify-between p-6 border-b border-gray-800">
            <div className="flex items-center gap-4">
              <div className="flex items-center gap-3">
-               <img src={veeforceLogo} alt="VeeFore" className="w-10 h-10 rounded-xl" />
+               <img src="/veefore.svg" alt="VeeFore" className="w-10 h-10 rounded-xl" />
                <div>
                  <h1 className="text-white text-xl font-semibold">Video Studio</h1>
                  <p className="text-gray-400 text-sm">Create AI-powered videos</p>
