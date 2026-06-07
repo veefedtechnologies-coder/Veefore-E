@@ -75,7 +75,7 @@
     "mongoose": "^8.16.2",
     "multer": "^2.0.1",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^7.0.5",
+    "nodemailer": "^8.0.10",
     "openai": "^5.15.0",
     "openid-client": "^6.6.2",
     "passport": "^0.7.0",
@@ -141,6 +141,9 @@
     "sharp": "^0.34.3"
   },
   "overrides": {
-    "minimatch": "^5.0.0"
+    "minimatch": "^5.0.0",
+    "firebase-admin": {
+      "uuid": "^11.1.1"
+    }
   }
 }
