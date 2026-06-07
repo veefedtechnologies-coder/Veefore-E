@@ -8,3 +8,12 @@ export { FeatureUsageSchema, FeatureUsageModel } from './FeatureUsage';
 export type { IFeatureUsage } from './FeatureUsage';
 export { AIUsageLogSchema, AIUsageLogModel } from './AIUsageLog';
 export type { IAIUsageLog } from './AIUsageLog';
+export { ExampleCaptionSchema, ExampleCaptionModel } from './ExampleCaption';
+export type { IExampleCaption } from './ExampleCaption';
+export { ViralPatternModel } from './ViralPattern';
+export type { IViralPattern } from './ViralPattern';
+export { ViralHookModel } from './ViralHook';
+export type { IViralHook } from './ViralHook';
+export { GeneratedCaptionSchema, GeneratedCaptionModel } from './GeneratedCaption';
+export type { IGeneratedCaption, ICaptionVariation } from './GeneratedCaption';
+

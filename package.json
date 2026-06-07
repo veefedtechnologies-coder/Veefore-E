@@ -16,6 +16,10 @@
     "build": "npm run client:build && npm run server:build",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:bug-exploration": "vitest run tests/ai-generation-bug-exploration.test.ts",
     "admin:dev": "cd admin-panel && npm run dev",
     "admin:build": "cd admin-panel && npm run build",
     "admin:start": "cd admin-panel && npm run start"
@@ -125,9 +129,14 @@
     "@types/passport-local": "^1.0.38",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^7.2.0",
     "@types/ws": "^8.18.1",
+    "@vitest/ui": "^4.1.8",
+    "fast-check": "^4.8.0",
     "selfsigned": "^3.0.1",
-    "tsx": "^4.20.3"
+    "supertest": "^7.2.2",
+    "tsx": "^4.20.3",
+    "vitest": "^4.1.8"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8",

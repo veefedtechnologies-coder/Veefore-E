@@ -15,6 +15,7 @@ import webhooksRoutes from './webhooks.routes';
 import healthRoutes from './health.routes';
 import activityRoutes from './activity.routes';
 import socialAuthRoutes from './social-auth.routes';
+import voiceProfileRoutes from './voice-profile.routes';
 
 export { default as authRoutes } from './auth.routes';
 export { default as userRoutes } from './user.routes';
@@ -33,6 +34,7 @@ export { default as healthRoutes } from './health.routes';
 import { default as earlyAccessRoutes } from './early-access.routes';
 
 export { default as activityRoutes } from './activity.routes';
+export { default as voiceProfileRoutes } from './voice-profile.routes';
 
 export function mountV1Routes(app: Application, basePath: string = '/api/v1'): void {
   app.use(`${basePath}/auth`, authRoutes);
@@ -44,6 +46,7 @@ export function mountV1Routes(app: Application, basePath: string = '/api/v1'): v
   app.use(`${basePath}/social-auth`, socialAuthRoutes);
   app.use(`${basePath}/scheduler`, schedulerRoutes);
   app.use(`${basePath}/ai`, aiRoutes);
+  app.use(`${basePath}/voice-profile`, voiceProfileRoutes);
   app.use(`${basePath}/thumbnails`, thumbnailsRoutes);
   app.use(`${basePath}/trends`, trendsRoutes);
   app.use(`${basePath}/automation`, automationRoutes);
@@ -64,6 +67,7 @@ v1Router.use('/social-accounts', socialAccountRoutes);
 v1Router.use('/social-auth', socialAuthRoutes);
 v1Router.use('/scheduler', schedulerRoutes);
 v1Router.use('/ai', aiRoutes);
+v1Router.use('/voice-profile', voiceProfileRoutes);
 v1Router.use('/thumbnails', thumbnailsRoutes);
 v1Router.use('/trends', trendsRoutes);
 v1Router.use('/automation', automationRoutes);

@@ -999,6 +999,15 @@ export function AISettings() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   
+  // Get current workspace context and workspaceId
+  const { currentWorkspaceId, currentWorkspace, isLoading: workspaceLoading } = useCurrentWorkspace()
+  
+  // Use currentWorkspace directly instead of fetching again
+  // This avoids the 401 error and uses already-loaded data
+  const workspace = currentWorkspace
+  const workspaceDataLoading = workspaceLoading
+  const workspaceError = null
+  
   const [formData, setFormData] = useState({
     aiModel: 'veegpt-hybrid',
     creativityLevel: 0.7,
@@ -1017,53 +1026,175 @@ export function AISettings() {
     openAiKey: ''
   })
 
-  // Sync state when userData loads
+  // Sync state when workspace loads - Task 5.2: Update form initialization to read from workspace.aiConfiguration
   useEffect(() => {
-    if (userData?.preferences) {
+    console.log('[AISettings] Workspace data loaded:', workspace);
+    console.log('[AISettings] aiConfiguration:', workspace?.aiConfiguration);
+    
+    if (workspace?.aiConfiguration) {
+      console.log('[AISettings] Loading AI configuration from workspace');
       setFormData(prev => ({
         ...prev,
-        aiModel: userData.preferences.aiModel || 'veegpt-hybrid',
-        creativityLevel: userData.preferences.creativityLevel ?? 0.7,
-        optimizationGoals: userData.preferences.optimizationGoals || 'Engagement',
-        aiPersona: userData.preferences.aiPersona || 'Professional & Authoritative',
-        captionStyle: userData.preferences.captionStyle || 'Storytelling',
-        responseLength: userData.preferences.responseLength || 'medium',
-        multilingual: userData.preferences.multilingual || 'auto',
-        videoEngine: userData.preferences.videoEngine || 'cinematic',
-        thumbnailStyle: userData.preferences.thumbnailStyle || 'realistic',
-        autoHashtags: userData.preferences.autoHashtags !== false,
-        contentSafety: userData.preferences.contentSafety || 'standard',
-        aiMemory: userData.preferences.aiMemory || 'long-term',
-        autoLearning: userData.preferences.autoLearning !== false,
-        googleAiStudioKey: userData.preferences.googleAiStudioKey || '',
-        openAiKey: userData.preferences.openAiKey || ''
+        aiModel: workspace.aiConfiguration.aiModel || 'veegpt-hybrid',
+        creativityLevel: workspace.aiConfiguration.creativityLevel ?? 0.7,
+        optimizationGoals: workspace.aiConfiguration.optimizationGoals || 'Engagement',
+        aiPersona: workspace.aiConfiguration.aiPersona || 'Professional & Authoritative',
+        captionStyle: workspace.aiConfiguration.captionStyle || 'Storytelling',
+        responseLength: workspace.aiConfiguration.responseLength || 'medium',
+        multilingual: workspace.aiConfiguration.multilingual || 'auto',
+        videoEngine: workspace.aiConfiguration.videoEngine || 'cinematic',
+        thumbnailStyle: workspace.aiConfiguration.thumbnailStyle || 'realistic',
+        autoHashtags: workspace.aiConfiguration.autoHashtags ?? true,
+        contentSafety: workspace.aiConfiguration.contentSafety || 'standard',
+        aiMemory: workspace.aiConfiguration.aiMemory || 'long-term',
+        autoLearning: workspace.aiConfiguration.autoLearning ?? true,
+        googleAiStudioKey: workspace.aiConfiguration.googleAiStudioKey || '',
+        openAiKey: workspace.aiConfiguration.openAiKey || ''
       }))
+    } else {
+      console.log('[AISettings] No aiConfiguration in workspace, using defaults');
     }
-  }, [userData])
+  }, [workspace])
 
-  const updatePreferencesMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/user', { method: 'PATCH', body: JSON.stringify(data) }),
+  // Task 5.3: Create new mutation for workspace AI config update
+  const updateAIConfigMutation = useMutation({
+    mutationFn: (data: any) => {
+      if (!currentWorkspaceId) {
+        throw new Error('No workspace ID available')
+      }
+      return apiRequest(`/api/workspaces/${currentWorkspaceId}`, { 
+        method: 'PUT', 
+        body: JSON.stringify({ aiConfiguration: data }) 
+      })
+    },
     onSuccess: () => {
-      toast({ title: "AI Preferences Saved", description: "Your global AI configuration has been updated successfully." })
+      toast({ 
+        title: "AI Configuration Saved", 
+        description: "Your workspace AI settings have been updated successfully." 
+      })
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces', currentWorkspaceId] })
       queryClient.invalidateQueries({ queryKey: ['/api/user'] })
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to save AI preferences", variant: "destructive" })
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to save AI configuration", 
+        variant: "destructive" 
+      })
     }
   })
 
+  // Task 5.4: Update handleSave to use new mutation with workspaceId validation
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    updatePreferencesMutation.mutate({
-      preferences: {
-        ...(userData?.preferences || {}),
-        ...formData
-      }
-    })
+    
+    // Task 5.5: Add workspaceId validation before submitting
+    if (!currentWorkspaceId) {
+      toast({ 
+        title: "Error", 
+        description: "No active workspace found. Please select a workspace.", 
+        variant: "destructive" 
+      })
+      return
+    }
+    
+    updateAIConfigMutation.mutate(formData)
   }
 
   const updateField = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  }
+
+  // Validate workspaceId availability - show error if not available
+  if (!currentWorkspaceId && !workspaceLoading) {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">AI Configuration</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-lg max-w-2xl">Enterprise-grade controls for the VeeGPT intelligence engine.</p>
+        </div>
+        
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 md:p-8">
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl">
+              <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+                No Workspace Available
+              </h3>
+              <p className="text-red-700 dark:text-red-300 mb-4">
+                AI Configuration requires an active workspace. Please create or select a workspace to continue.
+              </p>
+              <Button
+                onClick={() => window.location.href = '/workspaces'}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Building2 className="w-4 h-4 mr-2" />
+                Go to Workspaces
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state while workspace is being fetched
+  if (workspaceLoading || workspaceDataLoading) {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">AI Configuration</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-lg max-w-2xl">Loading workspace settings...</p>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-4">
+            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Loading Configuration</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Please wait while we fetch your workspace settings...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state if workspace query fails
+  if (workspaceError) {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">AI Configuration</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-lg max-w-2xl">Enterprise-grade controls for the VeeGPT intelligence engine.</p>
+        </div>
+        
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 md:p-8">
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl">
+              <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+                Failed to Load Workspace
+              </h3>
+              <p className="text-red-700 dark:text-red-300 mb-4">
+                {workspaceError instanceof Error ? workspaceError.message : 'Unable to load workspace data. Please try again.'}
+              </p>
+              <Button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/workspaces', currentWorkspaceId] })}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -1333,9 +1464,14 @@ export function AISettings() {
         </div>
 
         <div className="flex justify-end pt-4 sticky bottom-6 z-10">
-          <Button type="submit" disabled={updatePreferencesMutation.isPending} className="flex items-center gap-2 px-8 h-12 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 font-semibold rounded-xl transition-colors shadow-lg">
-            {updatePreferencesMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            {updatePreferencesMutation.isPending ? "Saving configuration..." : "Save AI Configuration"}
+          {/* Task 5.5: Add loading and error states */}
+          <Button 
+            type="submit" 
+            disabled={updateAIConfigMutation.isPending || !currentWorkspaceId || workspaceDataLoading} 
+            className="flex items-center gap-2 px-8 h-12 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 font-semibold rounded-xl transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {updateAIConfigMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            {updateAIConfigMutation.isPending ? "Saving configuration..." : "Save AI Configuration"}
           </Button>
         </div>
       </form>
@@ -1405,6 +1541,9 @@ export function SecurityPrivacySettings() {
 }
 
 export function DangerZoneSettings() {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>

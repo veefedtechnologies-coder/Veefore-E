@@ -31,6 +31,23 @@ const UpdateWorkspaceSchema = z.object({
   avatar: z.string().url().optional(),
   theme: z.string().max(50).optional(),
   aiPersonality: z.string().max(50).optional(),
+  aiConfiguration: z.object({
+    aiModel: z.string().optional(),
+    creativityLevel: z.number().min(0).max(1).optional(),
+    optimizationGoals: z.string().optional(),
+    aiPersona: z.string().optional(),
+    captionStyle: z.string().optional(),
+    responseLength: z.string().optional(),
+    multilingual: z.string().optional(),
+    videoEngine: z.string().optional(),
+    thumbnailStyle: z.string().optional(),
+    autoHashtags: z.boolean().optional(),
+    contentSafety: z.string().optional(),
+    aiMemory: z.string().optional(),
+    autoLearning: z.boolean().optional(),
+    googleAiStudioKey: z.string().optional(),
+    openAiKey: z.string().optional(),
+  }).optional(),
 });
 
 const SetDefaultSchema = z.object({

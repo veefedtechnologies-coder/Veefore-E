@@ -428,16 +428,23 @@ export function CreatePost() {
         mediaType = firstMediaFile.type.startsWith('video/') ? 'video' : 'image';
       }
 
-      const mediaUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : undefined;
+      let mediaUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : undefined;
+      
+      // Convert relative URLs to absolute URLs
+      if (mediaUrl && !mediaUrl.startsWith('http')) {
+        const baseUrl = window.location.origin;
+        mediaUrl = `${baseUrl}${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
+      }
 
       const requestBody: Record<string, any> = {
-        mediaType,
         postType,
         platform: 'instagram',
         workspaceId: currentWorkspace.id
       };
-      if (mediaUrl) requestBody.mediaUrl = mediaUrl;
-      if (postContent) requestBody.existingCaption = postContent;
+      // Only include fields with valid values
+      if (mediaType) requestBody.mediaType = mediaType;
+      if (mediaUrl && mediaUrl.trim()) requestBody.mediaUrl = mediaUrl; // Ensure it's not empty
+      if (postContent && postContent.trim()) requestBody.existingCaption = postContent;
 
       const response = await apiRequest('/api/v1/ai/generate-content', {
         method: 'POST',
@@ -445,13 +452,45 @@ export function CreatePost() {
         body: JSON.stringify(requestBody)
       });
 
+      // [DIAGNOSTIC LOGGING - Task 1: Bug Condition Exploration]
+      console.log('[AI GENERATE DEBUG] Full response:', JSON.stringify(response, null, 2));
+      console.log('[AI GENERATE DEBUG] Response type:', typeof response);
+      console.log('[AI GENERATE DEBUG] response.success:', response?.success);
+
+      // [DEFENSIVE RESPONSE VALIDATION - Task 3.1]
+      if (!response) {
+        console.error('[AI GENERATE ERROR] Empty response received');
+        throw new Error('Empty response from server');
+      }
+      if (typeof response !== 'object') {
+        console.error('[AI GENERATE ERROR] Invalid response type:', typeof response);
+        throw new Error('Invalid response format');
+      }
+
+      console.log('[AI GENERATE DEBUG] About to check response.success');
+
       if (response.success) {
-        setAiGeneratedData({
-          caption: response.caption,
-          hashtags: response.hashtags,
-          engagementScore: response.engagementScore,
-          viralityScore: response.viralityScore,
-          ctaRecommendation: response.ctaRecommendation
+        console.log('[AI GENERATE DEBUG] Inside success block, setting state with:', {
+          caption: response.caption?.substring(0, 50),
+          hashtagCount: response.hashtags?.length
+        });
+
+        setAiGeneratedData(prev => {
+          console.log('[AI GENERATE DEBUG] State update callback, prev:', prev);
+          const newData = {
+            caption: response.caption,
+            hashtags: response.hashtags,
+            engagementScore: response.engagementScore,
+            viralityScore: response.viralityScore,
+            ctaRecommendation: response.ctaRecommendation
+          };
+          console.log('[AI GENERATE DEBUG] New state data:', {
+            hasCaption: !!newData.caption,
+            hashtagCount: newData.hashtags?.length,
+            engagementScore: newData.engagementScore,
+            viralityScore: newData.viralityScore
+          });
+          return newData;
         });
 
         toast({

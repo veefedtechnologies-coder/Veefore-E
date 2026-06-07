@@ -94,6 +94,23 @@ export interface Workspace {
   isDefault: boolean;
   maxTeamMembers: number;
   inviteCode?: string;
+  aiConfiguration?: {
+    aiModel?: string;
+    creativityLevel?: number;
+    optimizationGoals?: string;
+    aiPersona?: string;
+    captionStyle?: string;
+    responseLength?: string;
+    multilingual?: string;
+    videoEngine?: string;
+    thumbnailStyle?: string;
+    autoHashtags?: boolean;
+    contentSafety?: string;
+    aiMemory?: string;
+    autoLearning?: boolean;
+    googleAiStudioKey?: string;
+    openAiKey?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,6 +126,23 @@ export interface InsertWorkspace {
   isDefault?: boolean;
   maxTeamMembers?: number;
   inviteCode?: string;
+  aiConfiguration?: {
+    aiModel?: string;
+    creativityLevel?: number;
+    optimizationGoals?: string;
+    aiPersona?: string;
+    captionStyle?: string;
+    responseLength?: string;
+    multilingual?: string;
+    videoEngine?: string;
+    thumbnailStyle?: string;
+    autoHashtags?: boolean;
+    contentSafety?: string;
+    aiMemory?: string;
+    autoLearning?: boolean;
+    googleAiStudioKey?: string;
+    openAiKey?: string;
+  };
 }
 
 // ============================================================================
@@ -1160,4 +1194,268 @@ export interface InsertConversationContext {
   contextValue: string;
   confidence?: number;
   expiresAt?: Date;
+}
+
+// ============================================================================
+// VIRAL PATTERN TYPES
+// ============================================================================
+export interface ViralPattern {
+  id: string;
+  
+  // Pattern Details
+  name: string;                    // e.g., "Story-Insight-Question"
+  category: 'hook' | 'structure' | 'engagement' | 'storytelling';
+  pattern: string;                 // Template with placeholders
+  description: string;
+  
+  // Targeting
+  niches: string[];               // fitness, food, travel, etc.
+  postTypes: ('post' | 'story' | 'reel')[];
+  
+  // Performance
+  avgEngagementRate: number;      // Historical average
+  usageCount: number;             // How many times used
+  successRate: number;            // % of times it performed well
+  
+  // Examples
+  exampleCaptions: string[];      // Real captions using this pattern
+  
+  // Metadata
+  trending: boolean;              // Currently trending
+  lastUsed?: Date;
+  createdAt: Date;
+}
+
+export interface InsertViralPattern {
+  name: string;
+  category: 'hook' | 'structure' | 'engagement' | 'storytelling';
+  pattern: string;
+  description: string;
+  niches: string[];
+  postTypes: ('post' | 'story' | 'reel')[];
+  avgEngagementRate?: number;
+  usageCount?: number;
+  successRate?: number;
+  exampleCaptions?: string[];
+  trending?: boolean;
+}
+
+export interface ViralHook {
+  id: string;
+  hookText: string;               // e.g., "Hot take:", "POV:"
+  niche: string;
+  avgEngagementBoost: number;     // % increase in engagement
+  usageCount: number;
+  createdAt: Date;
+}
+
+export interface InsertViralHook {
+  hookText: string;
+  niche: string;
+  avgEngagementBoost?: number;
+  usageCount?: number;
+}
+
+// ============================================================================
+// AUTHENTIC INSTAGRAM CAPTION GENERATION TYPES
+// ============================================================================
+
+// Niche Context Types
+export interface NicheContext {
+  id: string;
+  niche: string;
+  
+  // Language
+  vocabulary: string[];
+  slangTerms: Record<string, string>;
+  culturalReferences: string[];
+  
+  // Trends (last 30 days)
+  trendingTopics: string[];
+  trendingHashtags: string[];
+  trendingPhrases: string[];
+  
+  // Style
+  typicalEmojis: string[];
+  toneGuidelines: string;
+  
+  // Metadata
+  lastUpdated: Date;
+}
+
+// Hashtag Performance Types
+export interface HashtagPerformance {
+  id: string;
+  hashtag: string;
+  niche: string;
+  
+  // Usage tracking
+  usageCount: number;
+  lastUsedAt: Date;
+  
+  // Performance metrics (aggregated)
+  totalImpressions: number;
+  totalReach: number;
+  totalLikes: number;
+  totalComments: number;
+  totalSaves: number;
+  totalShares: number;
+  
+  // Calculated metrics
+  avgEngagementRate: number;
+  avgDiscoverability: number;
+  avgRankingPosition: number;
+  
+  // Competition estimate
+  estimatedCompetition: 'high' | 'medium' | 'low';
+  estimatedPostCount: number;
+  
+  // Performance by post type
+  performanceByType: {
+    post: {
+      count: number;
+      avgEngagementRate: number;
+    };
+    story: {
+      count: number;
+      avgEngagementRate: number;
+    };
+    reel: {
+      count: number;
+      avgEngagementRate: number;
+    };
+  };
+  
+  // Individual usage records
+  usageHistory: Array<{
+    postId: string;
+    postType: 'post' | 'story' | 'reel';
+    impressions: number;
+    reach: number;
+    engagementRate: number;
+    recordedAt: Date;
+  }>;
+  
+  // Metadata
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertNicheContext {
+  niche: string;
+  vocabulary?: string[];
+  slangTerms?: Record<string, string>;
+  culturalReferences?: string[];
+  trendingTopics?: string[];
+  trendingHashtags?: string[];
+  trendingPhrases?: string[];
+  typicalEmojis?: string[];
+  toneGuidelines?: string;
+}
+
+// ============================================================================
+// EXAMPLE CAPTION TYPES
+// ============================================================================
+export interface ExampleCaption {
+  id: string;
+  caption: string;
+  
+  // Source
+  source: 'user' | 'curated' | 'scraped';
+  sourceAccount?: string;
+  userId?: string;
+  
+  // Classification
+  niche: string;
+  postType: 'post' | 'story' | 'reel';
+  style: string;
+  
+  // Performance
+  engagementRate: number;
+  likes: number;
+  comments: number;
+  saves: number;
+  shares: number;
+  
+  // Characteristics
+  captionLength: number;
+  hookType: string;
+  hasQuestion: boolean;
+  hasEmoji: boolean;
+  emojiCount: number;
+  
+  // Metadata
+  capturedAt: Date;
+  verified: boolean;
+}
+
+export interface InsertExampleCaption {
+  caption: string;
+  source: 'user' | 'curated' | 'scraped';
+  sourceAccount?: string;
+  userId?: string;
+  niche: string;
+  postType: 'post' | 'story' | 'reel';
+  style: string;
+  engagementRate: number;
+  likes?: number;
+  comments?: number;
+  saves?: number;
+  shares?: number;
+  captionLength: number;
+  hookType?: string;
+  hasQuestion?: boolean;
+  hasEmoji?: boolean;
+  emojiCount?: number;
+  verified?: boolean;
+}
+
+// ============================================================================
+// ENGAGEMENT PREDICTION TYPES
+// ============================================================================
+export interface EngagementPrediction {
+  // Predicted Rates
+  predictedLikeRate: number;     // %
+  predictedCommentRate: number;  // %
+  predictedSaveRate: number;     // %
+  predictedShareRate: number;    // %
+  
+  // Confidence
+  confidence: number;  // 0-1
+  
+  // Contributing Factors
+  factors: {
+    hookStrength: number;        // 0-10
+    readabilityScore: number;    // 0-10
+    ctaClarity: number;          // 0-10
+    emotionalResonance: number;  // 0-10
+    lengthOptimality: number;    // 0-10
+    trendingTopicBonus: number;  // 0-10
+  };
+  
+  // Comparison
+  vsUserAverage: number;  // % difference from user's avg
+  
+  // Performance Flag (Requirements 9.3, 9.6)
+  performanceFlag?: {
+    isBelowAverage: boolean;
+    severity: 'none' | 'minor' | 'moderate' | 'major';
+    suggestions: string[];
+    weakestFactors: Array<{ factor: string; score: number; suggestion: string }>;
+  };
+}
+
+export interface UserAverageMetrics {
+  avgLikeRate: number;
+  avgCommentRate: number;
+  avgSaveRate: number;
+  avgShareRate: number;
+}
+
+export interface ActualPerformanceMetrics {
+  likes: number;
+  comments: number;
+  saves: number;
+  shares: number;
+  impressions: number;
 }
