@@ -108,6 +108,7 @@
     "workbox-window": "^7.4.0",
     "wouter": "^3.9.0",
     "ws": "^8.18.3",
+    "yt-search": "^2.13.1",
     "zod": "^3.25.76",
     "zod-validation-error": "^3.5.2"
   },
@@ -127,6 +128,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
+    "agentation": "^3.0.2",
     "selfsigned": "^3.0.1",
     "tsx": "^4.20.3"
   },
