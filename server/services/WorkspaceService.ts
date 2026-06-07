@@ -17,6 +17,23 @@ interface UpdateWorkspaceInput {
   avatar?: string;
   theme?: string;
   aiPersonality?: string;
+  aiConfiguration?: {
+    aiModel?: string;
+    creativityLevel?: number;
+    optimizationGoals?: string;
+    aiPersona?: string;
+    captionStyle?: string;
+    responseLength?: string;
+    multilingual?: string;
+    videoEngine?: string;
+    thumbnailStyle?: string;
+    autoHashtags?: boolean;
+    contentSafety?: string;
+    aiMemory?: string;
+    autoLearning?: boolean;
+    googleAiStudioKey?: string;
+    openAiKey?: string;
+  };
 }
 
 export class WorkspaceService extends BaseService {

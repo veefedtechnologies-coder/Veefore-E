@@ -100,3 +100,8 @@ export {
   WaitlistUserRepository,
   waitlistUserRepository,
 } from './WaitlistUserRepository';
+
+export {
+  GeneratedCaptionRepository,
+  generatedCaptionRepository,
+} from './GeneratedCaptionRepository';

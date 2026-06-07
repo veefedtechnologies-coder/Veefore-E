@@ -127,7 +127,8 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
   const pathname = (() => {
     try { const u = new URL(url); return u.pathname || '' } catch { return url }
   })()
-  if (pathname.includes('/api/user') || pathname.includes('/api/social-accounts') || pathname.includes('/api/workspaces') || pathname.includes('/api/content')) {
+  // [AI CONTENT UI DISPLAY FIX - Task 3.2] Increase timeout for AI endpoints
+  if (pathname.includes('/api/user') || pathname.includes('/api/social-accounts') || pathname.includes('/api/workspaces') || pathname.includes('/api/content') || pathname.includes('/api/v1/ai')) {
     timeoutMs = 60000
   }
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
@@ -150,7 +151,12 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
 
   const contentType = response.headers.get('content-type')
   if (contentType && contentType.includes('application/json')) {
-    return response.json()
+    const data = await response.json();
+    // [DIAGNOSTIC LOGGING - Task 1: Bug Condition Exploration]
+    console.log('[apiRequest DEBUG] Parsed JSON data:', data);
+    console.log('[apiRequest DEBUG] Data type:', typeof data);
+    console.log('[apiRequest DEBUG] Has success property:', 'success' in data);
+    return data;
   }
 
   return response.text()

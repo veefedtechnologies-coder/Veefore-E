@@ -186,6 +186,7 @@ export function convertWorkspace(mongoWorkspace: any): Workspace {
     isDefault: mongoWorkspace.isDefault || false,
     maxTeamMembers: mongoWorkspace.maxTeamMembers || 1,
     inviteCode: mongoWorkspace.inviteCode || null,
+    aiConfiguration: mongoWorkspace.aiConfiguration || undefined,
     createdAt: mongoWorkspace.createdAt,
     updatedAt: mongoWorkspace.updatedAt
   };

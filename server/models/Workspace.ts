@@ -27,6 +27,23 @@ export interface IWorkspace extends mongoose.Document {
       maxBackoffTime: number; // milliseconds
     };
   };
+  aiConfiguration?: {
+    aiModel?: string;
+    creativityLevel?: number;
+    optimizationGoals?: string;
+    aiPersona?: string;
+    captionStyle?: string;
+    responseLength?: string;
+    multilingual?: string;
+    videoEngine?: string;
+    thumbnailStyle?: string;
+    autoHashtags?: boolean;
+    contentSafety?: string;
+    aiMemory?: string;
+    autoLearning?: boolean;
+    googleAiStudioKey?: string;
+    openAiKey?: string;
+  };
   lastActivity: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -121,6 +138,70 @@ const WorkspaceSchema = new mongoose.Schema({
         type: Number,
         default: 30000 // 30 seconds
       }
+    }
+  },
+  aiConfiguration: {
+    aiModel: {
+      type: String,
+      default: 'veegpt-hybrid'
+    },
+    creativityLevel: {
+      type: Number,
+      default: 0.7,
+      min: 0,
+      max: 1
+    },
+    optimizationGoals: {
+      type: String,
+      default: 'Engagement'
+    },
+    aiPersona: {
+      type: String,
+      default: 'Professional & Authoritative'
+    },
+    captionStyle: {
+      type: String,
+      default: 'Storytelling'
+    },
+    responseLength: {
+      type: String,
+      default: 'medium'
+    },
+    multilingual: {
+      type: String,
+      default: 'auto'
+    },
+    videoEngine: {
+      type: String,
+      default: 'cinematic'
+    },
+    thumbnailStyle: {
+      type: String,
+      default: 'realistic'
+    },
+    autoHashtags: {
+      type: Boolean,
+      default: true
+    },
+    contentSafety: {
+      type: String,
+      default: 'standard'
+    },
+    aiMemory: {
+      type: String,
+      default: 'long-term'
+    },
+    autoLearning: {
+      type: Boolean,
+      default: true
+    },
+    googleAiStudioKey: {
+      type: String,
+      default: ''
+    },
+    openAiKey: {
+      type: String,
+      default: ''
     }
   },
   lastActivity: {

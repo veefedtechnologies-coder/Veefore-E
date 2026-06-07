@@ -1,0 +1,160 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - Optional MediaType Validation Failure
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the validation bug exists
+  - **Scoped PBT Approach**: Scope the property to requests with `mediaType` as `undefined`, `null`, or omitted
+  - Test that POST `/api/v1/ai/generate-content` with `mediaType: undefined` fails with HTTP 400 on unfixed code
+  - Test that POST `/api/v1/ai/generate-content` with `mediaType: null` fails with HTTP 400 on unfixed code
+  - Test that POST `/api/v1/ai/generate-content` with mediaType field omitted fails with HTTP 400 on unfixed code
+  - Test that error message contains "Invalid body data" from Zod validation
+  - The test assertions should verify requests are accepted (200/202 status) after fix
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists)
+  - Document counterexamples found: specific request payloads and validation error messages
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Explicit MediaType Behavior
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for requests with explicit `mediaType: 'image'` or `mediaType: 'video'`
+  - Observe that requests with `mediaType: 'image'` and `mediaUrl` successfully generate captions on unfixed code
+  - Observe that requests with `mediaType: 'video'` and `mediaUrl` successfully trigger video analysis on unfixed code
+  - Observe that credit deduction occurs correctly for all valid media type requests on unfixed code
+  - Write property-based tests capturing observed behavior patterns:
+    - For all requests with explicit `mediaType: 'image'`, system returns successful caption generation
+    - For all requests with explicit `mediaType: 'video'`, system performs video analysis
+    - For all valid requests, credit checking and deduction work correctly
+    - For all requests, workspace permission validation continues working
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10_
+
+- [x] 3. Fix for AI Caption & Hashtag Generation System validation and enhancement
+
+  - [x] 3.1 Fix Zod schema validation to handle optional mediaType
+    - Update `GenerateContentSchema` in `server/routes/v1/ai.routes.ts`
+    - Replace `.optional().nullable()` with `.nullish()` for mediaType field
+    - Add `inferMediaTypeFromUrl()` helper function to infer media type from URL extensions
+    - Add `.preprocess()` to schema to normalize data before validation (infer mediaType from mediaUrl when missing)
+    - Test that schema accepts `mediaType: undefined`, `mediaType: null`, and omitted mediaType
+    - Test that schema still validates mediaType must be 'image' or 'video' when explicitly provided
+    - _Bug_Condition: isBugCondition(request) where request.body.mediaType === undefined OR request.body.mediaType === null_
+    - _Expected_Behavior: Requests with optional or missing mediaType are accepted and processed successfully (Property 1 from design)_
+    - _Preservation: Requests with explicit mediaType ('image' or 'video') continue to be validated and processed exactly as before (Preservation Requirements from design)_
+    - _Requirements: 2.1, 2.2, 2.3, 3.1_
+
+  - [x] 3.2 Enhance buildUserPrompt to incorporate trending data
+    - Modify `buildUserPrompt()` method in `server/ai-content-generator.ts`
+    - Check if `insights.trending.viralHooks` exists and has content
+    - Add section to user prompt: "Consider these proven viral hooks for your niche: [viralHooks]"
+    - Suggest incorporating one viral hook naturally into the caption structure
+    - Ensure prompt building handles cases where trending data is undefined
+    - Test that prompts include viral hooks when available
+    - Test that prompts work without error when trending data is missing
+    - _Expected_Behavior: System incorporates viral hooks into caption prompts to increase engagement (Property 3 from design)_
+    - _Preservation: System prompt building continues to respect user preferences (AI persona, caption style, content niche, creativity level) (Preservation Requirements from design)_
+    - _Requirements: 2.4, 3.6_
+
+  - [x] 3.3 Enhance hashtag generation to prioritize trending hashtags
+    - Modify hashtag generation logic in `server/ai-content-generator.ts`
+    - Include `insights.trending.hashtags` in the hashtag generation prompt
+    - Instruct OpenAI to prioritize trending tags while maintaining relevance
+    - Ensure mix of trending + niche + evergreen hashtags (15-20 total)
+    - Test that trending hashtags appear in results when available
+    - Test that hashtag generation maintains proper count and format
+    - _Expected_Behavior: System prioritizes trending hashtags in generation to increase discoverability (Property 3 from design)_
+    - _Preservation: Hashtag generation returns 15-20 hashtags mixing high-volume and niche tags (Preservation Requirements from design)_
+    - _Requirements: 2.5, 3.7_
+
+  - [x] 3.4 Implement caching for trending data
+    - Add in-memory caching layer in `server/ai-content-generator.ts`
+    - Create private cache object: `Map<string, { data: any, timestamp: number }>`
+    - Implement cache check in `getTrendingData()` before returning curated data
+    - Set 1-hour expiration (3600000ms) for cache entries
+    - Return cached data if fresh, otherwise fetch/generate new data
+    - Add cache key format: `${niche}_${platform}` for different combinations
+    - Test that repeated calls within 1 hour return cached data
+    - Test that calls after 1 hour fetch fresh data
+    - Test that different niche/platform combinations maintain separate cache entries
+    - _Expected_Behavior: System uses cached trending data to reduce latency and prevent rate limiting (Property 4 from design)_
+    - _Preservation: Trending data content and format remain unchanged (Preservation Requirements from design)_
+    - _Requirements: 2.7_
+
+  - [x] 3.5 Add real-time trend API integration structure
+    - Create placeholder method `fetchRealTimeTrends(niche: string, platform: string)` in `server/ai-content-generator.ts`
+    - Document integration points for trend APIs (Twitter API, Instagram Graph API, TikTok Trends API)
+    - Add API endpoint configuration in environment variables (prepare for future integration)
+    - Return curated data as fallback when API unavailable or errors occur
+    - Add error handling for API rate limits and network failures
+    - Test that system gracefully falls back to curated data when API unavailable
+    - _Expected_Behavior: System prepares for real-time trend API integration while maintaining stability (Property 3 from design)_
+    - _Preservation: Existing trending data behavior continues working with curated data (Preservation Requirements from design)_
+    - _Requirements: 2.6_
+
+  - [x] 3.6 Improve error handling for missing OpenAI API key
+    - Add early API key validation in `generateContent()` method in `server/ai-content-generator.ts`
+    - Check for `process.env.OPENAI_API_KEY` presence before credit deduction
+    - Return 503 error with user-friendly message: "AI service is not configured. Please contact support."
+    - Add `requiresSetup: true` flag in error response for frontend handling
+    - Prevent credit deduction when service is misconfigured
+    - Update `/api/v1/ai/generate-content` endpoint handler in `server/routes/v1/ai.routes.ts`
+    - Test that missing API key returns 503 with clear error message
+    - Test that no credits are deducted when API key is missing
+    - _Expected_Behavior: System returns user-friendly error messages when configuration issues occur (Property 5 from design)_
+    - _Preservation: OpenAI API interaction patterns for valid configurations remain unchanged (Preservation Requirements from design)_
+    - _Requirements: 2.8_
+
+  - [x] 3.7 Add comprehensive logging throughout generation pipeline
+    - Add structured logging format: `[AI CONTENT][PHASE] Message: { context }`
+    - Log start of generation with full parameters (excluding sensitive data) in `generateContent()` method
+    - Log execution time for each phase: insights fetching, media analysis, caption generation, hashtag generation
+    - Log errors with full context including userId, workspaceId, operation name, error stack
+    - Add request logging in `/api/v1/ai/generate-content` endpoint handler
+    - Log successful generation metrics: caption length, hashtag count, engagement scores
+    - Ensure sensitive data (API keys, user tokens) is never logged
+    - Test that all major operations log start, completion, and timing
+    - Test that errors log full context for debugging
+    - _Expected_Behavior: System logs detailed contextual information for debugging (Property 5 from design)_
+    - _Preservation: Existing OpenAI API calls and response formatting remain unchanged (Preservation Requirements from design)_
+    - _Requirements: 2.9_
+
+  - [x] 3.8 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Optional MediaType Validation Success
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - Verify POST `/api/v1/ai/generate-content` with `mediaType: undefined` now returns 200/202
+    - Verify POST `/api/v1/ai/generate-content` with `mediaType: null` now returns 200/202
+    - Verify POST `/api/v1/ai/generate-content` with mediaType omitted now returns 200/202
+    - Verify content generation completes successfully for all optional mediaType cases
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - _Requirements: 2.1, 2.2, 2.3 (Expected Behavior Properties from design)_
+
+  - [x] 3.9 Verify preservation tests still pass
+    - **Property 2: Preservation** - Explicit MediaType Behavior Preserved
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - Verify requests with `mediaType: 'image'` produce identical behavior as before
+    - Verify requests with `mediaType: 'video'` produce identical behavior as before
+    - Verify credit checking and deduction logic remains unchanged
+    - Verify workspace permission validation continues working
+    - Confirm all tests still pass after fix (no regressions)
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Run complete test suite including unit tests, property-based tests, and integration tests
+  - Verify bug condition test passes (optional mediaType accepted)
+  - Verify preservation tests pass (explicit mediaType behavior unchanged)
+  - Verify trending data integration tests pass (viral hooks and hashtags incorporated)
+  - Verify caching tests pass (data cached with proper expiration)
+  - Verify error handling tests pass (user-friendly messages returned)
+  - Verify logging tests pass (comprehensive context captured)
+  - Ensure all tests pass, ask the user if questions arise
