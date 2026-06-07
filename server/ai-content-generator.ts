@@ -17,9 +17,37 @@ interface GenerateContentParams {
   aiPreferences?: any;
 }
 
-interface GeneratedContent {
+interface CaptionVariationResult {
   caption: string;
+  style: 'viral' | 'authentic' | 'balanced';
+  styleDescription: string;
+  authenticityScore: number;
+  engagementPrediction: {
+    predictedLikeRate: number;
+    predictedCommentRate: number;
+    predictedSaveRate: number;
+    predictedShareRate: number;
+    confidence: number;
+    vsUserAverage?: number;
+  };
   hashtags: string[];
+  hashtagBreakdown?: {
+    high: string[];
+    medium: string[];
+    low: string[];
+    branded: string[];
+  };
+  hashtagPerformance?: {
+    discoverabilityScore: number;
+    rankingPotential: number;
+    overall: number;
+  };
+}
+
+interface GeneratedContent {
+  // Legacy single caption support (kept for backward compatibility)
+  caption?: string;
+  hashtags?: string[];
   mentions?: string[];
   engagementScore?: number;
   viralityScore?: number;
@@ -35,6 +63,9 @@ interface GeneratedContent {
     rankingPotential: number;
     overall: number;
   };
+  
+  // NEW: Multi-variation support (Task 11.2)
+  variations?: CaptionVariationResult[];
 }
 
 export class AIContentGenerator {
@@ -500,106 +531,136 @@ export class AIContentGenerator {
       console.log('[AI CONTENT][MEDIA] Media analysis skipped - not available for model:', aiPreferences.aiModel);
     }
 
-    // Step 4: Build enhanced context-aware prompts with ALL user preferences
-    const systemPrompt = this.buildEnhancedSystemPrompt(insights, postType, platform, aiPreferences);
-    const userPrompt = this.buildEnhancedUserPrompt({
+    // Step 4-8: TASK 11.2 - Generate 3 distinct caption variations with scoring and filtering
+    // Requirements: 8.1, 8.2, 4.6
+    console.log(`[AI CONTENT][VARIATIONS] Generating 3 caption variations with ${aiPreferences.aiModel}...`);
+    const variationsStartTime = Date.now();
+    
+    // Generate 3 variations (viral, authentic, balanced) with authenticity scoring and engagement prediction
+    const rawVariations = await aiServiceManager.generateInstagramCaptions({
+      userId,
+      workspaceId: workspaceId || '',
+      topic: mediaAnalysis || existingCaption || 'Generate engaging content',
       mediaAnalysis,
       existingCaption,
       postType,
       platform,
-      insights,
-      aiPreferences
+      preferences: aiPreferences
     });
 
-    // Step 5: Generate caption using configured AI provider with full preferences
-    console.log(`[AI CONTENT][CAPTION] Generating caption with ${aiPreferences.aiModel}...`);
-    const captionStartTime = Date.now();
-    const fullCaptionPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const caption = await aiServiceManager.generateText(fullCaptionPrompt, aiPreferences);
-    const captionDuration = Date.now() - captionStartTime;
-    console.log(`[AI CONTENT][CAPTION] Caption generated:`, {
-      duration: `${captionDuration}ms`,
-      model: aiPreferences.aiModel,
-      captionLength: caption.length,
-      promptLength: fullCaptionPrompt.length
+    const variationsDuration = Date.now() - variationsStartTime;
+    console.log(`[AI CONTENT][VARIATIONS] Generated ${rawVariations.length} variations`, {
+      duration: `${variationsDuration}ms`,
+      variationCount: rawVariations.length,
+      authenticityScores: rawVariations.map(v => v.authenticityScore?.overallScore || 0),
+      passedThreshold: rawVariations.filter(v => v.authenticityScore && v.authenticityScore.overallScore >= 80).length
     });
 
-    // Step 6: Generate strategic hashtags if auto-hashtag is enabled
-    let hashtags: string[] = [];
-    let hashtagBreakdown: any = null;
-    let hashtagPerformance: any = null;
-    
-    if (aiPreferences.autoHashtags) {
-      console.log(`[AI CONTENT][HASHTAGS] Generating strategic hashtags with enhanced algorithm...`);
-      const hashtagStartTime = Date.now();
-      
-      try {
-        // Use enhanced hashtag generation service
-        const hashtagResult = await hashtagGeneratorService.generateStrategicHashtags({
-          caption,
-          mediaAnalysis,
-          niche: insights.contentNiche || 'lifestyle',
-          platform,
-          postType,
-          userId,
-          workspaceId,
-          targetCount: 20, // Generate 15-25 hashtags
-          aiPreferences
-        });
+    // Filter variations below 80 authenticity threshold (Requirement 4.6)
+    const filteredVariations = rawVariations.filter(v => 
+      v.authenticityScore && v.authenticityScore.overallScore >= 80
+    );
 
-        hashtags = hashtagResult.hashtags;
-        hashtagBreakdown = hashtagResult.breakdown;
-        hashtagPerformance = hashtagResult.performanceEstimate;
-        
-        const hashtagDuration = Date.now() - hashtagStartTime;
-        console.log('[AI CONTENT][HASHTAGS] Strategic hashtags generated:', {
-          duration: `${hashtagDuration}ms`,
-          totalCount: hashtags.length,
-          high: hashtagBreakdown.high.length,
-          medium: hashtagBreakdown.medium.length,
-          low: hashtagBreakdown.low.length,
-          branded: hashtagBreakdown.branded.length,
-          performanceScore: hashtagPerformance.overall
-        });
-      } catch (error: any) {
-        console.error('[AI CONTENT][HASHTAGS] Enhanced generation failed, falling back to legacy:', error);
-        
-        // Fallback to legacy hashtag generation
-        const hashtagSystemPrompt = this.buildHashtagSystemPrompt(platform, aiPreferences);
-        const hashtagUserPrompt = this.buildHashtagUserPrompt({
-          postType,
-          platform,
-          caption,
-          mediaAnalysis,
-          insights,
-          aiPreferences
-        });
-        
-        const fullHashtagPrompt = `${hashtagSystemPrompt}\n\n${hashtagUserPrompt}`;
-        const hashtagText = await aiServiceManager.generateText(fullHashtagPrompt, {
-          ...aiPreferences,
-          creativityLevel: aiPreferences.creativityLevel * 0.85
-        });
+    console.log(`[AI CONTENT][VARIATIONS] Filtered variations`, {
+      originalCount: rawVariations.length,
+      filteredCount: filteredVariations.length,
+      removedCount: rawVariations.length - filteredVariations.length,
+      removedScores: rawVariations
+        .filter(v => !v.authenticityScore || v.authenticityScore.overallScore < 80)
+        .map(v => ({
+          style: v.style,
+          score: v.authenticityScore?.overallScore || 0
+        }))
+    });
 
-        hashtags = hashtagText
-          .split(/\s+/)
-          .filter(tag => tag.startsWith('#'))
-          .map(tag => tag.replace('#', ''))
-          .slice(0, 20);
-        
-        const hashtagDuration = Date.now() - hashtagStartTime;
-        console.log('[AI CONTENT][HASHTAGS] Fallback hashtags generated:', {
-          duration: `${hashtagDuration}ms`,
-          hashtagCount: hashtags.length
-        });
-      }
-    } else {
-      console.log('[AI CONTENT][HASHTAGS] Auto-hashtag generation disabled by user');
+    // If no variations passed threshold, use the best scoring ones
+    const variationsToUse = filteredVariations.length > 0 ? filteredVariations : 
+      rawVariations.sort((a, b) => 
+        (b.authenticityScore?.overallScore || 0) - (a.authenticityScore?.overallScore || 0)
+      ).slice(0, 3);
+
+    if (filteredVariations.length === 0) {
+      console.warn('[AI CONTENT][VARIATIONS] No variations passed 80 authenticity threshold, using best available:', {
+        bestScores: variationsToUse.map(v => v.authenticityScore?.overallScore || 0)
+      });
     }
 
-    // Step 7: Generate engagement predictions
-    const engagementScore = this.predictEngagement(caption, hashtags, insights);
-    const viralityScore = this.predictVirality(caption, hashtags, mediaAnalysis);
+    // Generate hashtags for each variation if auto-hashtag is enabled
+    const variations: CaptionVariationResult[] = [];
+    
+    for (const variation of variationsToUse) {
+      let hashtags: string[] = [];
+      let hashtagBreakdown: any = null;
+      let hashtagPerformance: any = null;
+      
+      if (aiPreferences.autoHashtags) {
+        console.log(`[AI CONTENT][HASHTAGS] Generating hashtags for ${variation.style} variation...`);
+        const hashtagStartTime = Date.now();
+        
+        try {
+          // Use enhanced hashtag generation service
+          const hashtagResult = await hashtagGeneratorService.generateStrategicHashtags({
+            caption: variation.caption,
+            mediaAnalysis,
+            niche: insights.contentNiche || 'lifestyle',
+            platform,
+            postType,
+            userId,
+            workspaceId,
+            targetCount: 20, // Generate 15-25 hashtags
+            aiPreferences
+          });
+
+          hashtags = hashtagResult.hashtags;
+          hashtagBreakdown = hashtagResult.breakdown;
+          hashtagPerformance = hashtagResult.performanceEstimate;
+          
+          const hashtagDuration = Date.now() - hashtagStartTime;
+          console.log(`[AI CONTENT][HASHTAGS] Hashtags generated for ${variation.style}:`, {
+            duration: `${hashtagDuration}ms`,
+            totalCount: hashtags.length,
+            performanceScore: hashtagPerformance.overall
+          });
+        } catch (error: any) {
+          console.error(`[AI CONTENT][HASHTAGS] Failed to generate hashtags for ${variation.style}:`, error);
+          // Continue with empty hashtags on error
+          hashtags = [];
+        }
+      }
+
+      // Build variation result
+      variations.push({
+        caption: variation.caption,
+        style: variation.style,
+        styleDescription: variation.styleDescription,
+        authenticityScore: variation.authenticityScore?.overallScore || 0,
+        engagementPrediction: {
+          predictedLikeRate: variation.engagementPrediction?.predictedLikeRate || 0,
+          predictedCommentRate: variation.engagementPrediction?.predictedCommentRate || 0,
+          predictedSaveRate: variation.engagementPrediction?.predictedSaveRate || 0,
+          predictedShareRate: variation.engagementPrediction?.predictedShareRate || 0,
+          confidence: variation.engagementPrediction?.confidence || 0,
+          vsUserAverage: variation.engagementPrediction?.vsUserAverage
+        },
+        hashtags,
+        hashtagBreakdown,
+        hashtagPerformance
+      });
+    }
+
+    // For backward compatibility, also populate single caption fields with the first variation
+    const primaryVariation = variations[0];
+    const caption = primaryVariation?.caption || '';
+    const hashtags = primaryVariation?.hashtags || [];
+    const hashtagBreakdown = primaryVariation?.hashtagBreakdown || null;
+    const hashtagPerformance = primaryVariation?.hashtagPerformance || null;
+    const engagementScore = primaryVariation ? Math.round(
+      (primaryVariation.engagementPrediction.predictedLikeRate + 
+       primaryVariation.engagementPrediction.predictedCommentRate + 
+       primaryVariation.engagementPrediction.predictedSaveRate +
+       primaryVariation.engagementPrediction.predictedShareRate) / 4
+    ) : 50;
+    const viralityScore = primaryVariation?.authenticityScore || 50;
 
     // Step 8: Generate CTA recommendation based on optimization goals
     const ctaRecommendation = this.generateCTA(postType, aiPreferences.optimizationGoals);
@@ -609,23 +670,29 @@ export class AIContentGenerator {
       totalDuration: `${totalDuration}ms`,
       userId,
       workspaceId: workspaceId || 'none',
+      variationCount: variations.length,
       captionLength: caption.length,
       hashtagCount: hashtags.length,
       engagementScore,
       viralityScore,
       model: aiPreferences.aiModel,
       hadMedia: !!mediaUrl,
-      mediaType: mediaType || 'none'
+      mediaType: mediaType || 'none',
+      authenticityScores: variations.map(v => v.authenticityScore)
     });
 
     return {
+      // Legacy single caption fields (backward compatibility)
       caption,
       hashtags,
       engagementScore,
       viralityScore,
       ctaRecommendation,
       hashtagBreakdown,
-      hashtagPerformance
+      hashtagPerformance,
+      
+      // NEW: Multi-variation support (Task 11.2)
+      variations
     };
     } catch (error: any) {
       const errorDuration = Date.now() - startTime;

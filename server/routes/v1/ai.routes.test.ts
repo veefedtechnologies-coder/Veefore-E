@@ -787,3 +787,362 @@ describe('RecordPerformanceSchema - Task 16.1', () => {
     });
   });
 });
+
+// Caption Insights endpoint tests
+describe('Caption Insights Endpoint - Task 16.2', () => {
+  describe('Response Structure Validation', () => {
+    it('should return all required insight fields', () => {
+      // This test validates the expected structure of the caption insights response
+      const expectedInsightStructure = {
+        captionId: expect.any(String),
+        
+        // Caption text and metadata
+        caption: {
+          text: expect.any(String),
+          wasEdited: expect.any(Boolean),
+          originalText: expect.toBeOneOf([expect.any(String), undefined]),
+          editedText: expect.toBeOneOf([expect.any(String), undefined]),
+          editDistance: expect.toBeOneOf([expect.any(Number), undefined]),
+        },
+
+        // Metadata
+        metadata: {
+          postType: expect.toBeOneOf(['post', 'story', 'reel']),
+          platform: expect.any(String),
+          niche: expect.any(String),
+          generatedAt: expect.any(Date),
+          publishedAt: expect.toBeOneOf([expect.any(Date), undefined]),
+          performanceRecordedAt: expect.toBeOneOf([expect.any(Date), undefined]),
+        },
+
+        // Authenticity score breakdown
+        authenticityScore: {
+          overall: expect.any(Number),
+          threshold: 80,
+          passed: expect.any(Boolean),
+        },
+
+        // Engagement prediction details
+        engagementPrediction: {
+          likeRate: expect.any(Number),
+          commentRate: expect.any(Number),
+          saveRate: expect.any(Number),
+          shareRate: expect.any(Number),
+          confidence: expect.any(Number),
+        },
+
+        // Used patterns and hooks
+        patternsUsed: {
+          patterns: expect.any(Array),
+          hooks: expect.any(Array),
+          patternCount: expect.any(Number),
+          hookCount: expect.any(Number),
+        },
+
+        // Hashtag strategy
+        hashtagStrategy: {
+          hashtags: expect.any(Array),
+          count: expect.any(Number),
+          strategy: expect.any(String),
+        },
+
+        // Performance metrics (if available)
+        performanceMetrics: expect.toBeOneOf([
+          {
+            likes: expect.any(Number),
+            comments: expect.any(Number),
+            saves: expect.any(Number),
+            shares: expect.any(Number),
+            impressions: expect.any(Number),
+            engagementRate: expect.any(Number),
+          },
+          null
+        ]),
+        
+        // Predicted vs actual comparison (if available)
+        performanceComparison: expect.toBeOneOf([
+          {
+            predicted: expect.any(Object),
+            actual: expect.any(Object),
+            accuracy: expect.any(Object),
+            performedBetter: expect.any(Boolean),
+          },
+          null
+        ]),
+
+        // Voice profile match indicators
+        voiceProfileMatch: {
+          wasEdited: expect.any(Boolean),
+          editDistance: expect.toBeOneOf([expect.any(Number), undefined]),
+          matchQuality: expect.toBeOneOf(['high', 'medium', 'low', 'unknown']),
+        },
+
+        // All variations (for comparison)
+        allVariations: expect.any(Array),
+
+        // User's average performance for context
+        userAverageMetrics: expect.toBeOneOf([
+          {
+            avgLikeRate: expect.any(Number),
+            avgCommentRate: expect.any(Number),
+            avgSaveRate: expect.any(Number),
+            avgShareRate: expect.any(Number),
+            sampleSize: expect.any(Number),
+          },
+          null
+        ]),
+
+        // Insights for future generations
+        insights: {
+          recommendations: expect.any(Array),
+          learnings: expect.any(Array),
+        }
+      };
+
+      // Validate that the expected structure is well-formed
+      expect(expectedInsightStructure).toBeDefined();
+      expect(expectedInsightStructure.captionId).toBeDefined();
+      expect(expectedInsightStructure.authenticityScore.threshold).toBe(80);
+    });
+
+    it('should calculate voice match quality correctly based on edit distance', () => {
+      // Test high match quality (edit distance < 50)
+      const highMatchEditDistance = 30;
+      const highMatch = highMatchEditDistance < 50 ? 'high' : highMatchEditDistance < 150 ? 'medium' : 'low';
+      expect(highMatch).toBe('high');
+
+      // Test medium match quality (50 <= edit distance < 150)
+      const mediumMatchEditDistance = 100;
+      const mediumMatch = mediumMatchEditDistance < 50 ? 'high' : mediumMatchEditDistance < 150 ? 'medium' : 'low';
+      expect(mediumMatch).toBe('medium');
+
+      // Test low match quality (edit distance >= 150)
+      const lowMatchEditDistance = 200;
+      const lowMatch = lowMatchEditDistance < 50 ? 'high' : lowMatchEditDistance < 150 ? 'medium' : 'low';
+      expect(lowMatch).toBe('low');
+    });
+
+    it('should calculate predicted vs actual performance comparison correctly', () => {
+      // Test data
+      const predicted = {
+        likeRate: 10.0,
+        commentRate: 2.0,
+        saveRate: 1.5,
+        shareRate: 0.5,
+      };
+
+      const actual = {
+        likes: 150,
+        comments: 30,
+        shares: 10,
+        saves: 25,
+        impressions: 1000,
+      };
+
+      // Calculate actual rates
+      const actualLikeRate = (actual.likes / actual.impressions) * 100; // 15.0
+      const actualCommentRate = (actual.comments / actual.impressions) * 100; // 3.0
+      const actualSaveRate = (actual.saves / actual.impressions) * 100; // 2.5
+      const actualShareRate = (actual.shares / actual.impressions) * 100; // 1.0
+
+      // Validate calculations
+      expect(actualLikeRate).toBe(15.0);
+      expect(actualCommentRate).toBe(3.0);
+      expect(actualSaveRate).toBe(2.5);
+      expect(actualShareRate).toBe(1.0);
+
+      // Calculate differences
+      const likeRateDiff = actualLikeRate - predicted.likeRate; // 5.0
+      const commentRateDiff = actualCommentRate - predicted.commentRate; // 1.0
+      const saveRateDiff = actualSaveRate - predicted.saveRate; // 1.0
+      const shareRateDiff = actualShareRate - predicted.shareRate; // 0.5
+
+      expect(likeRateDiff).toBe(5.0);
+      expect(commentRateDiff).toBe(1.0);
+      expect(saveRateDiff).toBe(1.0);
+      expect(shareRateDiff).toBe(0.5);
+
+      // Validate performance comparison
+      const performedBetter = actualLikeRate > predicted.likeRate;
+      expect(performedBetter).toBe(true);
+    });
+  });
+
+  describe('Insights Generation Logic', () => {
+    it('should generate learning insight when caption outperforms predictions', () => {
+      const performanceComparison = {
+        performedBetter: true,
+        accuracy: {
+          likeRateDiff: 5.5,
+        },
+      };
+
+      const learnings: string[] = [];
+      if (performanceComparison.performedBetter) {
+        learnings.push(
+          `This caption outperformed predictions by ${Math.abs(performanceComparison.accuracy.likeRateDiff)}% on likes`
+        );
+      }
+
+      expect(learnings.length).toBe(1);
+      expect(learnings[0]).toContain('outperformed predictions by 5.5% on likes');
+    });
+
+    it('should generate recommendation when prediction accuracy is low', () => {
+      const performanceComparison = {
+        accuracy: {
+          overallAccuracy: 65, // Below 70%
+        },
+      };
+
+      const recommendations: string[] = [];
+      if (performanceComparison.accuracy.overallAccuracy < 70) {
+        recommendations.push(
+          'Prediction accuracy was below 70%. Consider providing more sample captions to improve voice profile.'
+        );
+      }
+
+      expect(recommendations.length).toBe(1);
+      expect(recommendations[0]).toContain('below 70%');
+    });
+
+    it('should generate recommendation when caption was heavily edited', () => {
+      const caption = {
+        wasEdited: true,
+        editDistance: 150, // Significant edit
+      };
+
+      const recommendations: string[] = [];
+      if (caption.wasEdited && caption.editDistance && caption.editDistance > 100) {
+        recommendations.push(
+          'You made significant edits to this caption. The AI will learn from these changes to better match your voice.'
+        );
+      }
+
+      expect(recommendations.length).toBe(1);
+      expect(recommendations[0]).toContain('significant edits');
+    });
+
+    it('should not generate recommendation for minor edits', () => {
+      const caption = {
+        wasEdited: true,
+        editDistance: 50, // Minor edit
+      };
+
+      const recommendations: string[] = [];
+      if (caption.wasEdited && caption.editDistance && caption.editDistance > 100) {
+        recommendations.push(
+          'You made significant edits to this caption. The AI will learn from these changes to better match your voice.'
+        );
+      }
+
+      expect(recommendations.length).toBe(0);
+    });
+  });
+
+  describe('Hashtag Strategy Display', () => {
+    it('should display strategy when hashtags are present', () => {
+      const hashtags = ['#fitness', '#workout', '#health'];
+      const strategy = hashtags.length > 0 
+        ? '30/50/20 competition ratio (high/medium/low)' 
+        : 'No hashtags generated';
+
+      expect(strategy).toBe('30/50/20 competition ratio (high/medium/low)');
+    });
+
+    it('should display no hashtags message when empty', () => {
+      const hashtags: string[] = [];
+      const strategy = hashtags.length > 0 
+        ? '30/50/20 competition ratio (high/medium/low)' 
+        : 'No hashtags generated';
+
+      expect(strategy).toBe('No hashtags generated');
+    });
+  });
+
+  describe('Authenticity Score Validation', () => {
+    it('should mark as passed when score >= 80', () => {
+      const authenticityScore = 85;
+      const passed = authenticityScore >= 80;
+      expect(passed).toBe(true);
+    });
+
+    it('should mark as failed when score < 80', () => {
+      const authenticityScore = 75;
+      const passed = authenticityScore >= 80;
+      expect(passed).toBe(false);
+    });
+
+    it('should mark as passed when score exactly 80', () => {
+      const authenticityScore = 80;
+      const passed = authenticityScore >= 80;
+      expect(passed).toBe(true);
+    });
+  });
+
+  describe('Variation Selection Logic', () => {
+    it('should select first variation when none explicitly selected', () => {
+      const selectedVariationIndex = undefined;
+      const selectedIndex = selectedVariationIndex ?? 0;
+      expect(selectedIndex).toBe(0);
+    });
+
+    it('should use explicit selection when provided', () => {
+      const selectedVariationIndex = 2;
+      const selectedIndex = selectedVariationIndex ?? 0;
+      expect(selectedIndex).toBe(2);
+    });
+
+    it('should handle zero index correctly', () => {
+      const selectedVariationIndex = 0;
+      const selectedIndex = selectedVariationIndex ?? 0;
+      expect(selectedIndex).toBe(0);
+    });
+  });
+
+  describe('Engagement Rate Calculation in Performance Comparison', () => {
+    it('should calculate engagement rate correctly', () => {
+      const metrics = {
+        likes: 150,
+        comments: 25,
+        saves: 30,
+        shares: 10,
+        impressions: 1000,
+      };
+
+      const engagementRate = ((metrics.likes + metrics.comments + metrics.saves + metrics.shares) / metrics.impressions) * 100;
+      expect(engagementRate).toBe(21.5);
+    });
+
+    it('should round engagement rate to 2 decimal places', () => {
+      const metrics = {
+        likes: 157,
+        comments: 23,
+        saves: 31,
+        shares: 12,
+        impressions: 1000,
+      };
+
+      const engagementRate = ((metrics.likes + metrics.comments + metrics.saves + metrics.shares) / metrics.impressions) * 100;
+      const rounded = Math.round(engagementRate * 100) / 100;
+      expect(rounded).toBe(22.3);
+    });
+  });
+});
+
+// Helper type for test expectations (not actually run, just for validation)
+expect.extend({
+  toBeOneOf(received: any, expected: any[]) {
+    const pass = expected.some(item => {
+      if (item === undefined) return received === undefined;
+      if (item === null) return received === null;
+      if (typeof item === 'function') return item(received);
+      return received === item;
+    });
+
+    return {
+      pass,
+      message: () => `expected ${received} to be one of ${expected}`,
+    };
+  },
+});

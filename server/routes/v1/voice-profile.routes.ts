@@ -508,4 +508,94 @@ router.put('/:workspaceId/recalibrate',
   }
 );
 
+/**
+ * GET /api/voice-profile/:workspaceId/evolution
+ * Retrieves voice profile evolution data including snapshots, milestones, and acceptance trends
+ * 
+ * Requirements: 10.4, 10.5
+ * 
+ * URL parameters:
+ * - workspaceId: string (workspace identifier)
+ * 
+ * Response:
+ * - success: boolean
+ * - snapshots: VoiceProfileSnapshot[] (voice profile snapshots over time)
+ * - milestones: LearningMilestone[] (learning achievements and improvements)
+ * - acceptanceTrend: AcceptanceRateTrend[] (caption acceptance rates over time)
+ */
+router.get('/:workspaceId/evolution',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const { workspaceId } = req.params;
+
+      console.log('[VOICE PROFILE] Retrieving evolution data for workspace:', workspaceId);
+
+      // Validate workspaceId parameter
+      if (!workspaceId || typeof workspaceId !== 'string' || workspaceId.trim() === '') {
+        return res.status(400).json({ 
+          error: 'Valid workspace ID is required'
+        });
+      }
+
+      // Verify workspace exists
+      const workspace = await storage.getWorkspace(workspaceId);
+      if (!workspace) {
+        return res.status(404).json({ 
+          error: 'Workspace not found'
+        });
+      }
+
+      // Verify user owns or has access to workspace
+      const user = await storage.getUser(userId);
+      const workspaceUserId = workspace.userId?.toString();
+      const requestUserId = userId.toString();
+      const firebaseUid = user?.firebaseUid;
+
+      const userOwnsWorkspace = workspaceUserId === requestUserId || 
+                               workspaceUserId === firebaseUid ||
+                               workspace.userId === userId ||
+                               workspace.userId === firebaseUid;
+
+      if (!userOwnsWorkspace) {
+        return res.status(403).json({ 
+          error: 'Access denied to workspace' 
+        });
+      }
+
+      // Initialize VoiceProfileService
+      const mongoClient = mongoose.connection.getClient();
+      const dbName = process.env.MONGODB_DB_NAME || 'veeforedb';
+      const voiceProfileService = new VoiceProfileService(mongoClient, dbName);
+
+      // Get voice profile snapshots (historical data)
+      const snapshots = await voiceProfileService.getProfileSnapshots(userId, workspaceId);
+
+      // Get learning milestones
+      const milestones = await voiceProfileService.getLearningMilestones(userId, workspaceId);
+
+      // Get acceptance rate trends
+      const acceptanceTrend = await voiceProfileService.getAcceptanceRateTrend(userId, workspaceId);
+
+      console.log('[VOICE PROFILE] Found', snapshots.length, 'snapshots,', milestones.length, 'milestones,', acceptanceTrend.length, 'trends');
+
+      res.json({
+        success: true,
+        snapshots,
+        milestones,
+        acceptanceTrend
+      });
+
+    } catch (error: any) {
+      console.error('[VOICE PROFILE] Evolution data retrieval failed:', error);
+      
+      res.status(500).json({ 
+        error: 'Failed to retrieve voice profile evolution data',
+        details: error.message 
+      });
+    }
+  }
+);
+
 export default router;

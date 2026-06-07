@@ -10,7 +10,7 @@ import { safeParseAIResponse } from '../../middleware/unsafe-json-replacements';
 import OpenAI from 'openai';
 import { AuthenticatedRequest } from '../../types/express';
 import { AIServiceManager } from '../../services/AIServiceManager';
-import { HashtagGeneratorService } from '../../services/HashtagGeneratorService';
+import { hashtagGeneratorService } from '../../services/HashtagGeneratorService';
 import { performanceCorrelationService } from '../../services/PerformanceCorrelationService';
 import { generatedCaptionRepository } from '../../repositories/GeneratedCaptionRepository';
 
@@ -520,7 +520,6 @@ router.post('/generate-caption',
       });
 
       // Generate hashtags for each variation
-      const hashtagGeneratorService = HashtagGeneratorService.getInstance();
       const variationsWithHashtags = await Promise.all(
         variations.map(async (variation) => {
           try {
@@ -1807,6 +1806,560 @@ router.post('/record-performance',
       console.error('[AI PERFORMANCE] Recording failed:', error);
       res.status(500).json({ 
         error: 'Failed to record performance metrics',
+        details: error.message 
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/v1/ai/caption-insights/:captionId
+ * 
+ * Retrieve detailed insights and analytics for a specific generated caption.
+ * Returns caption metadata, authenticity scores, engagement predictions,
+ * used patterns/hooks, hashtag strategy, voice profile match indicators,
+ * and actual performance metrics if available.
+ * 
+ * Requirements: 9.5, 16.2
+ */
+router.get('/caption-insights/:captionId',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const { captionId } = req.params;
+
+      console.log('[CAPTION INSIGHTS] Fetching insights for caption:', {
+        userId,
+        captionId
+      });
+
+      // Retrieve the caption from database
+      const caption = await generatedCaptionRepository.findById(captionId);
+
+      if (!caption) {
+        return res.status(404).json({ error: 'Caption not found' });
+      }
+
+      // Verify workspace access
+      const workspace = await storage.getWorkspace(caption.workspaceId);
+      if (!workspace) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+
+      const user = await storage.getUser(userId);
+      const workspaceUserId = workspace.userId?.toString();
+      const requestUserId = userId.toString();
+      const firebaseUid = user?.firebaseUid;
+
+      const userOwnsWorkspace = workspaceUserId === requestUserId || 
+                               workspaceUserId === firebaseUid ||
+                               workspace.userId === userId ||
+                               workspace.userId === firebaseUid;
+
+      if (!userOwnsWorkspace) {
+        return res.status(403).json({ error: 'Access denied to workspace' });
+      }
+
+      // Verify the caption belongs to the user
+      if (caption.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied to this caption' });
+      }
+
+      // Get the selected variation (or first variation if none selected)
+      const selectedIndex = caption.selectedVariationIndex ?? 0;
+      const selectedVariation = caption.variations[selectedIndex];
+
+      // Calculate predicted vs actual performance comparison if available
+      let performanceComparison: any = null;
+      if (caption.actualMetrics && caption.actualMetrics.impressions > 0) {
+        const predicted = selectedVariation.engagementPrediction;
+        const actual = caption.actualMetrics;
+
+        // Calculate actual rates
+        const actualLikeRate = (actual.likes / actual.impressions) * 100;
+        const actualCommentRate = (actual.comments / actual.impressions) * 100;
+        const actualSaveRate = (actual.saves / actual.impressions) * 100;
+        const actualShareRate = (actual.shares / actual.impressions) * 100;
+
+        performanceComparison = {
+          predicted: {
+            likeRate: predicted.likeRate,
+            commentRate: predicted.commentRate,
+            saveRate: predicted.saveRate,
+            shareRate: predicted.shareRate,
+            confidence: predicted.confidence
+          },
+          actual: {
+            likeRate: Math.round(actualLikeRate * 100) / 100,
+            commentRate: Math.round(actualCommentRate * 100) / 100,
+            saveRate: Math.round(actualSaveRate * 100) / 100,
+            shareRate: Math.round(actualShareRate * 100) / 100,
+            engagementRate: actual.engagementRate
+          },
+          accuracy: {
+            likeRateDiff: Math.round((actualLikeRate - predicted.likeRate) * 100) / 100,
+            commentRateDiff: Math.round((actualCommentRate - predicted.commentRate) * 100) / 100,
+            saveRateDiff: Math.round((actualSaveRate - predicted.saveRate) * 100) / 100,
+            shareRateDiff: Math.round((actualShareRate - predicted.shareRate) * 100) / 100,
+            overallAccuracy: Math.round(100 - Math.abs(
+              ((actualLikeRate - predicted.likeRate) / predicted.likeRate * 100) +
+              ((actualCommentRate - predicted.commentRate) / predicted.commentRate * 100) +
+              ((actualSaveRate - predicted.saveRate) / predicted.saveRate * 100) +
+              ((actualShareRate - predicted.shareRate) / predicted.shareRate * 100)
+            ) / 4)
+          },
+          performedBetter: actualLikeRate > predicted.likeRate
+        };
+      }
+
+      // Get user's average metrics for comparison
+      const userAverageMetrics = await generatedCaptionRepository.calculateAverageMetrics(
+        userId,
+        caption.workspaceId
+      );
+
+      // Build comprehensive insights response
+      const insights = {
+        captionId: caption._id.toString(),
+        
+        // Caption text and metadata
+        caption: {
+          text: selectedVariation.caption,
+          wasEdited: caption.wasEdited,
+          originalText: caption.originalCaption,
+          editedText: caption.editedCaption,
+          editDistance: caption.editDistance
+        },
+
+        // Metadata
+        metadata: {
+          postType: caption.postType,
+          platform: caption.platform,
+          niche: caption.niche,
+          generatedAt: caption.generatedAt,
+          publishedAt: caption.publishedAt,
+          performanceRecordedAt: caption.performanceRecordedAt
+        },
+
+        // Authenticity score breakdown
+        authenticityScore: {
+          overall: selectedVariation.authenticityScore,
+          threshold: 80,
+          passed: selectedVariation.authenticityScore >= 80
+        },
+
+        // Engagement prediction details
+        engagementPrediction: selectedVariation.engagementPrediction,
+
+        // Used patterns and hooks
+        patternsUsed: {
+          patterns: selectedVariation.usedPatterns,
+          hooks: selectedVariation.usedHooks,
+          patternCount: selectedVariation.usedPatterns.length,
+          hookCount: selectedVariation.usedHooks.length
+        },
+
+        // Hashtag strategy
+        hashtagStrategy: {
+          hashtags: selectedVariation.hashtagsGenerated,
+          count: selectedVariation.hashtagsGenerated.length,
+          // Categorize hashtags by popularity (this would be enhanced with actual hashtag data)
+          strategy: selectedVariation.hashtagsGenerated.length > 0 
+            ? '30/50/20 competition ratio (high/medium/low)' 
+            : 'No hashtags generated'
+        },
+
+        // Performance metrics (if available)
+        performanceMetrics: caption.actualMetrics || null,
+        
+        // Predicted vs actual comparison
+        performanceComparison,
+
+        // Voice profile match indicators
+        voiceProfileMatch: {
+          wasEdited: caption.wasEdited,
+          editDistance: caption.editDistance,
+          matchQuality: caption.wasEdited && caption.editDistance !== undefined
+            ? caption.editDistance < 50 ? 'high' : caption.editDistance < 150 ? 'medium' : 'low'
+            : 'unknown'
+        },
+
+        // All variations (for comparison)
+        allVariations: caption.variations.map((variation, index) => ({
+          index,
+          caption: variation.caption,
+          authenticityScore: variation.authenticityScore,
+          engagementPrediction: variation.engagementPrediction,
+          hashtags: variation.hashtagsGenerated,
+          selected: index === selectedIndex
+        })),
+
+        // User's average performance for context
+        userAverageMetrics: userAverageMetrics.sampleSize > 0 ? userAverageMetrics : null,
+
+        // Insights for future generations
+        insights: {
+          recommendations: [],
+          learnings: []
+        }
+      };
+
+      // Add performance-based insights if actual metrics are available
+      if (performanceComparison) {
+        if (performanceComparison.performedBetter) {
+          insights.insights.learnings.push(
+            `This caption outperformed predictions by ${Math.abs(performanceComparison.accuracy.likeRateDiff)}% on likes`
+          );
+        }
+        
+        if (performanceComparison.accuracy.overallAccuracy < 70) {
+          insights.insights.recommendations.push(
+            'Prediction accuracy was below 70%. Consider providing more sample captions to improve voice profile.'
+          );
+        }
+      }
+
+      // Add voice profile insights
+      if (caption.wasEdited && caption.editDistance && caption.editDistance > 100) {
+        insights.insights.recommendations.push(
+          'You made significant edits to this caption. The AI will learn from these changes to better match your voice.'
+        );
+      }
+
+      console.log('[CAPTION INSIGHTS] Successfully retrieved insights for caption:', captionId);
+
+      res.json({
+        success: true,
+        insights
+      });
+
+    } catch (error: any) {
+      console.error('[CAPTION INSIGHTS] Failed to retrieve insights:', error);
+      res.status(500).json({ 
+        error: 'Failed to retrieve caption insights',
+        details: error.message 
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/v1/ai/adapt-caption
+ * 
+ * Adapt an Instagram caption for different social media platforms.
+ * Transforms caption structure, hashtag placement, and tone based on
+ * platform-specific requirements while maintaining the user's voice.
+ * 
+ * Supported platforms: instagram, facebook, twitter, linkedin, tiktok
+ * 
+ * Requirements: 12.1, 12.2, 12.4
+ */
+const AdaptCaptionSchema = z.object({
+  caption: z.string().min(1).max(5000),
+  targetPlatform: z.enum(['instagram', 'facebook', 'twitter', 'linkedin', 'tiktok']),
+  workspaceId: z.string().optional(),
+});
+
+router.post('/adapt-caption',
+  requireAuth,
+  aiRateLimiter,
+  validateRequest({ body: AdaptCaptionSchema }),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { caption, targetPlatform, workspaceId } = req.body;
+      const userId = req.user.id;
+
+      console.log('[AI ADAPT CAPTION] Adapting caption for platform:', {
+        userId,
+        targetPlatform,
+        captionLength: caption.length,
+        workspaceId
+      });
+
+      // Validate workspace access if provided
+      if (workspaceId) {
+        const workspace = await storage.getWorkspace(workspaceId);
+        if (!workspace) {
+          return res.status(404).json({ error: 'Workspace not found' });
+        }
+        
+        const user = await storage.getUser(userId);
+        const workspaceUserId = workspace.userId?.toString();
+        const requestUserId = userId.toString();
+        const firebaseUid = user?.firebaseUid;
+        
+        const userOwnsWorkspace = workspaceUserId === requestUserId || 
+                                 workspaceUserId === firebaseUid ||
+                                 workspace.userId === userId ||
+                                 workspace.userId === firebaseUid;
+        
+        if (!userOwnsWorkspace) {
+          return res.status(403).json({ error: 'Access denied to workspace' });
+        }
+      }
+
+      // Get user's voice profile (optional, for maintaining voice consistency)
+      const { voiceProfileService } = await import('../../services/VoiceProfileService');
+      let voiceProfile = undefined;
+      try {
+        voiceProfile = await voiceProfileService.getProfile(userId, workspaceId || userId);
+      } catch (error) {
+        console.warn('[AI ADAPT CAPTION] Could not load voice profile, proceeding without it:', error);
+      }
+
+      // Use PlatformAdapterService to adapt caption
+      const { PlatformAdapterService } = await import('../../services/PlatformAdapterService');
+      const platformAdapter = new PlatformAdapterService();
+
+      // Adapt caption for target platform
+      const adaptedResult = await platformAdapter.adaptForPlatform(
+        caption,
+        targetPlatform,
+        voiceProfile
+      );
+
+      console.log('[AI ADAPT CAPTION] Successfully adapted caption:', {
+        targetPlatform: adaptedResult.platform,
+        originalLength: caption.length,
+        adaptedLength: adaptedResult.characterCount,
+        warningCount: adaptedResult.warnings.length,
+        adaptationNoteCount: adaptedResult.adaptationNotes.length
+      });
+
+      // Return adapted caption with all metadata
+      res.json({
+        success: true,
+        adapted: {
+          platform: adaptedResult.platform,
+          caption: adaptedResult.caption,
+          hashtags: adaptedResult.hashtags,
+          characterCount: adaptedResult.characterCount,
+          warnings: adaptedResult.warnings,
+          adaptationNotes: adaptedResult.adaptationNotes,
+          optimizationTips: adaptedResult.optimizationTips
+        },
+        original: {
+          caption,
+          characterCount: caption.length
+        }
+      });
+
+    } catch (error: any) {
+      console.error('[AI ADAPT CAPTION] Adaptation failed:', error);
+      res.status(500).json({ 
+        error: 'Failed to adapt caption',
+        details: error.message 
+      });
+    }
+  }
+);
+
+// ============================================================================
+// TASK 22.2: SAFETY FEEDBACK ENDPOINTS
+// Requirements: 11.6 - User feedback on safety false positives
+// ============================================================================
+
+const SafetyFeedbackSchema = z.object({
+  workspaceId: z.string().min(1),
+  captionId: z.string().optional(),
+  feedbackType: z.enum(['false_positive', 'missed_issue', 'calibration_request']),
+  flaggedIssue: z.string().min(1).max(500),
+  userRating: z.enum(['inappropriate', 'acceptable', 'authentic']),
+  comment: z.string().max(1000).optional(),
+  caption: z.string().min(1).max(5000),
+  safetyLevel: z.enum(['off', 'standard', 'strict']),
+  originalSafetyScore: z.number().min(0).max(100),
+  originalFlags: z.array(z.string()),
+});
+
+/**
+ * Submit safety feedback
+ * 
+ * Allows users to report false positives or request calibration adjustments
+ * for the content safety system.
+ */
+router.post('/safety-feedback',
+  requireAuth,
+  validateRequest({ body: SafetyFeedbackSchema }),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const feedbackData = req.body;
+
+      console.log('[SAFETY FEEDBACK] Receiving feedback from user:', userId, {
+        workspaceId: feedbackData.workspaceId,
+        feedbackType: feedbackData.feedbackType,
+        userRating: feedbackData.userRating,
+      });
+
+      // Validate workspace access
+      const workspace = await storage.getWorkspace(feedbackData.workspaceId);
+      if (!workspace) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const workspaceUserId = workspace.userId?.toString();
+      const requestUserId = userId.toString();
+      const firebaseUid = user?.firebaseUid;
+      
+      const userOwnsWorkspace = workspaceUserId === requestUserId || 
+                               workspaceUserId === firebaseUid ||
+                               workspace.userId === userId ||
+                               workspace.userId === firebaseUid;
+      
+      if (!userOwnsWorkspace) {
+        return res.status(403).json({ error: 'Access denied to workspace' });
+      }
+
+      // Submit feedback using SafetyFeedbackService
+      const { safetyFeedbackService } = await import('../../services/SafetyFeedbackService');
+      const feedback = await safetyFeedbackService.submitFeedback({
+        userId,
+        workspaceId: feedbackData.workspaceId,
+        captionId: feedbackData.captionId,
+        feedbackType: feedbackData.feedbackType,
+        flaggedIssue: feedbackData.flaggedIssue,
+        userRating: feedbackData.userRating,
+        comment: feedbackData.comment,
+        caption: feedbackData.caption,
+        safetyLevel: feedbackData.safetyLevel,
+        originalSafetyScore: feedbackData.originalSafetyScore,
+        originalFlags: feedbackData.originalFlags,
+      });
+
+      console.log('[SAFETY FEEDBACK] Feedback submitted successfully:', feedback.id);
+
+      res.json({
+        success: true,
+        feedback: {
+          id: feedback.id,
+          status: feedback.status,
+          calibrationApplied: feedback.calibrationApplied,
+        },
+        message: 'Thank you for your feedback. Our system will learn from this to improve safety filtering accuracy.',
+      });
+
+    } catch (error: any) {
+      console.error('[SAFETY FEEDBACK] Submission failed:', error);
+      res.status(500).json({ 
+        error: 'Failed to submit safety feedback',
+        details: error.message 
+      });
+    }
+  }
+);
+
+/**
+ * Get safety calibration settings
+ * 
+ * Returns the user's current safety calibration settings including
+ * allowed and sensitive patterns.
+ */
+router.get('/safety-calibration/:workspaceId',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const { workspaceId } = req.params;
+
+      // Validate workspace access
+      const workspace = await storage.getWorkspace(workspaceId);
+      if (!workspace) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const workspaceUserId = workspace.userId?.toString();
+      const requestUserId = userId.toString();
+      const firebaseUid = user?.firebaseUid;
+      
+      const userOwnsWorkspace = workspaceUserId === requestUserId || 
+                               workspaceUserId === firebaseUid ||
+                               workspace.userId === userId ||
+                               workspace.userId === firebaseUid;
+      
+      if (!userOwnsWorkspace) {
+        return res.status(403).json({ error: 'Access denied to workspace' });
+      }
+
+      // Get calibration settings
+      const { safetyFeedbackService } = await import('../../services/SafetyFeedbackService');
+      const calibration = await safetyFeedbackService.getCalibration(userId, workspaceId);
+      
+      // Get feedback statistics
+      const stats = await safetyFeedbackService.getFeedbackStats(userId, workspaceId);
+
+      res.json({
+        success: true,
+        calibration: calibration || {
+          allowedPatterns: [],
+          sensitivePatterns: [],
+          customRules: [],
+          falsePositiveCount: 0,
+          feedbackCount: 0,
+        },
+        statistics: stats,
+      });
+
+    } catch (error: any) {
+      console.error('[SAFETY CALIBRATION] Retrieval failed:', error);
+      res.status(500).json({ 
+        error: 'Failed to retrieve safety calibration',
+        details: error.message 
+      });
+    }
+  }
+);
+
+/**
+ * Get recent safety feedback
+ * 
+ * Returns recent safety feedback submissions for the user/workspace
+ */
+router.get('/safety-feedback/:workspaceId',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const { workspaceId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      // Validate workspace access
+      const workspace = await storage.getWorkspace(workspaceId);
+      if (!workspace) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const workspaceUserId = workspace.userId?.toString();
+      const requestUserId = userId.toString();
+      const firebaseUid = user?.firebaseUid;
+      
+      const userOwnsWorkspace = workspaceUserId === requestUserId || 
+                               workspaceUserId === firebaseUid ||
+                               workspace.userId === userId ||
+                               workspace.userId === firebaseUid;
+      
+      if (!userOwnsWorkspace) {
+        return res.status(403).json({ error: 'Access denied to workspace' });
+      }
+
+      // Get recent feedback
+      const { safetyFeedbackService } = await import('../../services/SafetyFeedbackService');
+      const feedback = await safetyFeedbackService.getRecentFeedback(userId, workspaceId, limit);
+
+      res.json({
+        success: true,
+        feedback,
+        count: feedback.length,
+      });
+
+    } catch (error: any) {
+      console.error('[SAFETY FEEDBACK] Retrieval failed:', error);
+      res.status(500).json({ 
+        error: 'Failed to retrieve safety feedback',
         details: error.message 
       });
     }

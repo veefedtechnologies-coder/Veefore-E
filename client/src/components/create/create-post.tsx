@@ -33,6 +33,7 @@ import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { useToast } from '@/hooks/use-toast'
 import { ImageCropper } from './ImageCropper'
 import { VideoAdjuster } from './VideoAdjuster'
+import { CaptionVariationSelector } from '@/components/caption/CaptionVariationSelector'
 
 export function CreatePost() {
   const [, setLocation] = useLocation()
@@ -82,13 +83,23 @@ export function CreatePost() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
-  const [aiGeneratedData, setAiGeneratedData] = useState<{
-    caption?: string;
-    hashtags?: string[];
-    engagementScore?: number;
-    viralityScore?: number;
-    ctaRecommendation?: string;
-  } | null>(null)
+  const [aiGeneratedVariations, setAiGeneratedVariations] = useState<Array<{
+    caption: string;
+    hashtags: string[];
+    style: 'viral' | 'authentic' | 'balanced';
+    styleDescription: string;
+    authenticityScore: number;
+    engagementPrediction: {
+      predictedLikeRate: number;
+      predictedCommentRate: number;
+      predictedSaveRate: number;
+      predictedShareRate: number;
+      confidence: number;
+    };
+    usedPatterns?: string[];
+    usedHooks?: string[];
+  }> | null>(null)
+  const [selectedVariationIndex, setSelectedVariationIndex] = useState<number>(0)
 
   // Step gating
   const accountSelected = !!selectedAccount
@@ -413,13 +424,19 @@ export function CreatePost() {
 
   // AI Content Generation Handler
   const handleGenerateAI = async () => {
+    console.log('[AI GENERATE] Function called');
+    console.log('[AI GENERATE] currentWorkspace:', currentWorkspace);
+    console.log('[AI GENERATE] currentWorkspace.id:', currentWorkspace?.id);
+    
     if (!currentWorkspace?.id) {
+      console.error('[AI GENERATE] No workspace ID, exiting early');
       toast({ title: 'Error', description: 'No active workspace selected', variant: 'destructive' });
       return;
     }
 
+    console.log('[AI GENERATE] Starting generation process');
     setIsGeneratingAI(true);
-    setAiGeneratedData(null);
+    setAiGeneratedVariations(null);
 
     try {
       const firstMediaFile = mediaFiles[0];
@@ -443,60 +460,48 @@ export function CreatePost() {
       };
       // Only include fields with valid values
       if (mediaType) requestBody.mediaType = mediaType;
-      if (mediaUrl && mediaUrl.trim()) requestBody.mediaUrl = mediaUrl; // Ensure it's not empty
+      if (mediaUrl && mediaUrl.trim()) requestBody.mediaUrl = mediaUrl;
       if (postContent && postContent.trim()) requestBody.existingCaption = postContent;
 
-      const response = await apiRequest('/api/v1/ai/generate-content', {
+      console.log('[AI GENERATE] About to call API with:', { requestBody });
+      console.log('[AI GENERATE] Request URL:', '/api/v1/ai/generate-caption');
+      console.log('[AI GENERATE] Method: POST');
+
+      const response = await apiRequest('/api/v1/ai/generate-caption', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
       });
 
-      // [DIAGNOSTIC LOGGING - Task 1: Bug Condition Exploration]
-      console.log('[AI GENERATE DEBUG] Full response:', JSON.stringify(response, null, 2));
+      console.log('[AI GENERATE DEBUG] API call completed');
+      console.log('[AI GENERATE DEBUG] Response received');
       console.log('[AI GENERATE DEBUG] Response type:', typeof response);
-      console.log('[AI GENERATE DEBUG] response.success:', response?.success);
+      console.log('[AI GENERATE DEBUG] Response keys:', Object.keys(response || {}));
+      console.log('[AI GENERATE DEBUG] Has variations key:', 'variations' in (response || {}));
+      console.log('[AI GENERATE DEBUG] Full response:', JSON.stringify(response, null, 2));
 
-      // [DEFENSIVE RESPONSE VALIDATION - Task 3.1]
       if (!response) {
         console.error('[AI GENERATE ERROR] Empty response received');
         throw new Error('Empty response from server');
       }
-      if (typeof response !== 'object') {
-        console.error('[AI GENERATE ERROR] Invalid response type:', typeof response);
-        throw new Error('Invalid response format');
-      }
 
-      console.log('[AI GENERATE DEBUG] About to check response.success');
-
-      if (response.success) {
-        console.log('[AI GENERATE DEBUG] Inside success block, setting state with:', {
-          caption: response.caption?.substring(0, 50),
-          hashtagCount: response.hashtags?.length
-        });
-
-        setAiGeneratedData(prev => {
-          console.log('[AI GENERATE DEBUG] State update callback, prev:', prev);
-          const newData = {
-            caption: response.caption,
-            hashtags: response.hashtags,
-            engagementScore: response.engagementScore,
-            viralityScore: response.viralityScore,
-            ctaRecommendation: response.ctaRecommendation
-          };
-          console.log('[AI GENERATE DEBUG] New state data:', {
-            hasCaption: !!newData.caption,
-            hashtagCount: newData.hashtags?.length,
-            engagementScore: newData.engagementScore,
-            viralityScore: newData.viralityScore
-          });
-          return newData;
-        });
+      // Handle variations response
+      if (response.variations && Array.isArray(response.variations)) {
+        console.log('[AI GENERATE DEBUG] Got variations:', response.variations.length);
+        console.log('[AI GENERATE DEBUG] Variations data:', response.variations);
+        console.log('[AI GENERATE DEBUG] Setting state with variations');
+        setAiGeneratedVariations(response.variations);
+        setSelectedVariationIndex(0); // Select first variation by default
+        
+        console.log('[AI GENERATE DEBUG] State updated, should trigger re-render');
 
         toast({
-          title: 'AI Content Generated! ✨',
-          description: `Caption and ${response.hashtags?.length || 0} viral hashtags ready. Review and apply below.`
+          title: 'AI Captions Generated! ✨',
+          description: `${response.variations.length} caption variations ready with authenticity scores.`
         });
+      } else {
+        console.error('[AI GENERATE ERROR] No variations in response:', response);
+        throw new Error('No variations returned from server');
       }
     } catch (error: any) {
       console.error('[AI GENERATE] Error:', error);
@@ -510,24 +515,22 @@ export function CreatePost() {
     }
   };
 
-  const applyAICaption = () => {
-    if (aiGeneratedData?.caption) {
-      setPostContent(aiGeneratedData.caption);
-    }
-  };
-
-  const applyAIHashtags = () => {
-    if (aiGeneratedData?.hashtags && aiGeneratedData.hashtags.length > 0) {
-      const newTags = aiGeneratedData.hashtags.filter(tag => !hashtags.includes(tag));
+  const handleSelectVariation = (index: number, variation: any) => {
+    setSelectedVariationIndex(index);
+    // Auto-apply the selected variation
+    setPostContent(variation.caption);
+    if (variation.hashtags && variation.hashtags.length > 0) {
+      const newTags = variation.hashtags.filter((tag: string) => !hashtags.includes(tag));
       setHashtags(prev => [...prev, ...newTags]);
     }
+    toast({ 
+      title: 'Caption Applied!', 
+      description: `${variation.style} variation applied with ${variation.hashtags?.length || 0} hashtags.` 
+    });
   };
 
-  const applyAllAI = () => {
-    applyAICaption();
-    applyAIHashtags();
-    setAiGeneratedData(null);
-    toast({ title: 'Applied!', description: 'AI-generated caption and hashtags have been applied.' });
+  const handleRegenerateAll = () => {
+    handleGenerateAI();
   };
 
   const handleSaveDraft = async () => {
@@ -1137,92 +1140,38 @@ export function CreatePost() {
                 </div>
               </div>
 
-              {/* AI Generated Content Panel */}
-              {aiGeneratedData && (
-                <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 dark:from-purple-500/10 dark:to-blue-500/10 border border-purple-200 dark:border-purple-500/20 rounded-2xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                        <Sparkles className="w-4 h-4 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-purple-900 dark:text-purple-200">AI Generated Content</h3>
-                        <p className="text-[10px] text-purple-600 dark:text-purple-400">Based on your media, insights & AI settings</p>
-                      </div>
-                    </div>
-                    <button onClick={() => setAiGeneratedData(null)} className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-200 transition-colors">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Scores */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white/70 dark:bg-white/5 rounded-xl p-3 border border-purple-100 dark:border-purple-500/10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-purple-500 dark:text-purple-400 mb-1">Engagement Score</div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-xl font-black text-purple-900 dark:text-purple-100">{aiGeneratedData.engagementScore || 0}</div>
-                        <div className="flex-1 h-2 bg-purple-100 dark:bg-purple-500/20 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-1000" style={{ width: `${aiGeneratedData.engagementScore || 0}%` }}></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-white/70 dark:bg-white/5 rounded-xl p-3 border border-purple-100 dark:border-purple-500/10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-1">Virality Score</div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-xl font-black text-blue-900 dark:text-blue-100">{aiGeneratedData.viralityScore || 0}</div>
-                        <div className="flex-1 h-2 bg-blue-100 dark:bg-blue-500/20 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-1000" style={{ width: `${aiGeneratedData.viralityScore || 0}%` }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CTA Recommendation */}
-                  {aiGeneratedData.ctaRecommendation && (
-                    <div className="bg-amber-50/80 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
-                      <span className="text-amber-500 mt-0.5">💡</span>
-                      <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">{aiGeneratedData.ctaRecommendation}</p>
-                    </div>
-                  )}
-
-                  {/* Generated Caption Preview */}
-                  {aiGeneratedData.caption && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Generated Caption</label>
-                      <div className="bg-white dark:bg-white/5 rounded-xl p-3 border border-purple-100 dark:border-purple-500/10 text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
-                        {aiGeneratedData.caption}
-                      </div>
-                      <button onClick={applyAICaption} className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 transition-colors flex items-center gap-1">
-                        <span>✓ Apply Caption</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Generated Hashtags Preview */}
-                  {aiGeneratedData.hashtags && aiGeneratedData.hashtags.length > 0 && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Viral Hashtags ({aiGeneratedData.hashtags.length})</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {aiGeneratedData.hashtags.map((tag, i) => (
-                          <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 text-xs font-medium border border-blue-100 dark:border-blue-500/20">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                      <button onClick={applyAIHashtags} className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors flex items-center gap-1">
-                        <span>✓ Apply Hashtags</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Apply All Button */}
-                  <button 
-                    onClick={applyAllAI}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold text-sm hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 flex items-center justify-center gap-2"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Apply All AI Content
-                  </button>
+              {/* AI Generated Caption Variations */}
+              {(() => {
+                console.log('[RENDER DEBUG] aiGeneratedVariations:', aiGeneratedVariations);
+                console.log('[RENDER DEBUG] Length check:', aiGeneratedVariations && aiGeneratedVariations.length > 0);
+                return null;
+              })()}
+              {aiGeneratedVariations && aiGeneratedVariations.length > 0 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <CaptionVariationSelector
+                    variations={aiGeneratedVariations.map(v => ({
+                      caption: v.caption,
+                      hashtags: v.hashtags,
+                      authenticityScore: v.authenticityScore,
+                      engagementPrediction: {
+                        likeRate: v.engagementPrediction.predictedLikeRate,
+                        commentRate: v.engagementPrediction.predictedCommentRate,
+                        saveRate: v.engagementPrediction.predictedSaveRate,
+                        shareRate: v.engagementPrediction.predictedShareRate,
+                        confidence: v.engagementPrediction.confidence
+                      },
+                      styleCharacteristics: {
+                        type: v.style,
+                        description: v.styleDescription,
+                        patterns: v.usedPatterns,
+                        hooks: v.usedHooks
+                      }
+                    }))}
+                    onSelectVariation={handleSelectVariation}
+                    onRegenerateAll={handleRegenerateAll}
+                    isLoading={isGeneratingAI}
+                    selectedIndex={selectedVariationIndex}
+                  />
                 </div>
               )}
               
