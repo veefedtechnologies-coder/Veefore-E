@@ -16,3 +16,5 @@ export type { PromptConstructionParams } from './PromptConstructorService';
 export { ExampleCaptionService, exampleCaptionService } from './ExampleCaptionService';
 export type { ExampleCaptionMetrics, ExtractedPatterns } from './ExampleCaptionService';
 export { PerformanceCorrelationService, performanceCorrelationService } from './PerformanceCorrelationService';
+export { PlatformAdapterService } from './PlatformAdapterService';
+export type { PlatformConstraints, PlatformValidation, AdaptedCaption } from './PlatformAdapterService';

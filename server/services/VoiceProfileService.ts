@@ -1491,4 +1491,170 @@ Confidence: ${(profile.confidence * 100).toFixed(0)}% (based on ${profile.sample
       .map(s => s.replace(/_DOT_/g, '.').trim())
       .filter(s => s.length > 0);
   }
+
+  /**
+   * Get voice profile snapshots (evolution history)
+   * Requirements: 10.4, 10.5
+   */
+  async getProfileSnapshots(userId: string, workspaceId: string): Promise<any[]> {
+    // For now, we'll create a snapshot from the current profile
+    // In a production system, you would store historical snapshots in a separate collection
+    const currentProfile = await this.getProfile(userId, workspaceId);
+    
+    if (currentProfile.sampleSize === 0) {
+      return [];
+    }
+
+    // Get top vocabulary for snapshot
+    const topVocabulary = Object.entries(currentProfile.vocabularyFrequency)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([word]) => word);
+
+    // Create a snapshot from current profile
+    const snapshot = {
+      date: currentProfile.lastUpdated,
+      confidence: currentProfile.confidence,
+      sampleSize: currentProfile.sampleSize,
+      toneMarkers: currentProfile.toneMarkers,
+      topVocabulary,
+      signaturePhrases: currentProfile.signaturePhrases.slice(0, 3),
+      acceptanceRate: undefined // This would come from feedback data
+    };
+
+    // Return as array (in production, you'd fetch multiple historical snapshots)
+    return [snapshot];
+  }
+
+  /**
+   * Get learning milestones
+   * Requirements: 10.4, 10.5
+   */
+  async getLearningMilestones(userId: string, workspaceId: string): Promise<any[]> {
+    // In a production system, milestones would be tracked in a separate collection
+    // For now, we'll generate milestones based on the current profile state
+    const currentProfile = await this.getProfile(userId, workspaceId);
+    
+    if (currentProfile.sampleSize === 0) {
+      return [];
+    }
+
+    const milestones: any[] = [];
+
+    // Milestone: Profile created
+    milestones.push({
+      id: `profile-created-${currentProfile.createdAt.getTime()}`,
+      date: currentProfile.createdAt,
+      type: 'profile_updated',
+      title: 'Voice Profile Created',
+      description: `Analyzed ${currentProfile.sampleSize} captions to establish your unique writing style with ${Math.round(currentProfile.confidence * 100)}% confidence.`,
+      impact: 'high'
+    });
+
+    // Milestone: High confidence achieved (if applicable)
+    if (currentProfile.confidence >= 0.90) {
+      milestones.push({
+        id: `high-confidence-${currentProfile.lastUpdated.getTime()}`,
+        date: currentProfile.lastUpdated,
+        type: 'accuracy_improved',
+        title: 'High Confidence Achieved',
+        description: `Voice profile confidence reached ${Math.round(currentProfile.confidence * 100)}%, ensuring highly accurate caption generation.`,
+        impact: 'high'
+      });
+    }
+
+    // Milestone: Signature phrases discovered (if applicable)
+    if (currentProfile.signaturePhrases.length >= 3) {
+      milestones.push({
+        id: `phrases-discovered-${currentProfile.lastUpdated.getTime()}`,
+        date: currentProfile.lastUpdated,
+        type: 'pattern_discovered',
+        title: 'Signature Phrases Discovered',
+        description: `Identified ${currentProfile.signaturePhrases.length} unique signature phrases that define your writing style.`,
+        impact: 'medium'
+      });
+    }
+
+    return milestones.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
+  /**
+   * Get acceptance rate trends
+   * Requirements: 10.4, 10.5
+   */
+  async getAcceptanceRateTrend(userId: string, workspaceId: string): Promise<any[]> {
+    // In a production system, acceptance rates would be tracked in the captionfeedback collection
+    // For now, we'll return an empty array as this requires integration with caption feedback tracking
+    
+    // Query the generatedcaptions collection to calculate acceptance rates
+    const generatedCaptionsCollection = this.db.collection('generatedcaptions');
+    
+    try {
+      // Aggregate acceptance rates by month
+      const trends = await generatedCaptionsCollection.aggregate([
+        {
+          $match: {
+            userId,
+            workspaceId,
+            publishedAt: { $exists: true }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$generatedAt' },
+              month: { $month: '$generatedAt' }
+            },
+            totalGenerated: { $sum: 1 },
+            totalAccepted: {
+              $sum: {
+                $cond: [
+                  { $or: [
+                    { $eq: ['$wasEdited', false] },
+                    { $lte: ['$editDistance', 20] } // Minor edits count as accepted
+                  ]},
+                  1,
+                  0
+                ]
+              }
+            }
+          }
+        },
+        {
+          $sort: { '_id.year': 1, '_id.month': 1 }
+        },
+        {
+          $project: {
+            date: {
+              $dateFromParts: {
+                year: '$_id.year',
+                month: '$_id.month',
+                day: 1
+              }
+            },
+            totalGenerated: 1,
+            totalAccepted: 1,
+            acceptanceRate: {
+              $cond: [
+                { $gt: ['$totalGenerated', 0] },
+                { $divide: ['$totalAccepted', '$totalGenerated'] },
+                0
+              ]
+            }
+          }
+        }
+      ]).toArray();
+
+      return trends.map(trend => ({
+        date: trend.date.toISOString(),
+        acceptanceRate: trend.acceptanceRate,
+        totalGenerated: trend.totalGenerated,
+        totalAccepted: trend.totalAccepted
+      }));
+    } catch (error) {
+      console.error('[VOICE PROFILE] Error calculating acceptance trends:', error);
+      return [];
+    }
+  }
 }
+

@@ -1260,6 +1260,91 @@ export interface InsertViralHook {
 // AUTHENTIC INSTAGRAM CAPTION GENERATION TYPES
 // ============================================================================
 
+// Task 22.2: Safety Feedback Types
+// Requirements: 11.6 - Allow users to provide feedback on safety false positives
+
+export interface SafetyFeedback {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  captionId?: string;                    // Reference to generated caption (if applicable)
+  
+  // Feedback details
+  feedbackType: 'false_positive' | 'missed_issue' | 'calibration_request';
+  flaggedIssue: string;                  // The safety issue that was flagged
+  userRating: 'inappropriate' | 'acceptable' | 'authentic'; // User's assessment
+  comment?: string;                      // Optional user comment
+  
+  // Context
+  caption: string;                       // The caption that was flagged
+  safetyLevel: 'off' | 'standard' | 'strict';
+  originalSafetyScore: number;
+  originalFlags: string[];               // Which safety flags were triggered
+  
+  // Resolution
+  status: 'pending' | 'reviewed' | 'calibrated'; // Feedback processing status
+  reviewedAt?: Date;
+  calibrationApplied: boolean;           // Whether this feedback led to calibration changes
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertSafetyFeedback {
+  userId: string;
+  workspaceId: string;
+  captionId?: string;
+  feedbackType: 'false_positive' | 'missed_issue' | 'calibration_request';
+  flaggedIssue: string;
+  userRating: 'inappropriate' | 'acceptable' | 'authentic';
+  comment?: string;
+  caption: string;
+  safetyLevel: 'off' | 'standard' | 'strict';
+  originalSafetyScore: number;
+  originalFlags: string[];
+}
+
+// Task 22.2: Safety Calibration Settings
+// Store per-user/workspace safety calibration adjustments based on feedback
+
+export interface SafetyCalibration {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  
+  // Calibration adjustments
+  allowedPatterns: string[];             // Patterns user has marked as acceptable for their brand
+  sensitivePatterns: string[];           // Patterns user wants stricter filtering on
+  customRules: {
+    pattern: string;
+    action: 'allow' | 'flag' | 'block';
+    reason: string;
+  }[];
+  
+  // Learning data
+  falsePositiveCount: number;            // Track calibration accuracy
+  feedbackCount: number;                 // Total feedback submissions
+  lastCalibrationAt?: Date;
+  
+  // Metadata
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InsertSafetyCalibration {
+  userId: string;
+  workspaceId: string;
+  allowedPatterns?: string[];
+  sensitivePatterns?: string[];
+  customRules?: {
+    pattern: string;
+    action: 'allow' | 'flag' | 'block';
+    reason: string;
+  }[];
+}
+
+// ============================================================================
+
 // Niche Context Types
 export interface NicheContext {
   id: string;
