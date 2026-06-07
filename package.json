@@ -59,6 +59,7 @@
     "elevenlabs": "^1.59.0",
     "esbuild": "^0.25.0",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.5.2",
     "express-session": "^1.18.1",
     "firebase": "^12.3.0",
     "firebase-admin": "^13.4.0",

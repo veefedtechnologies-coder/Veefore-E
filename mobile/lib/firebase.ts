@@ -11,7 +11,7 @@ import {
 
 // Firebase configuration - same as web app
 const firebaseConfig = {
-    apiKey: 'AIzaSyABXnYreK-ZA8pRAK2t352bUpDaUwJoWzE',
+    apiKey: 'YOUR_FIREBASE_API_KEY_HERE',
     authDomain: 'veefore-b84c8.firebaseapp.com',
     projectId: 'veefore-b84c8',
     storageBucket: 'veefore-b84c8.firebasestorage.app',
