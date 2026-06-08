@@ -84,6 +84,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
   const [isEmailLoading, setIsEmailLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [redirectChecked, setRedirectChecked] = useState(false)
 
   // Forgot Password Modal State
   const [showForgotModal, setShowForgotModal] = useState(false)
@@ -141,11 +142,19 @@ const SignIn = ({ onNavigate }: SignInProps) => {
 
   // Handle Google Redirect Result (fires when user returns from Google sign-in redirect)
   useEffect(() => {
+    // Prevent multiple redirect checks
+    if (redirectChecked) return
+    
     const checkRedirectResult = async () => {
       try {
+        console.log('[AUTH] Checking for redirect result...')
         const result = await getRedirectResult(auth)
+        
         if (result) {
+          console.log('[AUTH] Redirect result found, processing...')
           setIsGoogleLoading(true)
+          setRedirectChecked(true)
+          
           const idToken = await result.user.getIdToken()
           const linkResponse = await fetch('/api/auth/link-firebase', {
             method: 'POST',
@@ -239,6 +248,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
               }
               
               // CRITICAL FIX: Clear loading state and clean URL to prevent stuck loading state
+              console.log('[AUTH] Clearing loading state and cleaning URL')
               setIsGoogleLoading(false)
               
               // Clean up URL by removing any OAuth query parameters to prevent redirect loop
@@ -249,6 +259,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
             }
             
             // Handle other backend errors
+            console.error('[AUTH] Backend error:', linkJson)
             setAuthError(linkJson?.message || 'Failed to link user account after redirect')
             setIsGoogleLoading(false)
             
@@ -267,6 +278,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
             localStorage.setItem('veefore_early_access_status', 'approved')
           }
 
+          console.log('[AUTH] Sign-in successful, redirecting to dashboard')
           toast({ title: "Success", description: "Signed in with Google successfully!" })
           // Redirect to home/dashboard after successful authentication
           setTimeout(() => {
@@ -275,12 +287,15 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         } else {
           // No redirect result means we're just loading the page normally
           // Make sure loading state is off
+          console.log('[AUTH] No redirect result, normal page load')
           setIsGoogleLoading(false)
+          setRedirectChecked(true)
         }
       } catch (error: any) {
         console.error('Google redirect sign in error:', error)
         setAuthError(error.message || "Failed to sign in with Google.")
         setIsGoogleLoading(false)
+        setRedirectChecked(true)
         
         // Clean up URL to prevent stuck state
         window.history.replaceState({}, document.title, window.location.pathname)
@@ -288,7 +303,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     }
     
     checkRedirectResult()
-  }, [toast])
+  }, [toast, redirectChecked])
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
