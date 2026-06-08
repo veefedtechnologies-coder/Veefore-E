@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "redis:start": "cd ~/Downloads/redis-stable && src/redis-server --daemonize yes || true",
     "redis:stop": "pkill redis-server || true",
