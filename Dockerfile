@@ -4,7 +4,7 @@
 # ==========================================
 # Build Stage
 # ==========================================
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -28,7 +28,7 @@ RUN NODE_ENV=production npm run build
 # ==========================================
 # Production Stage
 # ==========================================
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Security hardening
 RUN addgroup -g 1001 -S nodejs && \
