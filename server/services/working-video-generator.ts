@@ -34,7 +34,12 @@ export class WorkingVideoGenerator {
   // private elevenlabs: ElevenLabsClient;
 
   constructor() {
-    this.outputDir = join(process.cwd(), 'media', 'generated');
+    // Use /tmp on Railway/production for generated files (filesystem may be read-only)
+    const baseDir = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production' 
+      ? '/tmp/media/generated'
+      : join(process.cwd(), 'media', 'generated');
+    this.outputDir = baseDir;
+    
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
@@ -50,7 +55,8 @@ export class WorkingVideoGenerator {
     try {
       await mkdir(this.outputDir, { recursive: true });
     } catch (error) {
-      // Directory might already exist
+      console.error('[WORKING VIDEO] Failed to create directory:', error);
+      // Non-fatal - will try again if needed
     }
   }
 

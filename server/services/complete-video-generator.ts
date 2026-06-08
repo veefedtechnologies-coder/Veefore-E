@@ -75,8 +75,15 @@ export class CompleteVideoGenerator {
     this.elevenLabs = new ElevenLabsService();
     this.replicate = new ReplicateService();
     this.runway = new RunwayService();
-    this.outputDir = join(process.cwd(), 'media', 'generated');
-    this.ensureOutputDirectory();
+    
+    // Use /tmp on Railway/production for generated files (filesystem may be read-only)
+    const baseDir = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production' 
+      ? '/tmp/media/generated'
+      : join(process.cwd(), 'media', 'generated');
+    this.outputDir = baseDir;
+    
+    // Don't call async function in constructor - will be called when needed
+    // this.ensureOutputDirectory();
   }
 
   private async ensureOutputDirectory() {
@@ -85,6 +92,7 @@ export class CompleteVideoGenerator {
       console.log('[VIDEO] Output directory ready:', this.outputDir);
     } catch (error) {
       console.error('[VIDEO] Failed to create output directory:', error);
+      // Non-fatal - will try again when actually generating
     }
   }
 
