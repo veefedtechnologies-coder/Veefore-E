@@ -33,7 +33,8 @@ export function useEarlyAccessCheck() {
 
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/early-access/status?email=${encodeURIComponent(email)}`);
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+            const response = await fetch(`${apiBaseUrl}/api/early-access/status?email=${encodeURIComponent(email)}`);
             const data = await response.json();
 
             const newStatus = {
