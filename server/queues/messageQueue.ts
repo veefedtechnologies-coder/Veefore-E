@@ -1,5 +1,9 @@
 import { Queue, QueueOptions } from 'bullmq';
-import { redisConnection, redisAvailable } from './metricsQueue';
+import { getSharedRedisConnection } from '../lib/redis';
+
+// Use shared Redis connection from pool (Task 3.4: Redis Optimization)
+const redisConnection = getSharedRedisConnection();
+const redisAvailable = redisConnection && redisConnection.status === 'ready';
 
 export interface MessageJobData {
   workspaceId: string;

@@ -917,7 +917,7 @@ Controls that are completely absent (not misconfigured — fully missing):
 
 8. **MongoDB Atlas cluster IP access** — specifically check for `0.0.0.0/0` in Atlas network access configuration if any config files reference this setting
 
-9. **The `AUDIT_REPORT.md` is a deliverable** — it must be clean, professional, well-formatted Markdown that a developer, security engineer, or CTO can read and act on immediately without additional context
+9. **The `AUDIT_REPORT_Production.md` is a deliverable** — it must be clean, professional, well-formatted Markdown that a developer, security engineer, or CTO can read and act on immediately without additional context
 
 10. **When in doubt, flag it** — it is better to have a LOW finding that turns out to be fine than to miss a CRITICAL vulnerability
 
