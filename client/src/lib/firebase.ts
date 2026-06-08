@@ -2,41 +2,41 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, User, setPersistence, browserLocalPersistence, getRedirectResult, sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth'
 
 // Firebase configuration
-// authDomain: Use veefore.com in production for OAuth redirects
-// 1. The Express server proxies /__/auth/* → veefore-b84c8.firebaseapp.com
-// 2. https://veefore.com/__/auth/handler is registered in Google Cloud Console
-// This makes the OAuth redirect same-origin, bypassing Safari's ITP cross-origin block.
-// Note: app.veefore.com is only for local/dev testing
+// authDomain: MUST use Firebase's hosted domain (veefore-b84c8.firebaseapp.com) for redirect-based OAuth
+//
+// IMPORTANT: signInWithRedirect requires Firebase's authDomain for OAuth callbacks
+// - Full-page redirect flow: User → Google → Firebase authDomain → App
+// - Firebase processes OAuth callback at: https://veefore-b84c8.firebaseapp.com/__/auth/handler
+// - After processing, redirects back to app with credential embedded in URL fragment
+// - Custom domains (veefore.com) cannot be used because OAuth callback must go to Firebase's hosted domain
+//
+// NOTE: signInWithPopup (iframe-based OAuth) could theoretically work with custom domains via proxy,
+// but signInWithRedirect (full-page redirect) bypasses any proxy and REQUIRES direct Firebase communication.
+//
+// Using custom domain with signInWithRedirect causes:
+// - Browser attempts to load Firebase response in iframe context (proxy architecture)
+// - Content Security Policy (CSP) blocks iframe loading
+// - Result: Blank page with console error "Content blocker prevented iframe from loading"
 
-// CRITICAL: Hardcode production domain to prevent SSR/build-time issues
-// During Vercel build, window is undefined, causing fallback to Firebase domain
-// This ensures production ALWAYS uses veefore.com
+// CRITICAL: Hardcode Firebase domain to prevent SSR/build-time issues
+// During Vercel build, window is undefined, so we must return a valid authDomain
 const getAuthDomain = () => {
   // Check if we're in browser environment
   if (typeof window === 'undefined') {
-    // SSR/Build time: Default to production domain
-    // This prevents build-time evaluation from using Firebase default domain
-    return 'veefore.com';
+    // SSR/Build time: Return Firebase's hosted domain
+    return 'veefore-b84c8.firebaseapp.com';
   }
   
   const hostname = window.location.hostname;
   
-  // Production: Always use veefore.com (not app.veefore.com)
-  if (hostname === 'veefore.com' || hostname === 'www.veefore.com') {
-    return 'veefore.com';
-  }
-  
-  // Development/Local: Use app.veefore.com or localhost
-  if (hostname === 'app.veefore.com') {
-    return 'app.veefore.com';
-  }
-  
+  // Local development: Use localhost for local testing
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'localhost';
   }
   
-  // Default to production domain for any other case
-  return 'veefore.com';
+  // Production and all other environments: Use Firebase's hosted domain
+  // This ensures OAuth redirect flow works correctly without proxy interference
+  return 'veefore-b84c8.firebaseapp.com';
 }
 
 const firebaseConfig = {
