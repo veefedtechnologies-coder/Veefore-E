@@ -12,7 +12,8 @@ export function useEarlyAccessCheck() {
         if (typeof window !== 'undefined') {
             const email = localStorage.getItem('veefore_early_access_email');
             const cachedStatus = localStorage.getItem('veefore_early_access_status');
-            if (email && cachedStatus === 'approved') {
+            // Backend uses 'early_access' as the approved status
+            if (email && cachedStatus === 'early_access') {
                 return {
                     hasEarlyAccess: true,
                     status: 'early_access',
@@ -44,7 +45,7 @@ export function useEarlyAccessCheck() {
             if (data.hasEarlyAccess) {
                 // Store in localStorage for persistence across sessions/pages
                 localStorage.setItem('veefore_early_access_email', email);
-                localStorage.setItem('veefore_early_access_status', 'approved');
+                localStorage.setItem('veefore_early_access_status', data.status || 'early_access'); // Use backend status value
             } else {
                 // If explicitly rejected/waitlisted, clear approval but keep email ?
                 // Or just don't store "approved"
@@ -72,7 +73,8 @@ export function useEarlyAccessCheck() {
         const cachedStatus = localStorage.getItem('veefore_early_access_status');
 
         if (cachedEmail) {
-            if (cachedStatus === 'approved') {
+            // Backend uses 'early_access' as the approved status
+            if (cachedStatus === 'early_access') {
                 setStatus({
                     hasEarlyAccess: true,
                     status: 'early_access',
@@ -88,7 +90,8 @@ export function useEarlyAccessCheck() {
             const email = localStorage.getItem('veefore_early_access_email');
             const status = localStorage.getItem('veefore_early_access_status');
 
-            if (email && status === 'approved') {
+            // Backend uses 'early_access' as the approved status
+            if (email && status === 'early_access') {
                 setStatus({
                     hasEarlyAccess: true,
                     status: 'early_access',
