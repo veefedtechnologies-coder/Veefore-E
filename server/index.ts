@@ -651,31 +651,18 @@ app.use((req, res, next) => {
     res.status(404).end();
   });
 
-  // FIREBASE AUTH PROXY: Forward /__/auth/* to Firebase's hosted handler endpoint.
-  // This allows authDomain to be set to app.veefore.com so the Google sign-in popup
-  // opens on the SAME origin as the app. Without this proxy, the popup opens on
-  // veefore-b84c8.firebaseapp.com and Safari's ITP blocks the cross-origin postMessage
-  // that sends the credential back to the parent window.
-  const https = await import('https');
-  app.use('/__/auth', (req: Request, res: Response) => {
-    const firebaseHandlerUrl = `https://veefore-b84c8.firebaseapp.com/__/auth${req.url}`;
-    const proxyReq = https.get(firebaseHandlerUrl, {
-      headers: {
-        'user-agent': req.headers['user-agent'] || '',
-        'accept': req.headers['accept'] || '*/*',
-        'accept-language': req.headers['accept-language'] || '',
-      }
-    }, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
-      proxyRes.pipe(res);
-    });
-    proxyReq.on('error', (err) => {
-      console.error('[FIREBASE AUTH PROXY] Error:', err.message);
-      if (!res.headersSent) {
-        res.status(502).send('Firebase auth handler unavailable');
-      }
-    });
-  });
+  // REMOVED: Firebase Auth Proxy middleware
+  // Reason: Proxy middleware was designed for popup-based OAuth (iframe mode) but is incompatible 
+  // with redirect-based OAuth flows used by signInWithRedirect(). The proxy caused Content Security 
+  // Policy violations and blank pages because it attempted to serve OAuth responses in an iframe 
+  // context, which browsers block as a security violation.
+  //
+  // Fix: OAuth now communicates directly with Firebase's authDomain (veefore-b84c8.firebaseapp.com)
+  // without any proxy middleware interference, allowing the full-page redirect flow to complete 
+  // successfully: App → Google OAuth → Firebase authDomain → App with credential.
+  //
+  // Preservation: Non-OAuth API requests to Railway backend continue to process normally.
+  // This change only affects the /__/auth/* route handling for Firebase OAuth flows.
 
   // P2-FIX: Legacy Instagram OAuth Callback Redirect
   // Ensures existing .env configurations (pointing to /api/instagram/callback) still work
