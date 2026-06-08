@@ -22,8 +22,8 @@ RUN npm ci --legacy-peer-deps
 # Copy source code
 COPY . .
 
-# Build application
-RUN NODE_ENV=production npm run build
+# Build application (server only - client is deployed separately to Vercel)
+RUN NODE_ENV=production npm run server:build
 
 # ==========================================
 # Production Stage
