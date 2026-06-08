@@ -17,13 +17,23 @@ export class FFmpegService {
   private mediaDir: string;
 
   constructor(mediaDir: string = './media') {
-    this.mediaDir = mediaDir;
-    this.ensureMediaDirectory();
+    // Use /tmp on Railway/production for generated files (filesystem may be read-only)
+    if (process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production') {
+      this.mediaDir = mediaDir.startsWith('/tmp') ? mediaDir : `/tmp${mediaDir}`;
+    } else {
+      this.mediaDir = mediaDir;
+    }
+    // Don't create directory in constructor - will be created when needed
   }
 
   private ensureMediaDirectory() {
-    if (!fs.existsSync(this.mediaDir)) {
-      fs.mkdirSync(this.mediaDir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.mediaDir)) {
+        fs.mkdirSync(this.mediaDir, { recursive: true });
+      }
+    } catch (error) {
+      console.error('[FFMPEG] Failed to create media directory:', error);
+      // Non-fatal - will try again when needed
     }
   }
 
