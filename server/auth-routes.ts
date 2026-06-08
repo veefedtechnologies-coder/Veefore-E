@@ -206,6 +206,7 @@ router.post('/register', async (req, res) => {
   try {
     const { idToken, email, displayName } = req.body
 
+    const firebaseAdmin = getFirebaseAdmin()
     if (!firebaseAdmin) {
       return res.status(500).json({ error: 'Firebase Admin not initialized' })
     }
@@ -216,23 +217,67 @@ router.post('/register', async (req, res) => {
     const userEmail = email || decodedToken.email
 
     // ============================================
-    // EARLY ACCESS VALIDATION - Server-side gating
+    // EARLY ACCESS VALIDATION - Server-side gating with granular error messages
     // ============================================
     if (userEmail) {
       const { waitlistUserRepository } = await import('./repositories/WaitlistUserRepository')
-      const waitlistUser = await waitlistUserRepository.findByEmail(userEmail.toLowerCase())
+      const normalizedEmail = userEmail.toLowerCase().trim()
+      const waitlistUser = await waitlistUserRepository.findByEmail(normalizedEmail)
 
-      if (!waitlistUser || waitlistUser.status !== 'early_access') {
-        console.log(`[EARLY ACCESS] Access denied for ${userEmail} - Status: ${waitlistUser?.status || 'not found'}`)
+      // Scenario 1: User is not on waitlist at all
+      if (!waitlistUser) {
+        console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Not on waitlist`)
         return res.status(403).json({
-          error: 'ACCESS_DENIED',
-          code: 'EARLY_ACCESS_REQUIRED',
-          message: 'Your account is not approved for early access yet. Please join our waitlist first.',
-          hasWaitlistEntry: !!waitlistUser,
-          waitlistStatus: waitlistUser?.status || null
+          error: 'NOT_ON_WAITLIST',
+          code: 'NOT_ON_WAITLIST',
+          message: 'This email is not on our waitlist. Please join the waitlist first to get early access.',
+          action: 'JOIN_WAITLIST',
+          hasWaitlistEntry: false,
+          waitlistStatus: null
         })
       }
-      console.log(`[EARLY ACCESS] Access granted for ${userEmail}`)
+
+      // Scenario 2: User is on waitlist but pending approval
+      if (waitlistUser.status === 'pending' || waitlistUser.status === 'waitlisted') {
+        console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Status: ${waitlistUser.status} (pending approval)`)
+        return res.status(403).json({
+          error: 'NOT_APPROVED_YET',
+          code: 'PENDING_APPROVAL',
+          message: 'Your waitlist application is pending approval. We will notify you via email when you are approved for early access.',
+          action: 'WAIT_FOR_APPROVAL',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        })
+      }
+
+      // Scenario 3: User application was rejected
+      if (waitlistUser.status === 'rejected') {
+        console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Status: rejected`)
+        return res.status(403).json({
+          error: 'APPLICATION_REJECTED',
+          code: 'ACCESS_REJECTED',
+          message: 'Your application was not approved at this time. Please contact support for more information.',
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        })
+      }
+
+      // Scenario 4: User has invalid/unknown status
+      if (waitlistUser.status !== 'early_access') {
+        console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Invalid status: ${waitlistUser.status}`)
+        return res.status(403).json({
+          error: 'INVALID_STATUS',
+          code: 'INVALID_STATUS',
+          message: `Your account status (${waitlistUser.status}) does not allow signup. Please contact support.`,
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        })
+      }
+
+      // Success: User is approved for early access
+      console.log(`[EARLY ACCESS] Access granted for ${normalizedEmail} - Status: ${waitlistUser.status}`)
     }
     // ============================================
 

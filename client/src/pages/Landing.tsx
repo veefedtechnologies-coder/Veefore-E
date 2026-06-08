@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, Suspense, useCallback, memo } from 'react'
 import { Link } from 'wouter'
 import { useWaitlist } from '../context/WaitlistContext'
-import { useEarlyAccessCheck } from '../hooks/useEarlyAccessCheck'
 
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import {
@@ -768,7 +767,6 @@ const AnimatedDashboard = memo(() => {
 const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const isMobile = useIsMobile()
   const { openWaitlist } = useWaitlist()
-  const { hasEarlyAccess } = useEarlyAccessCheck()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
 
   // PERF: Defer 3D loading to allow hero text to render first
@@ -1058,10 +1056,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <div className="flex items-center justify-center px-4">
               <MagneticButton
                 className="group relative bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white rounded-full px-6 sm:px-7 md:px-8 py-3 sm:py-3.5 text-sm sm:text-sm md:text-base font-semibold overflow-hidden shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-shadow duration-300"
-                onClick={() => hasEarlyAccess ? onNavigate('signup') : openWaitlist()}
+                onClick={() => onNavigate('signup')}
               >
                 <span className="relative z-10 flex items-center">
-                  {hasEarlyAccess ? "Get Started" : "Join Waitlist"}
+                  Get Started
                   <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -1125,10 +1123,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             >
               <MagneticButton
                 className="group relative bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white rounded-full px-7 sm:px-8 md:px-10 py-3.5 sm:py-4 text-sm sm:text-base md:text-lg font-semibold overflow-hidden shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-shadow duration-300"
-                onClick={() => hasEarlyAccess ? onNavigate('signup') : openWaitlist()}
+                onClick={() => onNavigate('signup')}
               >
                 <span className="relative z-10 flex items-center">
-                  {hasEarlyAccess ? "Get Started" : "Join Waitlist"}
+                  Get Started
                   <ArrowRight className="ml-2 w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                 </span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -2243,9 +2241,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           <div className="mt-16 text-center">
             <MagneticButton
               className="bg-white text-black hover:bg-white/90 rounded-full px-8 py-3 text-sm font-bold transition-all duration-300 shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.5)]"
-              onClick={() => hasEarlyAccess ? onNavigate('signup') : openWaitlist()}
+              onClick={() => onNavigate('signup')}
             >
-              {hasEarlyAccess ? "Get Started Now" : "Switch to VeeFore Now"}
+              Get Started Now
             </MagneticButton>
           </div>
         </div>
@@ -2330,9 +2328,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         ? 'bg-white text-black hover:bg-white/90'
                         : 'bg-white/5 border border-white/10 hover:bg-white/10'
                         }`}
-                      onClick={() => hasEarlyAccess ? onNavigate('signup') : openWaitlist()}
+                      onClick={() => onNavigate('signup')}
                     >
-                      {hasEarlyAccess ? "Get Started" : "Get Notified"}
+                      Get Started
                     </MagneticButton>
                   </GlassCard>
                 </TiltCard>
@@ -2460,10 +2458,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
             <MagneticButton
               className="group relative bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full px-14 py-6 text-xl font-bold overflow-hidden"
-              onClick={() => onNavigate(hasEarlyAccess ? 'signup' : 'waitlist')}
+              onClick={() => onNavigate('signup')}
             >
               <span className="relative z-10 flex items-center">
-                {hasEarlyAccess ? "Get Started Now" : "Join Beta Waitlist"}
+                Get Started Now
                 <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
               </span>
               <div className="absolute inset-[-2px] bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity" />
