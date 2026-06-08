@@ -1,0 +1,24 @@
+{
+  "name": "VeeFore - Social Media Management",
+  "short_name": "VeeFore",
+  "description": "AI-powered social media management platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/veefore.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "business",
+    "productivity",
+    "social"
+  ],
+  "prefer_related_applications": false
+}
