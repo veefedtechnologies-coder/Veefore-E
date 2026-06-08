@@ -268,7 +268,8 @@ export default function WaitlistPage() {
                 // If restoring to a later step, verify they aren't already registered
                 // This handles the "user comes back after a few minutes" case
                 if (parsed.formData.email && parsed.step > 1) {
-                    fetch(`/api/early-access/check-email?email=${encodeURIComponent(parsed.formData.email)}&reason=restore`)
+                    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+                    fetch(`${apiBaseUrl}/api/early-access/check-email?email=${encodeURIComponent(parsed.formData.email)}&reason=restore`)
                         .then(res => res.json())
                         .then(data => {
                             if (data.exists) {
@@ -415,8 +416,9 @@ export default function WaitlistPage() {
                             const controller = new AbortController();
                             const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+                            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
                             const response = await fetch(
-                                `/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`,
+                                `${apiBaseUrl}/api/early-access/check-email?email=${encodeURIComponent(trimmedEmail)}`,
                                 { signal: controller.signal }
                             );
 
@@ -494,7 +496,8 @@ export default function WaitlistPage() {
         try {
             await new Promise(resolve => setTimeout(resolve, 1500));
             console.log('[WaitlistPage] Sending request...');
-            const response = await fetch('/api/early-access/join', {
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+            const response = await fetch(`${apiBaseUrl}/api/early-access/join`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: formData.name.trim(), email: formData.email.trim().toLowerCase(), role: formData.orgType, questionnaire: { ...formData } })
