@@ -1426,28 +1426,54 @@ app.use((req, res, next) => {
       }
     }
   } else {
-    // Production mode - use static file serving
-    try {
-      if (serveStatic) {
-        serveStatic(app);
-        console.log('[PRODUCTION] Static file serving enabled');
-      } else {
-        throw new Error('serveStatic not available');
-      }
-    } catch (error) {
-      console.error('[PRODUCTION] Static serving failed, using fallback:', error);
+    // Production mode - Railway backend is API-only, Vercel serves frontend
+    const isBackendOnly = process.env.BACKEND_ONLY === 'true' || process.env.RAILWAY_ENVIRONMENT !== undefined;
+    
+    if (isBackendOnly) {
+      console.log('[PRODUCTION] Running as backend-only server (Railway)');
+      console.log('[PRODUCTION] Static assets are served by Vercel at veefore.com');
+      console.log('[PRODUCTION] This instance serves API endpoints only');
+      
+      // For backend-only mode, just handle 404s for non-API routes
+      app.get('*', (req, res, next) => {
+        // API routes are already handled by registered routes
+        if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health') || req.path.startsWith('/webhook')) {
+          return next();
+        }
+        
+        // All other routes return info about the API
+        res.status(200).json({
+          name: 'VeeFore API',
+          version: '1.0.0',
+          environment: 'production',
+          message: 'Backend API server - Frontend is at https://veefore.com',
+          health: '/api/health',
+          docs: '/api/docs'
+        });
+      });
+    } else {
+      // Production mode with static file serving (for single-server deployments)
+      try {
+        if (serveStatic) {
+          serveStatic(app);
+          console.log('[PRODUCTION] Static file serving enabled');
+        } else {
+          throw new Error('serveStatic not available');
+        }
+      } catch (error) {
+        console.error('[PRODUCTION] Static serving failed, using fallback:', error);
 
-      // Enhanced fallback static serving for production
-      const possiblePaths = [
-        path.join(process.cwd(), 'dist/public'),
-        path.join(process.cwd(), 'client/dist'),
-        path.join(process.cwd(), 'public'),
-        path.join(process.cwd(), 'build')
-      ];
+        // Enhanced fallback static serving for production
+        const possiblePaths = [
+          path.join(process.cwd(), 'dist/public'),
+          path.join(process.cwd(), 'client/dist'),
+          path.join(process.cwd(), 'public'),
+          path.join(process.cwd(), 'build')
+        ];
 
-      let staticPath: string | null = null;
+        let staticPath: string | null = null;
 
-      for (const possiblePath of possiblePaths) {
+        for (const possiblePath of possiblePaths) {
         if (fs.existsSync(possiblePath)) {
           staticPath = possiblePath;
           break;
@@ -1500,6 +1526,7 @@ app.use((req, res, next) => {
           }
         });
       }
+    }
     }
   }
 
