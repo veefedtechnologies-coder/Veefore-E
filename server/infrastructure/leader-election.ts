@@ -41,9 +41,11 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
     console.log('[LEADER ELECTION] Attempting to acquire polling lock...');
     const hasPollingLock = await waitForMongoDBAndAcquireLock(LOCK_NAMES.INSTAGRAM_POLLING);
 
-    // FIX FOR DEV/SINGLE-INSTANCE: If we failed to get lock, but it might be a ghost lock from a crash
-    // In dev/test environments, we want to force takeover if possible
-    if (!hasPollingLock && (process.env.NODE_ENV !== 'production' || process.env.FORCE_LEADER === 'true')) {
+    // PRODUCTION FIX: In production, if another instance holds the lock, this is normal
+    // Only force-release in development or with explicit FORCE_LEADER flag
+    const shouldForceRelease = process.env.NODE_ENV !== 'production' || process.env.FORCE_LEADER === 'true';
+    
+    if (!hasPollingLock && shouldForceRelease) {
       console.log('[LEADER ELECTION] ⚠️ Failed to acquire polling lock in DEV/FORCE mode. Attempting to clear ghost lock...');
       await distributedLock.forceReleaseLock(LOCK_NAMES.INSTAGRAM_POLLING);
       const retryLock = await waitForMongoDBAndAcquireLock(LOCK_NAMES.INSTAGRAM_POLLING, 5, 1000);
@@ -51,7 +53,7 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
         console.log('[LEADER ELECTION] 🧨 Successfully acquired polling lock after force release!');
       }
     } else if (!hasPollingLock) {
-      console.log('[LEADER ELECTION] Failed to acquire polling lock (and not in dev force mode)');
+      console.log('[LEADER ELECTION] ⏸️ Polling lock held by another instance - this instance is a FOLLOWER');
     }
 
     // Re-check status after potential retry
@@ -61,14 +63,16 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
     console.log('[LEADER ELECTION] Attempting to acquire monitor lock...');
     const hasMonitorLock = await waitForMongoDBAndAcquireLock(LOCK_NAMES.INSTAGRAM_ACCOUNT_MONITOR);
 
-    // Same fix for monitor lock
-    if (!hasMonitorLock && (process.env.NODE_ENV !== 'production' || process.env.FORCE_LEADER === 'true')) {
+    // Same logic for monitor lock
+    if (!hasMonitorLock && shouldForceRelease) {
       console.log('[LEADER ELECTION] ⚠️ Failed to acquire monitor lock in DEV/FORCE mode. Attempting to clear ghost lock...');
       await distributedLock.forceReleaseLock(LOCK_NAMES.INSTAGRAM_ACCOUNT_MONITOR);
       const retryLock = await waitForMongoDBAndAcquireLock(LOCK_NAMES.INSTAGRAM_ACCOUNT_MONITOR, 5, 1000);
       if (retryLock) {
         console.log('[LEADER ELECTION] 🧨 Successfully acquired monitor lock after force release!');
       }
+    } else if (!hasMonitorLock) {
+      console.log('[LEADER ELECTION] ⏸️ Monitor lock held by another instance - this instance is a FOLLOWER');
     }
 
     const finalMonitorLock = distributedLock.isLockOwner(LOCK_NAMES.INSTAGRAM_ACCOUNT_MONITOR);
@@ -88,11 +92,20 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
     } else {
       console.log(`[LEADER ELECTION] ⏳ This instance (${distributedLock.getInstanceId()}) is a FOLLOWER - skipping Instagram polling`);
       console.log('[SMART POLLING] ℹ️ Polling will be handled by the leader instance');
+      console.log('[SMART POLLING] ℹ️ This is normal behavior for horizontal scaling');
     }
   } catch (error) {
     console.error('[LEADER ELECTION] Failed to acquire polling locks:', error);
-    console.log('[SMART POLLING] ⚠️ Starting polling as fallback due to lock error');
-    startFallbackSmartPolling();
+    
+    // PRODUCTION FIX: Don't start fallback polling in production if locks failed
+    // This prevents multiple instances from all running polling
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SMART POLLING] ⚠️ Starting polling as fallback (development mode only)');
+      startFallbackSmartPolling();
+    } else {
+      console.log('[SMART POLLING] ⏸️ Not starting polling - lock acquisition failed in production');
+      console.log('[SMART POLLING] ℹ️ Another instance should be handling polling');
+    }
   }
 }
 

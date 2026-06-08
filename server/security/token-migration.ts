@@ -227,18 +227,24 @@ export function scheduleTokenReEncryption(): void {
   const intervalDays = isNaN(parsed) ? 30 : Math.max(1, parsed);
 
   // Safe interval calculation (Node.js max timeout is ~24.8 days)
-  // If > 24 days, cap it to 24 days to avoid infinite loop (1ms fallback)
-  const MAX_SAFE_INTERVAL = 24 * 60 * 60 * 1000; // 1 day daily check is safer
+  // Node.js setTimeout/setInterval max value is 2,147,483,647 ms (≈24.8 days)
+  // Cap at 24 days to avoid exceeding this limit
+  const MAX_SAFE_INTERVAL_DAYS = 24;
+  const MAX_SAFE_INTERVAL_MS = MAX_SAFE_INTERVAL_DAYS * 24 * 60 * 60 * 1000; // 24 days in ms
+  
   let intervalMs = intervalDays * 24 * 60 * 60 * 1000;
 
-  if (intervalMs > 2147483647) {
-    console.warn(`⚠️ P2-2: Interval ${intervalDays} days exceeds Node.js limit. Capping at 24 days.`);
-    intervalMs = 24 * 24 * 60 * 60 * 1000; // Cap at ~24 days
+  if (intervalMs > MAX_SAFE_INTERVAL_MS || intervalMs > 2147483647) {
+    console.warn(`⚠️ P2-2: Interval ${intervalDays} days exceeds Node.js limit. Capping at ${MAX_SAFE_INTERVAL_DAYS} days.`);
+    intervalMs = MAX_SAFE_INTERVAL_MS;
   }
 
-  if (process.env.NODE_ENV !== 'production') return;
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`🔐 P2-2: Token re-encryption scheduled for ${intervalDays} days (skipped in development)`);
+    return;
+  }
 
-  console.log(`🔐 P2-2: Scheduled token re-encryption interval: ${intervalDays} days (running every ${intervalMs}ms)`);
+  console.log(`🔐 P2-2: Scheduled token re-encryption interval: ${Math.floor(intervalMs / (24 * 60 * 60 * 1000))} days (${intervalMs}ms)`);
 
   setInterval(async () => {
     console.log('🔐 P2-2: Starting scheduled token re-encryption...');

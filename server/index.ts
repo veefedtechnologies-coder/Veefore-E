@@ -190,22 +190,27 @@ app.use(correlationIdMiddleware);
 // P1-7 SECURITY: Security monitoring and logging
 app.use(securityLoggingMiddleware);
 
-// CRITICAL: Serve static assets BEFORE security middleware to prevent 403 blocks
-// This must run before CORS checks since static files don't need origin validation
-const distPublicPath = path.join(process.cwd(), 'dist/public');
-if (fs.existsSync(distPublicPath)) {
-  app.use('/assets', express.static(path.join(distPublicPath, 'assets'), {
-    maxAge: '1y',
-    immutable: true,
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css');
-      } else if (filePath.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript');
+// PRODUCTION NOTE: Static assets are served by Vercel (frontend)
+// Railway only serves the API backend - no dist/public directory needed
+if (isDevelopment) {
+  // Only check for static files in development mode
+  const distPublicPath = path.join(process.cwd(), 'dist/public');
+  if (fs.existsSync(distPublicPath)) {
+    app.use('/assets', express.static(path.join(distPublicPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+        } else if (filePath.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
       }
-    }
-  }));
-  console.log('[STATIC] Serving /assets from dist/public/assets (pre-CORS)');
+    }));
+    console.log('[STATIC] Serving /assets from dist/public/assets (development mode)');
+  }
+} else {
+  console.log('[PRODUCTION] Static assets served by Vercel - Railway handles API only');
 }
 
 // P1-5 SECURITY: Emergency CORS lockdown check (highest priority)
