@@ -2,15 +2,28 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, User, setPersistence, browserLocalPersistence, getRedirectResult, sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth'
 
 // Firebase configuration
-// authDomain: Use app.veefore.com in production since:
+// authDomain: Use veefore.com in production for OAuth redirects
 // 1. The Express server proxies /__/auth/* → veefore-b84c8.firebaseapp.com
-// 2. https://app.veefore.com/__/auth/handler is registered in Google Cloud Console
-// This makes the popup same-origin, bypassing Safari's ITP cross-origin block.
+// 2. https://veefore.com/__/auth/handler is registered in Google Cloud Console
+// This makes the OAuth redirect same-origin, bypassing Safari's ITP cross-origin block.
+// Note: app.veefore.com is only for local/dev testing
 const getAuthDomain = () => {
-  if (typeof window !== 'undefined' && window.location.hostname.includes('veefore.com')) {
-    return window.location.hostname // e.g. app.veefore.com
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    
+    // Production: Always use veefore.com (not app.veefore.com)
+    if (hostname === 'veefore.com') {
+      return 'veefore.com';
+    }
+    
+    // Development/Local: Use app.veefore.com or localhost
+    if (hostname === 'app.veefore.com' || hostname === 'localhost') {
+      return hostname;
+    }
   }
-  return 'veefore-b84c8.firebaseapp.com' // localhost / dev fallback
+  
+  // Fallback for SSR or unknown environments
+  return 'veefore-b84c8.firebaseapp.com';
 }
 
 const firebaseConfig = {
