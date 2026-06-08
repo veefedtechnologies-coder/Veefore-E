@@ -26,6 +26,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      external: ['agentation'],
+    },
   },
   server: {
     port: 5173,
