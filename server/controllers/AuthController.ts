@@ -81,6 +81,85 @@ export class AuthController extends BaseController {
     res: Response
   ) => {
     const input = LinkFirebaseSchema.parse(req.body);
+    const normalizedEmail = input.email.trim().toLowerCase();
+
+    // ============================================
+    // EARLY ACCESS VALIDATION - Server-side gating with granular error messages
+    // ============================================
+    const { waitlistUserRepository } = await import('../repositories/WaitlistUserRepository');
+    const waitlistUser = await waitlistUserRepository.findByEmail(normalizedEmail);
+
+    // Scenario 1: User is not on waitlist at all
+    if (!waitlistUser) {
+      console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Not on waitlist`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'NOT_ON_WAITLIST',
+          message: 'This email is not on our waitlist. Please join the waitlist first to get early access.',
+        },
+        details: {
+          action: 'JOIN_WAITLIST',
+          hasWaitlistEntry: false,
+          waitlistStatus: null
+        }
+      });
+    }
+
+    // Scenario 2: User is on waitlist but pending approval
+    if (waitlistUser.status === 'pending' || waitlistUser.status === 'waitlisted') {
+      console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Status: ${waitlistUser.status} (pending approval)`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'PENDING_APPROVAL',
+          message: 'Your waitlist application is pending approval. We will notify you via email when you are approved for early access.',
+        },
+        details: {
+          action: 'WAIT_FOR_APPROVAL',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Scenario 3: User application was rejected
+    if (waitlistUser.status === 'rejected') {
+      console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Status: rejected`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'ACCESS_REJECTED',
+          message: 'Your application was not approved at this time. Please contact support for more information.',
+        },
+        details: {
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Scenario 4: User has invalid/unknown status
+    if (waitlistUser.status !== 'early_access') {
+      console.log(`[EARLY ACCESS] Access denied for ${normalizedEmail} - Invalid status: ${waitlistUser.status}`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'INVALID_STATUS',
+          message: `Your account status (${waitlistUser.status}) does not allow signup. Please contact support.`,
+        },
+        details: {
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Success: User is approved for early access
+    console.log(`[EARLY ACCESS] Access granted for ${normalizedEmail} - Status: ${waitlistUser.status}`);
+    // ============================================
 
     let user = await userService.getUserByEmail(input.email);
 
@@ -326,6 +405,86 @@ export class AuthController extends BaseController {
   ) => {
     const input = SendVerificationSchema.parse(req.body);
     const { email, firstName } = input;
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // ============================================
+    // PRE-OTP EARLY ACCESS VALIDATION
+    // Check before sending OTP to give immediate feedback
+    // ============================================
+    const { waitlistUserRepository } = await import('../repositories/WaitlistUserRepository');
+    const waitlistUser = await waitlistUserRepository.findByEmail(normalizedEmail);
+
+    // Scenario 1: User is not on waitlist at all
+    if (!waitlistUser) {
+      console.log(`[EARLY ACCESS] Signup denied for ${normalizedEmail} - Not on waitlist`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'NOT_ON_WAITLIST',
+          message: 'This email is not on our waitlist. Please join the waitlist first to get early access.',
+        },
+        details: {
+          action: 'JOIN_WAITLIST',
+          hasWaitlistEntry: false,
+          waitlistStatus: null
+        }
+      });
+    }
+
+    // Scenario 2: User is on waitlist but pending approval
+    if (waitlistUser.status === 'pending' || waitlistUser.status === 'waitlisted') {
+      console.log(`[EARLY ACCESS] Signup denied for ${normalizedEmail} - Status: ${waitlistUser.status} (pending approval)`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'PENDING_APPROVAL',
+          message: 'Your waitlist application is pending approval. We will notify you via email when you are approved for early access.',
+        },
+        details: {
+          action: 'WAIT_FOR_APPROVAL',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Scenario 3: User application was rejected
+    if (waitlistUser.status === 'rejected') {
+      console.log(`[EARLY ACCESS] Signup denied for ${normalizedEmail} - Status: rejected`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'ACCESS_REJECTED',
+          message: 'Your application was not approved at this time. Please contact support for more information.',
+        },
+        details: {
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Scenario 4: User has invalid/unknown status
+    if (waitlistUser.status !== 'early_access') {
+      console.log(`[EARLY ACCESS] Signup denied for ${normalizedEmail} - Invalid status: ${waitlistUser.status}`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'INVALID_STATUS',
+          message: `Your account status (${waitlistUser.status}) does not allow signup. Please contact support.`,
+        },
+        details: {
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Success: User is approved for early access - proceed with OTP
+    console.log(`[EARLY ACCESS] Access granted for ${normalizedEmail} - Proceeding with verification email`);
+    // ============================================
 
     console.log(`[OPEN SIGNUP] User ${email} signup allowed, proceeding with verification email`);
 
@@ -507,6 +666,101 @@ export class AuthController extends BaseController {
 
     this.sendSuccess(res, {
       message: 'Verification email resent successfully'
+    });
+  });
+
+  // Check early access eligibility (called before creating Firebase user)
+  checkEarlyAccess = this.wrapAsync(async (
+    req: TypedRequest<ParamsDictionary, { email: string }>,
+    res: Response
+  ) => {
+    const { email } = req.body;
+    
+    if (!email) {
+      return this.sendError(res, new ValidationError('Email is required'));
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // ============================================
+    // EARLY ACCESS VALIDATION CHECK
+    // ============================================
+    const { waitlistUserRepository } = await import('../repositories/WaitlistUserRepository');
+    const waitlistUser = await waitlistUserRepository.findByEmail(normalizedEmail);
+
+    // Scenario 1: User is not on waitlist at all
+    if (!waitlistUser) {
+      console.log(`[EARLY ACCESS] Pre-check failed for ${normalizedEmail} - Not on waitlist`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'NOT_ON_WAITLIST',
+          message: 'This email is not on our waitlist. Please join the waitlist first to get early access.',
+        },
+        details: {
+          action: 'JOIN_WAITLIST',
+          hasWaitlistEntry: false,
+          waitlistStatus: null
+        }
+      });
+    }
+
+    // Scenario 2: User is on waitlist but pending approval
+    if (waitlistUser.status === 'pending' || waitlistUser.status === 'waitlisted') {
+      console.log(`[EARLY ACCESS] Pre-check failed for ${normalizedEmail} - Status: ${waitlistUser.status} (pending approval)`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'PENDING_APPROVAL',
+          message: 'Your waitlist application is pending approval. We will notify you via email when you are approved for early access.',
+        },
+        details: {
+          action: 'WAIT_FOR_APPROVAL',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Scenario 3: User application was rejected
+    if (waitlistUser.status === 'rejected') {
+      console.log(`[EARLY ACCESS] Pre-check failed for ${normalizedEmail} - Status: rejected`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'ACCESS_REJECTED',
+          message: 'Your application was not approved at this time. Please contact support for more information.',
+        },
+        details: {
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Scenario 4: User has invalid/unknown status
+    if (waitlistUser.status !== 'early_access') {
+      console.log(`[EARLY ACCESS] Pre-check failed for ${normalizedEmail} - Invalid status: ${waitlistUser.status}`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'INVALID_STATUS',
+          message: `Your account status (${waitlistUser.status}) does not allow signup. Please contact support.`,
+        },
+        details: {
+          action: 'CONTACT_SUPPORT',
+          hasWaitlistEntry: true,
+          waitlistStatus: waitlistUser.status
+        }
+      });
+    }
+
+    // Success: User is approved for early access
+    console.log(`[EARLY ACCESS] Pre-check passed for ${normalizedEmail} - Status: ${waitlistUser.status}`);
+    this.sendSuccess(res, {
+      message: 'Early access check passed',
+      status: waitlistUser.status
     });
   });
 }

@@ -294,10 +294,91 @@ const SignIn = ({ onNavigate }: SignInProps) => {
           photoURL: result.user.photoURL
         })
       })
-      const linkJson = await linkResponse.json().catch(() => ({}))
+      
+      // Enhanced early access error handling
       if (!linkResponse.ok) {
+        const linkJson = await linkResponse.json().catch(() => ({}))
+        
+        // Handle early access specific errors (403 Forbidden)
+        if (linkResponse.status === 403) {
+          const errorCode = linkJson.error?.code || linkJson.code
+          const errorMessage = linkJson.error?.message || linkJson.message
+          
+          console.log('[EARLY ACCESS] Google Sign-In blocked:', { errorCode, errorMessage })
+          
+          // CRITICAL: Delete the Firebase user since backend validation failed
+          // Firebase auto-creates the user during Google OAuth, so we need to remove it
+          // This prevents orphaned Firebase users that aren't in our system
+          try {
+            if (result.user) {
+              await result.user.delete()
+              console.log('[AUTH] Deleted Firebase user due to early access validation failure')
+            }
+          } catch (deleteError: any) {
+            console.error('[AUTH] Failed to delete Firebase user:', deleteError)
+            // If delete fails (e.g., token expired), at least sign them out
+            try {
+              await auth.signOut()
+              console.log('[AUTH] Signed out Firebase user instead')
+            } catch (signOutError) {
+              console.error('[AUTH] Failed to sign out:', signOutError)
+            }
+          }
+          
+          switch (errorCode) {
+            case 'NOT_ON_WAITLIST':
+              setAuthError('🚫 Access Denied - This email isn\'t registered for early access. Join our waitlist to get started!')
+              toast({
+                title: "Join Our Waitlist First",
+                description: "Sign up for early access at veefore.com/waitlist to get started.",
+                variant: "destructive",
+              })
+              throw new Error('NOT_ON_WAITLIST')
+              
+            case 'PENDING_APPROVAL':
+              setAuthError('⏳ Almost There! Your waitlist application is under review. We\'ll email you once approved (usually within 24-48 hours).')
+              toast({
+                title: "Hang Tight!",
+                description: "We're reviewing your application. Check your email for updates!",
+                variant: "default",
+              })
+              throw new Error('PENDING_APPROVAL')
+              
+            case 'ACCESS_REJECTED':
+              setAuthError('😔 Unfortunately, your application wasn\'t approved this time. Contact us at support@veefore.com if you have questions.')
+              toast({
+                title: "Application Not Approved",
+                description: "Reach out to support@veefore.com for more information.",
+                variant: "destructive",
+              })
+              throw new Error('ACCESS_REJECTED')
+              
+            case 'INVALID_STATUS':
+              setAuthError('⚠️ There\'s an issue with your account status. Please contact support@veefore.com for help.')
+              toast({
+                title: "Account Status Issue",
+                description: "Our support team can help resolve this. Email support@veefore.com",
+                variant: "destructive",
+              })
+              throw new Error('INVALID_STATUS')
+              
+            default:
+              setAuthError('🔒 Early Access Required - This product is currently invite-only. Join our waitlist to get access!')
+              toast({
+                title: "Early Access Required",
+                description: "Visit veefore.com/waitlist to request access.",
+                variant: "destructive",
+              })
+              throw new Error(errorMessage || 'Early access validation failed')
+          }
+        }
+        
+        // Handle other errors
         throw new Error(linkJson?.message || 'Failed to link user account')
       }
+      
+      const linkJson = await linkResponse.json().catch(() => ({}))
+      
       if (result.user.email) {
         localStorage.setItem('veefore_early_access_email', result.user.email)
         localStorage.setItem('veefore_early_access_status', 'approved')
@@ -329,7 +410,15 @@ const SignIn = ({ onNavigate }: SignInProps) => {
       } else if (error.code === 'auth/popup-closed-by-user') {
         setAuthError('Sign-in popup was closed. Please try again.')
       } else {
-        setAuthError(error.message || 'Failed to sign in with Google. Please try again.')
+        // CRITICAL: Don't override friendly error messages already set for early access errors
+        // These errors already have user-friendly messages set via setAuthError() above
+        const earlyAccessErrors = ['NOT_ON_WAITLIST', 'PENDING_APPROVAL', 'ACCESS_REJECTED', 'INVALID_STATUS']
+        
+        if (!earlyAccessErrors.includes(error.message)) {
+          // Only set generic error if it's not an early access error
+          setAuthError(error.message || 'Failed to sign in with Google. Please try again.')
+        }
+        // If it IS an early access error, the friendly message is already set - don't override it
       }
       setIsGoogleLoading(false)
     }
