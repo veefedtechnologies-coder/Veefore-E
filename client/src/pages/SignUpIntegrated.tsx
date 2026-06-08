@@ -517,8 +517,83 @@ function SignUpIntegrated() {
       const data = await response.json()
 
       if (!response.ok) {
+        // Log the error for debugging
+        console.log('[EARLY ACCESS] Error response:', { status: response.status, data })
+
+        // Handle early access errors (403 Forbidden)
+        if (response.status === 403) {
+          const errorCode = data.error?.code || data.code
+          const errorMessage = data.error?.message || data.message
+
+          console.log('[EARLY ACCESS] Parsed error:', { errorCode, errorMessage })
+
+          switch (errorCode) {
+            case 'NOT_ON_WAITLIST':
+              setErrors({ 
+                email: '🚫 Access Denied - This email isn\'t on our waitlist yet. Join us at veefore.com/waitlist!' 
+              })
+              toast({
+                title: "Join Our Waitlist First",
+                description: "Sign up for early access at veefore.com/waitlist to get started.",
+                variant: "destructive",
+              })
+              setIsResending(false)
+              return
+              
+            case 'PENDING_APPROVAL':
+              setErrors({ 
+                email: '⏳ Almost There! Your application is under review. We\'ll email you once approved (usually 24-48 hours).' 
+              })
+              toast({
+                title: "Hang Tight!",
+                description: "We're reviewing your application. Check your email for updates!",
+                variant: "default",
+              })
+              setIsResending(false)
+              return
+              
+            case 'ACCESS_REJECTED':
+              setErrors({ 
+                email: '😔 Unfortunately, your application wasn\'t approved this time. Contact support@veefore.com for details.' 
+              })
+              toast({
+                title: "Application Not Approved",
+                description: "Reach out to support@veefore.com for more information.",
+                variant: "destructive",
+              })
+              setIsResending(false)
+              return
+              
+            case 'INVALID_STATUS':
+              setErrors({ 
+                email: '⚠️ There\'s an issue with your account status. Contact support@veefore.com for help.' 
+              })
+              toast({
+                title: "Account Status Issue",
+                description: "Our support team can help resolve this. Email support@veefore.com",
+                variant: "destructive",
+              })
+              setIsResending(false)
+              return
+              
+            default:
+              setErrors({ 
+                email: '🔒 Early Access Required - This product is invite-only. Join our waitlist to get access!' 
+              })
+              toast({
+                title: "Early Access Required",
+                description: "Visit veefore.com/waitlist to request access.",
+                variant: "destructive",
+              })
+              setIsResending(false)
+              return
+          }
+        }
+
+        // Handle other errors
         if (data.userExists && data.shouldSignIn) {
           setUserExistsModal({ show: true, email: formData.email.trim().toLowerCase() })
+          setIsResending(false)
           return
         }
         throw new Error(data.message || 'Failed to send verification email')
@@ -592,6 +667,91 @@ function SignUpIntegrated() {
         throw new Error(message)
       }
 
+      // CRITICAL: Validate early access BEFORE creating Firebase user
+      // This prevents creating users that will be immediately rejected
+      console.log('[EARLY ACCESS] Pre-validation check before Firebase user creation')
+      
+      const preValidationResponse = await fetch('/api/auth/check-early-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email.trim().toLowerCase()
+        })
+      })
+
+      if (!preValidationResponse.ok) {
+        const preValidationData = await preValidationResponse.json()
+        
+        if (preValidationResponse.status === 403) {
+          const errorCode = preValidationData.error?.code || preValidationData.code
+          const errorMessage = preValidationData.error?.message || preValidationData.message
+          
+          console.log('[EARLY ACCESS] Pre-validation failed:', { errorCode, errorMessage })
+          
+          switch (errorCode) {
+            case 'NOT_ON_WAITLIST':
+              setErrors({ 
+                otp: '🚫 Access Denied - This email isn\'t on our waitlist. Join at veefore.com/waitlist to get started!' 
+              })
+              toast({
+                title: "Join Our Waitlist First",
+                description: "Sign up for early access at veefore.com/waitlist.",
+                variant: "destructive",
+              })
+              throw new Error('NOT_ON_WAITLIST')
+              
+            case 'PENDING_APPROVAL':
+              setErrors({ 
+                otp: '⏳ Almost There! Your application is under review. We\'ll email you once approved (usually 24-48 hours).' 
+              })
+              toast({
+                title: "Hang Tight!",
+                description: "We're reviewing your application. Check your email for updates!",
+                variant: "default",
+              })
+              throw new Error('PENDING_APPROVAL')
+              
+            case 'ACCESS_REJECTED':
+              setErrors({ 
+                otp: '😔 Unfortunately, your application wasn\'t approved this time. Contact support@veefore.com for details.' 
+              })
+              toast({
+                title: "Application Not Approved",
+                description: "Reach out to support@veefore.com for more information.",
+                variant: "destructive",
+              })
+              throw new Error('ACCESS_REJECTED')
+              
+            case 'INVALID_STATUS':
+              setErrors({ 
+                otp: '⚠️ There\'s an issue with your account status. Contact support@veefore.com for help.' 
+              })
+              toast({
+                title: "Account Status Issue",
+                description: "Our support team can help resolve this. Email support@veefore.com",
+                variant: "destructive",
+              })
+              throw new Error('INVALID_STATUS')
+              
+            default:
+              setErrors({ 
+                otp: '🔒 Early Access Required - This product is invite-only. Join our waitlist to get access!' 
+              })
+              toast({
+                title: "Early Access Required",
+                description: "Visit veefore.com/waitlist to request access.",
+                variant: "destructive",
+              })
+              throw new Error(errorMessage || 'Early access validation failed')
+          }
+        }
+        
+        throw new Error('Validation check failed')
+      }
+
+      console.log('[EARLY ACCESS] Pre-validation passed - proceeding with Firebase user creation')
+
+      // Only create Firebase user after early access validation passes
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
       console.log('✅ Firebase user created successfully:', userCredential.user.uid)
 
@@ -612,7 +772,89 @@ function SignUpIntegrated() {
 
         clearTimeout(timeoutId)
 
+        // Enhanced early access error handling
         if (!linkResponse.ok) {
+          const errorData = await linkResponse.json()
+          
+          // Handle early access specific errors with user-friendly messages
+          if (linkResponse.status === 403) {
+            const errorCode = errorData.error?.code || errorData.code
+            const errorMessage = errorData.error?.message || errorData.message
+            
+            // CRITICAL: Delete the Firebase user we just created since backend validation failed
+            // This prevents the user from being stuck in a partial auth state
+            try {
+              await userCredential.user.delete()
+              console.log('[AUTH] Deleted Firebase user due to early access validation failure')
+            } catch (deleteError) {
+              console.error('[AUTH] Failed to delete Firebase user:', deleteError)
+              // If delete fails, at least sign them out
+              try {
+                await auth.signOut()
+                console.log('[AUTH] Signed out Firebase user instead')
+              } catch (signOutError) {
+                console.error('[AUTH] Failed to sign out:', signOutError)
+              }
+            }
+            
+            switch (errorCode) {
+              case 'NOT_ON_WAITLIST':
+                setErrors({ 
+                  otp: '🚫 Access Denied - This email isn\'t on our waitlist. Join at veefore.com/waitlist to get started!' 
+                })
+                toast({
+                  title: "Join Our Waitlist First",
+                  description: "Sign up for early access at veefore.com/waitlist.",
+                  variant: "destructive",
+                })
+                throw new Error('NOT_ON_WAITLIST')
+                
+              case 'PENDING_APPROVAL':
+                setErrors({ 
+                  otp: '⏳ Almost There! Your application is under review. We\'ll email you once approved (usually 24-48 hours).' 
+                })
+                toast({
+                  title: "Hang Tight!",
+                  description: "We're reviewing your application. Check your email for updates!",
+                  variant: "default",
+                })
+                throw new Error('PENDING_APPROVAL')
+                
+              case 'ACCESS_REJECTED':
+                setErrors({ 
+                  otp: '😔 Unfortunately, your application wasn\'t approved this time. Contact support@veefore.com for details.' 
+                })
+                toast({
+                  title: "Application Not Approved",
+                  description: "Reach out to support@veefore.com for more information.",
+                  variant: "destructive",
+                })
+                throw new Error('ACCESS_REJECTED')
+                
+              case 'INVALID_STATUS':
+                setErrors({ 
+                  otp: '⚠️ There\'s an issue with your account status. Contact support@veefore.com for help.' 
+                })
+                toast({
+                  title: "Account Status Issue",
+                  description: "Our support team can help resolve this. Email support@veefore.com",
+                  variant: "destructive",
+                })
+                throw new Error('INVALID_STATUS')
+                
+              default:
+                setErrors({ 
+                  otp: '🔒 Early Access Required - This product is invite-only. Join our waitlist to get access!' 
+                })
+                toast({
+                  title: "Early Access Required",
+                  description: "Visit veefore.com/waitlist to request access.",
+                  variant: "destructive",
+                })
+                throw new Error(errorMessage || 'Early access validation failed')
+            }
+          }
+          
           throw new Error('Failed to complete account setup')
         }
 
@@ -637,6 +879,16 @@ function SignUpIntegrated() {
     } catch (error: any) {
       console.error('❌ Verification error:', error)
       setCurrentStep('verification') // Ensure we look like we are on verification step
+
+      // CRITICAL: Don't override friendly error messages already set for early access errors
+      // These errors already have user-friendly messages set via setErrors() above
+      const earlyAccessErrors = ['NOT_ON_WAITLIST', 'PENDING_APPROVAL', 'ACCESS_REJECTED', 'INVALID_STATUS']
+      
+      if (earlyAccessErrors.includes(error.message)) {
+        // Error message already set with setErrors() - just return without overriding
+        console.log('[EARLY ACCESS] Preserving friendly error message for:', error.message)
+        return
+      }
 
       let errorMessage = 'Verification failed. Please try again.'
       let toastTitle = "Verification Failed"

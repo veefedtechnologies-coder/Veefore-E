@@ -31,6 +31,10 @@ const LinkFirebaseSchema = z.object({
 // Using apiRateLimiter (60/min) instead of authRateLimiter (5/15min) since this is a read-only check
 router.get('/check-email-exists', apiRateLimiter, authController.checkEmailExists);
 
+// Check early access eligibility (called before creating Firebase user)
+// Using authRateLimiter (5/15min) to prevent abuse
+router.post('/check-early-access', authRateLimiter, authController.checkEarlyAccess);
+
 router.get('/session', authController.getSession);
 
 router.post('/link-firebase',
