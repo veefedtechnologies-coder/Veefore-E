@@ -46,7 +46,8 @@ const Community = React.lazy(() => import('./pages/Community'))
 const Status = React.lazy(() => import('./pages/Status'))
 const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
 const CookieConsentBanner = React.lazy(() => import('./components/CookieConsentBanner'))
-const WaitlistPage = React.lazy(() => import('./pages/WaitlistPage'))
+// Eagerly load WaitlistPage to prevent chunk loading errors
+import WaitlistPage from './pages/WaitlistPage'
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
 
 const publicRoutes = [

@@ -24,6 +24,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:bug-exploration": "vitest run tests/ai-generation-bug-exploration.test.ts",
+    "test:landing-bug": "vitest run tests/landing-early-access-bug-exploration.client.test.tsx --config vitest.client.config.ts",
     "admin:dev": "cd admin-panel && npm run dev",
     "admin:build": "cd admin-panel && npm run build",
     "admin:start": "cd admin-panel && npm run start"
