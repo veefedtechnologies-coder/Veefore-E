@@ -1,8 +1,13 @@
 import { Queue } from 'bullmq';
-import { redisConnection, isRedisAvailable } from './metricsQueue';
+import { getSharedRedisConnection } from '../lib/redis';
 
-// Re-export for convenience
-export { isRedisAvailable };
+// Use shared Redis connection from pool (Task 3.5: Redis Optimization)
+const redisConnection = getSharedRedisConnection();
+
+// Helper function to check Redis availability
+export function isRedisAvailable(): boolean {
+  return redisConnection && redisConnection.status === 'ready';
+}
 
 export interface ScheduledPostJobData {
   contentId: number;
@@ -193,20 +198,21 @@ export class PostSchedulerManager {
     }
 
     try {
+      // Phase 2 Optimization (Task 4.4): Use O(1) count methods instead of O(n) array fetches
       const [waiting, active, completed, failed, delayed] = await Promise.all([
-        postQueue.getWaiting(),
-        postQueue.getActive(),
-        postQueue.getCompleted(),
-        postQueue.getFailed(),
-        postQueue.getDelayed(),
+        postQueue.getWaitingCount(),
+        postQueue.getActiveCount(),
+        postQueue.getCompletedCount(),
+        postQueue.getFailedCount(),
+        postQueue.getDelayedCount(),
       ]);
 
       return {
-        waiting: waiting.length,
-        active: active.length,
-        completed: completed.length,
-        failed: failed.length,
-        delayed: delayed.length,
+        waiting,
+        active,
+        completed,
+        failed,
+        delayed,
         redisAvailable: true,
       };
     } catch (error: any) {

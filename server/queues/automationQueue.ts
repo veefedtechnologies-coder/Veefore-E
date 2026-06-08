@@ -1,5 +1,9 @@
 import { Queue, QueueOptions } from 'bullmq';
-import { redisConnection, redisAvailable } from './metricsQueue';
+import { getSharedRedisConnection } from '../lib/redis';
+
+// Use shared Redis connection from pool (Task 3.3: Redis Optimization)
+const redisConnection = getSharedRedisConnection();
+const redisAvailable = redisConnection && redisConnection.status === 'ready';
 
 // Interface for Comment-to-DM Automation Jobs
 export interface AutomationJobData {

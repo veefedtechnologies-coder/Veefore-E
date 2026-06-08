@@ -135,6 +135,15 @@ attached_assets/
 server/test-gemini*.ts
 server/test_gemini*.ts
 
+# ===== DEPLOYMENT SECRETS =====
+# Never commit files with API keys and secrets
+RAILWAY_ENV_VARIABLES.txt
+VERCEL_ENV_VARIABLES.txt
+railway-set-vars.sh
+vercel-set-vars.sh
+*_ENV_VARIABLES.txt
+*-set-vars.sh
+
 # ===== Optional binaries/tools =====
 cloudflared/
 cloudflared.exe

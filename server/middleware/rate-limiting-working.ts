@@ -45,11 +45,17 @@ setInterval(() => {
 
 /**
  * Get rate limit info from Redis (with in-memory fallback)
+ * 
+ * Phase 4 Optimization (Task 6.1): Fixed-window INCR pattern
+ * - Reduces from 4 Redis commands to 2 commands per request
+ * - Feature flag: RATE_LIMIT_ALGORITHM (default: 'fixed-window')
+ * 
+ * Exported for testing purposes
  */
-async function getRateLimitInfo(key: string, windowMs: number, maxRequests: number): Promise<RateLimitInfo> {
+export async function getRateLimitInfo(key: string, windowMs: number, maxRequests: number): Promise<RateLimitInfo> {
   const startTimer = Date.now();
+  
   // FAST PATH: If Redis is not ready, switch to In-Memory immediately
-  // This prevents 1-second logic timeouts from stacking up (e.g. 8 checks = 8s delay)
   if (!redisClient || redisClient.status !== 'ready') {
     const now = Date.now();
     let record = localRateLimitStore.get(key);
@@ -90,42 +96,76 @@ async function getRateLimitInfo(key: string, windowMs: number, maxRequests: numb
   }
 
   try {
-    const startTimer = Date.now();
     const now = Date.now();
-    const windowStart = now - windowMs;
+    
+    // Task 6.2: Feature flag for rate-limiting algorithm (allows instant rollback)
+    // Set RATE_LIMIT_ALGORITHM=sliding-window to revert to old behavior
+    const algorithm = process.env.RATE_LIMIT_ALGORITHM || 'fixed-window';
 
-    // OPTIMIZATION: Use multi() instead of pipeline() to guarantee ATOMIC execution.
-    // This prevents race conditions where concurrent requests get the same zcard count
-    const transaction = redisClient.multi();
-    transaction.zremrangebyscore(key, 0, windowStart);
-    transaction.zcard(key);
-    transaction.zadd(key, now, `${now}-${Math.random()}`);
-    transaction.expire(key, Math.ceil(windowMs / 1000));
+    if (algorithm === 'fixed-window') {
+      // NEW: Fixed-Window INCR Pattern (Task 6.1: 2 commands instead of 4)
+      // Uses atomic INCR + conditional EXPIRE for better performance
+      
+      // Lua script for atomic INCR with conditional EXPIRE
+      // Only sets EXPIRE on first request (count == 1) to avoid unnecessary EXPIRE commands
+      const luaScript = `
+        local key = KEYS[1]
+        local windowMs = tonumber(ARGV[1])
+        local count = redis.call('INCR', key)
+        if count == 1 then
+          redis.call('PEXPIRE', key, windowMs)
+        end
+        local ttl = redis.call('PTTL', key)
+        return {count, ttl}
+      `;
 
-    const results = await transaction.exec();
+      const result = await redisClient.eval(
+        luaScript,
+        1,
+        key,
+        windowMs.toString()
+      ) as [number, number];
 
-    // Check for transaction errors
-    if (!results) throw new Error("Redis transaction failed");
+      const count = result[0];
+      const ttl = result[1];
+      
+      // Calculate reset time from TTL
+      const resetTime = now + (ttl > 0 ? ttl : windowMs);
+      const blocked = count > maxRequests;
 
-    // results is [[err, res], [err, res], ...]
-    // result[1] is zcard count
-    const zcardResult = results[1];
-    if (zcardResult[0]) throw zcardResult[0]; // Throw if zcard had error
+      return {
+        requests: count,
+        resetTime,
+        blocked
+      };
 
-    const current = zcardResult[1] as number;
-    const requests = current + 1;
-    const blocked = requests > maxRequests;
+    } else {
+      // OLD: Sliding-Window Sorted Set Pattern (4 commands: backward compatibility)
+      const windowStart = now - windowMs;
 
-    const duration = Date.now() - startTimer;
+      const transaction = redisClient.multi();
+      transaction.zremrangebyscore(key, 0, windowStart);
+      transaction.zcard(key);
+      transaction.zadd(key, now, `${now}-${Math.random()}`);
+      transaction.expire(key, Math.ceil(windowMs / 1000));
 
-    // VERIFICATION LOG: Show redis success + timing
-    // console.log(`[RATE-LIMIT] ✅ Redis: ${key} | Count: ${requests}/${maxRequests} | Time: ${duration}ms`);
+      const results = await transaction.exec();
 
-    return {
-      requests,
-      resetTime: now + windowMs,
-      blocked
-    };
+      if (!results) throw new Error("Redis transaction failed");
+
+      const zcardResult = results[1];
+      if (zcardResult[0]) throw zcardResult[0];
+
+      const current = zcardResult[1] as number;
+      const requests = current + 1;
+      const blocked = requests > maxRequests;
+
+      return {
+        requests,
+        resetTime: now + windowMs,
+        blocked
+      };
+    }
   } catch (error) {
     // Fail safe - logic error catch
     const msg = (error as Error).message;

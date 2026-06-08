@@ -86,6 +86,110 @@ export const getRedisSubscriber = (): Redis => {
     return redisSubscriber;
 };
 
+/**
+ * Connection Strategy for Redis Optimization:
+ * 
+ * 1. Shared Worker Connection (getSharedRedisConnection):
+ *    - Single connection shared by ALL BullMQ workers
+ *    - Reduces connection overhead from 5+ connections to 1
+ *    - Configured with maxRetriesPerRequest: null for BullMQ compatibility
+ * 
+ * 2. Shared Subscriber Connection (getSharedRedisSubscriber):
+ *    - Single subscriber connection for ALL BullMQ event subscriptions
+ *    - Required by BullMQ pub/sub pattern
+ *    - Shared across all workers to minimize connection count
+ * 
+ * 3. Separate Rate-Limit Connection (getRateLimitRedisClient):
+ *    - Dedicated fail-fast connection for rate limiting
+ *    - Kept SEPARATE for fault isolation (prevents slow Redis from blocking API)
+ *    - If rate-limit Redis fails, API fails open (allows requests)
+ * 
+ * Target: 2 shared connections for workers + 1 separate for rate-limiting = 3 total
+ * Previous: 5+ separate connections (one per queue file)
+ */
+
+// Shared BullMQ worker connection (singleton)
+let sharedWorkerConnection: Redis | null = null;
+
+// Shared BullMQ subscriber connection (singleton)
+let sharedWorkerSubscriber: Redis | null = null;
+
+/**
+ * Get shared Redis connection for BullMQ workers.
+ * This connection is reused by all workers to reduce connection overhead.
+ * 
+ * @returns Singleton Redis connection instance configured for BullMQ
+ */
+export const getSharedRedisConnection = (): Redis => {
+    if (!sharedWorkerConnection) {
+        const redisUrl = process.env.REDIS_URL ||
+            process.env.KV_URL ||
+            process.env.STORAGE_REDIS_URL;
+
+        if (!redisUrl) {
+            console.warn('[REDIS-WORKER] REDIS_URL not set, falling back to localhost default');
+        }
+
+        console.log('[REDIS-WORKER] Initializing shared worker connection');
+
+        const baseOptions = getRedisOptions(redisUrl);
+        sharedWorkerConnection = new Redis(redisUrl || 'redis://localhost:6379', {
+            ...baseOptions,
+            maxRetriesPerRequest: null, // Required for BullMQ
+            retryStrategy: (times) => {
+                const delay = Math.min(times * 50, 2000);
+                return delay;
+            }
+        });
+
+        sharedWorkerConnection.on('error', (err) => {
+            console.error('[REDIS-WORKER] Shared Connection Error:', err);
+        });
+
+        sharedWorkerConnection.on('connect', () => {
+            console.log('[REDIS-WORKER] Shared Worker Connection Connected');
+        });
+    }
+
+    return sharedWorkerConnection;
+};
+
+/**
+ * Get shared Redis subscriber for BullMQ event subscriptions.
+ * This subscriber is reused by all workers for pub/sub patterns.
+ * 
+ * @returns Singleton Redis subscriber instance configured for BullMQ
+ */
+export const getSharedRedisSubscriber = (): Redis => {
+    if (!sharedWorkerSubscriber) {
+        const redisUrl = process.env.REDIS_URL ||
+            process.env.KV_URL ||
+            process.env.STORAGE_REDIS_URL;
+
+        console.log('[REDIS-WORKER] Initializing shared subscriber connection');
+
+        const baseOptions = getRedisOptions(redisUrl);
+        sharedWorkerSubscriber = new Redis(redisUrl || 'redis://localhost:6379', {
+            ...baseOptions,
+            maxRetriesPerRequest: null, // Required for BullMQ
+            retryStrategy: (times) => {
+                const delay = Math.min(times * 50, 2000);
+                return delay;
+            }
+        });
+
+        sharedWorkerSubscriber.on('error', (err) => {
+            console.error('[REDIS-WORKER] Shared Subscriber Error:', err);
+        });
+
+        sharedWorkerSubscriber.on('connect', () => {
+            console.log('[REDIS-WORKER] Shared Subscriber Connection Connected');
+        });
+    }
+
+    return sharedWorkerSubscriber;
+};
+
 // Create a separate connection for Rate Limiting (Fail-fast strategy)
 // This ensures that if Redis is slow/down, the API doesn't hang but "fails open"
 let rateLimitClient: Redis | null = null;

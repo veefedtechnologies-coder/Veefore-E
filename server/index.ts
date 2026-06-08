@@ -708,13 +708,14 @@ app.use((req, res, next) => {
     const { MessageWorker } = await import('./workers/messageWorker');
     const { PostWorker } = await import('./workers/postWorker');
     const { VerifyWorker } = await import('./workers/verifyWorker');
-    const { startSocialListeningWorker } = await import('./workers/social-listening.worker');
-    const { startSocialListeningAIWorker } = await import('./workers/social-listening-ai.worker');
     
-    // Phase 8 Background Workers
-    const { startWebhookWorker } = await import('./workers/webhookWorker');
-    const { startAIWorker } = await import('./workers/aiWorker');
-    const { startNotificationWorker } = await import('./workers/notificationWorker');
+    // Lazy workers - imported but NOT started on boot (Task 5.6: Redis Optimization)
+    // These workers will lazy-initialize on first job:
+    // - startSocialListeningWorker (social-listening.worker.ts)
+    // - startSocialListeningAIWorker (social-listening-ai.worker.ts)
+    // - startWebhookWorker (webhookWorker.ts)
+    // - startAIWorker (aiWorker.ts)
+    // - startNotificationWorker (notificationWorker.ts)
 
 
     // Connect to Redis (Standard client for queues)
@@ -723,23 +724,24 @@ app.use((req, res, next) => {
     // Connect to Redis (Fail-fast client for rate limiting)
     const rateLimitRedis = getRateLimitRedisClient();
 
-    // Initialize systems
+    // Initialize systems - ACTIVE WORKERS ONLY
     initQueues();
     initEmailWorker();
     AutomationWorker.start(storage);
     MessageWorker.start(storage);
     PostWorker.start(storage);
     VerifyWorker.start(storage);
-    startSocialListeningWorker();
-    startSocialListeningAIWorker();
     
-    // Phase 8 Start
-    startWebhookWorker();
-    startAIWorker();
-    startNotificationWorker();
+    // REMOVED: Eager worker starts (Task 5.6: Redis Optimization)
+    // startSocialListeningWorker();      // Now lazy: getSocialListeningWorker() called on first job
+    // startSocialListeningAIWorker();    // Now lazy: getSocialListeningAIWorker() called on first job
+    // startWebhookWorker();              // Now lazy: getWebhookWorker() called on first job
+    // startAIWorker();                   // Now lazy: getAIWorker() called on first job
+    // startNotificationWorker();         // Now lazy: getNotificationWorker() called on first job
+    
     initializeRateLimiting(rateLimitRedis); // Connect rate limiter to fail-fast client
 
-    console.log('[INFRA] Background workers and Rate Limiting connected to Redis');
+    console.log('[INFRA] Active workers initialized. Unused workers (AI, Notification, SocialListening, Webhook) will lazy-initialize on first job.');
   } catch (error) {
     console.warn('[INFRA] Failed to initialize workers (Redis might be missing):', (error as Error).message);
   }
