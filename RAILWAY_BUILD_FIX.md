@@ -15,6 +15,7 @@ The build was using Node 18, causing compatibility issues and build failures.
 2. **package.json** had no explicit engine requirements
 3. **Railway/Nixpacks** was not configured to use Node 20
 4. Dependencies require Node >=20 but the environment was providing Node 18 or lower
+5. **Build command** was building both client and server, but Railway should only build the backend
 
 ## Solution Applied
 
@@ -51,7 +52,16 @@ nixPkgs = ["nodejs-20_x"]
 
 This explicitly tells Railway/Nixpacks to use Node.js 20.x.
 
-### 4. Created .nvmrc File
+### 4. Fixed Build Command in railway.toml
+**Changed:**
+```toml
+# Before: buildCommand = "npm run build"  (builds client + server)
+# After:  buildCommand = "npm run server:build"  (builds server only)
+```
+
+Railway backend deployment should only build the server, not the client. The client is deployed separately to Vercel.
+
+### 5. Created .nvmrc File
 **Added:**
 ```
 20
