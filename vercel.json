@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/__/auth/:path*",
-      "destination": "https://veefore-e-production.up.railway.app/__/auth/:path*"
+      "destination": "https://api.veefore.com/__/auth/:path*"
     },
     {
       "source": "/(.*)",
