@@ -7,23 +7,36 @@ import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWith
 // 2. https://veefore.com/__/auth/handler is registered in Google Cloud Console
 // This makes the OAuth redirect same-origin, bypassing Safari's ITP cross-origin block.
 // Note: app.veefore.com is only for local/dev testing
+
+// CRITICAL: Hardcode production domain to prevent SSR/build-time issues
+// During Vercel build, window is undefined, causing fallback to Firebase domain
+// This ensures production ALWAYS uses veefore.com
 const getAuthDomain = () => {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Production: Always use veefore.com (not app.veefore.com)
-    if (hostname === 'veefore.com') {
-      return 'veefore.com';
-    }
-    
-    // Development/Local: Use app.veefore.com or localhost
-    if (hostname === 'app.veefore.com' || hostname === 'localhost') {
-      return hostname;
-    }
+  // Check if we're in browser environment
+  if (typeof window === 'undefined') {
+    // SSR/Build time: Default to production domain
+    // This prevents build-time evaluation from using Firebase default domain
+    return 'veefore.com';
   }
   
-  // Fallback for SSR or unknown environments
-  return 'veefore-b84c8.firebaseapp.com';
+  const hostname = window.location.hostname;
+  
+  // Production: Always use veefore.com (not app.veefore.com)
+  if (hostname === 'veefore.com' || hostname === 'www.veefore.com') {
+    return 'veefore.com';
+  }
+  
+  // Development/Local: Use app.veefore.com or localhost
+  if (hostname === 'app.veefore.com') {
+    return 'app.veefore.com';
+  }
+  
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'localhost';
+  }
+  
+  // Default to production domain for any other case
+  return 'veefore.com';
 }
 
 const firebaseConfig = {
