@@ -238,13 +238,23 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   })
               }
               
+              // CRITICAL FIX: Clear loading state and clean URL to prevent stuck loading state
               setIsGoogleLoading(false)
+              
+              // Clean up URL by removing any OAuth query parameters to prevent redirect loop
+              // This ensures the user stays on the sign-in page with the error message visible
+              window.history.replaceState({}, document.title, window.location.pathname)
+              
               return
             }
             
             // Handle other backend errors
             setAuthError(linkJson?.message || 'Failed to link user account after redirect')
             setIsGoogleLoading(false)
+            
+            // Clean up URL to prevent stuck state
+            window.history.replaceState({}, document.title, window.location.pathname)
+            
             return
           }
 
@@ -262,11 +272,18 @@ const SignIn = ({ onNavigate }: SignInProps) => {
           setTimeout(() => {
             window.location.href = '/'
           }, 500)
+        } else {
+          // No redirect result means we're just loading the page normally
+          // Make sure loading state is off
+          setIsGoogleLoading(false)
         }
       } catch (error: any) {
         console.error('Google redirect sign in error:', error)
         setAuthError(error.message || "Failed to sign in with Google.")
         setIsGoogleLoading(false)
+        
+        // Clean up URL to prevent stuck state
+        window.history.replaceState({}, document.title, window.location.pathname)
       }
     }
     
