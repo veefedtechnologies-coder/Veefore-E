@@ -2,29 +2,35 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, User, setPersistence, browserLocalPersistence, getRedirectResult, sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth'
 
 // Firebase configuration
-// authDomain: MUST use Firebase's hosted domain (veefore-b84c8.firebaseapp.com) for redirect-based OAuth
+// authDomain: Using custom domain (veefore.com) for redirect-based OAuth
 //
-// IMPORTANT: signInWithRedirect requires Firebase's authDomain for OAuth callbacks
-// - Full-page redirect flow: User → Google → Firebase authDomain → App
-// - Firebase processes OAuth callback at: https://veefore-b84c8.firebaseapp.com/__/auth/handler
+// IMPORTANT: Custom domain MUST be added to Firebase Console → Authentication → Authorized domains
+// - Go to: https://console.firebase.google.com/project/veefore-b84c8/authentication/settings
+// - Add "veefore.com" to the list of authorized domains
+// - This allows signInWithRedirect to work with custom domain WITHOUT requiring proxy
+//
+// OAuth Flow with Custom Domain:
+// - Full-page redirect flow: User → Google → Custom Domain (veefore.com) → App
+// - Firebase processes OAuth callback at: https://veefore.com/__/auth/handler
 // - After processing, redirects back to app with credential embedded in URL fragment
-// - Custom domains (veefore.com) cannot be used because OAuth callback must go to Firebase's hosted domain
 //
-// NOTE: signInWithPopup (iframe-based OAuth) could theoretically work with custom domains via proxy,
-// but signInWithRedirect (full-page redirect) bypasses any proxy and REQUIRES direct Firebase communication.
+// Why This Works:
+// - Firebase validates the redirect URI against authorized domains
+// - Custom domains in authorized list are treated the same as Firebase hosted domains
+// - No proxy needed - Firebase handles the OAuth callback directly on custom domain
 //
-// Using custom domain with signInWithRedirect causes:
-// - Browser attempts to load Firebase response in iframe context (proxy architecture)
-// - Content Security Policy (CSP) blocks iframe loading
-// - Result: Blank page with console error "Content blocker prevented iframe from loading"
+// Previous Issue (now resolved):
+// - Previously used proxy chain because custom domain wasn't authorized in Firebase
+// - Proxy caused Content Security Policy violations and blank pages
+// - Now using direct Firebase OAuth handling on authorized custom domain
 
-// CRITICAL: Hardcode Firebase domain to prevent SSR/build-time issues
+// CRITICAL: Return valid authDomain for SSR/build-time
 // During Vercel build, window is undefined, so we must return a valid authDomain
 const getAuthDomain = () => {
   // Check if we're in browser environment
   if (typeof window === 'undefined') {
-    // SSR/Build time: Return Firebase's hosted domain
-    return 'veefore-b84c8.firebaseapp.com';
+    // SSR/Build time: Return custom domain (must be authorized in Firebase Console)
+    return 'veefore.com';
   }
   
   const hostname = window.location.hostname;
@@ -34,9 +40,10 @@ const getAuthDomain = () => {
     return 'localhost';
   }
   
-  // Production and all other environments: Use Firebase's hosted domain
-  // This ensures OAuth redirect flow works correctly without proxy interference
-  return 'veefore-b84c8.firebaseapp.com';
+  // Production: Use custom domain (veefore.com)
+  // REQUIREMENT: veefore.com MUST be added to Firebase Console → Authentication → Authorized domains
+  // This allows signInWithRedirect to work with custom domain WITHOUT proxy
+  return 'veefore.com';
 }
 
 const firebaseConfig = {
