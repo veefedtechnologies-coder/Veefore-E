@@ -21,7 +21,7 @@ export default function LoginScreen() {
     // Note: For production, you'll need to create an iOS OAuth client in Google Cloud Console
     // For now, using web client ID which works with Expo Go
     const [request, response, promptAsync] = Google.useAuthRequest({
-        expoClientId: '309418074269-8vnst4fvpl3o7pf7gmkths2qv3cn6ad1.apps.googleusercontent.com',
+        clientId: '309418074269-8vnst4fvpl3o7pf7gmkths2qv3cn6ad1.apps.googleusercontent.com',
         iosClientId: '309418074269-8vnst4fvpl3o7pf7gmkths2qv3cn6ad1.apps.googleusercontent.com',
         webClientId: '309418074269-8vnst4fvpl3o7pf7gmkths2qv3cn6ad1.apps.googleusercontent.com',
     });
