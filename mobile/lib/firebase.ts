@@ -9,13 +9,13 @@ import {
     User
 } from 'firebase/auth';
 
-// Firebase configuration - same as web app
+// Firebase configuration using environment variables for security
 const firebaseConfig = {
-    apiKey: 'AIzaSyABXnYreK-ZA8pRAK2t352bUpDaUwJoWzE',
-    authDomain: 'veefore-b84c8.firebaseapp.com',
-    projectId: 'veefore-b84c8',
-    storageBucket: 'veefore-b84c8.firebasestorage.app',
-    appId: '1:309418074269:web:7b2a61fe3f40fc11343474'
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || ''
 };
 
 // Initialize Firebase
