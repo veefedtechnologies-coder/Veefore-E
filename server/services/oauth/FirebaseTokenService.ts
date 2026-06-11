@@ -1,5 +1,6 @@
 import { User, IUser } from '../../models/User/User';
 import { logger } from '../../config/logger';
+import { getFirebaseAdmin } from '../../firebase-admin';
 
 /**
  * FirebaseTokenService - Firebase custom token creation and user management
@@ -88,7 +89,7 @@ export class FirebaseTokenService {
     
     try {
       // Requirement 3.1: Find existing user by email
-      let user = await User.findOne({ email: googleUserInfo.email });
+      let user: IUser | null = await User.findOne({ email: googleUserInfo.email });
       let isNewUser = false;
 
       if (!user) {
@@ -114,7 +115,7 @@ export class FirebaseTokenService {
         // Requirement 18.2: Log user creation during OAuth flow
         logger.info('New user created via Google OAuth', {
           component: 'OAuth.FirebaseToken',
-          userId: user._id.toString(),
+          userId: String(user._id),
           email: googleUserInfo.email,
           isNewUser: true,
         });
@@ -140,28 +141,15 @@ export class FirebaseTokenService {
         // Requirement 18.2: Log user update during OAuth flow
         logger.debug('Existing user updated via Google OAuth', {
           component: 'OAuth.FirebaseToken',
-          userId: user._id.toString(),
+          userId: String(user._id),
           email: googleUserInfo.email,
           isNewUser: false,
         });
       }
 
       // Requirement 3.4: Create Firebase custom token
-      // Import firebase-admin directly to avoid module initialization issues
-      const admin = await import('firebase-admin');
-      
-      // Get or initialize Firebase app
-      let firebaseApp;
-      if (admin.default.apps && admin.default.apps.length > 0) {
-        firebaseApp = admin.default.app();
-      } else {
-        // Initialize with service account
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY!);
-        firebaseApp = admin.default.initializeApp({
-          credential: admin.default.credential.cert(serviceAccount),
-          projectId: serviceAccount.project_id,
-        });
-      }
+      // Use the singleton Firebase Admin instance
+      const firebaseApp = getFirebaseAdmin();
       
       console.log('[OAuth] Firebase Admin initialized, creating custom token for userId:', String(user._id));
       
@@ -184,7 +172,7 @@ export class FirebaseTokenService {
       // Requirement 18.2: Log Firebase token creation success with INFO level
       logger.info('Firebase custom token created', {
         component: 'OAuth.FirebaseToken',
-        userId: user._id.toString(),
+        userId: String(user._id),
         email: googleUserInfo.email,
         isNewUser,
         durationMs,
@@ -234,19 +222,8 @@ export class FirebaseTokenService {
    */
   async verifyToken(token: string): Promise<DecodedToken> {
     try {
-      const admin = await import('firebase-admin');
-      
-      // Get Firebase app instance
-      let firebaseApp;
-      if (admin.default.apps && admin.default.apps.length > 0) {
-        firebaseApp = admin.default.app();
-      } else {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY!);
-        firebaseApp = admin.default.initializeApp({
-          credential: admin.default.credential.cert(serviceAccount),
-          projectId: serviceAccount.project_id,
-        });
-      }
+      // Use the singleton Firebase Admin instance
+      const firebaseApp = getFirebaseAdmin();
       
       // Verify the token with Firebase Admin SDK
       const decodedToken = await firebaseApp.auth().verifyIdToken(token);
@@ -257,8 +234,6 @@ export class FirebaseTokenService {
         exp: decodedToken.exp,
         email: decodedToken.email,
         emailVerified: decodedToken.email_verified,
-        // Include custom claims (sessionVersion, googleId, etc.)
-        ...decodedToken,
       };
     } catch (error) {
       logger.error('Failed to verify Firebase token', error, {
