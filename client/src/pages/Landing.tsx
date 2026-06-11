@@ -41,24 +41,9 @@ import { Phase1EngagementVisual, Phase1DMVisual, HookVisual } from '../component
 // Phase 1 Review Mode flag
 const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
-// Cinematic Hero flag
-const useCinematicHero = import.meta.env.VITE_USE_CINEMATIC_HERO === 'true';
-
+// Cinematic Hero flag is now permanently true, old hero removed
 // Only keep 3D component lazy as it's truly optional and heavy (WebGL)
-const Landing3D = React.lazy(() => import('./Landing3D'))
-
-// Mobile background with soft blur effects - GPU accelerated
-const MobileBackground = memo(() => (
-  <div
-    className="absolute inset-0 bg-[#030303] overflow-hidden"
-    style={MOBILE_OPTIMIZED_LAYER}
-  >
-    <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-purple-950/20 to-transparent blur-2xl" style={{ transform: 'translateZ(0)' }} />
-    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/30 via-transparent to-transparent blur-xl" style={{ transform: 'translateZ(0)' }} />
-    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" style={{ transform: 'translateZ(0)' }} />
-    <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" style={{ transform: 'translateZ(0)' }} />
-  </div>
-))
+// (Leaving Landing3D import if it's used elsewhere, but removing MobileBackground as it was only used in old hero)
 
 const Landing3DFallback = memo(() => (
   <div className="absolute inset-0 bg-black">
@@ -187,24 +172,6 @@ const RotatingHeroText = memo(() => {
     const delay = isMobile ? 2000 : 500
     const timer = setTimeout(() => setIsReady(true), delay)
     return () => clearTimeout(timer)
-  }, [isMobile])
-
-  useEffect(() => {
-    if (!isReady) return
-    const interval = setInterval(() => {
-      setPrevIndex(currentIndex)
-      setCurrentIndex((prev) => (prev + 1) % taglines.length)
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [currentIndex, isReady])
-
-  return (
-    <div className="relative overflow-visible" style={{ height: 'clamp(10rem, 25vw, 16rem)', paddingBottom: '0.5em' }}>
-      {taglines.map((tagline, index) => {
-        const isActive = currentIndex === index
-        const isExiting = prevIndex === index
-
-        return (
           <motion.div
             key={index}
             initial={false}
@@ -774,22 +741,13 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const { openWaitlist } = useWaitlist()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
 
-  // PERF: Defer 3D loading to allow hero text to render first
-  const [show3D, setShow3D] = useState(false)
-  useEffect(() => {
-    const timer = setTimeout(() => setShow3D(true), 100)
-    return () => clearTimeout(timer)
-  }, [])
+  const [activeFaq, setActiveFaq] = useState<number | null>(null)
 
   // HUD State for Algorithm Science section
 
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { scrollYProgress } = useScroll()
-
-  const heroOpacity = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0])
-  const heroScale = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [1, isMobile ? 1 : 0.95])
-  const heroY = useTransform(scrollYProgress, isMobile ? [0, 1] : [0, 0.15], [0, isMobile ? 0 : -50])
 
   const heroFeatures = isPhase1 ? [
     {
@@ -1014,153 +972,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* MainNavigation is rendered by App.tsx */}
 
-      {/* Hero Section - Conditional based on VITE_USE_CINEMATIC_HERO */}
-      {useCinematicHero ? (
-        <CinematicHeroSection />
-      ) : (
-        <section className={`relative min-h-screen flex items-center justify-center pb-20 overflow-hidden ${isMobile ? 'pt-28' : 'pt-24'}`} style={{ marginTop: '-80px', paddingTop: isMobile ? 'calc(80px + 2rem)' : 'calc(80px + 6rem)' }}>
-        {/* Background layer - PERF: Defer 3D to allow hero text to render first */}
-        <div className="absolute inset-0 z-0">
-          {isMobile ? (
-            <MobileBackground />
-          ) : (
-            show3D ? (
-              <Suspense fallback={<Landing3DFallback />}>
-                <Landing3D />
-              </Suspense>
-            ) : (
-              <Landing3DFallback />
-            )
-          )}
-        </div>
-
-        {/* Gradient orbs layer for mobile - on top of MobileBackground */}
-        {isMobile && (
-          <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
-            <GradientOrb className="w-[350px] h-[350px] -top-[50px] -left-[80px]" color="blue" />
-            <GradientOrb className="w-[280px] h-[280px] top-[40%] -right-[60px]" color="purple" />
-            <GradientOrb className="w-[200px] h-[200px] bottom-[15%] left-[30%]" color="indigo" />
-          </div>
-        )}
-
-        {isMobile ? (
-          <div className="container max-w-[1100px] mx-auto px-3 sm:px-6 relative z-10 text-center">
-
-
-            <h1 className="text-[clamp(2rem,8vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8">
-              <RotatingHeroText />
-            </h1>
-
-            <p className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4">
-              {isPhase1
-                ? 'VeeFore supercharges your social media growth with AI-powered content creation, hook intelligence, and data-driven publishing.'
-                : 'VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.'}
-            </p>
-
-            <p className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4">
-              Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
-            </p>
-
-            <div className="flex items-center justify-center px-4">
-              <button
-                className="group btn-brick btn-brick-brand px-6 sm:px-7 md:px-8 py-3 sm:py-3.5 text-sm sm:text-sm md:text-base"
-                onClick={() => onNavigate('signup')}
-              >
-                <span className="relative z-10 flex items-center">
-                  Get Started
-                  <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-                </span>
-              </button>
-            </div>
-
-            <div className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4">
-              {[
-                { icon: CheckCircle, text: 'No credit card required' },
-                { icon: Zap, text: '150 credits included' },
-                { icon: Shield, text: 'Cancel anytime' }
-              ].map((item, i) => (
-                <div key={i} className="flex items-center space-x-1.5 sm:space-x-2">
-                  <item.icon className="w-3 h-3 sm:w-4 sm:h-4 text-green-500/70" />
-                  <span>{item.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <motion.div
-            style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
-            className="container max-w-[1100px] mx-auto px-3 sm:px-6 relative z-10 text-center"
-          >
-
-
-            <motion.h1
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="text-[clamp(2rem,8vw,5.5rem)] font-extrabold tracking-[-0.04em] leading-[1] mb-8"
-            >
-              <RotatingHeroText />
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-              className="text-sm sm:text-lg md:text-xl lg:text-2xl text-white/40 max-w-3xl mx-auto mb-4 sm:mb-6 leading-relaxed font-medium px-4"
-            >
-              {isPhase1
-                ? 'VeeFore supercharges your social media growth with AI-powered content creation, hook intelligence, and data-driven publishing.'
-                : 'VeeFore actively grows your social media using AI-driven engagement automation, hook intelligence, and smart DM funnels.'}
-            </motion.p>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 1 }}
-              className="text-xs sm:text-sm md:text-base lg:text-lg text-white/25 max-w-2xl mx-auto mb-8 sm:mb-12 px-4"
-            >
-              Most tools help you post. VeeFore helps you <span className="text-blue-400/80">respond faster</span>, <span className="text-indigo-400/80">engage at scale</span>, and <span className="text-purple-400/80">maintain momentum</span>.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 1.1 }}
-              className="flex items-center justify-center px-4"
-            >
-              <button
-                className="group btn-brick btn-brick-brand px-7 sm:px-8 md:px-10 py-3.5 sm:py-4 text-sm sm:text-base md:text-lg"
-                onClick={() => onNavigate('signup')}
-              >
-                <span className="relative z-10 flex items-center">
-                  Get Started
-                  <ArrowRight className="ml-2 w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
-                </span>
-              </button>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 1.3 }}
-              className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4"
-            >
-              {[
-                { icon: CheckCircle, text: 'No credit card required' },
-                { icon: Zap, text: '150 credits included' },
-                { icon: Shield, text: 'Cancel anytime' }
-              ].map((item, i) => (
-                <div key={i} className="flex items-center space-x-1.5 sm:space-x-2">
-                  <item.icon className="w-3 h-3 sm:w-4 sm:h-4 text-green-500/70" />
-                  <span>{item.text}</span>
-                </div>
-              ))}
-            </motion.div>
-          </motion.div>
-        )}
-
-      </section>
-      )}
+      <CinematicHeroSection />
 
       <section className="relative pt-8 pb-20 md:pb-32 -mt-20 z-20 w-full overflow-visible">
         <div className="w-full px-4 md:px-8">
