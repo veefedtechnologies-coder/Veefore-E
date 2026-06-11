@@ -390,14 +390,14 @@ const GrowthEngineSection = () => {
         <div className="flex flex-col lg:flex-row relative items-start gap-12 lg:gap-24">
           
           {/* LEFT COLUMN: Sticky Visualizer */}
-          <div className="w-full lg:w-1/2 lg:sticky lg:top-[15vh] flex flex-col justify-center text-center lg:text-left z-0">
-            <div className="mb-6 lg:mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm mb-4">
+          <div className="w-full lg:w-1/2 sticky top-[80px] lg:top-[15vh] flex flex-col justify-center text-center lg:text-left z-20 lg:z-0 bg-black/95 backdrop-blur-xl lg:bg-transparent pt-4 lg:pt-0 pb-6 lg:pb-0 border-b border-white/5 lg:border-none">
+            <div className="mb-4 lg:mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm mb-2 lg:mb-4">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400/80 animate-[pulse_2s_ease-in-out_infinite]" />
                 <span className="text-[10px] md:text-xs font-medium text-white/60 tracking-wide uppercase">How It Works</span>
               </div>
               
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight">
+              <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold leading-tight">
                 <span className="text-white">Four steps to </span>
                 <br className="hidden lg:block" />
                 <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -410,7 +410,7 @@ const GrowthEngineSection = () => {
           </div>
 
           {/* RIGHT COLUMN: Scrolling Cards */}
-          <div className="w-full lg:w-1/2 relative flex flex-col gap-8 md:gap-[15vh] py-[5vh] lg:py-[20vh] z-10">
+          <div className="w-full lg:w-1/2 relative flex flex-col gap-6 lg:gap-8 md:gap-[15vh] py-8 lg:py-[20vh] z-10">
             {steps.map((step, index) => (
               <StepCard 
                 key={step.number} 

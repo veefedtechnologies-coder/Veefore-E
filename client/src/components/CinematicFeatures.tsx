@@ -67,20 +67,20 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
       </motion.div>
 
       {/* Responsive Container */}
-      <div className="relative w-full h-full max-w-[1400px] mx-auto p-6 pt-20 md:p-12 md:pt-28 flex flex-col justify-center">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center h-full max-h-[800px]">
+      <div className="relative w-full h-full max-w-[1400px] mx-auto p-4 pt-16 pb-20 md:p-12 md:pt-28 flex flex-col justify-center overflow-y-auto md:overflow-hidden">
+        <div className="grid lg:grid-cols-2 gap-4 md:gap-8 lg:gap-16 items-center min-h-min md:h-full md:max-h-[800px]">
 
           {/* Left: Text Content */}
           <motion.div 
             style={{ y, opacity }}
-            className="flex flex-col justify-center order-2 lg:order-1 z-10"
+            className="flex flex-col justify-center order-2 lg:order-1 z-10 mt-4 md:mt-0"
           >
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 border border-white/10 w-fit mb-4 md:mb-6 md:backdrop-blur-md">
               <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
               <span className="text-[10px] md:text-xs font-bold tracking-widest text-white/60 uppercase">Feature 0{index + 1}</span>
             </div>
 
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 md:mb-6 leading-tight drop-shadow-lg">
+            <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-2 md:mb-6 leading-tight drop-shadow-lg">
               {feature.title}
             </h2>
 
@@ -88,8 +88,8 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
               {feature.tagline}
             </p>
 
-            <div className="p-5 md:p-8 rounded-2xl bg-black/90 md:bg-black/40 border border-white/10 md:backdrop-blur-md shadow-xl">
-              <p className="text-white/80 mb-6 leading-relaxed text-sm md:text-lg">
+            <div className="p-4 md:p-8 rounded-2xl bg-black/90 md:bg-black/40 border border-white/10 md:backdrop-blur-md shadow-xl">
+              <p className="text-white/80 mb-4 md:mb-6 leading-relaxed text-xs md:text-lg">
                 {feature.description}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
@@ -107,7 +107,7 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
           {/* Fixed aspect ratio container that scales with screen width */}
           <motion.div 
             style={{ x }}
-            className="relative w-full h-auto aspect-auto md:max-h-[60vh] order-1 lg:order-2 flex items-center justify-center z-30 mb-6 md:mb-0"
+            className="relative w-full h-auto aspect-video md:aspect-auto md:max-h-[60vh] order-1 lg:order-2 flex items-center justify-center z-30 mb-2 md:mb-0"
           >
             {/* Visual container with blur effects */}
             <div className="relative w-full h-auto bg-gradient-to-tr from-white/10 to-white/0 rounded-xl md:rounded-[2rem] border border-white/10 bg-black/50 md:bg-transparent md:backdrop-blur-xl overflow-hidden shadow-2xl p-0.5 md:p-1 transform transition-transform hover:scale-[1.02] duration-500">
