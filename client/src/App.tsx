@@ -23,7 +23,6 @@ import Landing from './pages/Landing'
 
 const AuthenticatedApp = React.lazy(() => import('./AuthenticatedApp'))
 
-const Landing3D = React.lazy(() => import('./pages/Landing3D'))
 const Landing3DAdvanced = React.lazy(() => import('./pages/Landing3DAdvanced'))
 const SplineKeyboardLanding = React.lazy(() => import('./pages/SplineKeyboardLanding'))
 const RobotHeroLanding = React.lazy(() => import('./pages/RobotHeroLanding'))
@@ -55,7 +54,7 @@ const publicRoutes = [
   '/', '/features', '/pricing', '/changelog', '/about', '/blog', '/careers',
   '/contact', '/security', '/gdpr', '/privacy-policy', '/terms-of-service',
   '/free-trial', '/help', '/community', '/status', '/cookies', '/waitlist',
-  '/signup', '/signin', '/admin-login', '/3d', '/3d-advanced', '/keyboard',
+  '/signup', '/signin', '/admin-login', '/3d-advanced', '/keyboard',
   '/robot-hero', '/landing', '/auth/reset-password'
 ]
 
@@ -225,8 +224,7 @@ function App() {
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignIn onNavigate={handleNavigate} /></React.Suspense>
       case '/admin-login':
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><AdminLogin /></React.Suspense>
-      case '/3d':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing3D /></React.Suspense>
+
       case '/3d-advanced':
         return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing3DAdvanced /></React.Suspense>
       case '/keyboard':
