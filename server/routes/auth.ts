@@ -32,6 +32,7 @@ import { refreshTokenStore } from '../services/oauth/RefreshTokenStore';
 import { refreshRateLimiter } from '../services/oauth/RefreshRateLimiter';
 import { oauthSecurityMiddleware } from '../middleware/oauthSecurity';
 import { oauthMetrics } from '../services/oauth/OAuthMetrics';
+import { getFirebaseAdmin } from '../firebase-admin';
 
 const router = Router();
 
@@ -606,7 +607,6 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
     console.log('[OAuth] Creating new Firebase custom token:', { correlationId, userId, email: decodedToken.email });
     
     // Create new Firebase custom token using Firebase Admin SDK
-    const { getFirebaseAdmin } = await import('../firebase-admin');
     const admin = getFirebaseAdmin();
     
     const customToken = await admin.auth().createCustomToken(
