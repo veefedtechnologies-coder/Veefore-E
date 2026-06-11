@@ -260,7 +260,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     // Preserve form data before initiating OAuth (Requirement 19.6)
     preserveFormData(formData)
     setIsEmailLoading(true)
-    window.location.href = '/api/auth/google/start'
+    window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
   }
 
   // Handle dismissing OAuth error
@@ -584,7 +584,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   // Show loading state during redirect (Requirement 19.1)
                   setIsEmailLoading(true)
                   // Redirect to server-side OAuth start endpoint
-                  window.location.href = '/api/auth/google/start'
+                  window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
                 }}
                 disabled={isEmailLoading || showOAuthSuccess}
                 className="w-full h-11 rounded-md bg-white text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors border border-gray-300 disabled:opacity-70"
