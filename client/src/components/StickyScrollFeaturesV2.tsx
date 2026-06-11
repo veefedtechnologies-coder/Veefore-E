@@ -462,7 +462,12 @@ const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
 
     return (
         <motion.div
-            style={{ opacity: opacityValue, y: yValue, ...GPU_ACCELERATED_STYLES }}
+            style={{ 
+                opacity: opacityValue, 
+                y: yValue, 
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden'
+            }}
             className="w-full max-w-lg"
         >
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6 md:backdrop-blur-md`}>
@@ -522,8 +527,10 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
             style={{
                 y: springY,
                 scale: springScale,
-                ...MOBILE_OPTIMIZED_LAYER,
                 opacity: springOpacity,
+                willChange: 'transform, opacity',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden'
             }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
@@ -574,9 +581,8 @@ const MotionMockupSlide = ({ feature, index, activeFeature }: { feature: Feature
     const y = isActive ? 0 : isPast ? -slideDistance : slideDistance;
     const scale = isActive ? 1 : 0.85;
     
-    // Keep opacity at 1 so the slide animation is fully visible and not perceived as a fade.
-    // The overflow-hidden on the parent container will clip it cleanly.
-    const opacity = 1; 
+    // Add a slight opacity fade (0 to 1) so it gracefully exits, but keeping it visible enough to see the slide!
+    const opacity = isActive ? 1 : 0; 
 
     return <MockupSlide feature={feature} y={y} scale={scale} opacity={opacity} isVisible={isActive} />;
 };
