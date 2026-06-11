@@ -78,6 +78,10 @@ router.get('/google/start', (req: OAuthRequest, res: Response) => {
     // Record OAuth flow initiation
     oauthMetrics.recordFlowInitiation(req.correlationId);
     
+    // Clear any existing OAuth session to allow retry without waiting for expiration
+    // This prevents "Concurrent OAuth flow detected" errors when users click the button again
+    stateValidator.clearOAuthSession(req);
+    
     // Requirement 1.2: Generate cryptographically secure state parameter
     const state = stateValidator.generateState();
     
