@@ -574,8 +574,8 @@ const MotionMockupSlide = ({ feature, index, activeFeature }: { feature: Feature
     const isPast = index < activeFeature;
     const isActive = index === activeFeature;
 
-    // Use a slide distance relative to the screen height to ensure it fully clears the viewport
-    const slideDistance = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 800;
+    // Use a slide distance large enough to ensure it flies completely off the full screen
+    const slideDistance = typeof window !== 'undefined' ? window.innerHeight * 1.2 : 1200;
     
     // Pure snappy sliding effect without opacity fade so the motion is clearly visible
     const y = isActive ? 0 : isPast ? -slideDistance : slideDistance;
@@ -692,7 +692,7 @@ export default function StickyScrollFeaturesV2() {
                         ))}
                     </motion.div>
 
-                    <div className="w-full md:w-[45%] relative h-[35vh] sm:h-[40vh] md:h-full flex items-center md:items-center justify-start z-20 pb-4 md:pb-0">
+                    <div className="w-full md:w-[45%] relative h-[35vh] sm:h-[40vh] md:h-full flex items-center md:items-center justify-start z-30 pb-4 md:pb-0">
                         {features.map((feature, i) => (
                             <MotionTextSlide key={i} feature={feature} index={i} activeFeature={activeFeature} />
                         ))}
@@ -722,7 +722,7 @@ export default function StickyScrollFeaturesV2() {
                         </motion.div>
 
                         <div
-                            className="relative w-full h-[90%] md:h-[80%] max-w-[700px] overflow-hidden rounded-[2.5rem] md:rounded-[3rem]"
+                            className="relative w-full h-[90%] md:h-[80%] max-w-[700px]"
                             style={{
                                 WebkitTransform: 'translate3d(0,0,0)',
                                 transform: 'translate3d(0,0,0)',
