@@ -672,7 +672,7 @@ export default function StickyScrollFeaturesV2() {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
             <div
-                className="sticky top-0 h-[100dvh] flex flex-col md:flex-row items-center w-full"
+                className="sticky top-0 h-[100dvh] flex flex-col md:flex-row items-center w-full z-[60]"
                 style={{
                     position: 'sticky',
                     WebkitOverflowScrolling: 'touch'
@@ -692,13 +692,13 @@ export default function StickyScrollFeaturesV2() {
                         ))}
                     </motion.div>
 
-                    <div className="w-full md:w-[45%] relative h-[35vh] sm:h-[40vh] md:h-full flex items-center md:items-center justify-start z-30 pb-4 md:pb-0">
+                    <div className="w-full md:w-[45%] relative h-[35vh] sm:h-[40vh] md:h-full flex items-center md:items-center justify-start z-20 pb-4 md:pb-0">
                         {features.map((feature, i) => (
                             <MotionTextSlide key={i} feature={feature} index={i} activeFeature={activeFeature} />
                         ))}
                     </div>
 
-                    <div className="flex w-full md:w-[55%] h-[55vh] sm:h-[60vh] md:h-full items-center justify-center relative z-20">
+                    <div className="flex w-full md:w-[55%] h-[55vh] sm:h-[60vh] md:h-full items-center justify-center relative z-[70]">
                         <motion.div
                             style={{ opacity: sectionOpacity, ...MOBILE_OPTIMIZED_LAYER }}
                             className="absolute -inset-2 md:-inset-8 overflow-visible pointer-events-none"
@@ -722,7 +722,7 @@ export default function StickyScrollFeaturesV2() {
                         </motion.div>
 
                         <div
-                            className="relative w-full h-[90%] md:h-[80%] max-w-[700px]"
+                            className="relative w-full h-[90%] md:h-[80%] max-w-[700px] z-[100]"
                             style={{
                                 WebkitTransform: 'translate3d(0,0,0)',
                                 transform: 'translate3d(0,0,0)',
