@@ -565,16 +565,18 @@ const MotionTextSlide = ({ feature, index, activeFeature }: { feature: Feature; 
 
 const MotionMockupSlide = ({ feature, index, activeFeature }: { feature: Feature; index: number; activeFeature: number }) => {
     const isPast = index < activeFeature;
-    const isUpcoming = index > activeFeature;
     const isActive = index === activeFeature;
 
-    // Use a substantial pixel distance for the slide effect
-    const slideDistance = typeof window !== 'undefined' ? window.innerHeight : 800;
+    // Use a slide distance relative to the screen height to ensure it fully clears the viewport
+    const slideDistance = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 800;
     
-    // Discrete snappy sliding effect
+    // Pure snappy sliding effect without opacity fade so the motion is clearly visible
     const y = isActive ? 0 : isPast ? -slideDistance : slideDistance;
     const scale = isActive ? 1 : 0.85;
-    const opacity = isActive ? 1 : 0;
+    
+    // Keep opacity at 1 so the slide animation is fully visible and not perceived as a fade.
+    // The overflow-hidden on the parent container will clip it cleanly.
+    const opacity = 1; 
 
     return <MockupSlide feature={feature} y={y} scale={scale} opacity={opacity} isVisible={isActive} />;
 };
@@ -714,7 +716,7 @@ export default function StickyScrollFeaturesV2() {
                         </motion.div>
 
                         <div
-                            className="relative w-full h-[90%] md:h-[80%] max-w-[700px]"
+                            className="relative w-full h-[90%] md:h-[80%] max-w-[700px] overflow-hidden rounded-[2.5rem] md:rounded-[3rem]"
                             style={{
                                 WebkitTransform: 'translate3d(0,0,0)',
                                 transform: 'translate3d(0,0,0)',
