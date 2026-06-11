@@ -147,9 +147,21 @@ export class FirebaseTokenService {
       }
 
       // Requirement 3.4: Create Firebase custom token
-      // Use dynamic import to avoid module initialization timing issues
-      const { getFirebaseAdmin: getAdmin } = await import('../../firebase-admin');
-      const firebaseApp = getAdmin();
+      // Import firebase-admin directly to avoid module initialization issues
+      const admin = await import('firebase-admin');
+      
+      // Get or initialize Firebase app
+      let firebaseApp;
+      if (admin.default.apps && admin.default.apps.length > 0) {
+        firebaseApp = admin.default.app();
+      } else {
+        // Initialize with service account
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY!);
+        firebaseApp = admin.default.initializeApp({
+          credential: admin.default.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id,
+        });
+      }
       
       console.log('[OAuth] Firebase Admin initialized, creating custom token for userId:', String(user._id));
       
@@ -222,8 +234,19 @@ export class FirebaseTokenService {
    */
   async verifyToken(token: string): Promise<DecodedToken> {
     try {
-      const { getFirebaseAdmin: getAdmin } = await import('../../firebase-admin');
-      const firebaseApp = getAdmin();
+      const admin = await import('firebase-admin');
+      
+      // Get Firebase app instance
+      let firebaseApp;
+      if (admin.default.apps && admin.default.apps.length > 0) {
+        firebaseApp = admin.default.app();
+      } else {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY!);
+        firebaseApp = admin.default.initializeApp({
+          credential: admin.default.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id,
+        });
+      }
       
       // Verify the token with Firebase Admin SDK
       const decodedToken = await firebaseApp.auth().verifyIdToken(token);
