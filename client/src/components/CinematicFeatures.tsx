@@ -67,36 +67,36 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
       </motion.div>
 
       {/* Responsive Container */}
-      <div className="relative w-full h-full max-w-[1400px] mx-auto p-4 pt-16 pb-20 md:p-12 md:pt-28 flex flex-col justify-center overflow-y-auto md:overflow-hidden">
-        <div className="grid lg:grid-cols-2 gap-4 md:gap-8 lg:gap-16 items-center min-h-min md:h-full md:max-h-[800px]">
+      <div className="relative w-full h-full max-w-[1400px] mx-auto p-3 pt-4 pb-8 sm:p-4 sm:pt-10 sm:pb-16 md:p-12 md:pt-28 flex flex-col justify-center overflow-y-auto md:overflow-hidden">
+        <div className="grid lg:grid-cols-2 gap-2 sm:gap-4 md:gap-8 lg:gap-16 items-center min-h-min md:h-full md:max-h-[800px]">
 
           {/* Left: Text Content */}
           <motion.div 
             style={{ y, opacity }}
-            className="flex flex-col justify-center order-2 lg:order-1 z-10 mt-4 md:mt-0"
+            className="flex flex-col justify-center order-2 lg:order-1 z-10 mt-2 sm:mt-4 md:mt-0"
           >
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 border border-white/10 w-fit mb-4 md:mb-6 md:backdrop-blur-md">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 border border-white/10 w-fit mb-2 sm:mb-4 md:mb-6 md:backdrop-blur-md">
               <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
               <span className="text-[10px] md:text-xs font-bold tracking-widest text-white/60 uppercase">Feature 0{index + 1}</span>
             </div>
 
-            <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-2 md:mb-6 leading-tight drop-shadow-lg">
+            <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-1.5 sm:mb-2 md:mb-6 leading-tight drop-shadow-lg">
               {feature.title}
             </h2>
 
-            <p className="text-lg md:text-xl lg:text-xl text-white/80 mb-6 md:mb-8 font-light leading-relaxed">
+            <p className="text-sm sm:text-lg md:text-xl lg:text-xl text-white/80 mb-3 sm:mb-6 md:mb-8 font-light leading-relaxed">
               {feature.tagline}
             </p>
 
-            <div className="p-4 md:p-8 rounded-2xl bg-black/90 md:bg-black/40 border border-white/10 md:backdrop-blur-md shadow-xl">
-              <p className="text-white/80 mb-4 md:mb-6 leading-relaxed text-xs md:text-lg">
+            <div className="p-3 sm:p-4 md:p-8 rounded-2xl bg-black/90 md:bg-black/40 border border-white/10 md:backdrop-blur-md shadow-xl">
+              <p className="text-white/80 mb-3 sm:mb-4 md:mb-6 leading-relaxed text-xs md:text-lg">
                 {feature.description}
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
                 {feature.details.map((detail, i) => (
-                  <div key={i} className="flex items-center space-x-3">
-                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-400 shrink-0" />
-                    <span className="text-xs md:text-sm text-white/70">{detail}</span>
+                  <div key={i} className="flex items-center space-x-2.5 sm:space-x-3">
+                    <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-green-400 shrink-0" />
+                    <span className="text-[11px] sm:text-xs md:text-sm text-white/70 leading-snug">{detail}</span>
                   </div>
                 ))}
               </div>
@@ -104,13 +104,13 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
           </motion.div>
 
           {/* Right: Visual Content */}
-          {/* Fixed aspect ratio container that scales with screen width */}
+          {/* Allow visual container to fit content naturally on mobile to avoid overflow clipping */}
           <motion.div 
             style={{ x }}
-            className="relative w-full h-auto aspect-video md:aspect-auto md:max-h-[60vh] order-1 lg:order-2 flex items-center justify-center z-30 mb-2 md:mb-0"
+            className="relative w-full h-auto max-h-[45vh] md:max-h-[60vh] order-1 lg:order-2 flex items-center justify-center z-30 mb-1 sm:mb-2 md:mb-0"
           >
             {/* Visual container with blur effects */}
-            <div className="relative w-full h-auto bg-gradient-to-tr from-white/10 to-white/0 rounded-xl md:rounded-[2rem] border border-white/10 bg-black/50 md:bg-transparent md:backdrop-blur-xl overflow-hidden shadow-2xl p-0.5 md:p-1 transform transition-transform hover:scale-[1.02] duration-500">
+            <div className="relative w-full max-w-[400px] md:max-w-none h-auto bg-gradient-to-tr from-white/10 to-white/0 rounded-xl md:rounded-[2rem] border border-white/10 bg-black/50 md:bg-transparent md:backdrop-blur-xl overflow-hidden shadow-2xl p-0.5 md:p-1 transform transition-transform hover:scale-[1.02] duration-500 mx-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 pointer-events-none" />
               <div className="w-full h-auto rounded-[0.7rem] md:rounded-[1.9rem] overflow-hidden flex items-center justify-center bg-black/60">
                 <div className="w-full h-auto flex items-center justify-center">
