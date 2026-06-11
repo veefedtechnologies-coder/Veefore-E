@@ -42,19 +42,19 @@ const steps = [
 ];
 
 const CreateContentMock = () => (
-  <div className="space-y-3 w-full px-2 lg:px-4">
-    <div className="flex items-center space-x-3 mb-4">
-      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
-        <span className="text-sm font-bold text-white">SJ</span>
+  <div className="space-y-2 lg:space-y-3 w-full px-1 lg:px-4">
+    <div className="flex items-center space-x-2 lg:space-x-3 mb-2 lg:mb-4">
+      <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center shadow-lg shrink-0">
+        <span className="text-xs lg:text-sm font-bold text-white">SJ</span>
       </div>
       <div>
-        <div className="text-sm font-semibold text-white">Sarah Jenkins</div>
-        <div className="text-[10px] text-white/50">Drafting new post...</div>
+        <div className="text-[11px] lg:text-sm font-semibold text-white">Sarah Jenkins</div>
+        <div className="text-[9px] lg:text-[10px] text-white/50">Drafting new post...</div>
       </div>
     </div>
     
-    <div className="p-4 bg-white/5 border border-white/10 rounded-xl relative shadow-inner">
-      <p className="text-sm text-white/90 leading-relaxed font-light">
+    <div className="p-3 lg:p-4 bg-white/5 border border-white/10 rounded-xl relative shadow-inner">
+      <p className="text-[10px] lg:text-sm text-white/90 leading-relaxed font-light">
         Just launched our new feature! 🚀 We've been working on this for months and I can't wait for you all to try it out...
       </p>
       
@@ -63,34 +63,34 @@ const CreateContentMock = () => (
         initial={{ opacity: 0, y: 10, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ delay: 0.6, type: "spring", stiffness: 100 }}
-        className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start space-x-2"
+        className="mt-2 lg:mt-4 p-2 lg:p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start space-x-2"
       >
-        <Sparkles className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
-        <p className="text-xs text-blue-100 leading-snug">
+        <Sparkles className="w-3 h-3 lg:w-4 lg:h-4 text-blue-400 mt-0.5 shrink-0" />
+        <p className="text-[9px] lg:text-xs text-blue-100 leading-snug">
           <strong className="text-blue-400">AI Suggestion:</strong> Add a question at the end to boost comments by 40%.
         </p>
       </motion.div>
     </div>
     
-    <div className="flex justify-end pt-2">
-      <div className="px-4 py-2 bg-white/10 hover:bg-white/20 transition-colors rounded-lg text-xs font-semibold text-white flex items-center cursor-pointer">
-        <Sparkles className="w-3.5 h-3.5 mr-1.5 text-blue-400" /> Auto-Rewrite
+    <div className="flex justify-end pt-1 lg:pt-2">
+      <div className="px-3 py-1.5 lg:px-4 lg:py-2 bg-white/10 hover:bg-white/20 transition-colors rounded-lg text-[10px] lg:text-xs font-semibold text-white flex items-center cursor-pointer">
+        <Sparkles className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1.5 text-blue-400" /> Auto-Rewrite
       </div>
     </div>
   </div>
 );
 
 const AnalyticsMock = () => (
-  <div className="space-y-5 w-full px-2 lg:px-4">
-    <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl shadow-[0_0_20px_rgba(168,85,247,0.1)]">
-      <div className="text-[10px] text-purple-300 uppercase tracking-wider mb-2 font-semibold">Hook Analysis</div>
-      <div className="text-sm font-medium text-white italic">"Just launched our new..."</div>
-      <div className="mt-4 flex items-end justify-between">
-        <div className="text-xs text-white/60">Predicted Retention</div>
-        <div className="text-xl font-bold text-purple-400">85%</div>
+  <div className="space-y-3 lg:space-y-5 w-full px-1 lg:px-4">
+    <div className="p-3 lg:p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl shadow-[0_0_20px_rgba(168,85,247,0.1)]">
+      <div className="text-[9px] lg:text-[10px] text-purple-300 uppercase tracking-wider mb-1 lg:mb-2 font-semibold">Hook Analysis</div>
+      <div className="text-[11px] lg:text-sm font-medium text-white italic">"Just launched our new..."</div>
+      <div className="mt-2 lg:mt-4 flex items-end justify-between">
+        <div className="text-[10px] lg:text-xs text-white/60">Predicted Retention</div>
+        <div className="text-lg lg:text-xl font-bold text-purple-400">85%</div>
       </div>
       {/* Retention Curve */}
-      <div className="mt-3 h-12 w-full relative flex items-end border-b border-white/10">
+      <div className="mt-2 h-8 lg:h-12 w-full relative flex items-end border-b border-white/10">
         <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible" preserveAspectRatio="none">
           <motion.path 
             d="M0,5 Q20,5 40,15 T100,35" 
@@ -105,103 +105,103 @@ const AnalyticsMock = () => (
       </div>
     </div>
 
-    <div className="grid grid-cols-3 gap-3">
-      <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
-        <Eye className="w-4 h-4 text-white/40 mx-auto mb-1.5" />
-        <div className="text-sm font-bold text-white">12.4K</div>
+    <div className="grid grid-cols-3 gap-2 lg:gap-3">
+      <div className="bg-white/5 rounded-xl p-2 lg:p-3 text-center border border-white/5">
+        <Eye className="w-3 h-3 lg:w-4 lg:h-4 text-white/40 mx-auto mb-1 lg:mb-1.5" />
+        <div className="text-[11px] lg:text-sm font-bold text-white">12.4K</div>
       </div>
-      <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
-        <Heart className="w-4 h-4 text-white/40 mx-auto mb-1.5" />
-        <div className="text-sm font-bold text-white">842</div>
+      <div className="bg-white/5 rounded-xl p-2 lg:p-3 text-center border border-white/5">
+        <Heart className="w-3 h-3 lg:w-4 lg:h-4 text-white/40 mx-auto mb-1 lg:mb-1.5" />
+        <div className="text-[11px] lg:text-sm font-bold text-white">842</div>
       </div>
-      <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
-        <MessageCircle className="w-4 h-4 text-white/40 mx-auto mb-1.5" />
-        <div className="text-sm font-bold text-white">156</div>
+      <div className="bg-white/5 rounded-xl p-2 lg:p-3 text-center border border-white/5">
+        <MessageCircle className="w-3 h-3 lg:w-4 lg:h-4 text-white/40 mx-auto mb-1 lg:mb-1.5" />
+        <div className="text-[11px] lg:text-sm font-bold text-white">156</div>
       </div>
     </div>
   </div>
 );
 
 const OptimizeMock = () => (
-  <div className="space-y-5 w-full px-2 lg:px-4">
-    <div className="flex items-center space-x-2 text-orange-400 mb-4">
-      <Zap className="w-5 h-5" />
-      <span className="text-sm font-bold uppercase tracking-wider">Smart Scheduler</span>
+  <div className="space-y-3 lg:space-y-5 w-full px-1 lg:px-4">
+    <div className="flex items-center space-x-2 text-orange-400 mb-2 lg:mb-4">
+      <Zap className="w-4 h-4 lg:w-5 lg:h-5" />
+      <span className="text-[11px] lg:text-sm font-bold uppercase tracking-wider">Smart Scheduler</span>
     </div>
     
-    <div className="space-y-3">
-      <div className="p-3 border border-white/5 rounded-xl flex items-center justify-between opacity-50 bg-white/5">
-        <div className="flex items-center space-x-3">
-          <Clock className="w-4 h-4 text-white/50" />
-          <span className="text-xs text-white/80">Today, 2:00 PM</span>
+    <div className="space-y-2 lg:space-y-3">
+      <div className="p-2.5 lg:p-3 border border-white/5 rounded-xl flex items-center justify-between opacity-50 bg-white/5">
+        <div className="flex items-center space-x-2 lg:space-x-3">
+          <Clock className="w-3 h-3 lg:w-4 lg:h-4 text-white/50" />
+          <span className="text-[10px] lg:text-xs text-white/80">Today, 2:00 PM</span>
         </div>
-        <span className="text-[10px] text-white/30">Low Traffic</span>
+        <span className="text-[9px] lg:text-[10px] text-white/30">Low Traffic</span>
       </div>
       
       <motion.div 
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl flex items-center justify-between relative overflow-hidden shadow-[0_0_20px_rgba(249,115,22,0.15)]"
+        initial={{ x: -20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ delay: 0.8, type: "spring" }}
+        className="p-3 lg:p-4 border-2 border-orange-500/50 rounded-xl flex items-center justify-between bg-orange-500/10 shadow-[0_0_15px_rgba(249,115,22,0.15)] relative overflow-hidden"
       >
-        <div className="absolute inset-0 bg-orange-500/5 animate-pulse" />
-        <div className="flex items-center space-x-3 relative z-10">
-          <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
-            <Calendar className="w-4 h-4 text-orange-400" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-500/10 to-transparent animate-[shimmer_2s_infinite]" />
+        <div className="relative z-10 flex items-center space-x-2 lg:space-x-3">
+          <div className="p-1.5 lg:p-2 bg-orange-500/20 rounded-lg">
+            <Calendar className="w-3 h-3 lg:w-4 lg:h-4 text-orange-400" />
           </div>
           <div>
-            <div className="text-sm font-bold text-white">Tomorrow, 10:30 AM</div>
-            <div className="text-[10px] text-orange-300 mt-0.5">Peak Audience Active</div>
+            <div className="text-[11px] lg:text-sm font-bold text-white">Tomorrow, 10:30 AM</div>
+            <div className="text-[9px] lg:text-[10px] text-orange-300 mt-0.5">Peak Audience Active</div>
           </div>
         </div>
-        <div className="relative z-10 w-10 h-5 bg-orange-500 rounded-full flex items-center px-0.5 justify-end cursor-pointer">
-          <div className="w-4 h-4 bg-white rounded-full shadow-sm" />
+        <div className="relative z-10 w-8 lg:w-10 h-4 lg:h-5 bg-orange-500 rounded-full flex items-center px-0.5 justify-end cursor-pointer shrink-0">
+          <div className="w-3 h-3 lg:w-4 lg:h-4 bg-white rounded-full shadow-sm" />
         </div>
       </motion.div>
       
-      <div className="p-3 border border-white/5 rounded-xl flex items-center justify-between opacity-50 bg-white/5">
-        <div className="flex items-center space-x-3">
-          <Clock className="w-4 h-4 text-white/50" />
-          <span className="text-xs text-white/80">Friday, 6:00 PM</span>
+      <div className="p-2.5 lg:p-3 border border-white/5 rounded-xl flex items-center justify-between opacity-50 bg-white/5">
+        <div className="flex items-center space-x-2 lg:space-x-3">
+          <Clock className="w-3 h-3 lg:w-4 lg:h-4 text-white/50" />
+          <span className="text-[10px] lg:text-xs text-white/80">Friday, 6:00 PM</span>
         </div>
-        <span className="text-[10px] text-white/30">Average</span>
+        <span className="text-[9px] lg:text-[10px] text-white/30">Average</span>
       </div>
     </div>
   </div>
 );
 
 const GrowthMock = () => (
-  <div className="space-y-6 w-full px-2 lg:px-4">
+  <div className="space-y-4 lg:space-y-6 w-full px-1 lg:px-4">
     {/* Notification Toast */}
     <motion.div 
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.4, type: "spring" }}
-      className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center space-x-3 backdrop-blur-md shadow-[0_4px_20px_rgba(52,211,153,0.15)]"
+      className="p-2.5 lg:p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center space-x-2 lg:space-x-3 backdrop-blur-md shadow-[0_4px_20px_rgba(52,211,153,0.15)]"
     >
-      <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-        <Bell className="w-4 h-4 text-emerald-400" />
+      <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+        <Bell className="w-3 h-3 lg:w-4 lg:h-4 text-emerald-400" />
       </div>
       <div>
-        <div className="text-xs font-bold text-white">Viral Alert!</div>
-        <div className="text-[10px] text-emerald-200 mt-0.5">Your post hit the explore page.</div>
+        <div className="text-[10px] lg:text-xs font-bold text-white">Viral Alert!</div>
+        <div className="text-[9px] lg:text-[10px] text-emerald-200 mt-0.5">Your post hit the explore page.</div>
       </div>
     </motion.div>
     
-    <div className="pt-2">
-      <div className="flex justify-between items-end mb-6">
+    <div className="pt-1 lg:pt-2">
+      <div className="flex justify-between items-end mb-4 lg:mb-6">
         <div>
-          <div className="text-[10px] text-white/50 uppercase tracking-wider mb-1">New Followers</div>
-          <div className="text-4xl font-bold text-white">+1,248</div>
+          <div className="text-[9px] lg:text-[10px] text-white/50 uppercase tracking-wider mb-1">New Followers</div>
+          <div className="text-2xl lg:text-4xl font-bold text-white">+1,248</div>
         </div>
-        <div className="flex items-center space-x-1 text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20">
-          <ArrowUpRight className="w-4 h-4" />
-          <span className="text-sm font-bold">400%</span>
+        <div className="flex items-center space-x-1 text-emerald-400 bg-emerald-500/10 px-2 py-1 lg:px-2.5 lg:py-1.5 rounded-lg border border-emerald-500/20">
+          <ArrowUpRight className="w-3 h-3 lg:w-4 lg:h-4" />
+          <span className="text-xs lg:text-sm font-bold">400%</span>
         </div>
       </div>
       
       {/* Hockey Stick Chart */}
-      <div className="h-24 w-full relative">
+      <div className="h-16 lg:h-24 w-full relative">
         {/* Fill Area */}
         <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible" preserveAspectRatio="none">
           <defs>
@@ -229,7 +229,7 @@ const GrowthMock = () => (
           
           {/* Data Point Dots */}
           <motion.circle 
-            cx="100" cy="5" r="3" 
+            cx="100" cy="5" r="2.5" 
             fill="#10b981" 
             stroke="#fff" 
             strokeWidth="1.5"
@@ -245,7 +245,7 @@ const GrowthMock = () => (
 
 const VisualizerDashboard = ({ activeStep }: { activeStep: number }) => {
   return (
-    <div className="relative w-full max-w-[240px] sm:max-w-[300px] lg:max-w-[420px] mx-auto aspect-[4/3] lg:aspect-square flex items-center justify-center mt-2 lg:mt-0">
+    <div className="relative w-full max-w-[280px] sm:max-w-[320px] lg:max-w-[420px] mx-auto aspect-square lg:aspect-square flex items-center justify-center mt-2 lg:mt-0">
       {/* Background Ambient Glow */}
       <motion.div
         animate={{ 
@@ -266,7 +266,7 @@ const VisualizerDashboard = ({ activeStep }: { activeStep: number }) => {
         </div>
         
         {/* Content area */}
-        <div className="flex-1 p-4 lg:p-6 relative flex flex-col justify-center items-center overflow-hidden">
+        <div className="flex-1 p-3 lg:p-6 relative flex flex-col justify-center items-center overflow-hidden">
           {/* Background grid */}
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNCkiLz48L3N2Zz4=')] [mask-image:radial-gradient(ellipse_at_center,black_60%,transparent_100%)] pointer-events-none" />
 
