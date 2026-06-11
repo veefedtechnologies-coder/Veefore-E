@@ -581,8 +581,8 @@ const MotionMockupSlide = ({ feature, index, activeFeature }: { feature: Feature
     const y = isActive ? 0 : isPast ? -slideDistance : slideDistance;
     const scale = isActive ? 1 : 0.85;
     
-    // Add a slight opacity fade (0 to 1) so it gracefully exits, but keeping it visible enough to see the slide!
-    const opacity = isActive ? 1 : 0; 
+    // Lock opacity at 1 so it NEVER fades. It will only disappear when it physically slides off the screen!
+    const opacity = 1; 
 
     return <MockupSlide feature={feature} y={y} scale={scale} opacity={opacity} isVisible={isActive} />;
 };
