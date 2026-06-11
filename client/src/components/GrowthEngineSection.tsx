@@ -307,7 +307,7 @@ const StepCard = ({
   // Detects when card is near the center to update the sticky visualizer
   const { scrollYProgress: spyProgress } = useScroll({
     target: ref,
-    offset: ["start 60%", "end 40%"]
+    offset: ["start 75%", "end 25%"]
   });
 
   useMotionValueEvent(spyProgress, "change", (latest) => {
@@ -405,7 +405,7 @@ const GrowthEngineSection = () => {
         <div className="flex flex-col lg:flex-row relative items-start gap-4 lg:gap-24">
           
           {/* LEFT COLUMN: Sticky Visualizer */}
-          <div className="w-full lg:w-1/2 sticky top-[70px] lg:top-[15vh] flex flex-col justify-center text-center lg:text-left z-20 lg:z-0 bg-black/95 backdrop-blur-2xl lg:bg-transparent pt-3 lg:pt-0 pb-4 lg:pb-0 border-b border-white/10 lg:border-none shadow-[0_20px_40px_-20px_rgba(0,0,0,0.8)] lg:shadow-none mx-[-24px] px-[24px] lg:mx-0 lg:px-0">
+          <div className="w-[calc(100%+48px)] lg:w-1/2 sticky top-[70px] lg:top-[15vh] flex flex-col justify-center items-center lg:items-start text-center lg:text-left z-20 lg:z-0 bg-black/95 backdrop-blur-2xl lg:bg-transparent pt-3 lg:pt-0 pb-4 lg:pb-0 border-b border-white/10 lg:border-none shadow-[0_20px_40px_-20px_rgba(0,0,0,0.8)] lg:shadow-none -mx-6 px-6 lg:mx-0 lg:w-full lg:px-0">
             {/* Desktop Title (Sticky) */}
             <div className="hidden lg:block lg:mb-12">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm mb-4">
