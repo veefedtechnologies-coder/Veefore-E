@@ -1,4 +1,3 @@
-import { getFirebaseAdmin } from '../../firebase-admin';
 import { User, IUser } from '../../models/User/User';
 import { logger } from '../../config/logger';
 
@@ -148,11 +147,15 @@ export class FirebaseTokenService {
       }
 
       // Requirement 3.4: Create Firebase custom token
-      const admin = getFirebaseAdmin();
+      // Use dynamic import to avoid module initialization timing issues
+      const { getFirebaseAdmin: getAdmin } = await import('../../firebase-admin');
+      const firebaseApp = getAdmin();
+      
+      console.log('[OAuth] Firebase Admin initialized, creating custom token for userId:', String(user._id));
       
       // Custom token expires after 60 minutes (Firebase default)
       // Include user claims for consistency with token refresh endpoint
-      const customToken = await admin.auth().createCustomToken(
+      const customToken = await firebaseApp.auth().createCustomToken(
         String(user._id),
         {
           email: user.email,
@@ -161,6 +164,8 @@ export class FirebaseTokenService {
           sessionVersion: user.sessionVersion || 1,
         }
       );
+      
+      console.log('[OAuth] Custom token created successfully, length:', customToken.length);
 
       const durationMs = Date.now() - startTime;
 
@@ -185,13 +190,20 @@ export class FirebaseTokenService {
         component: 'OAuth.FirebaseToken',
         email: googleUserInfo.email,
         errorType: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorStack: error instanceof Error ? error.stack?.substring(0, 500) : undefined,
+      });
+
+      // Log additional details for debugging
+      console.error('[OAuth] Firebase token creation detailed error:', {
+        email: googleUserInfo.email,
+        errorName: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorCode: (error as any)?.code || 'none',
+        errorDetails: (error as any)?.errorInfo || 'none',
       });
 
       // Throw with user-friendly message
-      if (error instanceof Error && error.message.includes('auth')) {
-        throw new Error('Failed to create authentication token');
-      }
-
       throw new Error('Failed to create authentication token');
     }
   }
@@ -210,10 +222,11 @@ export class FirebaseTokenService {
    */
   async verifyToken(token: string): Promise<DecodedToken> {
     try {
-      const admin = getFirebaseAdmin();
+      const { getFirebaseAdmin: getAdmin } = await import('../../firebase-admin');
+      const firebaseApp = getAdmin();
       
       // Verify the token with Firebase Admin SDK
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await firebaseApp.auth().verifyIdToken(token);
 
       return {
         uid: decodedToken.uid,
