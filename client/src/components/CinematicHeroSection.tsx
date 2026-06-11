@@ -22,7 +22,7 @@ const RotatingCinematicText = () => {
   }, [])
 
   return (
-    <div className="relative flex justify-center items-center w-full min-h-[160px] md:min-h-[120px] lg:min-h-[140px] overflow-visible">
+    <div className="relative flex justify-center items-center w-full overflow-visible pb-4 md:pb-8">
       <AnimatePresence mode="popLayout">
         <motion.h1
           key={index}
@@ -30,7 +30,7 @@ const RotatingCinematicText = () => {
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           exit={{ opacity: 0, y: -40, filter: 'blur(10px)' }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute w-full px-4 font-normal leading-[1.1] md:leading-[0.95] tracking-[-1px] md:tracking-[-2px] text-white"
+          className="w-full px-4 font-normal leading-[1.1] md:leading-[0.95] tracking-[-1px] md:tracking-[-2px] text-white"
           style={{
             fontFamily: "'Instrument Serif', serif",
             fontSize: 'clamp(2.5rem, 5.5vw, 5rem)',
