@@ -122,15 +122,7 @@ export default function AuthenticatedApp() {
 
   const { data: userData, isLoading: userDataLoading, error: userDataError } = useQuery({
     queryKey: ['/api/user'],
-    queryFn: async () => {
-      const token = await user?.getIdToken()
-      if (!token) throw new Error('No token')
-      const response = await fetch('/api/user', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error(`${response.status}`)
-      return response.json()
-    },
+    queryFn: () => apiRequest('/api/user'),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 3,
@@ -139,15 +131,7 @@ export default function AuthenticatedApp() {
 
   const { data: workspacesRaw, isLoading: workspacesLoading, error: workspacesError, refetch: enforceRefetch } = useQuery({
     queryKey: ['/api/workspaces'],
-    queryFn: async () => {
-      const token = await user?.getIdToken()
-      if (!token) return []
-      const response = await fetch('/api/workspaces', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error(`${response.status}`)
-      return response.json()
-    },
+    queryFn: () => apiRequest('/api/workspaces'),
     enabled: !!user && !!userData,
     staleTime: 5 * 60 * 1000,
     retry: 3,

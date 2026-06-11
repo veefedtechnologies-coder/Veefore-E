@@ -110,13 +110,18 @@ export class MetricsWorker {
     const { workspaceId, userId, instagramAccountId, token, metricsType, forceRefresh } = job.data;
     const isDailySnapshot = job.name === 'daily-snapshot' || (metricsType as any) === 'daily-snapshot' || (job.data as any).type === 'daily-snapshot';
     const isTokenHygieneRefresh = job.name === 'token-hygiene-refresh' || (job.data as any).type === 'token-hygiene-refresh';
-      const isTokenHygieneCleanup = job.name === 'token-hygiene-cleanup' || (job.data as any).type === 'token-hygiene-cleanup';
-      const isSocialListeningTrends = job.name === 'social-listening-trends' || (job.data as any).type === 'social-listening-trends';
-      
-      console.log(`📊 Processing metrics fetch: name=${job.name}, workspace=${workspaceId || 'N/A'}, account=${instagramAccountId || 'N/A'}`);
+    const isTokenHygieneCleanup = job.name === 'token-hygiene-cleanup' || (job.data as any).type === 'token-hygiene-cleanup';
+    const isSocialListeningTrends = job.name === 'social-listening-trends' || (job.data as any).type === 'social-listening-trends';
+    const isDeepHibernationCleanup = job.name === 'deep-hibernation-cleanup' || (job.data as any).type === 'deep-hibernation-cleanup';
+    
+    // Check if this is a system job that doesn't require instagramAccountId
+    const isSystemJob = isDailySnapshot || isTokenHygieneRefresh || isTokenHygieneCleanup || 
+                        isSocialListeningTrends || isDeepHibernationCleanup;
+    
+    console.log(`📊 Processing metrics fetch: name=${job.name}, workspace=${workspaceId || 'N/A'}, account=${instagramAccountId || 'N/A'}, systemJob=${isSystemJob}`);
 
-      try {
-        // PHASE 4: Global Daily Snapshot Job Intercept
+    try {
+      // PHASE 4: Global Daily Snapshot Job Intercept
         if (isDailySnapshot) {
           console.log(`[BULLMQ] 📸 Running global daily snapshot job`);
           const { analyticsService } = await import('../services');
@@ -212,7 +217,6 @@ export class MetricsWorker {
         // Runs daily at 2 AM. Scans all workspaces and physically removes
         // BullMQ repeatable jobs for any workspace inactive >30 days.
         // ══════════════════════════════════════════════════════════════
-        const isDeepHibernationCleanup = job.name === 'deep-hibernation-cleanup' || (job.data as any).type === 'deep-hibernation-cleanup';
         if (isDeepHibernationCleanup) {
           console.log(`[DEEP HIBERNATION] 🌙 Starting daily deep hibernation cleanup scan...`);
           try {
@@ -243,6 +247,11 @@ export class MetricsWorker {
                     for (const rj of workspaceJobs) {
                       await mq.removeRepeatableByKey(rj.key);
                       removedCount++;
+                    }
+                    // Invalidate cache after removing jobs
+                    if (workspaceJobs.length > 0) {
+                      const { invalidateRepeatableJobsCache } = await import('../queues/metricsQueue');
+                      invalidateRepeatableJobsCache();
                     }
                     // Also purge any waiting/delayed instances left over
                     const pendingJobs = await mq.getJobs(['waiting', 'delayed', 'prioritized']);
@@ -282,9 +291,10 @@ export class MetricsWorker {
               console.log(`[HIBERNATION] 💤 Workspace ${workspaceId} has been inactive for ${daysInactive.toFixed(1)} days. Suspending active polling schedules.`);
               // Suspend polling by physically removing this specific job from the repeatable list
               if (job.repeatJobKey) {
-                const { metricsQueue: mq } = await import('../queues/metricsQueue');
+                const { metricsQueue: mq, invalidateRepeatableJobsCache } = await import('../queues/metricsQueue');
                 if (mq) {
                    await mq.removeRepeatableByKey(job.repeatJobKey);
+                   invalidateRepeatableJobsCache();
                    console.log(`[HIBERNATION] 🗑️ Removed repeatable schedule ${job.repeatJobKey}`);
                 }
               }
@@ -296,22 +306,20 @@ export class MetricsWorker {
         }
       }
 
-      // P4-FIX: Delegate to the robust SocialAccountService.syncAccount which handles 
-      // rate limits, ContentModel tracking, Analytics snapshots, and WebSockets broadcasting properly!
       console.log(`\n======================================================`);
       console.log(`[BULLMQ WORKER] 🚀 DELEGATING FETCH TO SOCIAL ACCOUNT SERVICE`);
       console.log(`[BULLMQ WORKER] Account ID: ${instagramAccountId}`);
       console.log(`======================================================\n`);
       
+      // Guard against null or missing account IDs from regular jobs (not system jobs)
+      if (!instagramAccountId || typeof instagramAccountId !== 'string') {
+        throw new Error('Invalid or missing instagramAccountId in job data');
+      }
+      
       const { socialAccountService } = await import('../services/SocialAccountService');
       const { default: mongoose } = await import('mongoose');
       
       let targetAccountId = instagramAccountId;
-      
-      // Guard against null or missing account IDs from corrupted jobs
-      if (!instagramAccountId || typeof instagramAccountId !== 'string') {
-        throw new Error('Invalid or missing instagramAccountId in job data');
-      }
       
       // If the provided ID is not a valid Mongo ObjectId (e.g. it is the external Instagram numerical ID)
       if (!mongoose.Types.ObjectId.isValid(instagramAccountId)) {

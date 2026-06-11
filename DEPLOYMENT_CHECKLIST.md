@@ -84,6 +84,69 @@ curl https://api.veefore.com/api/health
 
 ---
 
+## 🔄 Redis Optimization Rollback (Phase 4)
+
+### Rate Limiting Algorithm Feature Flag
+
+The application uses an optimized **fixed-window rate limiting algorithm** by default (2 Redis commands per request instead of 4). If issues arise, you can instantly rollback to the old **sliding-window algorithm** without code changes.
+
+#### Rollback Procedure
+
+**Method 1: Environment Variable (Recommended - NO CODE DEPLOY REQUIRED)**
+
+1. **Set the rollback flag:**
+   - Railway: Add environment variable `RATE_LIMIT_ALGORITHM=sliding-window`
+   - Vercel: Add environment variable `RATE_LIMIT_ALGORITHM=sliding-window`
+   
+2. **Restart the application:**
+   - Railway: Restart happens automatically when env var changes
+   - Vercel: Redeploy or wait for auto-restart
+   
+3. **Verify rollback:**
+   - Check server logs for: `📊 Rate Limit Algorithm: sliding-window`
+   - Monitor Redis commands increase to ~350K-450K/month (expected)
+   - Test rate limiting: send 121 requests/min, verify 121st is blocked
+
+**Method 2: Git Revert (If env var unavailable)**
+
+1. Revert commit implementing Phase 4 (Task 6.1)
+2. Deploy previous version
+3. System returns to sliding-window implementation
+
+#### When to Rollback
+
+Consider rollback if you observe:
+- ❌ Rate limiting not working correctly (requests not blocked)
+- ❌ False positives (legitimate requests blocked unexpectedly)
+- ❌ Application errors related to Redis rate limiting
+- ❌ Unusual spikes in 429 (Too Many Requests) responses
+
+#### Verification After Rollback
+
+```bash
+# Check logs for algorithm in use
+grep "Rate Limit Algorithm" logs/server.log
+
+# Expected output:
+# 📊 Rate Limit Algorithm: sliding-window (set RATE_LIMIT_ALGORITHM=sliding-window to rollback)
+
+# Test rate limiting still works
+curl -X POST https://api.veefore.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"test"}' \
+  # Repeat 121 times, 121st should return 429
+```
+
+#### Default Algorithm
+
+By default (no RATE_LIMIT_ALGORITHM set):
+- Uses **fixed-window** algorithm (optimized, 2 commands/request)
+- 50% reduction in Redis commands
+- Slightly different behavior at window boundaries (allows burst)
+- Production-tested and recommended
+
+---
+
 ## 🐛 Troubleshooting
 
 ### If Vercel Build Still Fails

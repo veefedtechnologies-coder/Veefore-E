@@ -233,15 +233,15 @@ const PricingCard = ({ plan, isHero = false }: { plan: PricingPlan, isHero?: boo
                     ))}
                 </div>
 
-                <MagneticButton
-                    className={`w-full rounded-full py-4 font-bold transition-all duration-300 ${isHero
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25'
-                        : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
+                <button
+                    className={`w-full py-4 btn-brick ${isHero
+                        ? 'btn-brick-white'
+                        : 'btn-brick-dark'
                         }`}
                     onClick={openWaitlist}
                 >
                     Get Notified
-                </MagneticButton>
+                </button>
             </GlassCard>
         </TiltCard>
     );

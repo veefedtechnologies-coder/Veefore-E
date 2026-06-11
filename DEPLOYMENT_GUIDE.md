@@ -281,6 +281,8 @@ vercel --prod
 
 ## Environment Variables
 
+**For detailed OAuth environment variables configuration**, see [docs/OAUTH_ENVIRONMENT_VARIABLES.md](docs/OAUTH_ENVIRONMENT_VARIABLES.md)
+
 ### Required Variables
 ```env
 # Application
@@ -309,6 +311,13 @@ SENDGRID_API_KEY=SG....
 INSTAGRAM_CLIENT_ID=your-client-id
 INSTAGRAM_CLIENT_SECRET=your-client-secret
 INSTAGRAM_REDIRECT_URI=https://your-domain.com/api/instagram/callback
+
+# Google OAuth (Server-Side Authentication)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+OAUTH_CALLBACK_URL=https://your-domain.com/api/auth/google/callback
+FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}'
+SESSION_SECRET=your-cryptographically-random-32-char-secret
 
 # Additional APIs
 ANTHROPIC_API_KEY=sk-ant-...

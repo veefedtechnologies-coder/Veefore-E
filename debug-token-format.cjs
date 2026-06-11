@@ -1,109 +1,75 @@
-require('dotenv').config();
-const { MongoClient } = require('mongodb');
+/**
+ * Debug Token Format Script
+ * 
+ * This script checks if the auth_token cookie contains a valid Firebase custom token
+ */
 
-async function debugTokenFormat() {
-  console.log('🔍 Debugging token format and encoding...');
-  
-  const client = new MongoClient('mongodb+srv://brandboost09:Arpitc8433@cluster0.mekr2dh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
-  
-  try {
-    await client.connect();
-    console.log('✅ Connected to MongoDB');
-    
-    const db = client.db('veeforedb');
-    const collection = db.collection('socialaccounts');
-    
-    // Find the arpit.10 Instagram account
-    const account = await collection.findOne({
-      username: 'arpit.10',
-      platform: 'instagram'
-    });
-    
-    if (!account) {
-      console.log('❌ No arpit.10 Instagram account found');
-      return;
-    }
-    
-    console.log('📱 Found Instagram account:');
-    console.log('  Username:', account.username);
-    
-    const encryptedToken = account.encryptedAccessToken;
-    console.log('\n🔍 Encrypted Token Analysis:');
-    console.log('  Type:', typeof encryptedToken);
-    console.log('  Keys:', Object.keys(encryptedToken));
-    
-    // Analyze each component
-    console.log('\n📋 Component Analysis:');
-    
-    Object.keys(encryptedToken).forEach(key => {
-      const value = encryptedToken[key];
-      console.log(`\n${key}:`);
-      console.log(`  Type: ${typeof value}`);
-      console.log(`  Length: ${value?.length || 'N/A'}`);
-      console.log(`  Value: ${value}`);
-      
-      // Try different decoding methods
-      if (typeof value === 'string') {
-        console.log(`  Decoding attempts:`);
-        
-        // Try hex decoding
-        try {
-          const hexBuffer = Buffer.from(value, 'hex');
-          console.log(`    Hex decode length: ${hexBuffer.length}`);
-          console.log(`    Hex decode valid: ${hexBuffer.length > 0}`);
-        } catch (e) {
-          console.log(`    Hex decode failed: ${e.message}`);
-        }
-        
-        // Try base64 decoding
-        try {
-          const base64Buffer = Buffer.from(value, 'base64');
-          console.log(`    Base64 decode length: ${base64Buffer.length}`);
-          console.log(`    Base64 decode valid: ${base64Buffer.length > 0}`);
-        } catch (e) {
-          console.log(`    Base64 decode failed: ${e.message}`);
-        }
-        
-        // Check if it looks like base64
-        const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-        console.log(`    Looks like base64: ${base64Regex.test(value)}`);
-        
-        // Check if it looks like hex
-        const hexRegex = /^[0-9a-fA-F]+$/;
-        console.log(`    Looks like hex: ${hexRegex.test(value)}`);
-      }
-    });
-    
-    // Test with base64 decoding instead of hex
-    console.log('\n🔧 Testing base64 decoding:');
-    try {
-      const { encryptedData, iv, salt, tag } = encryptedToken;
-      
-      const ivBuffer = Buffer.from(iv, 'base64');
-      const saltBuffer = Buffer.from(salt, 'base64');
-      const tagBuffer = Buffer.from(tag, 'base64');
-      
-      console.log('  Base64 buffer lengths:');
-      console.log(`    IV: ${ivBuffer.length} bytes`);
-      console.log(`    Salt: ${saltBuffer.length} bytes`);
-      console.log(`    Tag: ${tagBuffer.length} bytes`);
-      
-      // Check if these match expected lengths
-      console.log('  Expected vs Actual:');
-      console.log(`    IV: expected 12, got ${ivBuffer.length} ${ivBuffer.length === 12 ? '✅' : '❌'}`);
-      console.log(`    Salt: expected 32, got ${saltBuffer.length} ${saltBuffer.length === 32 ? '✅' : '❌'}`);
-      console.log(`    Tag: expected 16, got ${tagBuffer.length} ${tagBuffer.length === 16 ? '✅' : '❌'}`);
-      
-    } catch (error) {
-      console.log('  Base64 decoding failed:', error.message);
-    }
-    
-  } catch (error) {
-    console.error('❌ Error:', error);
-  } finally {
-    await client.close();
-    console.log('\n🔌 Disconnected from MongoDB');
+const http = require('http');
+
+console.log('🔍 Checking token format from /api/auth/session...\n');
+
+const options = {
+  hostname: 'localhost',
+  port: 3000,
+  path: '/api/auth/session',
+  method: 'GET',
+  headers: {
+    // Use a dummy token to test the response format
+    'Cookie': 'auth_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJ0ZXN0In0.test'
   }
-}
+};
 
-debugTokenFormat().catch(console.error);
+const req = http.request(options, (res) => {
+  console.log(`✅ Status Code: ${res.statusCode}\n`);
+  
+  let data = '';
+  
+  res.on('data', (chunk) => {
+    data += chunk;
+  });
+  
+  res.on('end', () => {
+    try {
+      const parsed = JSON.parse(data);
+      console.log('📦 Response:', JSON.stringify(parsed, null, 2));
+      
+      if (parsed.customToken) {
+        console.log('\n✅ Custom token found!');
+        console.log(`   Length: ${parsed.customToken.length} characters`);
+        console.log(`   Starts with: ${parsed.customToken.substring(0, 50)}...`);
+        
+        // Check if it looks like a JWT
+        const parts = parsed.customToken.split('.');
+        console.log(`   JWT parts: ${parts.length} (should be 3 for valid JWT)`);
+        
+        if (parts.length === 3) {
+          console.log('\n✅ Token appears to be a valid JWT format');
+          try {
+            const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
+            console.log('   Header:', JSON.stringify(header, null, 2));
+          } catch (e) {
+            console.log('   ⚠️  Could not decode header');
+          }
+        } else {
+          console.log('\n❌ Token is NOT in JWT format!');
+          console.log('   This could be why Firebase rejects it');
+        }
+      } else if (parsed.error) {
+        console.log('\n❌ Error response:', parsed.error);
+        console.log('   Message:', parsed.message);
+      } else {
+        console.log('\n⚠️  Unexpected response format');
+      }
+    } catch (e) {
+      console.log('❌ Failed to parse response:', e.message);
+      console.log('   Raw data:', data);
+    }
+  });
+});
+
+req.on('error', (error) => {
+  console.error('❌ Request failed:', error.message);
+  console.log('\n⚠️  Make sure your server is running on port 3000');
+});
+
+req.end();

@@ -31,6 +31,8 @@ import TargetAudienceSection from '../components/TargetAudienceSection';
 import GrowthEngineSection from '../components/GrowthEngineSection';
 import CreditSystemSection from '../components/CreditSystemSection';
 import BetaLaunchSection from '../components/BetaLaunchSection';
+import CinematicHeroSection from '../components/CinematicHeroSection';
+import { AlgorithmScienceSection } from '../components/AlgorithmScienceSection';
 
 
 // Visuals for Hero section
@@ -38,6 +40,9 @@ import { Phase1EngagementVisual, Phase1DMVisual, HookVisual } from '../component
 
 // Phase 1 Review Mode flag
 const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
+
+// Cinematic Hero flag
+const useCinematicHero = import.meta.env.VITE_USE_CINEMATIC_HERO === 'true';
 
 // Only keep 3D component lazy as it's truly optional and heavy (WebGL)
 const Landing3D = React.lazy(() => import('./Landing3D'))
@@ -777,7 +782,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   }, [])
 
   // HUD State for Algorithm Science section
-  const [hudActiveSignal, setHudActiveSignal] = useState<number | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { scrollYProgress } = useScroll()
@@ -791,9 +796,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       id: 'smart-scheduler',
       icon: Clock,
       title: 'Smart Content Scheduler',
-      tagline: 'Publish at the exact moment your audience is most active.',
-      description: 'AI analyzes your audience activity patterns and recommends optimal posting windows for maximum organic reach.',
-      details: ['AI best-time recommendations', 'Multi-platform queue management', 'Content calendar automation', 'Audience activity heatmaps'],
+      tagline: 'Post when your fans are actually awake.',
+      description: 'Stop guessing when to hit publish. We track exactly when your specific audience is scrolling, so your post doesn\'t die in the first 10 minutes.',
+      details: ['Peak-time prediction', 'Visual content calendar', 'Auto-publishing queue', 'Audience heatmaps'],
       gradient: 'from-blue-500 to-cyan-500',
       visual: <Phase1EngagementVisual />
     },
@@ -1009,8 +1014,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* MainNavigation is rendered by App.tsx */}
 
-      {/* Hero Section */}
-      <section className={`relative min-h-screen flex items-center justify-center pb-20 overflow-hidden ${isMobile ? 'pt-28' : 'pt-24'}`} style={{ marginTop: '-80px', paddingTop: isMobile ? 'calc(80px + 2rem)' : 'calc(80px + 6rem)' }}>
+      {/* Hero Section - Conditional based on VITE_USE_CINEMATIC_HERO */}
+      {useCinematicHero ? (
+        <CinematicHeroSection />
+      ) : (
+        <section className={`relative min-h-screen flex items-center justify-center pb-20 overflow-hidden ${isMobile ? 'pt-28' : 'pt-24'}`} style={{ marginTop: '-80px', paddingTop: isMobile ? 'calc(80px + 2rem)' : 'calc(80px + 6rem)' }}>
         {/* Background layer - PERF: Defer 3D to allow hero text to render first */}
         <div className="absolute inset-0 z-0">
           {isMobile ? (
@@ -1054,16 +1062,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             </p>
 
             <div className="flex items-center justify-center px-4">
-              <MagneticButton
-                className="group relative bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white rounded-full px-6 sm:px-7 md:px-8 py-3 sm:py-3.5 text-sm sm:text-sm md:text-base font-semibold overflow-hidden shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-shadow duration-300"
+              <button
+                className="group btn-brick btn-brick-brand px-6 sm:px-7 md:px-8 py-3 sm:py-3.5 text-sm sm:text-sm md:text-base"
                 onClick={() => onNavigate('signup')}
               >
                 <span className="relative z-10 flex items-center">
                   Get Started
                   <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              </MagneticButton>
+              </button>
             </div>
 
             <div className="mt-8 sm:mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-white/30 text-xs sm:text-sm px-4">
@@ -1121,19 +1128,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               transition={{ duration: 0.8, delay: 1.1 }}
               className="flex items-center justify-center px-4"
             >
-              <MagneticButton
-                className="group relative bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white rounded-full px-7 sm:px-8 md:px-10 py-3.5 sm:py-4 text-sm sm:text-base md:text-lg font-semibold overflow-hidden shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-shadow duration-300"
+              <button
+                className="group btn-brick btn-brick-brand px-7 sm:px-8 md:px-10 py-3.5 sm:py-4 text-sm sm:text-base md:text-lg"
                 onClick={() => onNavigate('signup')}
               >
                 <span className="relative z-10 flex items-center">
                   Get Started
                   <ArrowRight className="ml-2 w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                 </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="absolute inset-[-3px] bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur-xl opacity-40" />
-                </div>
-              </MagneticButton>
+              </button>
             </motion.div>
 
             <motion.div
@@ -1157,12 +1160,27 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         )}
 
       </section>
-      <section className="relative py-8 -mt-20 z-20 w-full overflow-hidden">
+      )}
+
+      <section className="relative pt-8 pb-20 md:pb-32 -mt-20 z-20 w-full overflow-visible">
         <div className="w-full px-4 md:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
+            initial={{ opacity: 0, y: 160, scale: 0.95, rotateX: 5 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+            viewport={{ once: false, amount: 0, margin: "0px 0px 300px 0px" }}
+            onViewportEnter={() => {
+              // Gentle haptic feedback as it locks into place
+              if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(20);
+              }
+            }}
+            transition={{
+              opacity: { duration: 0.5, delay: 0.1 },
+              y: { type: 'spring', stiffness: 120, damping: 20, mass: 1.8, delay: 0.1 },
+              scale: { type: 'spring', stiffness: 100, damping: 20, mass: 1.5, delay: 0.1 },
+              rotateX: { type: 'spring', stiffness: 100, damping: 20, mass: 1.5, delay: 0.1 },
+            }}
+            style={{ perspective: 1200, transformStyle: 'preserve-3d' }}
             className="relative w-full"
           >
             {/* Side Graphics - Left (Faded, beautiful.ai style) - Hidden on mobile */}
@@ -1269,7 +1287,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
             {/* Central Dashboard - Animated Motion Graphic - Now visible on mobile */}
             <div className="relative">
-              <AnimatedDashboard />
+              <TiltCard className="w-full">
+                <AnimatedDashboard />
+              </TiltCard>
 
               {/* Floating Elements - Responsive */}
               <motion.div
@@ -1448,568 +1468,18 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
-      {/* How VeeFore Works - Ascending Graph Section */}
-      {/* How VeeFore Works - Ascending Graph Section */}
-      <section className="relative py-20 z-20 overflow-hidden">
-        {/* Left Side - Meaningful Social Media Context Graphics with fade */}
-        {/* Left fade overlay */}
-        <div className="hidden lg:block absolute left-0 top-0 bottom-0 w-64 pointer-events-none bg-gradient-to-r from-transparent via-transparent to-transparent z-10" />
-
-        {/* Incoming comments/engagement waiting to be answered */}
-        <div className="hidden lg:block absolute left-6 top-28 pointer-events-none opacity-60">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 0.6, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.5 }}
-            className="bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3 backdrop-blur-sm scale-110"
-            style={{ maskImage: 'linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,1) 30%)' }}
-          >
-            <div className="flex items-center gap-2.5 mb-2">
-              <MessageCircle className="w-4 h-4 text-blue-400" />
-              <span className="text-xs text-white/50">New comments</span>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-400 to-purple-500" />
-                <div className="h-2.5 w-24 bg-white/10 rounded" />
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500" />
-                <div className="h-2.5 w-20 bg-white/10 rounded" />
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500" />
-                <div className="h-2.5 w-28 bg-white/10 rounded" />
-              </div>
-            </div>
-            <div className="mt-2.5 text-[10px] text-orange-400/70 flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              <span>Waiting for reply...</span>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Manual work indicator - time consuming */}
-        <div className="hidden lg:block absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 0.5, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.7 }}
-            className="text-center scale-115"
-            style={{ maskImage: 'linear-gradient(to right, rgba(0,0,0,0.2), rgba(0,0,0,1) 40%)' }}
-          >
-            <div className="bg-white/[0.03] border border-white/5 rounded-xl px-4 py-3 mb-3">
-              <div className="text-xs text-white/30 uppercase tracking-wider mb-1.5">Without AI</div>
-              <div className="text-2xl font-bold text-red-400/60">2-4 hrs</div>
-              <div className="text-[10px] text-white/30">{isPhase1 ? 'manual content' : 'daily replies'}</div>
-            </div>
-            <svg className="w-8 h-12 mx-auto text-white/20" viewBox="0 0 24 40">
-              <path d="M12 5 L12 30 M7 25 L12 30 L17 25" stroke="currentColor" strokeWidth="1.5" fill="none" />
-            </svg>
-          </motion.div>
-        </div>
-
-        {/* DM inbox preview */}
-        <div className="hidden lg:block absolute left-8 bottom-20 pointer-events-none opacity-55">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 0.55, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.9 }}
-            className="bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3 backdrop-blur-sm scale-110"
-            style={{ maskImage: 'linear-gradient(to right, rgba(0,0,0,0.25), rgba(0,0,0,1) 35%)' }}
-          >
-            <div className="flex items-center gap-2.5 mb-2">
-              <Send className="w-4 h-4 text-purple-400" />
-              <span className="text-xs text-white/50">{isPhase1 ? 'Scheduled posts' : 'DM requests'}</span>
-              <span className="text-[10px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">12</span>
-            </div>
-            <div className="space-y-1.5">
-              <div className="h-2.5 w-28 bg-white/10 rounded" />
-              <div className="h-2.5 w-24 bg-white/10 rounded" />
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Right Side - Results & Growth Graphics with fade */}
-        {/* AI auto-reply indicator */}
-        <div className="hidden lg:block absolute right-6 top-24 pointer-events-none opacity-60">
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 0.6, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.6 }}
-            className="bg-white/[0.04] border border-green-500/20 rounded-2xl px-4 py-3 backdrop-blur-sm scale-110"
-            style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.3), rgba(0,0,0,1) 30%)' }}
-          >
-            <div className="flex items-center gap-2.5 mb-2">
-              <Bot className="w-4 h-4 text-green-400" />
-              <span className="text-xs text-green-400/80">{isPhase1 ? 'AI Published' : 'AI Auto-replied'}</span>
-              <Check className="w-3.5 h-3.5 text-green-400" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-400 to-purple-500" />
-                <div className="flex-1 h-2.5 bg-green-500/20 rounded" />
-                <Check className="w-3 h-3 text-green-400/60" />
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500" />
-                <div className="flex-1 h-2.5 bg-green-500/20 rounded" />
-                <Check className="w-3 h-3 text-green-400/60" />
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500" />
-                <div className="flex-1 h-2.5 bg-green-500/20 rounded" />
-                <Check className="w-3 h-3 text-green-400/60" />
-              </div>
-            </div>
-            <div className="mt-2.5 text-[10px] text-green-400/70 flex items-center gap-1.5">
-              <Zap className="w-3 h-3" />
-              <span>{isPhase1 ? 'Published at optimal time' : 'Replied in 2 seconds'}</span>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Engagement growth metrics */}
-        <div className="hidden lg:block absolute right-4 top-1/2 -translate-y-1/4 pointer-events-none opacity-50">
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 0.5, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.8 }}
-            className="space-y-3 scale-115"
-            style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.2), rgba(0,0,0,1) 40%)' }}
-          >
-            <div className="bg-white/[0.03] border border-white/5 rounded-xl px-4 py-3 text-center">
-              <div className="text-xs text-white/30 uppercase tracking-wider mb-1.5">Engagement</div>
-              <div className="text-2xl font-bold text-green-400">+147%</div>
-              <div className="text-[10px] text-white/30">this month</div>
-            </div>
-            <div className="bg-white/[0.03] border border-white/5 rounded-xl px-4 py-3 text-center">
-              <div className="text-xs text-white/30 uppercase tracking-wider mb-1.5">Response</div>
-              <div className="text-2xl font-bold text-purple-400">{"<"}3s</div>
-              <div className="text-[10px] text-white/30">avg time</div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Follower growth indicator */}
-        <div className="hidden lg:block absolute right-8 bottom-16 pointer-events-none opacity-55">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 0.55, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 1 }}
-            className="bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3 backdrop-blur-sm scale-110"
-            style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.25), rgba(0,0,0,1) 35%)' }}
-          >
-            <div className="flex items-center gap-2.5 mb-2">
-              <Users className="w-4 h-4 text-blue-400" />
-              <span className="text-xs text-white/50">Follower growth</span>
-            </div>
-            <div className="flex items-end gap-1.5 h-10">
-              <div className="w-2.5 bg-blue-500/40 rounded-t" style={{ height: '30%' }} />
-              <div className="w-2.5 bg-blue-500/50 rounded-t" style={{ height: '45%' }} />
-              <div className="w-2.5 bg-purple-500/50 rounded-t" style={{ height: '55%' }} />
-              <div className="w-2.5 bg-purple-500/60 rounded-t" style={{ height: '70%' }} />
-              <div className="w-2.5 bg-green-500/70 rounded-t" style={{ height: '90%' }} />
-              <div className="w-2.5 bg-green-500 rounded-t" style={{ height: '100%' }} />
-            </div>
-            <div className="mt-2 text-[10px] text-green-400/70 flex items-center gap-1.5">
-              <TrendingUp className="w-3 h-3" />
-              <span>+2.4K this week</span>
-            </div>
-          </motion.div>
-        </div>
-
-
-        <div className="max-w-[1100px] mx-auto px-6 relative">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            className="text-center mb-12"
-          >
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-white/60 uppercase tracking-widest mb-5">
-              <Zap className="w-3.5 h-3.5 text-blue-400" />
-              <span>How It Works</span>
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4">
-              Your AI-powered <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">growth engine</span>
-            </h2>
-            <p className="text-base md:text-lg text-white/40 max-w-2xl mx-auto">
-              Each step compounds your engagement, building momentum that algorithms reward.
-            </p>
-          </motion.div>
-
-          {/* Ascending Graph Visualization */}
-          <div className="relative">
-            {/* Desktop: Ascending graph layout */}
-            <div className="hidden md:block">
-              {/* SVG Graph with wavy ascending line */}
-              <svg className="absolute inset-0 w-full h-[400px] pointer-events-none" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid meet">
-                <defs>
-                  <linearGradient id="graphLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#3b82f6" />
-                    <stop offset="33%" stopColor="#8b5cf6" />
-                    <stop offset="66%" stopColor="#6366f1" />
-                    <stop offset="100%" stopColor="#22c55e" />
-                  </linearGradient>
-                  <linearGradient id="graphFillGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.1" />
-                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0.05" />
-                  </linearGradient>
-                </defs>
-                {/* Wavy ascending line with oscillating pattern */}
-                <motion.path
-                  d="M 50 340 
-                     C 80 320, 100 330, 120 310
-                     C 140 290, 160 300, 180 280
-                     C 200 260, 220 270, 250 250
-                     C 280 230, 300 245, 340 220
-                     C 380 195, 400 210, 450 185
-                     C 500 160, 520 175, 580 145
-                     C 640 115, 660 130, 720 100
-                     C 780 70, 800 85, 860 55
-                     C 920 25, 940 35, 950 30"
-                  fill="none"
-                  stroke="url(#graphLineGradient)"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  initial={{ pathLength: 0 }}
-                  whileInView={{ pathLength: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 2, ease: "easeOut" }}
-                />
-                {/* Gradient fill under the wavy line */}
-                <motion.path
-                  d="M 50 340 
-                     C 80 320, 100 330, 120 310
-                     C 140 290, 160 300, 180 280
-                     C 200 260, 220 270, 250 250
-                     C 280 230, 300 245, 340 220
-                     C 380 195, 400 210, 450 185
-                     C 500 160, 520 175, 580 145
-                     C 640 115, 660 130, 720 100
-                     C 780 70, 800 85, 860 55
-                     C 920 25, 940 35, 950 30
-                     L 950 400 L 50 400 Z"
-                  fill="url(#graphFillGradient)"
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.5, duration: 1 }}
-                />
-              </svg>
-
-              {/* Step nodes positioned along the ascending wavy line */}
-              <div className="relative h-[400px]">
-                {[
-                  {
-                    step: 1,
-                    icon: Send,
-                    title: 'You Post',
-                    desc: 'Create content as usual',
-                    metric: 'Content Live',
-                    color: 'text-blue-400',
-                    bgColor: 'bg-blue-500',
-                    top: '75%',
-                    left: '2%'
-                  },
-                  {
-                    step: 2,
-                    icon: Bot,
-                    title: isPhase1 ? 'AI Analyzes' : 'AI Responds',
-                    desc: isPhase1 ? 'AI finds trending hooks & best times' : 'Instant comment & DM replies',
-                    metric: '+Speed',
-                    color: 'text-purple-400',
-                    bgColor: 'bg-purple-500',
-                    top: '52%',
-                    left: '25%'
-                  },
-                  {
-                    step: 3,
-                    icon: TrendingUp,
-                    title: 'Algorithm Boosts',
-                    desc: 'Engagement signals compound',
-                    metric: '+Reach',
-                    color: 'text-indigo-400',
-                    bgColor: 'bg-indigo-500',
-                    top: '30%',
-                    left: '52%'
-                  },
-                  {
-                    step: 4,
-                    icon: RefreshCw,
-                    title: 'AI Improves',
-                    desc: 'Every interaction trains AI',
-                    metric: '+Growth',
-                    color: 'text-green-400',
-                    bgColor: 'bg-green-500',
-                    top: '8%',
-                    left: '76%'
-                  }
-                ].map((item, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.5 + i * 0.3, type: "spring", stiffness: 100 }}
-                    className="absolute"
-                    style={{ top: item.top, left: item.left }}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Node circle with glow */}
-                      <div className="relative">
-                        <div className={`absolute inset - 0 ${item.bgColor} rounded - full blur - md opacity - 40`} />
-                        <div className={`relative w - 11 h - 11 rounded - full ${item.bgColor} flex items - center justify - center shadow - lg`}>
-                          <item.icon className="w-5 h-5 text-white" />
-                        </div>
-                      </div>
-                      {/* Content card */}
-                      <div className="bg-[#0d0d0d]/80 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 min-w-[170px]">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text - [10px] font - bold ${item.color} uppercase`}>Step {item.step}</span>
-                          <span className={`text - [10px] font - medium ${item.color} bg - white / 10 px - 1.5 py - 0.5 rounded`}>{item.metric}</span>
-                        </div>
-                        <h4 className="text-sm font-semibold text-white mb-0.5">{item.title}</h4>
-                        <p className="text-xs text-white/50">{item.desc}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* Mobile: Vertical curved layout */}
-            <div className="md:hidden relative px-4">
-              {/* Curved SVG connector */}
-              <svg className="absolute left-0 top-0 w-full h-full pointer-events-none" viewBox="0 0 100 400" preserveAspectRatio="none">
-                <motion.path
-                  d="M 20 20 Q 30 80, 20 120 Q 10 160, 20 200 Q 30 240, 20 280 Q 10 320, 20 360"
-                  fill="none"
-                  stroke="url(#mobileGradient)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  initial={{ pathLength: 0 }}
-                  whileInView={{ pathLength: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
-                />
-                <defs>
-                  <linearGradient id="mobileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-                    <stop offset="33%" stopColor="#8b5cf6" stopOpacity="0.3" />
-                    <stop offset="66%" stopColor="#6366f1" stopOpacity="0.3" />
-                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0.3" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              {/* Steps */}
-              <div className="space-y-6 relative">
-                {[
-                  { step: 1, icon: Send, title: 'You Post', desc: 'Create content as usual', metric: 'Content Live', color: 'text-blue-400', bgColor: 'bg-blue-500' },
-                  { step: 2, icon: Bot, title: isPhase1 ? 'AI Analyzes' : 'AI Responds', desc: isPhase1 ? 'Finds trending hooks & best times' : 'Instant comment & DM replies', metric: '+Speed', color: 'text-purple-400', bgColor: 'bg-purple-500' },
-                  { step: 3, icon: TrendingUp, title: 'Algorithm Boosts', desc: 'Engagement signals compound', metric: '+Reach', color: 'text-indigo-400', bgColor: 'bg-indigo-500' },
-                  { step: 4, icon: RefreshCw, title: 'AI Improves', desc: 'Every interaction trains AI', metric: '+Growth', color: 'text-green-400', bgColor: 'bg-green-500' }
-                ].map((item, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.15 }}
-                    className="flex items-center gap-3"
-                  >
-                    {/* Node with glow */}
-                    <div className="relative shrink-0">
-                      <div className={`absolute inset - 0 ${item.bgColor} rounded - full blur - md opacity - 40`} />
-                      <div className={`relative w - 11 h - 11 rounded - full ${item.bgColor} flex items - center justify - center shadow - lg`}>
-                        <item.icon className="w-5 h-5 text-white" />
-                      </div>
-                    </div>
-                    {/* Content */}
-                    <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text - [10px] font - bold ${item.color} uppercase tracking - wider`}>Step {item.step}</span>
-                        <span className={`text - [10px] font - medium ${item.color} bg - white / 10 px - 2 py - 0.5 rounded - full`}>{item.metric}</span>
-                      </div>
-                      <h4 className="text-sm font-semibold text-white mb-0.5">{item.title}</h4>
-                      <p className="text-xs text-white/50">{item.desc}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
+      {/* Growth Engine Section - "How It Works" (New Premium Design) */}
+      <GrowthEngineSection />
 
       {/* Algorithm Impact - Why Engagement Velocity Matters */}
-      <section className="py-12 sm:py-16 md:py-20 lg:py-28 relative overflow-hidden w-full">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/[0.03] to-transparent" />
-        <GradientOrb className="w-[300px] sm:w-[400px] md:w-[500px] h-[300px] sm:h-[400px] md:h-[500px] bottom-0 right-0 translate-x-1/2 translate-y-1/2" color="purple" />
-
-        <div className="w-full px-4 sm:px-6 md:px-12 lg:px-20 relative">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="relative overflow-hidden">
-              {/* Background decorative elements */}
-              <div className="absolute top-0 right-0 w-48 sm:w-64 md:w-96 h-48 sm:h-64 md:h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl opacity-50" />
-              <div className="absolute bottom-0 left-0 w-32 sm:w-48 md:w-64 h-32 sm:h-48 md:h-64 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl opacity-50" />
-
-              <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center relative">
-                <div>
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <div className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-[10px] sm:text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 sm:mb-6">
-                      <Brain className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span>Algorithm Science</span>
-                    </div>
-                    <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 leading-tight">
-                      Why <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">speed</span> matters to algorithms
-                    </h3>
-                    <p className="text-white/60 mb-6 sm:mb-8 text-sm sm:text-base md:text-lg leading-relaxed">
-                      Social platforms reward accounts that generate quick, meaningful engagement. The first <span className="text-blue-400 font-semibold">30 minutes</span> after posting are critical for algorithmic amplification.
-                    </p>
-                  </motion.div>
-                </div>
-
-                <div className="relative w-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#0a0a0a] via-[#111111] to-[#050505] backdrop-blur-2xl border border-white/5 shadow-2xl group/hud">
-                  {/* Premium Ambient Background Effects */}
-                  <div className="absolute inset-0 opacity-40 pointer-events-none">
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '4s' }} />
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-900/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }} />
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 md:p-8 relative z-10 items-center">
-
-                    {/* Left Column: Primary Metric */}
-                    <div className="flex flex-col justify-center relative">
-                      {/* Decorative vertical line */}
-                      <div className="absolute left-0 top-10 bottom-10 w-[1px] bg-gradient-to-b from-transparent via-blue-500/20 to-transparent hidden lg:block -ml-8" />
-
-                      <div className="relative pl-4">
-                        <div className="flex items-baseline space-x-2">
-                          <motion.span
-                            key={hudActiveSignal}
-                            initial={{ opacity: 0.9, filter: 'blur(0px)' }}
-                            animate={{
-                              opacity: 1,
-                              filter: 'blur(0px)',
-                              textShadow: hudActiveSignal ? '0 0 50px rgba(59,130,246,0.4)' : 'none'
-                            }}
-                            className="text-5xl sm:text-6xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60"
-                          >
-                            {hudActiveSignal ? 98 + hudActiveSignal : 98}
-                          </motion.span>
-                          <span className="text-3xl text-blue-400/50 font-light">%</span>
-                        </div>
-                        <div className="mt-4 space-y-3">
-                          <p className="text-2xl text-white/90 font-semibold tracking-wide flex items-center gap-2">
-                            Efficiency Score
-                            <span className="relative flex h-2.5 w-2.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                            </span>
-                          </p>
-                          <p className="text-lg text-white/50 leading-relaxed max-w-md font-medium">
-                            Real-time probability of algorithmic amplification based on current content velocity.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Column: Premium Glass Cards */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        {
-                          id: 1,
-                          label: 'Velocity',
-                          value: '12ms',
-                          sub: 'Response',
-                          icon: Zap,
-                          gradient: 'from-blue-500/10 to-transparent'
-                        },
-                        {
-                          id: 2,
-                          label: 'Depth',
-                          value: '4.2x',
-                          sub: 'Threads',
-                          icon: Layers,
-                          gradient: 'from-purple-500/10 to-transparent'
-                        },
-                        {
-                          id: 3,
-                          label: 'Trust',
-                          value: '100',
-                          sub: 'Health',
-                          icon: Shield,
-                          gradient: 'from-emerald-500/10 to-transparent'
-                        },
-                        {
-                          id: 4,
-                          label: 'Authority',
-                          value: 'Top 1%',
-                          sub: 'Rank',
-                          icon: Crown,
-                          gradient: 'from-amber-500/10 to-transparent'
-                        }
-                      ].map((item) => (
-                        <motion.div
-                          key={item.id}
-                          onHoverStart={() => setHudActiveSignal(item.id)}
-                          onHoverEnd={() => setHudActiveSignal(null)}
-                          whileHover={{ y: -2, scale: 1.01 }}
-                          className="relative overflow-hidden rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 cursor-default group transition-all duration-300 hover:border-white/15 hover:bg-white/[0.04] hover:shadow-lg min-h-[90px] flex flex-col justify-between"
-                        >
-                          {/* Hover Gradient Background */}
-                          <div className={`absolute inset - 0 bg - gradient - to - br ${item.gradient} opacity - 0 group - hover: opacity - 100 transition - opacity duration - 500`} />
-
-                          <div className="relative z-10 w-full">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="text-[10px] font-bold text-white/30 group-hover:text-white/60 transition-colors uppercase tracking-wider">{item.label}</span>
-                              <item.icon className="w-3 h-3 text-white/20 group-hover:text-white/80 transition-colors" />
-                            </div>
-
-                            <div className="mt-2">
-                              <span className={`text - xl font - bold text - white tracking - tight group - hover: scale - 105 inline - block transition - transform duration - 300 origin - left`}>
-                                {item.value}
-                              </span>
-                              <p className="text-[9px] text-white/30 font-medium mt-0 leading-tight">{item.sub}</p>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+      <AlgorithmScienceSection />
 
       {/* Sticky Scroll "Story" Features */}
       <StickyScrollFeaturesV2 />
 
 
       {/* Problem / Philosophy Section */}
-      <section id="how-it-works" className="py-16 md:py-32 relative overflow-hidden w-full">
+      <section id="how-it-works" className="py-10 md:py-16 relative overflow-hidden w-full">
         {/* Background Gradients */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-red-500/5 rounded-full blur-[60px] md:blur-[100px] pointer-events-none" />
         <div className="absolute right-0 bottom-0 w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-blue-500/5 rounded-full blur-[60px] md:blur-[100px] pointer-events-none" />
@@ -2110,7 +1580,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* Hero Features - Cinematic Scroll */}
       <section id="features" className="relative bg-black">
-        <div className="pt-16 md:pt-24 pb-6 md:pb-8 text-center">
+        <div className="pt-10 md:pt-14 pb-4 text-center">
           <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 md:mb-6">
             <Layers className="w-4 h-4" />
             <span>GAME-CHANGING FEATURES</span>
@@ -2125,9 +1595,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
         <CinematicFeatures features={heroFeatures} />
       </section>
-
-      {/* Support Features - Growth Engine Section */}
-      <GrowthEngineSection />
 
       {/* Credit System */}
       <CreditSystemSection />
@@ -2239,12 +1706,12 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
 
           <div className="mt-16 text-center">
-            <MagneticButton
-              className="bg-white text-black hover:bg-white/90 rounded-full px-8 py-3 text-sm font-bold transition-all duration-300 shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.5)]"
+            <button
+              className="btn-brick btn-brick-white px-8 py-3 text-sm"
               onClick={() => onNavigate('signup')}
             >
               Get Started Now
-            </MagneticButton>
+            </button>
           </div>
         </div>
       </section>
@@ -2323,15 +1790,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                       ))}
                     </div>
 
-                    <MagneticButton
-                      className={`w-full rounded-full py-2.5 sm:py-3 font-bold text-sm sm:text-base transition-all ${plan.popular
-                        ? 'bg-white text-black hover:bg-white/90'
-                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                    <button
+                      className={`w-full py-2.5 sm:py-3 text-sm sm:text-base btn-brick ${plan.popular
+                        ? 'btn-brick-white'
+                        : 'btn-brick-dark'
                         }`}
                       onClick={() => onNavigate('signup')}
                     >
                       Get Started
-                    </MagneticButton>
+                    </button>
                   </GlassCard>
                 </TiltCard>
               </div>
@@ -2456,16 +1923,15 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
               Be among the first creators to experience VeeFore. Limited spots available for early adopters who want to grow smarter.
             </p>
 
-            <MagneticButton
-              className="group relative bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full px-14 py-6 text-xl font-bold overflow-hidden"
+            <button
+              className="group btn-brick btn-brick-brand px-14 py-6 text-xl"
               onClick={() => onNavigate('signup')}
             >
               <span className="relative z-10 flex items-center">
                 Get Started Now
                 <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
               </span>
-              <div className="absolute inset-[-2px] bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity" />
-            </MagneticButton>
+            </button>
           </motion.div>
         </div>
       </section>

@@ -1,5 +1,5 @@
 import React from 'react';
-import Helmet from 'react-helmet';
+import { SEO } from '../lib/seo-optimization';
 
 import {
     HeroSection,
@@ -17,10 +17,10 @@ import {
 const Features = () => {
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-black text-white selection:bg-blue-500/30">
-            <Helmet>
-                <title>Features | Veefore - AI Growth Platform</title>
-                <meta name="description" content="Discover the powerful features of Veefore. From AI-driven engagement to automated workflows and deep analytics, see how Veefore helps you grow faster." />
-            </Helmet>
+            <SEO 
+                title="Features | Veefore - AI Growth Platform"
+                description="Discover the powerful features of Veefore. From AI-driven engagement to automated workflows and deep analytics, see how Veefore helps you grow faster."
+            />
 
 
 

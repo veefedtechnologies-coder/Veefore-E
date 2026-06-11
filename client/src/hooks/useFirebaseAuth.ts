@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { User, onAuthStateChanged } from 'firebase/auth'
+import { User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 
 export const useFirebaseAuth = () => {
@@ -8,6 +8,7 @@ export const useFirebaseAuth = () => {
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
   const unsubscribeRef = useRef<(() => void) | null>(null)
+  const sessionRestoreAttempted = useRef(false)
 
   // Check if we're in a server environment - use state instead of early return
   const isServerSide = typeof window === 'undefined'
@@ -28,11 +29,45 @@ export const useFirebaseAuth = () => {
     
     try {
       // Set up auth state listener only once
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        console.log('useFirebaseAuth: Auth state changed:', user ? `User logged in: ${user.email}` : 'User logged out')
-        setUser(user)
-        setLoading(false)
-        setIsInitialized(true)
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          // Firebase already has an authenticated user
+          console.log('useFirebaseAuth: Auth state changed:', `User logged in: ${firebaseUser.email}`)
+          setUser(firebaseUser)
+          setLoading(false)
+          setIsInitialized(true)
+        } else if (!sessionRestoreAttempted.current) {
+          // No Firebase user — try to restore session from server-side OAuth cookie
+          sessionRestoreAttempted.current = true
+          console.log('useFirebaseAuth: No Firebase user, attempting session restore from server cookie...')
+          try {
+            const response = await fetch('/api/auth/session', { credentials: 'include' })
+            if (response.ok) {
+              const { customToken } = await response.json()
+              console.log('useFirebaseAuth: Got custom token from server, signing in with Firebase...')
+              
+              await signInWithCustomToken(auth!, customToken)
+              // onAuthStateChanged will fire again with the authenticated user
+            } else {
+              // No server session either — user is truly logged out
+              console.log('useFirebaseAuth: No server session found, user is logged out')
+              setUser(null)
+              setLoading(false)
+              setIsInitialized(true)
+            }
+          } catch (error: any) {
+            console.error('useFirebaseAuth: Session restore failed:', error)
+            setUser(null)
+            setLoading(false)
+            setIsInitialized(true)
+          }
+        } else {
+          // Session restore already attempted, user is logged out
+          console.log('useFirebaseAuth: Auth state changed: User logged out')
+          setUser(null)
+          setLoading(false)
+          setIsInitialized(true)
+        }
       })
 
       unsubscribeRef.current = unsubscribe
@@ -44,7 +79,7 @@ export const useFirebaseAuth = () => {
           setLoading(false)
           setIsInitialized(true)
         }
-      }, 3000)
+      }, 10000)
 
       return () => {
         clearTimeout(timeout)

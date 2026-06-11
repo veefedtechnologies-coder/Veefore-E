@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useLocation } from 'wouter'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
+import { useTokenRefresh } from './hooks/useTokenRefresh'
 import LoadingSpinner from './components/LoadingSpinner'
 import { initializeTheme } from './lib/theme'
 import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
@@ -76,6 +77,11 @@ function App() {
 
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
+  
+  // [SERVER-SIDE OAUTH - Task 16.4] Initialize background token refresh
+  // This maintains user sessions without interruption by proactively refreshing
+  // tokens 5 minutes before they expire (Requirement 19.7)
+  useTokenRefresh(!loading && !!user)
 
   const handleNavigate = useCallback((page: string) => {
     setLocation(`/${page}`)

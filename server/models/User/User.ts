@@ -49,6 +49,14 @@ export interface IUser extends Document {
   lastApiCallTimestamp?: Date;
   rateLimitResetAt?: Date;
   apiCallCount: number;
+  // OAuth fields for server-side OAuth implementation
+  googleId?: string;                    // Google user identifier
+  refreshToken?: string;                // Encrypted refresh token
+  refreshTokenIV?: string;              // Encryption initialization vector
+  refreshTokenTag?: string;             // GCM authentication tag
+  refreshTokenKeyVersion?: string;      // Key version for graceful SESSION_SECRET rotation
+  refreshTokenCreatedAt?: Date;         // Token creation timestamp
+  sessionVersion: number;               // Session version for emergency session invalidation
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,6 +110,14 @@ export const UserSchema = new Schema<IUser>({
   lastApiCallTimestamp: Date,
   rateLimitResetAt: Date,
   apiCallCount: { type: Number, default: 0 },
+  // OAuth fields for server-side OAuth implementation
+  googleId: { type: String, index: true, sparse: true },
+  refreshToken: { type: String },
+  refreshTokenIV: { type: String },
+  refreshTokenTag: { type: String },
+  refreshTokenKeyVersion: { type: String }, // Key version for graceful SESSION_SECRET rotation
+  refreshTokenCreatedAt: { type: Date },
+  sessionVersion: { type: Number, default: 1 }, // Session version for emergency session invalidation
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -114,5 +130,17 @@ UserSchema.index({ createdAt: -1 }, { background: true });
 UserSchema.index({ status: 1, plan: 1 }, { background: true });
 UserSchema.index({ lastLoginAt: -1 }, { background: true });
 UserSchema.index({ stripeCustomerId: 1 }, { sparse: true, background: true });
+// OAuth indexes
+UserSchema.index({ googleId: 1 }, { unique: true, sparse: true, background: true });
+UserSchema.index({ email: 1, googleId: 1 }, { background: true });
+// TTL index for automatic refresh token cleanup (90 days)
+UserSchema.index(
+  { refreshTokenCreatedAt: 1 },
+  {
+    expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
+    partialFilterExpression: { refreshTokenCreatedAt: { $exists: true } },
+    background: true,
+  }
+);
 
 export const User = mongoose.models.User as mongoose.Model<IUser> || mongoose.model<IUser>('User', UserSchema);

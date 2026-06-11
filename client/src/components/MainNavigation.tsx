@@ -104,7 +104,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
                                 )}
                                 <button
                                     onClick={() => hasEarlyAccess ? setLocation('/signup') : openWaitlist()}
-                                    className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium rounded-full bg-white text-black hover:bg-white/90 transition-colors cursor-pointer"
+                                    className="btn-brick btn-brick-white px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm cursor-pointer"
                                 >
                                     {hasEarlyAccess ? "Sign Up" : "Join Waitlist"}
                                 </button>
@@ -117,7 +117,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
 
                                         <button
                                             onClick={() => hasEarlyAccess ? setLocation('/signup') : openWaitlist()}
-                                            className="px-4 py-2 text-sm font-semibold rounded-full bg-white text-black hover:bg-white/90 transition-colors cursor-pointer"
+                                            className="btn-brick btn-brick-white px-4 py-2 text-sm cursor-pointer"
                                         >
                                             {hasEarlyAccess ? "Sign Up" : "Join Waitlist"}
                                         </button>
@@ -169,13 +169,13 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
                                     <>
                                         <button
                                             onClick={() => { setLocation('/signup'); setMobileMenuOpen(false); }}
-                                            className="w-full py-4 rounded-full bg-white text-black font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:bg-white/90 active:scale-[0.98] transition-all duration-300"
+                                            className="btn-brick btn-brick-white w-full py-4 text-lg"
                                         >
                                             Sign Up
                                         </button>
                                         <button
                                             onClick={() => { setLocation('/signin'); setMobileMenuOpen(false); }}
-                                            className="w-full py-4 rounded-full bg-white/5 border border-white/10 text-white font-bold text-lg hover:bg-white/10 active:scale-[0.98] transition-all duration-300"
+                                            className="btn-brick btn-brick-dark w-full py-4 text-lg"
                                         >
                                             Sign In
                                         </button>
@@ -183,7 +183,7 @@ export const MainNavigation: React.FC<MainNavigationProps> = ({ onNavigate }) =>
                                 ) : (
                                     <button
                                         onClick={handleActionClick}
-                                        className="w-full py-4 rounded-full bg-white text-black font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:bg-white/90 active:scale-[0.98] transition-all duration-300"
+                                        className="btn-brick btn-brick-white w-full py-4 text-lg"
                                     >
                                         {actionLabel}
                                     </button>

@@ -22,8 +22,12 @@ const gradientStyles = {
  * 
  * Uses CSS-only responsive blur - no JavaScript viewport detection.
  * Mobile gets slightly less blur for better performance.
+ * 
+ * Optimizations:
+ * - React.memo to prevent unnecessary re-renders
+ * - Custom comparison function to check color and className equality
  */
-export const GradientOrb: React.FC<GradientOrbProps> = ({ className = '', color = 'blue', gradient: customGradient }) => {
+export const GradientOrb: React.FC<GradientOrbProps> = React.memo(({ className = '', color = 'blue', gradient: customGradient }) => {
     const gradient = customGradient || gradientStyles[color];
 
     return (
@@ -48,6 +52,13 @@ export const GradientOrb: React.FC<GradientOrbProps> = ({ className = '', color 
             />
         </>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison: only re-render if color, className, or gradient changes
+    return prevProps.color === nextProps.color &&
+           prevProps.className === nextProps.className &&
+           prevProps.gradient === nextProps.gradient;
+});
+
+GradientOrb.displayName = 'GradientOrb';
 
 export default GradientOrb;

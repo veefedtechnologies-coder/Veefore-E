@@ -10,12 +10,14 @@ import {
 } from 'firebase/auth';
 
 // Firebase configuration - same as web app
+const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'demo-project-id';
+
 const firebaseConfig = {
-    apiKey: 'AIzaSyABXnYreK-ZA8pRAK2t352bUpDaUwJoWzE',
-    authDomain: 'veefore-b84c8.firebaseapp.com',
-    projectId: 'veefore-b84c8',
-    storageBucket: 'veefore-b84c8.firebasestorage.app',
-    appId: '1:309418074269:web:7b2a61fe3f40fc11343474'
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'demo-api-key',
+    authDomain: `${projectId}.firebaseapp.com`,
+    projectId: projectId,
+    storageBucket: `${projectId}.firebasestorage.app`,
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || 'demo-app-id'
 };
 
 // Initialize Firebase
