@@ -245,7 +245,7 @@ const GrowthMock = () => (
 
 const VisualizerDashboard = ({ activeStep }: { activeStep: number }) => {
   return (
-    <div className="relative w-full max-w-[320px] lg:max-w-[420px] mx-auto aspect-[4/3] lg:aspect-square flex items-center justify-center mt-6 lg:mt-0">
+    <div className="relative w-full max-w-[240px] sm:max-w-[300px] lg:max-w-[420px] mx-auto aspect-[4/3] lg:aspect-square flex items-center justify-center mt-2 lg:mt-0">
       {/* Background Ambient Glow */}
       <motion.div
         animate={{ 
@@ -387,19 +387,35 @@ const GrowthEngineSection = () => {
       }} />
 
       <div className="max-w-7xl mx-auto px-6 md:px-8 relative">
-        <div className="flex flex-col lg:flex-row relative items-start gap-12 lg:gap-24">
+        
+        {/* Mobile Title (Scrolls normally) */}
+        <div className="lg:hidden mb-6 mt-4 text-center z-10 relative">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm mb-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-400/80 animate-[pulse_2s_ease-in-out_infinite]" />
+            <span className="text-[10px] font-medium text-white/60 tracking-wide uppercase">How It Works</span>
+          </div>
+          <h2 className="text-3xl font-bold leading-tight">
+            <span className="text-white">Four steps to </span>
+            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              exponential growth
+            </span>
+          </h2>
+        </div>
+
+        <div className="flex flex-col lg:flex-row relative items-start gap-4 lg:gap-24">
           
           {/* LEFT COLUMN: Sticky Visualizer */}
-          <div className="w-full lg:w-1/2 sticky top-[80px] lg:top-[15vh] flex flex-col justify-center text-center lg:text-left z-20 lg:z-0 bg-black/95 backdrop-blur-xl lg:bg-transparent pt-4 lg:pt-0 pb-6 lg:pb-0 border-b border-white/5 lg:border-none">
-            <div className="mb-4 lg:mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm mb-2 lg:mb-4">
+          <div className="w-full lg:w-1/2 sticky top-[70px] lg:top-[15vh] flex flex-col justify-center text-center lg:text-left z-20 lg:z-0 bg-black/95 backdrop-blur-2xl lg:bg-transparent pt-3 lg:pt-0 pb-4 lg:pb-0 border-b border-white/10 lg:border-none shadow-[0_20px_40px_-20px_rgba(0,0,0,0.8)] lg:shadow-none mx-[-24px] px-[24px] lg:mx-0 lg:px-0">
+            {/* Desktop Title (Sticky) */}
+            <div className="hidden lg:block lg:mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm mb-4">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400/80 animate-[pulse_2s_ease-in-out_infinite]" />
-                <span className="text-[10px] md:text-xs font-medium text-white/60 tracking-wide uppercase">How It Works</span>
+                <span className="text-xs font-medium text-white/60 tracking-wide uppercase">How It Works</span>
               </div>
               
-              <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold leading-tight">
+              <h2 className="text-4xl lg:text-5xl font-bold leading-tight">
                 <span className="text-white">Four steps to </span>
-                <br className="hidden lg:block" />
+                <br />
                 <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                   exponential growth
                 </span>
