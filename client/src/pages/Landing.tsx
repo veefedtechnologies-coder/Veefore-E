@@ -691,8 +691,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const { openWaitlist } = useWaitlist()
   const [activeFaq, setActiveFaq] = useState<number | null>(null)
 
-  const [activeFaq, setActiveFaq] = useState<number | null>(null)
-
   // HUD State for Algorithm Science section
 
   const containerRef = useRef<HTMLDivElement>(null)
