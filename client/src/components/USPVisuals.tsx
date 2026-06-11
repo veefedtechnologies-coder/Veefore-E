@@ -229,17 +229,24 @@ export const HookVisual = () => {
 
 export const SchedulerVisual = () => {
   const posts = [
-    { time: 'Mon 9:00 AM', label: 'Product Reel', status: 'scheduled', color: 'from-blue-500 to-cyan-500', score: 94 },
-    { time: 'Wed 12:00 PM', label: 'Carousel Post', status: 'optimal', color: 'from-purple-500 to-indigo-500', score: 91 },
-    { time: 'Fri 6:00 PM', label: 'Story Series', status: 'scheduled', color: 'from-pink-500 to-rose-500', score: 88 },
+    { time: 'Today, 9:00 AM', label: '"How I grew 10k followers..."', status: 'optimal', color: 'from-green-500 to-emerald-500', score: '3x Peak' },
+    { time: 'Tomorrow, 1:30 PM', label: 'Behind the scenes vlog', status: 'scheduled', color: 'from-blue-500 to-cyan-500' },
+    { time: 'Friday, 6:00 PM', label: 'Q&A: Answering your top...', status: 'scheduled', color: 'from-purple-500 to-indigo-500' },
   ];
   return (
-    <div className="relative w-full h-auto min-h-[220px] md:min-h-[320px] bg-neutral-950 rounded-xl border border-white/10 p-2 md:p-4 overflow-hidden flex flex-col justify-center shadow-2xl">
+    <div className="relative w-full h-auto min-h-[220px] md:min-h-[320px] bg-neutral-950 rounded-xl border border-white/10 p-3 md:p-5 overflow-hidden flex flex-col justify-center shadow-2xl">
       <motion.div style={MOBILE_OPTIMIZED_LAYER} className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent" />
       <div className="relative z-10 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <Calendar className="w-3.5 h-3.5 text-blue-400" />
-          <span className="text-[10px] md:text-xs font-bold text-blue-400 uppercase tracking-wider">AI Best-Time Scheduler</span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-400" />
+            </div>
+            <div>
+               <div className="text-[10px] md:text-xs font-bold text-white leading-tight">Content Calendar</div>
+               <div className="text-[8px] md:text-[9px] text-white/50">October 2026</div>
+            </div>
+          </div>
         </div>
         {posts.map((post, i) => (
           <motion.div
@@ -249,37 +256,33 @@ export const SchedulerVisual = () => {
             viewport={{ once: true }}
             transition={{ delay: 0.2 + i * 0.2, duration: 0.5 }}
             style={MOBILE_OPTIMIZED_LAYER}
-            className="bg-neutral-900/80 rounded-xl p-2.5 md:p-3.5 border border-white/5"
+            className={`bg-white/[0.02] rounded-xl p-3 border ${post.status === 'optimal' ? 'border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'border-white/5'}`}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${post.color} flex items-center justify-center shrink-0`}>
-                  <Clock className="w-3.5 h-3.5 text-white" />
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${post.color} flex items-center justify-center shrink-0`}>
+                  <Clock className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-[11px] md:text-sm font-semibold text-white">{post.label}</p>
+                  <p className="text-xs md:text-sm font-semibold text-white truncate max-w-[120px] md:max-w-[180px]">{post.label}</p>
                   <p className="text-[9px] md:text-[10px] text-white/40">{post.time}</p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${post.status === 'optimal' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                  {post.status === 'optimal' ? '⚡ Optimal' : '✓ Scheduled'}
-                </span>
-                <p className="text-[9px] text-white/30 mt-0.5">Score: {post.score}</p>
+              <div className="text-right flex flex-col items-end">
+                {post.status === 'optimal' ? (
+                   <span className={`text-[8px] md:text-[9px] px-2 py-1 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-1`}>
+                     <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                     {post.score} Activity
+                   </span>
+                ) : (
+                   <span className={`text-[8px] md:text-[9px] px-2 py-1 rounded bg-white/5 text-white/50 border border-white/10`}>
+                     Scheduled
+                   </span>
+                )}
               </div>
             </div>
           </motion.div>
         ))}
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.9 }}
-          className="flex items-center gap-2 pt-1"
-        >
-          <Sparkles className="w-3 h-3 text-blue-400 animate-pulse" />
-          <span className="text-[10px] text-blue-400/80 font-medium">AI analyzing peak engagement windows...</span>
-        </motion.div>
       </div>
     </div>
   );

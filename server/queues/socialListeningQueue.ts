@@ -1,5 +1,7 @@
 import { Queue, QueueOptions } from 'bullmq';
 import { redisConnection, redisAvailable } from './metricsQueue';
+import { getSocialListeningWorker } from '../workers/social-listening.worker';
+import { getSocialListeningAIWorker } from '../workers/social-listening-ai.worker';
 
 export interface SocialListeningJobData {
   workspaceId: string;
@@ -36,14 +38,17 @@ export const socialListeningAIQueue = redisConnection ? new Queue<AIAnalysisJobD
 
 export class SocialListeningQueueManager {
   static async scheduleIngestion(jobData: SocialListeningJobData): Promise<boolean> {
-    if (!redisAvailable || !socialListeningIngestQueue) {
-      console.log(`⚠️ Redis unavailable, skipping listening ingestion for ${jobData.value}`);
+    // Task 5.7: Trigger lazy worker initialization on first job
+    const worker = getSocialListeningWorker();
+    if (!worker || !redisAvailable || !socialListeningIngestQueue) {
+      console.log(`⚠️ Social Listening Worker or Redis unavailable, skipping ingestion for ${jobData.value}`);
       return false;
     }
     try {
       await socialListeningIngestQueue.add('ingest-source', jobData, {
         jobId: `ingest-${jobData.sourceId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       });
+      console.log(`👂 Scheduled social listening ingestion for ${jobData.platform}: ${jobData.value}`);
       return true;
     } catch (error) {
       console.error(`🚨 Failed to schedule listening ingestion:`, error);
@@ -52,14 +57,17 @@ export class SocialListeningQueueManager {
   }
 
   static async scheduleAIAnalysis(jobData: AIAnalysisJobData): Promise<boolean> {
-    if (!redisAvailable || !socialListeningAIQueue) {
-      console.log(`⚠️ Redis unavailable, skipping AI analysis for post ${jobData.postId}`);
+    // Task 5.7: Trigger lazy worker initialization on first job
+    const worker = getSocialListeningAIWorker();
+    if (!worker || !redisAvailable || !socialListeningAIQueue) {
+      console.log(`⚠️ Social Listening AI Worker or Redis unavailable, skipping AI analysis for post ${jobData.postId}`);
       return false;
     }
     try {
       await socialListeningAIQueue.add('analyze-post', jobData, {
         jobId: `ai-${jobData.postId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       });
+      console.log(`🧠 Scheduled AI analysis for post ${jobData.postId}`);
       return true;
     } catch (error) {
       console.error(`🚨 Failed to schedule AI analysis:`, error);

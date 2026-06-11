@@ -10,6 +10,7 @@ import authRoutes from './auth-routes';
 import authCookiesRouter from './routes/auth-cookies';
 import {
   authRateLimiter,
+  oauthRateLimiter,
   bruteForceMiddleware,
   aiRateLimiter
 } from './middleware/rate-limiting-working';
@@ -64,7 +65,8 @@ export async function registerRoutes(app: Express, storage: IStorage, httpServer
 
   registerAdminRoutes(app);
 
-  app.use('/api/auth', authRateLimiter, bruteForceMiddleware, authRoutes);
+  // OAuth routes with OAuth-specific rate limiter (10 requests/minute per IP) - Requirement 11.7
+  app.use('/api/auth', oauthRateLimiter, bruteForceMiddleware, authRoutes);
 
   app.use('/api/auth-cookies', authRateLimiter, bruteForceMiddleware, authCookiesRouter);
 

@@ -26,7 +26,9 @@ let redisClient: Redis;
  */
 export const initializeRateLimiting = (redis: Redis) => {
   redisClient = redis;
+  const algorithm = process.env.RATE_LIMIT_ALGORITHM || 'fixed-window';
   console.log('🔒 P1-3 SECURITY: Rate limiting system initialized with Redis persistence');
+  console.log(`📊 Rate Limit Algorithm: ${algorithm} (set RATE_LIMIT_ALGORITHM=sliding-window to rollback)`);
 };
 
 
@@ -49,6 +51,26 @@ setInterval(() => {
  * Phase 4 Optimization (Task 6.1): Fixed-window INCR pattern
  * - Reduces from 4 Redis commands to 2 commands per request
  * - Feature flag: RATE_LIMIT_ALGORITHM (default: 'fixed-window')
+ * 
+ * ROLLBACK PROCEDURE (Task 6.2):
+ * If issues arise with the new fixed-window algorithm, instant rollback is possible:
+ * 
+ * METHOD 1 - Environment Variable (Recommended - NO CODE DEPLOY REQUIRED):
+ *   1. Set environment variable: RATE_LIMIT_ALGORITHM=sliding-window
+ *   2. Restart the application (Railway/Vercel auto-restarts on env var change)
+ *   3. System immediately reverts to old 4-command sliding-window pattern
+ *   4. Monitor: Redis commands increase but rate limiting restored to baseline behavior
+ * 
+ * METHOD 2 - Git Revert (If env var method unavailable):
+ *   1. Revert commit implementing Task 6.1
+ *   2. Deploy previous version
+ *   3. System returns to sliding-window implementation
+ * 
+ * VERIFICATION AFTER ROLLBACK:
+ *   - Check logs for: "OLD: Sliding-Window" messages (indicates rollback active)
+ *   - Monitor Redis MONITOR output: should see ZREMRANGEBYSCORE, ZCARD, ZADD, EXPIRE
+ *   - Verify rate limiting still works: send 121 requests/minute, 121st should be blocked
+ *   - Redis command count should return to ~350K-450K/month for rate limiting
  * 
  * Exported for testing purposes
  */
@@ -281,6 +303,41 @@ export const authRateLimiter = async (req: Request, res: Response, next: NextFun
       message: 'Too many failed login attempts. Please wait 15 minutes.',
       retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
       securityNote: 'This protection helps secure accounts from unauthorized access.'
+    });
+  }
+
+  next();
+};
+
+/**
+ * OAuth-specific rate limiter - 10 requests per minute per IP (Requirement 11.7)
+ * Applies to all OAuth endpoints for CSRF and abuse prevention
+ */
+export const oauthRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  // P1 SECURITY: Exclude OPTIONS requests from OAuth rate limiting
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
+  const key = `oauth_rl:${req.ip}`;
+  const windowMs = 60 * 1000; // 1 minute
+  const maxRequests = 10; // 10 requests per minute per IP
+
+  const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
+
+  if (rateLimitInfo.blocked) {
+    console.log(`🚨 OAUTH RATE LIMIT: Blocked ${req.ip} (${rateLimitInfo.requests}/${maxRequests})`);
+
+    // Track OAuth abuse attempts
+    if (redisClient) {
+      const today = new Date().toISOString().slice(0, 10);
+      redisClient.incr(`oauth_rate_limit:${today}`).catch(console.error);
+    }
+
+    return res.status(429).json({
+      error: 'Too many requests',
+      message: 'Too many requests, please try again later',
+      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
     });
   }
 

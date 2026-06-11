@@ -887,8 +887,7 @@ const SignupSection = memo(() => {
                                             type="submit"
                                             disabled={isSubmitting}
                                             whileHover={{ scale: isMobile ? 1 : 1.02 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            className="px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold disabled:opacity-60 gpu-stable"
+                                            className="btn-brick btn-brick-brand px-8 py-4 gpu-stable"
                                         >
                                             {isSubmitting ? (
                                                 <motion.div

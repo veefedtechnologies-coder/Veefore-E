@@ -147,3 +147,10 @@ vercel-set-vars.sh
 # ===== Optional binaries/tools =====
 cloudflared/
 cloudflared.exe
+
+# Credentials
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+veefore-*-firebase-adminsdk-*.json

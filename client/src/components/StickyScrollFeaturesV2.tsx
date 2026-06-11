@@ -1,6 +1,6 @@
 import { useRef, useState, memo, useEffect } from 'react';
 import { motion, useScroll, useSpring, useMotionValueEvent, useTransform } from 'framer-motion';
-import { MessageSquare, DollarSign, Search, CheckCircle } from 'lucide-react';
+import { MessageSquare, DollarSign, Search, CheckCircle, Calendar, Clock } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
 import { GPU_ACCELERATED_STYLES, MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 
@@ -55,15 +55,16 @@ interface Feature {
     title: string;
     description: string;
     highlight: string;
-    icon: typeof Search | typeof MessageSquare | typeof DollarSign;
+    icon: typeof Search | typeof MessageSquare | typeof DollarSign | typeof Calendar;
     color: ColorKey;
     screen: {
-        type: 'analysis' | 'chat' | 'sales';
+        type: 'analysis' | 'chat' | 'sales' | 'calendar';
         title?: string;
         stats?: Array<{ label: string; value: string; color: string }>;
         points?: string[];
         messages?: Array<{ user: string; text: string; time: string }>;
         steps?: Array<{ text: string; status: string }>;
+        schedule?: { date: string; time: string; postTitle: string; peak: boolean };
     };
 }
 
@@ -71,48 +72,48 @@ const isPhase1 = import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true';
 
 const featuresDefault: Feature[] = [
     {
-        title: "Stop Guessing. Know Exactly What Works.",
-        description: "Expertly analyze top-performing competitor content. We tell you the emotional hooks, structural patterns, and why it went viral.",
-        highlight: "140+ Viral Patterns Detected",
+        title: "See Exactly Why They Blew Up.",
+        description: "Stop wondering why that creator went viral. We break down their videos frame-by-frame to show you the exact pacing, script formula, and hooks they used.",
+        highlight: "Competitor Teardown Active",
         icon: Search,
         color: "blue",
         screen: {
             type: "analysis",
-            title: "Viral Hook Intelligence",
+            title: "Video Breakdown",
             stats: [
-                { label: "Viral Probability", value: "98%", color: "text-green-400" },
-                { label: "Emotional Trigger", value: "FOMO", color: "text-blue-400" }
+                { label: "Pacing Speed", value: "Fast (1.2s cuts)", color: "text-blue-400" },
+                { label: "Opening Hook", value: "\"Negative Statement\"", color: "text-rose-400" }
             ],
-            points: ["Competitor Analysis", "Hook Extraction", "Trend Prediction"]
+            points: ["Visual hook at 0:02", "Text overlay matches speech", "Call-to-action at 80% mark"]
         }
     },
     {
-        title: "Turn Comments into Conversations.",
-        description: "Don't just post. Participate. Our AI replies to comments with human-like context in seconds, boosting your algorithm score.",
-        highlight: "12ms Response Time",
+        title: "Never Ignore A Fan Again.",
+        description: "Replying to hundreds of comments is exhausting. We reply to your audience exactly how you would, while you're busy filming your next hit.",
+        highlight: "Replies in Your Voice",
         icon: MessageSquare,
         color: "purple",
         screen: {
             type: "chat",
             messages: [
-                { user: "fan", text: "How do I get this?", time: "2m" },
-                { user: "me", text: "Check your DMs! I just sent you the link 🚀", time: "Just now" }
+                { user: "fan", text: "What camera did you use for this?? It's so crisp! 🔥", time: "2m" },
+                { user: "me", text: "Sony A7SIII with a 35mm GM lens! Honestly a game changer for these moody shots.", time: "Just now" }
             ]
         }
     },
     {
-        title: "Turn DMs into 24/7 Revenue.",
-        description: "Capture every lead. Auto-reply to keywords, qualify potential customers, and send payment links while you sleep.",
-        highlight: "Auto-Sales Funnel Active",
+        title: "Make Money While You Sleep.",
+        description: "Stop manually sending links in DMs. Tell your followers to 'comment LINK', and we'll handle the rest—delivering your digital products instantly.",
+        highlight: "Auto-DM Delivery Active",
         icon: DollarSign,
         color: "green",
         screen: {
             type: "sales",
-            title: "Smart Sales Funnel",
+            title: "Product Delivery",
             steps: [
-                { text: "Keyword Detected: 'START'", status: "complete" },
-                { text: "Lead Qualified", status: "complete" },
-                { text: "Checkout Link Sent", status: "active" }
+                { text: "Follower commented 'PRESET'", status: "complete" },
+                { text: "Verified they follow you", status: "complete" },
+                { text: "Sent Lightroom Preset link via DM", status: "active" }
             ]
         }
     }
@@ -120,48 +121,51 @@ const featuresDefault: Feature[] = [
 
 const featuresPhase1: Feature[] = [
     {
-        title: "Stop Guessing. Know Exactly What Works.",
-        description: "Expertly analyze top-performing competitor content. We tell you the emotional hooks, structural patterns, and why it went viral.",
-        highlight: "140+ Viral Patterns Detected",
+        title: "See Exactly Why They Blew Up.",
+        description: "Stop wondering why that creator went viral. We break down their videos frame-by-frame to show you the exact pacing, script formula, and hooks they used.",
+        highlight: "Competitor Teardown Active",
         icon: Search,
         color: "blue",
         screen: {
             type: "analysis",
-            title: "Viral Hook Intelligence",
+            title: "Video Breakdown",
             stats: [
-                { label: "Viral Probability", value: "98%", color: "text-green-400" },
-                { label: "Emotional Trigger", value: "FOMO", color: "text-blue-400" }
+                { label: "Pacing Speed", value: "Fast (1.2s cuts)", color: "text-blue-400" },
+                { label: "Opening Hook", value: "\"Negative Statement\"", color: "text-rose-400" }
             ],
-            points: ["Competitor Analysis", "Hook Extraction", "Trend Prediction"]
+            points: ["Visual hook at 0:02", "Text overlay matches speech", "Call-to-action at 80% mark"]
         }
     },
     {
-        title: "Publish at the Perfect Moment.",
-        description: "AI analyzes your audience's activity patterns and recommends the exact times to post for maximum reach and engagement.",
-        highlight: "Peak-Time Publishing",
-        icon: MessageSquare,
+        title: "Post When Your Fans Are Awake.",
+        description: "Stop guessing when to hit publish. We track exactly when your specific audience is scrolling, so your post doesn't die in the first 10 minutes.",
+        highlight: "Audience Sync Active",
+        icon: Calendar,
         color: "purple",
         screen: {
-            type: "chat",
-            messages: [
-                { user: "fan", text: "When should I post for max reach?", time: "2m" },
-                { user: "me", text: "Tuesday 9AM is your sweet spot — 94% higher reach! 📊", time: "Just now" }
-            ]
+            type: "calendar",
+            title: "Content Calendar",
+            schedule: {
+                date: "Tuesday, Oct 12",
+                time: "9:00 AM",
+                postTitle: "My new video hook...",
+                peak: true
+            }
         }
     },
     {
-        title: "Understand Your Growth. Double Down.",
-        description: "Deep analytics reveal what content drives real growth. Know your top hooks, best formats, and highest-performing content.",
-        highlight: "Deep Content Analytics",
+        title: "Never Miss A Collab Email.",
+        description: "Brands slip through the cracks when your inbox is a mess. We auto-sort your sponsorship requests and draft professional replies.",
+        highlight: "Inbox Manager Active",
         icon: DollarSign,
         color: "green",
         screen: {
             type: "sales",
-            title: "Content Performance",
+            title: "Sponsorship Pipeline",
             steps: [
-                { text: "Top Hook Identified", status: "complete" },
-                { text: "Audience Pattern Analyzed", status: "complete" },
-                { text: "Growth Strategy Generated", status: "active" }
+                { text: "Detected brand email from 'Nike'", status: "complete" },
+                { text: "Extracted budget & timeline", status: "complete" },
+                { text: "Drafted your media kit reply", status: "active" }
             ]
         }
     }
@@ -183,90 +187,225 @@ function mapRange(value: number, inMin: number, inMax: number, outMin: number, o
 const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, isMobile?: boolean }) => {
     const colors = colorMap[feature.color];
 
-    // Updated padding: removed top padding on mobile as IphoneMockup handles it now
     const baseClasses = isMobile
-        ? "h-full w-full p-2 sm:p-3 pt-4 sm:pt-6 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden"
-        : "h-full w-full p-4 md:p-6 lg:p-8 pt-10 md:pt-12 flex flex-col relative z-10 bg-gradient-to-br from-zinc-900 to-black overflow-hidden";
+        ? "h-full w-full flex flex-col relative z-10 bg-[#0A0A0A] overflow-hidden"
+        : "h-full w-full flex flex-col relative z-10 bg-[#0A0A0A] overflow-hidden";
 
     return (
         <div className={baseClasses}>
+            {/* Soft background glow */}
+            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 ${colors.bg} blur-[80px] opacity-20 pointer-events-none`} />
+
             {feature.screen.type === 'analysis' && (
-                <div className={`${isMobile ? 'space-y-2 sm:space-y-3' : 'space-y-4 md:space-y-6'} h-full flex flex-col justify-center`}>
-                    <div className={`bg-white/5 ${isMobile ? 'rounded-xl p-2 sm:p-3' : 'rounded-2xl p-4 md:p-6'} border border-white/10 backdrop-blur-sm`}>
-                        <h4 className={`${isMobile ? 'text-[8px] sm:text-[10px] mb-2 sm:mb-3' : 'text-xs md:text-sm mb-4 md:mb-6'} text-white/50 uppercase tracking-widest`}>{feature.screen.title}</h4>
-                        <div className={`flex justify-between items-end ${isMobile ? 'mb-2 sm:mb-3' : 'mb-4 md:mb-6'}`}>
-                            <div>
-                                <div className={`${isMobile ? 'text-lg sm:text-xl' : 'text-3xl md:text-5xl'} font-bold text-white mb-0.5 md:mb-2`}>High</div>
-                                <div className={`${isMobile ? 'text-[8px] sm:text-[10px]' : 'text-xs md:text-sm'} text-white/50`}>Potential</div>
-                            </div>
-                            <div className="text-right">
-                                <div className={`${isMobile ? 'text-lg sm:text-xl' : 'text-3xl md:text-5xl'} font-bold ${feature.screen.stats?.[0]?.color}`}>{feature.screen.stats?.[0]?.value}</div>
-                            </div>
+                <div className={`h-full flex flex-col ${isMobile ? 'p-3 sm:p-4' : 'p-6 md:p-8'} space-y-3 md:space-y-4`}>
+                    {/* Header */}
+                    <div className="flex items-center space-x-3 mb-1">
+                        <div className={`w-8 h-8 rounded-lg ${colors.bgLight} flex items-center justify-center`}>
+                            <feature.icon className={`w-4 h-4 ${colors.text}`} />
                         </div>
-                        <div className={`${isMobile ? 'h-1.5 sm:h-2' : 'h-2 md:h-3'} bg-white/10 rounded-full overflow-hidden`}>
-                            <div className={`h-full w-[98%] bg-gradient-to-r ${colors.gradient}`} />
-                        </div>
+                        <h4 className={`${isMobile ? 'text-xs' : 'text-sm'} text-white font-medium`}>{feature.screen.title}</h4>
                     </div>
 
-                    <div className={`grid ${isMobile ? 'grid-cols-1 gap-1.5 sm:gap-2' : 'grid-cols-3 gap-4'}`}>
-                        {feature.screen.points?.map((point: string, i: number) => (
-                            <div key={i} className={`flex items-center ${isMobile ? 'space-x-1.5 sm:space-x-2 p-1.5 sm:p-2 rounded-lg' : 'space-x-2 md:space-x-3 p-3 md:p-4 rounded-xl'} bg-white/5 border border-white/5 backdrop-blur-sm`}>
-                                <div className={`${isMobile ? 'w-1 h-1 sm:w-1.5 sm:h-1.5' : 'w-1.5 h-1.5 md:w-2 md:h-2'} rounded-full bg-blue-500 shrink-0`} />
-                                <span className={`${isMobile ? 'text-[8px] sm:text-[10px]' : 'text-xs md:text-sm'} text-white/80 truncate`}>{point}</span>
+                    {/* Video scanning visualization */}
+                    <div className="relative w-full aspect-[21/9] bg-zinc-900 rounded-xl overflow-hidden border border-white/5 shadow-inner">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-zinc-800 to-zinc-900 opacity-50" />
+                        {/* Play button hint */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-md border border-white/10">
+                                <div className="w-0 h-0 border-t-[5px] border-l-[8px] border-b-[5px] border-transparent border-l-white ml-1" />
+                            </div>
+                        </div>
+                        {/* Scanning laser line */}
+                        <motion.div 
+                            animate={{ x: ["0%", "100%", "0%"] }} 
+                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                            className={`absolute top-0 bottom-0 left-0 w-0.5 ${colors.bgLight} z-10`}
+                            style={{ boxShadow: `0 0 15px ${colors.orbPrimary}` }}
+                        />
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 gap-2 md:gap-3">
+                        {feature.screen.stats?.map((stat, i) => (
+                            <div key={i} className="p-3 bg-white/[0.03] border border-white/5 rounded-xl flex flex-col justify-center">
+                                <div className={`text-[9px] md:text-[10px] text-white/40 uppercase tracking-wider mb-1`}>{stat.label}</div>
+                                <div className={`${isMobile ? 'text-sm' : 'text-lg'} font-bold ${stat.color} truncate`}>{stat.value}</div>
                             </div>
                         ))}
                     </div>
+
+                    {/* Insights List */}
+                    <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col justify-center space-y-2.5 md:space-y-3">
+                        {feature.screen.points?.map((point: string, i: number) => (
+                            <div key={i} className="flex items-start space-x-2.5 md:space-x-3">
+                                <div className={`mt-0.5 w-3.5 h-3.5 md:w-4 md:h-4 rounded-full ${colors.bgLight} flex items-center justify-center shrink-0`}>
+                                    <CheckCircle className={`w-2 h-2 md:w-2.5 md:h-2.5 ${colors.text}`} />
+                                </div>
+                                <span className={`${isMobile ? 'text-[10px]' : 'text-sm'} text-white/80 leading-snug`}>{point}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {feature.screen.type === 'calendar' && (
+                <div className={`h-full flex flex-col ${isMobile ? 'p-3' : 'p-6'} relative`}>
+                    <div className="mb-2 md:mb-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-2 md:space-x-3">
+                            <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg ${colors.bgLight} flex items-center justify-center`}>
+                                <feature.icon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${colors.text}`} />
+                            </div>
+                            <div>
+                                <h4 className={`${isMobile ? 'text-[11px]' : 'text-sm'} font-bold text-white leading-tight`}>{feature.screen.title}</h4>
+                                <p className="text-[8px] md:text-[9px] text-white/50 font-medium mt-0.5">October 2026</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className="mb-2 md:mb-3 bg-white/[0.02] border border-white/5 rounded-xl p-2 md:p-3">
+                        <div className="grid grid-cols-7 gap-1 md:gap-1.5 mb-1.5 text-center text-[8px] md:text-[9px] text-white/40 font-medium">
+                            <div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div>
+                        </div>
+                        <div className="grid grid-cols-7 gap-1 md:gap-1.5">
+                            {Array.from({ length: 14 }).map((_, i) => (
+                                <div key={i} className={`aspect-square rounded flex items-center justify-center ${
+                                    i === 8 
+                                        ? `${colors.bg} border ${colors.border}` 
+                                        : 'bg-white/[0.02] border border-white/5'
+                                }`}>
+                                    {i === 8 && <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-white shadow-[0_0_10px_white]`} />}
+                                    {i === 3 && <div className={`w-0.5 h-0.5 md:w-1 md:h-1 rounded-full ${colors.bgLight}`} />}
+                                    {i === 11 && <div className={`w-0.5 h-0.5 md:w-1 md:h-1 rounded-full ${colors.bgLight}`} />}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Scheduled Post Card */}
+                    {feature.screen.schedule && (
+                        <div className={`flex-1 p-2 md:p-3 rounded-xl border bg-white/[0.02] ${colors.border} shadow-[0_0_30px_rgba(168,85,247,0.15)] flex flex-col justify-center`}>
+                            <div className="flex items-start justify-between mb-2">
+                                <div>
+                                    <div className={`text-[8px] md:text-[9px] ${colors.text} font-bold uppercase tracking-wider mb-0.5`}>
+                                        {feature.screen.schedule.date}
+                                    </div>
+                                    <div className={`${isMobile ? 'text-[9px]' : 'text-xs'} text-white font-medium`}>
+                                        {feature.screen.schedule.postTitle}
+                                    </div>
+                                </div>
+                                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded bg-black/50 border border-white/10 text-[8px] md:text-[10px] font-medium text-white flex items-center space-x-1`}>
+                                    <Clock className="w-2 h-2 md:w-2.5 md:h-2.5 text-white/50" />
+                                    <span>{feature.screen.schedule.time}</span>
+                                </div>
+                            </div>
+                            {feature.screen.schedule.peak && (
+                                <div className="flex items-center space-x-1.5 text-[8px] md:text-[9px] text-green-400 bg-green-500/10 p-1.5 md:p-2 rounded-md border border-green-500/20">
+                                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                    <span>3x Peak Audience Activity</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
             {feature.screen.type === 'chat' && (
-                <div className={`${isMobile ? 'space-y-2 sm:space-y-3 px-1 sm:px-2' : 'space-y-4 md:space-y-6 px-4 md:px-12'} h-full justify-center flex flex-col`}>
-                    {feature.screen.messages?.map((msg, i: number) => (
-                        <div
-                            key={i}
-                            className={`${isMobile ? 'max-w-[90%] p-2 sm:p-3 rounded-xl' : 'max-w-[85%] md:max-w-[70%] p-4 md:p-5 rounded-2xl'} ${msg.user === 'me'
-                                ? 'bg-purple-500 text-white self-end rounded-br-none ml-auto'
-                                : 'bg-white/10 text-white self-start rounded-bl-none backdrop-blur-sm'
-                                }`}
-                        >
-                            <p className={`${isMobile ? 'text-[10px] sm:text-xs' : 'text-sm md:text-base'} font-medium`}>{msg.text}</p>
-                            <p className={`${isMobile ? 'text-[8px] sm:text-[9px] mt-1' : 'text-[10px] md:text-xs mt-2'} opacity-60 ${msg.user === 'me' ? 'text-white' : 'text-white/60'}`}>{msg.time}</p>
+                <div className="h-full flex flex-col bg-[#0A0A0A]">
+                    {/* Chat Header */}
+                    <div className={`p-3 md:p-4 border-b border-white/10 flex items-center space-x-3 bg-white/[0.02]`}>
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 to-rose-400 flex items-center justify-center shrink-0 shadow-lg shadow-pink-500/20">
+                            <span className="text-xs text-white font-bold">IG</span>
                         </div>
-                    ))}
+                        <div>
+                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white font-medium`}>Audience Messages</div>
+                            <div className="text-[9px] md:text-[10px] text-green-400 font-medium">Online</div>
+                        </div>
+                    </div>
+
+                    {/* Messages Area */}
+                    <div className={`flex-1 overflow-hidden flex flex-col justify-end ${isMobile ? 'p-3' : 'p-6'} space-y-4`}>
+                        {feature.screen.messages?.map((msg, i: number) => (
+                            <div key={i} className={`flex ${msg.user === 'me' ? 'justify-end' : 'justify-start'}`}>
+                                {msg.user !== 'me' && (
+                                    <div className="w-6 h-6 rounded-full bg-zinc-800 shrink-0 mr-2 mt-auto flex items-center justify-center">
+                                        <span className="text-[8px] text-white/50">F</span>
+                                    </div>
+                                )}
+                                <div className={`max-w-[85%] p-3 rounded-2xl shadow-lg ${
+                                    msg.user === 'me' 
+                                        ? `bg-blue-600 text-white rounded-br-sm shadow-blue-900/20` 
+                                        : 'bg-zinc-800/80 border border-white/5 text-white/90 rounded-bl-sm'
+                                }`}>
+                                    <p className={`${isMobile ? 'text-[10px]' : 'text-sm'} leading-relaxed`}>{msg.text}</p>
+                                    <div className={`text-[8px] mt-1.5 text-right ${msg.user === 'me' ? 'text-blue-200' : 'text-white/40'}`}>
+                                        {msg.time}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Chat Input Placeholder */}
+                    <div className={`p-3 md:p-4 border-t border-white/10 bg-white/[0.02]`}>
+                        <div className="w-full h-8 md:h-10 rounded-full bg-zinc-900 border border-white/10 flex items-center px-4 shadow-inner">
+                            <span className="text-[10px] md:text-xs text-white/30">Message...</span>
+                        </div>
+                    </div>
                 </div>
             )}
 
             {feature.screen.type === 'sales' && (
-                <div className={`h-full flex flex-col justify-center ${isMobile ? 'space-y-3 sm:space-y-4 px-1 sm:px-2' : 'space-y-6 md:space-y-8 px-4 md:px-12'}`}>
-                    <div className={`text-center ${isMobile ? 'mb-1 sm:mb-2' : 'mb-4 md:mb-6'}`}>
-                        <div className={`${isMobile ? 'w-10 h-10 sm:w-12 sm:h-12 mb-2 sm:mb-3' : 'w-16 h-16 md:w-20 md:h-20 mb-4 md:mb-6'} bg-green-500/20 rounded-full flex items-center justify-center mx-auto animate-pulse`}>
-                            <DollarSign className={`${isMobile ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-8 h-8 md:w-10 md:h-10'} text-green-400`} />
+                <div className={`h-full flex flex-col ${isMobile ? 'p-4' : 'p-8'} relative`}>
+                    <div className="mb-4 md:mb-6 flex items-center space-x-3 md:space-x-4">
+                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl ${colors.bgLight} flex items-center justify-center`}>
+                            <feature.icon className={`w-4 h-4 md:w-5 md:h-5 ${colors.text}`} />
                         </div>
-                        <h4 className={`font-bold ${isMobile ? 'text-sm sm:text-base' : 'text-xl md:text-2xl'}`}>{feature.screen.title}</h4>
+                        <div>
+                            <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-bold text-white leading-tight`}>{feature.screen.title}</h4>
+                            <p className="text-[9px] md:text-[10px] text-green-400 font-medium">Automated Pipeline Running</p>
+                        </div>
                     </div>
 
-                    <div className={`${isMobile ? 'space-y-1.5 sm:space-y-2' : 'space-y-3 md:space-y-5'}`}>
-                        {feature.screen.steps?.map((step, i: number) => (
-                            <div
-                                key={i}
-                                className={`flex items-center ${isMobile ? 'space-x-2 sm:space-x-3 p-1.5 sm:p-2 rounded-lg' : 'space-x-3 md:space-x-5 p-3 md:p-4 rounded-xl'} bg-white/5 backdrop-blur-sm`}
-                            >
-                                <div className={`${isMobile ? 'w-5 h-5 sm:w-6 sm:h-6 border' : 'w-8 h-8 md:w-10 md:h-10 border-2'} rounded-full flex items-center justify-center shrink-0 ${step.status === 'complete' ? 'bg-green-500 border-green-500' : 'bg-transparent border-green-500/30'
+                    {/* Timeline */}
+                    <div className="flex-1 relative ml-2 mt-2 md:mt-4">
+                        <div className="absolute top-2 bottom-6 left-[9px] w-px bg-white/10" />
+                        <div className="space-y-4 md:space-y-6">
+                            {feature.screen.steps?.map((step, i: number) => (
+                                <div key={i} className="relative flex items-start pl-8">
+                                    <div className={`absolute left-0 top-1 w-5 h-5 rounded-full flex items-center justify-center bg-[#0A0A0A] ${
+                                        step.status === 'complete' 
+                                            ? `border border-white/20` 
+                                            : `border border-white/20`
                                     }`}>
-                                    {step.status === 'complete' && <CheckCircle className={`${isMobile ? 'w-2.5 h-2.5 sm:w-3 sm:h-3' : 'w-4 h-4 md:w-5 md:h-5'} text-white`} />}
-                                    {step.status === 'active' && <div className={`${isMobile ? 'w-1.5 h-1.5 sm:w-2 sm:h-2' : 'w-2.5 h-2.5 md:w-3 md:h-3'} bg-green-500 rounded-full animate-ping`} />}
+                                        {step.status === 'complete' ? (
+                                            <div className="w-2.5 h-2.5 rounded-full bg-white/80" />
+                                        ) : (
+                                            <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className={`p-3 md:p-4 rounded-xl border ${
+                                            step.status === 'complete' 
+                                                ? 'bg-white/[0.02] border-white/5' 
+                                                : `bg-white/[0.06] ${colors.border} shadow-[0_0_20px_rgba(34,197,94,0.15)]`
+                                        }`}>
+                                            <div className={`${isMobile ? 'text-[10px]' : 'text-sm'} ${step.status === 'complete' ? 'text-white/50' : 'text-white font-medium'}`}>
+                                                {step.text}
+                                            </div>
+                                            {step.status === 'active' && (
+                                                <div className={`text-[8px] md:text-[10px] mt-1.5 ${colors.text} uppercase tracking-wider font-bold`}>
+                                                    In Progress...
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                                <span className={`${isMobile ? 'text-[9px] sm:text-[10px]' : 'text-sm md:text-base'} ${step.status === 'active' ? 'text-white font-medium' : 'text-white/50'}`}>
-                                    {step.text}
-                                </span>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
-
-            <div className={`absolute -bottom-32 -right-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48 blur-[15px] sm:blur-[20px]' : 'w-60 h-60 md:w-80 md:h-80 blur-[20px] md:blur-[30px]'} ${colors.bg} rounded-full pointer-events-none`} />
-            <div className={`absolute -top-32 -left-32 ${isMobile ? 'w-40 h-40 sm:w-48 sm:h-48 blur-[15px] sm:blur-[20px]' : 'w-60 h-60 md:w-80 md:h-80 blur-[20px] md:blur-[30px]'} ${colors.bgLight} rounded-full pointer-events-none`} />
         </div>
     );
 });
@@ -305,16 +444,14 @@ const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
 
 interface TextSlideProps {
     feature: Feature;
-    opacity: any; // Allow MotionValue or number
-    y: any;       // Allow MotionValue or number
+    opacity: any;
+    y: any;
 }
 
-// Faster text spring for snappier transitions
-const textSpringConfig = { stiffness: 240, damping: 30, mass: 0.5 };
+const textSpringConfig = { stiffness: 70, damping: 20, mass: 1.2 };
 
 const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     const colors = colorMap[feature.color];
-    // Cast to any to bypass strict type checking for motion vs number mix
     const opacityValue = useSpring(opacity as any, textSpringConfig);
     const yValue = useSpring(y as any, textSpringConfig);
 
@@ -326,9 +463,9 @@ const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     return (
         <motion.div
             style={{ opacity: opacityValue, y: yValue, ...GPU_ACCELERATED_STYLES }}
-            className="absolute w-full max-w-lg"
+            className="w-full max-w-lg"
         >
-            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${colors.badgeBg} ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6`}>
+            <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6 md:backdrop-blur-md`}>
                 <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span>{feature.highlight}</span>
             </div>
@@ -347,32 +484,32 @@ interface MockupSlideProps {
     opacity?: any; // Allow MotionValue or number
 }
 
-// Faster mockup spring for snappier transitions
-const mockupSpringConfig = { stiffness: 220, damping: 30, mass: 0.5 };
+// Luxurious, smooth mockup spring for visible sliding transitions
+const mockupSpringConfig = { stiffness: 70, damping: 20, mass: 1.2 };
 
 const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opacity }: MockupSlideProps) => {
     // Cast to any to bypass strict type checking
     const springY = useSpring(y as any, mockupSpringConfig);
     const springScale = useSpring(scale as any, mockupSpringConfig);
-
-    // Only use spring for opacity if it's a number (if it's a MotionValue, use it directly)
-    const springOpacity = useSpring((typeof opacity === 'number' ? opacity : 1), mockupSpringConfig);
+    
+    // Determine final opacity to use
+    const targetOpacity = opacity !== undefined ? opacity : (isVisible ? 1 : 0);
+    const springOpacity = useSpring(targetOpacity as any, mockupSpringConfig);
 
     useEffect(() => {
         if (typeof y === 'number') springY.set(y);
         if (typeof scale === 'number') springScale.set(scale);
-        if (typeof opacity === 'number') springOpacity.set(opacity);
-    }, [y, scale, opacity]);
+        if (typeof targetOpacity === 'number') springOpacity.set(targetOpacity);
+    }, [y, scale, targetOpacity]);
 
     if (isStatic) {
         return (
             <div
                 style={{
                     ...GPU_ACCELERATED_STYLES,
-                    visibility: 'visible',
                     opacity: 1,
                 }}
-                className="absolute inset-0 flex items-center justify-center z-10"
+                className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
             >
                 <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
                 <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
@@ -380,26 +517,15 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
         );
     }
 
-    // Fallback visibility logic if opacity is not provided or is just a number
-    const shouldHide = !isVisible && y > 50;
-
-    // Determine final opacity to use: explicit prop (if MotionValue or number), or calculated fallback
-    const finalOpacity = opacity !== undefined
-        ? (typeof opacity === 'number' ? springOpacity : opacity)
-        : (shouldHide ? 0 : 1);
-
     return (
         <motion.div
             style={{
                 y: springY,
                 scale: springScale,
                 ...MOBILE_OPTIMIZED_LAYER,
-                opacity: finalOpacity,
-                // Only hide visibility if purely based on the fallback boolean logic and opacity is 0
-                visibility: (finalOpacity === 0 || (typeof finalOpacity === 'number' && finalOpacity === 0)) ? 'hidden' : 'visible',
-                pointerEvents: (finalOpacity === 0 || (typeof finalOpacity === 'number' && finalOpacity === 0)) ? 'none' : 'auto',
+                opacity: springOpacity,
             }}
-            className="absolute inset-0 flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
             <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
@@ -422,118 +548,35 @@ const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKe
     );
 });
 
-const MotionTextSlide = ({ feature, index, progress }: { feature: Feature; index: number; progress: any }) => {
-    const opacity = useTransform(progress, (p: number) => {
-        // Apply snap logic inside transform
-        const snapPoints = [0, 0.33, 0.66, 1];
-        const snapStrength = 0.25;
-        let snapped = p;
-        for (const snap of snapPoints) {
-            const dist = Math.abs(p - snap);
-            if (dist < snapStrength) {
-                const factor = dist / snapStrength;
-                const eased = factor * factor;
-                snapped = snap + (p - snap > 0 ? 1 : -1) * eased * snapStrength;
-            }
-        }
+const MotionTextSlide = ({ feature, index, activeFeature }: { feature: Feature; index: number; activeFeature: number }) => {
+    const isPast = index < activeFeature;
+    const isUpcoming = index > activeFeature;
+    const isActive = index === activeFeature;
 
-        const i = index;
-        if (i === 0) {
-            let op = mapRange(snapped, 0, 0.28, 1, 1);
-            if (snapped > 0.28) op = mapRange(snapped, 0.28, 0.35, 1, 0);
-            return Math.max(0, Math.min(1, op));
-        } else if (i === 1) {
-            let op = mapRange(snapped, 0.31, 0.38, 0, 1);
-            if (snapped > 0.58) op = mapRange(snapped, 0.58, 0.65, 1, 0);
-            return Math.max(0, Math.min(1, op));
-        } else {
-            const op = mapRange(snapped, 0.62, 0.69, 0, 1);
-            return Math.max(0, Math.min(1, op));
-        }
-    });
+    const y = isActive ? 0 : isPast ? -40 : 40;
+    const opacity = isActive ? 1 : 0;
 
-    const y = useTransform(progress, (p: number) => {
-        // Apply snap logic
-        const snapPoints = [0, 0.33, 0.66, 1];
-        const snapStrength = 0.15;
-        let snapped = p;
-        for (const snap of snapPoints) {
-            const dist = Math.abs(p - snap);
-            if (dist < snapStrength) {
-                const factor = dist / snapStrength;
-                const eased = factor * factor;
-                snapped = snap + (p - snap > 0 ? 1 : -1) * eased * snapStrength;
-            }
-        }
-
-        const i = index;
-        if (i === 0) {
-            return snapped > 0.28 ? mapRange(snapped, 0.28, 0.35, 0, -40) : 0;
-        } else if (i === 1) {
-            return snapped < 0.38 ? mapRange(snapped, 0.31, 0.38, 40, 0) :
-                snapped > 0.58 ? mapRange(snapped, 0.58, 0.65, 0, -40) : 0;
-        } else {
-            return snapped < 0.69 ? mapRange(snapped, 0.62, 0.69, 40, 0) : 0;
-        }
-    });
-
-    return <TextSlide feature={feature} opacity={opacity} y={y} />;
+    return (
+        <div className={`absolute inset-0 flex flex-col justify-center ${isActive ? 'pointer-events-auto z-10' : 'pointer-events-none z-0'}`}>
+            <TextSlide feature={feature} opacity={opacity} y={y} />
+        </div>
+    );
 };
 
-const MotionMockupSlide = ({ feature, index, progress }: { feature: Feature; index: number; progress: any }) => {
-    const transformValues = useTransform(progress, (p: number) => {
-        // Apply snap logic
-        const snapPoints = [0, 0.33, 0.66, 1];
-        const snapStrength = 0.25;
-        let snapped = p;
-        for (const snap of snapPoints) {
-            const dist = Math.abs(p - snap);
-            if (dist < snapStrength) {
-                const factor = dist / snapStrength;
-                const eased = factor * factor;
-                snapped = snap + (p - snap > 0 ? 1 : -1) * eased * snapStrength;
-            }
-        }
+const MotionMockupSlide = ({ feature, index, activeFeature }: { feature: Feature; index: number; activeFeature: number }) => {
+    const isPast = index < activeFeature;
+    const isUpcoming = index > activeFeature;
+    const isActive = index === activeFeature;
 
-        const i = index;
-        let y = 0;
-        let scale = 1;
-        let isVisible = true;
-        let isStatic = false;
+    // Use a substantial pixel distance for the slide effect
+    const slideDistance = typeof window !== 'undefined' ? window.innerHeight : 800;
+    
+    // Discrete snappy sliding effect
+    const y = isActive ? 0 : isPast ? -slideDistance : slideDistance;
+    const scale = isActive ? 1 : 0.85;
+    const opacity = isActive ? 1 : 0;
 
-        // Tighter transition windows for sharper mockup changes
-        if (i === 0) {
-            if (snapped < 0.05) {
-                isStatic = true;
-                isVisible = true;
-            } else {
-                y = snapped > 0.28 ? mapRange(snapped, 0.28, 0.35, 0, -100) * (typeof window !== 'undefined' ? window.innerHeight : 800) / 100 : 0;
-                scale = snapped > 0.28 ? mapRange(snapped, 0.28, 0.35, 1, 0.85) : 1;
-                isVisible = snapped < 0.40;
-            }
-        } else if (i === 1) {
-            const enterY = mapRange(snapped, 0.31, 0.38, 100, 0);
-            const exitY = mapRange(snapped, 0.58, 0.65, 0, -100);
-            y = (snapped < 0.38 ? enterY : snapped > 0.58 ? exitY : 0) * (typeof window !== 'undefined' ? window.innerHeight : 800) / 100;
-            scale = snapped < 0.40 ? mapRange(snapped, 0.31, 0.40, 0.85, 1) :
-                snapped > 0.56 ? mapRange(snapped, 0.56, 0.65, 1, 0.85) : 1;
-            isVisible = snapped > 0.28 && snapped < 0.70;
-        } else {
-            y = mapRange(snapped, 0.62, 0.69, 100, 0) * (typeof window !== 'undefined' ? window.innerHeight : 800) / 100;
-            scale = mapRange(snapped, 0.62, 0.72, 0.85, 1);
-            isVisible = snapped > 0.58;
-        }
-
-        return { y, scale: Math.max(0.85, Math.min(1, scale)), isVisible, isStatic };
-    });
-
-    const y = useTransform(transformValues, (v) => v.y);
-    const scale = useTransform(transformValues, (v) => v.scale);
-    const opacity = useTransform(transformValues, (v) => v.isVisible ? 1 : 0);
-    // We can't easily control 'isStatic' or 'isVisible' prop on MockupSlide via motion value without re-render
-    // So we use opacity to hide it and always render
-
-    return <MockupSlide feature={feature} y={y} scale={scale} opacity={opacity} isVisible={true} />;
+    return <MockupSlide feature={feature} y={y} scale={scale} opacity={opacity} isVisible={isActive} />;
 };
 
 const MotionAmbientGlow = ({ color, index, progress }: { color: any; index: number; progress: any }) => {
@@ -570,49 +613,58 @@ const MotionAmbientGlow = ({ color, index, progress }: { color: any; index: numb
 export default function StickyScrollFeaturesV2() {
     const containerRef = useRef<HTMLElement>(null);
     const [activeFeature, setActiveFeature] = useState(0);
-    const lastFeatureRef = useRef(0);
+    const [targetFeature, setTargetFeature] = useState(0);
+    const lastTransitionTimeRef = useRef(0);
 
     const { scrollYProgress } = useScroll({
         target: containerRef,
         offset: ["start start", "end end"]
     });
 
-    // Spring for smooth scrolling
-    const smoothProgress = useSpring(scrollYProgress, {
-        stiffness: 240,
-        damping: 35,
-        mass: 0.8
-    });
-
-    // Only update React state when feature changes - dramatically reduces re-renders
-    useMotionValueEvent(smoothProgress, "change", (latest) => {
+    // Update target feature based instantly on physical scroll
+    const activeFeatureIndex = useTransform(scrollYProgress, (latest) => {
         const clamped = Math.max(0, Math.min(1, latest));
-        const newFeature = clamped < 0.33 ? 0 : clamped < 0.66 ? 1 : 2;
-
-        // Only trigger re-render when feature actually changes
-        if (newFeature !== lastFeatureRef.current) {
-            lastFeatureRef.current = newFeature;
-            setActiveFeature(newFeature);
-        }
+        // Even distribution: 33% for each item
+        return clamped < 0.33 ? 0 : clamped < 0.66 ? 1 : 2;
     });
+
+    useMotionValueEvent(activeFeatureIndex, "change", (latest) => {
+        setTargetFeature(latest);
+    });
+
+    // Rate-limited sequential transition: forces the UI to visit every step even if the user scrolls instantly
+    useEffect(() => {
+        if (activeFeature !== targetFeature) {
+            const now = Date.now();
+            const timeSinceLast = now - lastTransitionTimeRef.current;
+            const delay = Math.max(0, 600 - timeSinceLast);
+
+            const timer = setTimeout(() => {
+                lastTransitionTimeRef.current = Date.now();
+                setActiveFeature(prev => prev < targetFeature ? prev + 1 : prev - 1);
+            }, delay);
+
+            return () => clearTimeout(timer);
+        }
+    }, [activeFeature, targetFeature]);
 
     // Snapped progress calculation
     const activeColors = colorMap[features[activeFeature].color];
 
     // Reactive opacity for section elements - smooth fade in/out based on scroll
-    const sectionOpacity = useTransform(smoothProgress, p => (p > 0.05 && p < 0.95 ? 1 : 0));
-    const hintOpacity = useTransform(smoothProgress, p => (p > 0.02 && p < 0.92 ? 1 : 0));
+    const sectionOpacity = useTransform(scrollYProgress, p => (p > 0.05 && p < 0.95 ? 1 : 0));
+    const hintOpacity = useTransform(scrollYProgress, (v: number) => (v > 0.05 && v < 0.90) ? 1 : 0);
 
     return (
         <section
             ref={containerRef}
-            className="h-[650vh] bg-black"
+            className="h-[450vh] bg-black"
             style={{ position: 'relative' }}
         >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
             <div
-                className="sticky top-0 h-screen flex flex-col md:flex-row items-center w-full"
+                className="sticky top-0 h-[100dvh] flex flex-col md:flex-row items-center w-full"
                 style={{
                     position: 'sticky',
                     WebkitOverflowScrolling: 'touch'
@@ -634,7 +686,7 @@ export default function StickyScrollFeaturesV2() {
 
                     <div className="w-full md:w-[45%] relative h-[35vh] sm:h-[40vh] md:h-full flex items-center md:items-center justify-start z-20 pb-4 md:pb-0">
                         {features.map((feature, i) => (
-                            <MotionTextSlide key={i} feature={feature} index={i} progress={smoothProgress} />
+                            <MotionTextSlide key={i} feature={feature} index={i} activeFeature={activeFeature} />
                         ))}
                     </div>
 
@@ -671,14 +723,14 @@ export default function StickyScrollFeaturesV2() {
                             }}
                         >
                             {features.map((feature, i) => (
-                                <MotionMockupSlide key={i} feature={feature} index={i} progress={smoothProgress} />
+                                <MotionMockupSlide key={i} feature={feature} index={i} activeFeature={activeFeature} />
                             ))}
                         </div>
                     </div>
 
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
                         {features.map((feature, i) => (
-                            <MotionAmbientGlow key={i} color={colorMap[feature.color]} index={i} progress={smoothProgress} />
+                            <MotionAmbientGlow key={i} color={colorMap[feature.color]} index={i} progress={scrollYProgress} />
                         ))}
                     </div>
 

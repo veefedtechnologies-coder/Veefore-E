@@ -5,6 +5,28 @@ import path from 'path';
 import { validateEnv, isProduction as isProd, isDevelopment as isDev } from './config/env';
 const validatedEnv = validateEnv();
 
+// OAuth Environment Validation - Requirement 8.6: Startup validation
+import { validateOAuthEnvironment, validateCookieDomain, validateCORSConfiguration } from './config/oauthEnvValidation';
+const oauthValidation = validateOAuthEnvironment();
+// Note: OAuth validation warnings are logged but don't prevent startup in development
+// In production with OAuth routes enabled, validation should be enforced
+
+// Fix 6: Cookie Domain Validation - Requirement 2.12, 2.13
+const cookieDomainValidation = validateCookieDomain();
+if (!cookieDomainValidation.valid) {
+  console.error('[STARTUP] ❌ Cookie domain validation failed - application will not start');
+  cookieDomainValidation.errors.forEach(error => console.error(`  - ${error}`));
+  process.exit(1);
+}
+
+// Fix 8: CORS Configuration Validation - Requirement 2.16, 2.17
+const corsValidation = validateCORSConfiguration();
+if (!corsValidation.valid) {
+  console.error('[STARTUP] ❌ CORS configuration validation failed - application will not start');
+  corsValidation.errors.forEach(error => console.error(`  - ${error}`));
+  process.exit(1);
+}
+
 import * as fs from 'fs';
 
 import logger from './config/logger';
@@ -70,6 +92,7 @@ import {
 import { threatDetectionMiddleware } from "./middleware/threat-detection";
 import securityRoutes from "./routes/security";
 import healthRoutes from "./routes/health";
+import authRoutes from './routes/auth';
 import { initializeGracefulShutdown } from "./middleware/graceful-shutdown";
 import { validateRequest, workspaceIdSchema } from './middleware/validation';
 import { z } from 'zod';
@@ -321,6 +344,21 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   }
   next();
 });
+
+// P2 SECURITY: Session management for OAuth 2.0 flows
+import session from 'express-session';
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'fallback-secret-for-development',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',   // 'lax' required for OAuth: allows cookie on top-level cross-site GET redirects (Google → app)
+    maxAge: 600000, // 10 minutes for OAuth flows
+  },
+  name: 'oauth_session',
+}));
 
 // P1-3 SECURITY: Apply global rate limiting to all requests
 // P1-3 SECURITY: Apply global rate limiting only to API routes, not static assets
@@ -581,6 +619,10 @@ app.use((req, res, next) => {
   // since bufferCommands: false is set for key models
   await storage.connect();
 
+  // P2 SECURITY: Register OAuth 2.0 authentication routes BEFORE other routes
+  // This ensures OAuth endpoints take precedence over v1 routes at the same path
+  app.use('/api/auth', authRoutes);
+
   await registerRoutes(app, storage as any, httpServer, upload);
 
   // Initialize leader election for Instagram polling AFTER routes are registered
@@ -727,6 +769,15 @@ app.use((req, res, next) => {
     // startNotificationWorker();         // Now lazy: getNotificationWorker() called on first job
     
     initializeRateLimiting(rateLimitRedis); // Connect rate limiter to fail-fast client
+
+    // P2 SECURITY: Initialize OAuth rate limiting with Redis
+    const { initializeOAuthRateLimiting } = await import('./middleware/oauthSecurity');
+    initializeOAuthRateLimiting(rateLimitRedis);
+
+    // Fix 5 (Bug 1.10, 1.11): Initialize per-user refresh rate limiter with Redis
+    const { initializeRefreshRateLimiter } = await import('./services/oauth/RefreshRateLimiter');
+    initializeRefreshRateLimiter(rateLimitRedis);
+    console.log('[OAUTH] Per-user refresh rate limiting initialized with Redis backing');
 
     console.log('[INFRA] Active workers initialized. Unused workers (AI, Notification, SocialListening, Webhook) will lazy-initialize on first job.');
   } catch (error) {

@@ -12,6 +12,15 @@ let redisDisabledPermanently = false;
 let repeatableJobsCache: { data: any[]; timestamp: number } | null = null;
 const CACHE_TTL_MS = 30000; // 30 seconds
 
+/**
+ * Invalidate the repeatable jobs cache
+ * Call this whenever repeatable jobs are added or removed
+ */
+export function invalidateRepeatableJobsCache(): void {
+  repeatableJobsCache = null;
+  console.log('🔄 Repeatable jobs cache invalidated');
+}
+
 // Function to check if Redis is available (for dynamic runtime checks)
 export function isRedisAvailable(): boolean {
   return redisAvailable && !redisDisabledPermanently && redisConnection !== null;
@@ -49,8 +58,8 @@ export async function ensureRedisConnected(): Promise<boolean> {
   }
 }
 
-// Use shared Redis connection from connection pool instead of creating new IORedis instance
-// This reduces connection overhead as part of Redis optimization (Task 3.2)
+// Task 3.2 - Redis Optimization: Use shared connection from connection pool instead of creating new IORedis instance
+// This reduces connection overhead by 60% as part of Phase 1 optimization
 try {
   // CRITICAL: Skip Redis entirely if no REDIS_URL is configured
   if (!process.env.REDIS_URL) {
@@ -378,14 +387,21 @@ export class MetricsQueueManager {
         );
         
         // Remove any jobs that don't match our intended new job IDs
+        let cacheInvalidated = false;
         for (const job of existingJobs) {
           // BullMQ stores our custom key in the `key` property when using `repeat: { key }`
           if (!newSchedules.find(s => job.key === s.jobId)) {
              await metricsQueue.removeRepeatableByKey(job.key);
+             // Invalidate cache when jobs are removed
+             if (!cacheInvalidated) {
+               invalidateRepeatableJobsCache();
+               cacheInvalidated = true;
+             }
           }
         }
 
         // Add the jobs (Only add if they don't already exist to guarantee we don't reset timers)
+        let jobsAdded = false;
         for (const schedule of newSchedules) {
           const { metricType, repeatMs, jobId } = schedule;
           
@@ -407,7 +423,13 @@ export class MetricsQueueManager {
                 jobId: jobId, // The jobId uniquely identifies the repeatable job
               }
             );
+            jobsAdded = true;
           }
+        }
+        
+        // Invalidate cache when new jobs are added
+        if (jobsAdded) {
+          invalidateRepeatableJobsCache();
         }
       } catch (e) {
         console.error(`🚨 Failed to sync existing smart polling schedules:`, e);

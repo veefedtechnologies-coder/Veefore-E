@@ -1,6 +1,73 @@
+/* ========================================
+   CINEMATIC HERO SECTION – fonts loaded via <link> in index.html
+   ======================================== */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* CSS variables used by CinematicHeroSection */
+:root {
+  --font-display: 'Instrument Serif', serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+/* Liquid Glass effect */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.45) 0%,
+    rgba(255, 255, 255, 0.15) 20%,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0) 60%,
+    rgba(255, 255, 255, 0.15) 80%,
+    rgba(255, 255, 255, 0.45) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Cinematic hero fade-rise animations */
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-rise {
+  animation: fade-rise 0.8s ease-out both;
+}
+
+.animate-fade-rise-delay {
+  animation: fade-rise 0.8s ease-out 0.2s both;
+}
+
+.animate-fade-rise-delay-2 {
+  animation: fade-rise 0.8s ease-out 0.4s both;
+}
 
 /* Shadcn UI CSS Variables - Dark Theme Optimized */
 @layer base {
@@ -214,6 +281,68 @@
 }
 
 /* Essential Animations Only */
+
+/* CSS Animations for Landing Page Continuous Effects */
+/* Replaces Framer Motion for better performance - GPU accelerated */
+
+/* Orb pulsing animation - continuous gradient pulse effect */
+@keyframes orb-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+/* Breathing animation - subtle scale effect for floating badges */
+@keyframes breathing {
+  0%, 100% {
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    transform: scale(1.02) translateZ(0);
+  }
+}
+
+/* Gradient pulse for center orb - 3s duration */
+@keyframes gradient-pulse {
+  0%, 100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Fade in up animation for initial badge entrance */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}
+
+/* Respect prefers-reduced-motion - disable continuous animations */
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[orb-pulse_4s_ease-in-out_infinite\],
+  .animate-\[breathing_3s_ease-in-out_infinite\],
+  .animate-\[gradient-pulse_3s_ease-in-out_infinite\] {
+    animation: none !important;
+  }
+  
+  /* Keep entrance animations but make them instant */
+  .animate-\[fade-in-up_0\.8s_ease-out_forwards\] {
+    animation-duration: 0.01s !important;
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -233,6 +362,15 @@
 
   50% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes borderShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
   }
 }
 
@@ -366,6 +504,158 @@ textarea:focus-visible {
   animation: bounce 1s infinite;
 }
 
+/* CSS Animations for Landing Page Continuous Effects */
+/* Replaces Framer Motion for better performance - GPU accelerated */
+
+/* Orb pulsing animation - continuous gradient pulse effect */
+@keyframes orb-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+/* Breathing animation - subtle scale effect for floating badges */
+@keyframes breathing {
+  0%, 100% {
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    transform: scale(1.02) translateZ(0);
+  }
+}
+
+/* Gradient pulse for center orb - 3s duration */
+@keyframes gradient-pulse {
+  0%, 100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Fade in up animation for initial badge entrance */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}
+
+/* Respect prefers-reduced-motion - disable continuous animations */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all continuous CSS animations */
+  .animate-\[orb-pulse_4s_ease-in-out_infinite\],
+  .animate-\[breathing_3s_ease-in-out_infinite\],
+  .animate-\[gradient-pulse_3s_ease-in-out_infinite\],
+  .animate-\[spin_30s_linear_infinite\],
+  .animate-\[spin_40s_linear_infinite_reverse\],
+  .animate-\[spin_25s_linear_infinite\],
+  .animate-\[spin_60s_linear_infinite\],
+  .animate-\[spin_10s_linear_infinite\],
+  .animate-\[shimmer-slide_2s_ease-in-out_infinite\],
+  .animate-\[pulse_3s_ease-in-out_infinite\] {
+    animation: none !important;
+  }
+  
+  /* Keep entrance animations but make them instant */
+  .animate-\[fade-in-up_0\.8s_ease-out_forwards\] {
+    animation-duration: 0.01s !important;
+  }
+  
+  /* Disable all Framer Motion animations */
+  [data-framer-motion] * {
+    animation-duration: 0.01s !important;
+    transition-duration: 0.01s !important;
+  }
+}
+
+/* Mobile animation optimizations - Task 7.2 */
+@media (max-width: 768px) {
+  /* Disable heavy 3D transforms on mobile */
+  [style*="rotateX"],
+  [style*="rotateY"],
+  [style*="perspective"] {
+    transform: translateZ(0) !important;
+  }
+  
+  /* Simplify orbit ring animations on mobile */
+  .animate-\[spin_30s_linear_infinite\],
+  .animate-\[spin_40s_linear_infinite_reverse\],
+  .animate-\[spin_25s_linear_infinite\] {
+    animation-duration: 60s !important; /* Slower = less CPU usage */
+  }
+  
+  /* Reduce parallax intensity on mobile */
+  [data-parallax] {
+    transform: translateZ(0) !important;
+  }
+  
+  /* Disable gradient orb animations on mobile for performance */
+  .animate-\[orb-pulse_4s_ease-in-out_infinite\] {
+    animation: none !important;
+    opacity: 0.4 !important;
+  }
+}
+
+@layer components {
+  .btn-brick {
+    @apply relative inline-flex items-center justify-center font-bold transition-all duration-100 active:translate-y-[4px] disabled:opacity-50 disabled:pointer-events-none;
+    border-radius: 12px !important;
+  }
+
+  .btn-brick-brand {
+    @apply bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    box-shadow: 0 5px 0 #1e1b4b !important;
+  }
+  .btn-brick-brand:hover {
+    @apply brightness-110;
+    box-shadow: 0 5px 0 #1e1b4b, 0 0 20px rgba(99,102,241,0.4) !important;
+  }
+  .btn-brick-brand:active {
+    box-shadow: 0 0px 0 #1e1b4b, 0 0 10px rgba(99,102,241,0.4) !important;
+    transform: translateY(5px);
+  }
+
+  .btn-brick-white {
+    @apply bg-white text-black;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 5px 0 #9ca3af !important;
+  }
+  .btn-brick-white:hover {
+    @apply bg-gray-50;
+    box-shadow: 0 5px 0 #9ca3af, 0 0 20px rgba(255,255,255,0.3) !important;
+  }
+  .btn-brick-white:active {
+    box-shadow: 0 0px 0 #9ca3af !important;
+    transform: translateY(5px);
+  }
+
+  .btn-brick-dark {
+    @apply bg-white/10 text-white;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 5px 0 rgba(0,0,0,0.8) !important;
+  }
+  .btn-brick-dark:hover {
+    @apply bg-white/15;
+    box-shadow: 0 5px 0 rgba(0,0,0,0.8), 0 0 15px rgba(255,255,255,0.1) !important;
+  }
+  .btn-brick-dark:active {
+    box-shadow: 0 0px 0 rgba(0,0,0,0.8) !important;
+    transform: translateY(5px);
+  }
+}
+
 @keyframes bounce {
 
   0%,
@@ -398,6 +688,21 @@ html.dark .glass {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Animated gradient text */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
 }
 
 /* Button hover effects */

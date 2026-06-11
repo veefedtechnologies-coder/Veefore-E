@@ -94,3 +94,106 @@ export const isMobileDevice = (): boolean => {
   return window.innerWidth < 768 ||
     /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
+
+/**
+ * Mobile-optimized animation configuration
+ * - Reduces animation complexity on mobile devices (< 768px)
+ * - Disables 3D transforms for better performance
+ * - Simplifies gradient orb animations
+ * - Reduces parallax intensity
+ * - Respects prefers-reduced-motion media query
+ * 
+ * Requirements: 5.4, 6.4
+ */
+export const getMobileOptimizedAnimation = (isMobile: boolean, prefersReducedMotion: boolean) => {
+  if (prefersReducedMotion) {
+    // Minimal animations for accessibility
+    return {
+      duration: 0,
+      initial: {},
+      animate: {},
+      transition: { duration: 0 },
+      disable3D: true,
+      disableParallax: true,
+      disableOrbs: false, // Keep static orbs for visual design
+    };
+  }
+
+  if (isMobile) {
+    // Simplified animations for mobile performance
+    return {
+      duration: 0.5, // Reduced from 800ms to 500ms
+      initial: { opacity: 0 },
+      animate: { opacity: 1 },
+      transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1.0] },
+      disable3D: true, // No 3D transforms on mobile
+      disableParallax: true, // Reduced parallax intensity
+      disableOrbs: false, // Simplify but keep visible
+    };
+  }
+
+  // Full animations for desktop
+  return {
+    duration: 0.8,
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+    disable3D: false,
+    disableParallax: false,
+    disableOrbs: false,
+  };
+};
+
+/**
+ * Optimized spring configuration for mobile devices
+ * Higher stiffness and damping reduce solver iterations
+ * 
+ * Requirements: 5.4
+ */
+export const getMobileSpringConfig = (isMobile: boolean) => {
+  if (isMobile) {
+    return {
+      type: 'tween' as const, // Use tween instead of spring on mobile
+      duration: 0.3,
+      ease: [0.25, 0.1, 0.25, 1.0],
+    };
+  }
+
+  return {
+    type: 'spring' as const,
+    stiffness: 200,
+    damping: 25,
+    mass: 1,
+  };
+};
+
+/**
+ * Get optimized animation properties based on device and user preferences
+ * 
+ * Requirements: 5.4, 6.4
+ */
+export const getOptimizedAnimationProps = (isMobile: boolean) => {
+  const prefersReducedMotion = shouldReduceMotion();
+  
+  if (prefersReducedMotion) {
+    return {
+      initial: {},
+      animate: {},
+      transition: { duration: 0 },
+    };
+  }
+
+  if (isMobile) {
+    return {
+      initial: { opacity: 0 },
+      animate: { opacity: 1 },
+      transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1.0] },
+    };
+  }
+
+  return {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+  };
+};

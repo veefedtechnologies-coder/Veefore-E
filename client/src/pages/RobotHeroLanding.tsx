@@ -55,7 +55,7 @@ const RobotHeroLanding = () => {
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden">
-      <style jsx>{`
+      <style>{`
         @keyframes pulse {
           0%, 100% {
             box-shadow: 0 0 40px rgba(16, 185, 129, 0.6), 0 0 80px rgba(16, 185, 129, 0.3);

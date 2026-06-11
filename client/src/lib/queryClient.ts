@@ -132,13 +132,77 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
     timeoutMs = 60000
   }
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  
+  // [SERVER-SIDE OAUTH - Task 16.2] Include credentials for cookie-based authentication
   const response = await fetch(url, {
     ...options,
     cache: 'no-store',
     headers,
+    credentials: 'include', // Include HTTP-only cookies for server-side OAuth
     signal: controller.signal,
   })
   clearTimeout(timeout)
+
+  // [SERVER-SIDE OAUTH - Task 16.2] Automatic token refresh on 401
+  if (response.status === 401) {
+    console.log('[Auth] Received 401, attempting token refresh...')
+    
+    // Try to refresh the token via server-side OAuth refresh endpoint
+    try {
+      const refreshResponse = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include', // Include cookies
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (refreshResponse.ok) {
+        console.log('[Auth] Token refresh successful, retrying original request...')
+        
+        // Retry the original request with new token
+        const retryController = new AbortController()
+        const retryTimeout = setTimeout(() => retryController.abort(), timeoutMs)
+        
+        const retryResponse = await fetch(url, {
+          ...options,
+          cache: 'no-store',
+          headers,
+          credentials: 'include',
+          signal: retryController.signal,
+        })
+        clearTimeout(retryTimeout)
+        
+        if (retryResponse.status === 304) {
+          throw new Error('Not Modified')
+        }
+        if (!retryResponse.ok) {
+          const errorData = await retryResponse.text()
+          console.error('API Error (after refresh):', retryResponse.status, retryResponse.statusText, errorData)
+          throw new Error(`${retryResponse.status}: ${retryResponse.statusText} - ${errorData}`)
+        }
+        
+        const contentType = retryResponse.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const data = await retryResponse.json();
+          console.log('[apiRequest DEBUG] Parsed JSON data (after refresh):', data);
+          return data;
+        }
+        
+        return retryResponse.text()
+      } else {
+        console.log('[Auth] Token refresh failed, redirecting to sign in...')
+        // Redirect to sign in if refresh fails
+        window.location.href = '/signin?expired=true'
+        throw new Error('Session expired. Please sign in again.')
+      }
+    } catch (refreshError) {
+      console.error('[Auth] Token refresh error:', refreshError)
+      // If refresh fails, redirect to sign in
+      window.location.href = '/signin?expired=true'
+      throw new Error('Session expired. Please sign in again.')
+    }
+  }
 
   if (response.status === 304) {
     throw new Error('Not Modified') // Let React Query handle the error or HTTP cache handle it

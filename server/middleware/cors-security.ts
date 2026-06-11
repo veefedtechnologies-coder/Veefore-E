@@ -106,13 +106,21 @@ function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): 
     return true;
   }
 
-  // Allow ngrok tunnels
-  if (origin.includes('.ngrok-free.dev') ||
+  // Allow ngrok tunnels ONLY in development (Security Audit Finding M2)
+  if (isDevelopment && (
+    origin.includes('.ngrok-free.dev') ||
     origin.includes('.ngrok.io') ||
     origin.includes('.ngrok-free.app') ||
-    origin.includes('.ngrok.app')) {
-    console.log(`✅ [CORS] Allowed ngrok tunnel: ${origin}`);
+    origin.includes('.ngrok.app')
+  )) {
+    console.log(`✅ [CORS] Allowed ngrok tunnel (dev only): ${origin}`);
     return true;
+  }
+
+  // SECURITY: Block ngrok in production (Finding M2)
+  if (isProduction && origin.includes('.ngrok')) {
+    console.warn(`🚨 [CORS] BLOCKED ngrok in production: ${origin}`);
+    return false;
   }
 
   console.warn(`🚨 [CORS] BLOCKED Origin: "${origin}" | Method: ${process.env.NODE_ENV} | Headers: ${JSON.stringify(allowedOrigins)}`);

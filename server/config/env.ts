@@ -7,7 +7,7 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().default(5000),
 
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
-  SESSION_SECRET: z.string().min(16, 'SESSION_SECRET must be at least 16 characters').optional(),
+  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters').optional(),
 
   MONGODB_URI: z.string().url().optional(),
   MONGO_URL: z.string().optional(),
@@ -40,10 +40,22 @@ const EnvSchema = z.object({
   FACEBOOK_APP_SECRET: z.string().optional(),
 
   FIREBASE_PROJECT_ID: z.string().optional(),
-  FIREBASE_SERVICE_ACCOUNT_KEY: z.string().optional(),
+  FIREBASE_SERVICE_ACCOUNT_KEY: z.string().optional().refine(
+    (val) => {
+      if (!val) return true; // Optional, so undefined/empty is ok
+      try {
+        JSON.parse(val);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'FIREBASE_SERVICE_ACCOUNT_KEY must be valid JSON' }
+  ),
 
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  OAUTH_CALLBACK_URL: z.string().url().optional(),
   GOOGLE_CLOUD_PROJECT_ID: z.string().optional(),
   GOOGLE_CLOUD_LOCATION: z.string().optional(),
 
@@ -143,6 +155,15 @@ export function validateEnv(): Env {
   if (!validatedEnv.SESSION_SECRET) {
     warnings.push('SESSION_SECRET not set - using fallback (not recommended for production)');
   }
+  if (!validatedEnv.GOOGLE_CLIENT_ID || !validatedEnv.GOOGLE_CLIENT_SECRET) {
+    warnings.push('Google OAuth credentials not configured - Google OAuth integration disabled');
+  }
+  if (!validatedEnv.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    warnings.push('FIREBASE_SERVICE_ACCOUNT_KEY not set - Firebase Admin SDK features disabled');
+  }
+  if (!validatedEnv.OAUTH_CALLBACK_URL) {
+    warnings.push('OAUTH_CALLBACK_URL not set - OAuth callback may not work correctly');
+  }
 
   if (warnings.length > 0) {
     console.warn('\n[ENV] ⚠️  Configuration warnings:');
@@ -207,4 +228,14 @@ export function hasEmailCapabilities(): boolean {
 
 export function hasPaymentCapabilities(): boolean {
   return !!(env.STRIPE_SECRET_KEY || env.RAZORPAY_KEY_ID);
+}
+
+export function hasOAuthCapabilities(): boolean {
+  return !!(
+    env.GOOGLE_CLIENT_ID && 
+    env.GOOGLE_CLIENT_SECRET && 
+    env.FIREBASE_SERVICE_ACCOUNT_KEY &&
+    env.SESSION_SECRET &&
+    env.OAUTH_CALLBACK_URL
+  );
 }
