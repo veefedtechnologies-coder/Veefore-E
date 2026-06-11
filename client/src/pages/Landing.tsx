@@ -161,56 +161,6 @@ const Marquee = memo(({ children, direction = 'left' }: { children: React.ReactN
   )
 })
 
-const RotatingHeroText = memo(() => {
-  const isMobile = useIsMobile()
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [prevIndex, setPrevIndex] = useState(-1)
-  const [isReady, setIsReady] = useState(false)
-
-  // Delay rotation start on mobile to allow fast initial render
-  useEffect(() => {
-    const delay = isMobile ? 2000 : 500
-    const timer = setTimeout(() => setIsReady(true), delay)
-    return () => clearTimeout(timer)
-          <motion.div
-            key={index}
-            initial={false}
-            animate={{
-              opacity: isActive ? 1 : 0,
-              y: isActive ? 0 : (isExiting ? '-100%' : '100%'),
-              scale: isActive ? 1 : 0.95
-            }}
-            transition={{
-              duration: isMobile ? 0.5 : 0.9,
-              ease: [0.22, 1, 0.36, 1]
-            }}
-            className={`absolute inset-0 flex flex-col items-center justify-center ${isActive ? 'hero-text-no-blur' : 'hero-text-blur'}`}
-            style={{ pointerEvents: isActive ? 'auto' : 'none' }}
-          >
-            <span className="block text-white" style={{ lineHeight: '1.15' }}>
-              {tagline.top}
-            </span>
-            <span
-              className="block mt-1 pb-2"
-              style={{
-                lineHeight: '1.2',
-                background: 'linear-gradient(to right, #60a5fa, #818cf8, #a78bfa)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent'
-              }}
-            >
-              {tagline.bottom}
-            </span>
-          </motion.div>
-        )
-      })}
-    </div>
-  )
-})
-
-
-
 const TiltCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => {
   const isMobile = useIsMobile()
   const ref = useRef<HTMLDivElement>(null)
