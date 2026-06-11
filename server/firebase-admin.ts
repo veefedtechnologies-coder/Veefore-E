@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import * as admin from 'firebase-admin';
 
 let firebaseAdmin: admin.app.App | null = null;
 
@@ -24,7 +24,7 @@ export function getFirebaseAdmin(): admin.app.App {
     
     try {
       firebaseAdmin = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
         projectId: serviceAccount.project_id,
       });
       console.log('[FIREBASE ADMIN] Initialized with service account for project:', serviceAccount.project_id);
