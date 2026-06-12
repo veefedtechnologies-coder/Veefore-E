@@ -1,14 +1,18 @@
-import * as firebaseAdmin from 'firebase-admin';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
-let firebaseApp: firebaseAdmin.app.App | null = null;
+// Load firebase-admin using CommonJS require
+const firebaseAdmin = require('firebase-admin');
 
-export function getFirebaseAdmin(): firebaseAdmin.app.App {
+let firebaseApp: typeof firebaseAdmin.app.App | null = null;
+
+export function getFirebaseAdmin(): typeof firebaseAdmin.app.App {
   if (firebaseApp) return firebaseApp;
   
   // Check if Firebase app already initialized
   const apps = firebaseAdmin.apps || [];
   if (apps.length > 0) {
-    firebaseApp = apps[0] as firebaseAdmin.app.App;
+    firebaseApp = apps[0];
     return firebaseApp;
   }
 
@@ -27,7 +31,7 @@ export function getFirebaseAdmin(): firebaseAdmin.app.App {
     
     try {
       firebaseApp = firebaseAdmin.initializeApp({
-        credential: firebaseAdmin.credential.cert(serviceAccount as firebaseAdmin.ServiceAccount),
+        credential: firebaseAdmin.credential.cert(serviceAccount),
         projectId: serviceAccount.project_id,
       });
       console.log('[FIREBASE ADMIN] Initialized with service account for project:', serviceAccount.project_id);
