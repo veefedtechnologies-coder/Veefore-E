@@ -56,6 +56,7 @@ const TermsOfService = () => {
     { id: 'description', title: 'Description of Service' },
     { id: 'eligibility', title: 'Eligibility' },
     { id: 'account', title: 'Account Registration' },
+    { id: 'social-media-integration', title: 'Social Media Integration' },
     { id: 'usage', title: 'Acceptable Use' },
     { id: 'prohibited', title: 'Prohibited Activities' },
     { id: 'intellectual-property', title: 'Intellectual Property' },
@@ -254,6 +255,86 @@ const TermsOfService = () => {
                 </p>
               </TermsSection>
 
+              <TermsSection id="social-media-integration" icon={UserCheck} title="Social Media Platform Integration">
+                <p>
+                  Veefore integrates with social media platforms, primarily Instagram, to provide automated
+                  content management and engagement features. By connecting your social media accounts to Veefore,
+                  you acknowledge and agree to the following:
+                </p>
+
+                <h4 className="text-white font-semibold mt-6 mb-2">Instagram Integration</h4>
+                <div className="p-4 bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-lg mb-4">
+                  <p className="font-semibold text-white mb-2">When You Connect Your Instagram Account:</p>
+                  <ul className="list-disc pl-6 space-y-2 text-sm">
+                    <li>You authorize Veefore to access your Instagram profile, posts, insights, and engagement data</li>
+                    <li>You authorize Veefore to publish content (posts, stories, reels) on your behalf based on your instructions</li>
+                    <li>You authorize Veefore to manage comments and direct messages as per your automation settings</li>
+                    <li>You grant us permission to access Instagram Analytics and Insights data associated with your account</li>
+                  </ul>
+                </div>
+
+                <h4 className="text-white font-semibold mt-6 mb-2">Your Responsibilities</h4>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Instagram Terms Compliance:</strong> You remain solely responsible for compliance with Instagram's{' '}
+                    <a href="https://help.instagram.com/581066165581870" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                      Terms of Use
+                    </a>,{' '}
+                    <a href="https://help.instagram.com/477434105621119" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                      Community Guidelines
+                    </a>, and{' '}
+                    <a href="https://developers.facebook.com/terms" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                      Platform Policies
+                    </a>.
+                  </li>
+                  <li><strong>Content Ownership:</strong> You must own or have proper licenses for all content you post through Veefore.</li>
+                  <li><strong>Automation Limits:</strong> You must use automation features responsibly and not engage in spam, artificial engagement, or other prohibited activities as defined by Instagram.</li>
+                  <li><strong>Account Security:</strong> You are responsible for the security of your Instagram login credentials and any actions taken through the connected account.</li>
+                  <li><strong>Monitoring:</strong> You must regularly monitor your connected Instagram account for any unauthorized activity or violations.</li>
+                </ul>
+
+                <h4 className="text-white font-semibold mt-6 mb-2">Revoking Access</h4>
+                <p>
+                  You may revoke Veefore's access to your Instagram account at any time by:
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Disconnecting your Instagram account in your Veefore account settings</li>
+                  <li>Removing Veefore's access through your Instagram or Facebook account settings</li>
+                </ul>
+                <p className="mt-4">
+                  Revoking access will immediately stop all automated actions but will not delete your Veefore account or historical data.
+                </p>
+
+                <h4 className="text-white font-semibold mt-6 mb-2">Platform Changes & Limitations</h4>
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                  <p className="text-sm">
+                    <strong className="text-white">Important Disclaimer:</strong> Instagram (owned by Meta) controls
+                    access to its platform through APIs. We are not liable for:
+                  </p>
+                  <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+                    <li>Instagram API changes, restrictions, or deprecations</li>
+                    <li>Temporary or permanent suspension of Instagram API access</li>
+                    <li>Instagram rate limits that may affect automation speed</li>
+                    <li>Actions taken by Instagram against your account for any reason</li>
+                    <li>Loss of Instagram features or functionality due to platform updates</li>
+                  </ul>
+                </div>
+
+                <h4 className="text-white font-semibold mt-6 mb-2">Prohibited Use</h4>
+                <p>You must NOT use Veefore to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Violate Instagram's automation policies or artificially inflate engagement metrics</li>
+                  <li>Send spam messages or engage in mass following/unfollowing</li>
+                  <li>Post content that violates Instagram's Community Guidelines (hate speech, violence, nudity, etc.)</li>
+                  <li>Impersonate others or create fake accounts</li>
+                  <li>Scrape or collect data from other Instagram users without authorization</li>
+                  <li>Use purchased or fake followers, likes, or comments</li>
+                </ul>
+                <p className="mt-4">
+                  Violation of these terms may result in immediate termination of your Veefore account without refund,
+                  and we may report violations to Instagram.
+                </p>
+              </TermsSection>
+
               <TermsSection id="usage" icon={CheckCircle} title="Acceptable Use">
                 <p>
                   You agree to use our Services only for lawful purposes and in accordance with these Terms.
@@ -336,6 +417,31 @@ const TermsOfService = () => {
                 <p>
                   You may cancel your subscription at any time through your account settings. Cancellation takes
                   effect at the end of the current billing period. No refunds are provided for partial periods.
+                </p>
+
+                <h4 className="text-white font-semibold mt-6 mb-2">Refund Policy</h4>
+                <p className="mb-4">
+                  Generally, subscription fees are non-refundable. However, we may provide refunds in the following circumstances:
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Service Unavailability:</strong> If our Services are unavailable for more than 7 consecutive days due to technical issues on our end, you may request a prorated refund for the downtime period.</li>
+                  <li><strong>Billing Errors:</strong> If you were charged incorrectly due to a billing system error, we will refund the erroneous charge immediately upon verification.</li>
+                  <li><strong>Fraudulent Charges:</strong> If unauthorized charges were made to your payment method, we will investigate and refund verified fraudulent transactions.</li>
+                  <li><strong>Technical Issues:</strong> If technical problems prevent you from using core features for more than 14 consecutive days and our support team cannot resolve them, you may be eligible for a partial refund.</li>
+                  <li><strong>Discretionary Refunds:</strong> In exceptional circumstances, we may grant refunds at our sole discretion.</li>
+                </ul>
+                <p className="mt-4">
+                  To request a refund, contact <a href="mailto:support@veefore.com" className="text-blue-400 hover:underline">support@veefore.com</a> with:
+                </p>
+                <ul className="list-disc pl-6 space-y-1 text-sm">
+                  <li>Your account email address</li>
+                  <li>Transaction ID or invoice number</li>
+                  <li>Detailed explanation of the issue</li>
+                  <li>Supporting evidence (screenshots, error messages, etc.)</li>
+                </ul>
+                <p className="mt-4 text-sm text-white/60">
+                  Refund requests are typically processed within 5-10 business days. Approved refunds will be credited
+                  to your original payment method within 7-14 business days depending on your financial institution.
                 </p>
               </TermsSection>
 
