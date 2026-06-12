@@ -1231,164 +1231,125 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       </section>
       )}
 
-      {/* ====== GOOGLE OAUTH VERIFICATION: Clear App Purpose Section ====== */}
-      <section className="relative py-16 md:py-24 px-4 sm:px-6 -mt-20 pt-24 md:pt-32 bg-gradient-to-b from-transparent via-[#030303]/95 to-[#030303] z-20">
-        <div className="max-w-6xl mx-auto">
-          {/* Main Purpose Statement */}
+      {/* ====== FEATURE BENTO GRID (DESIGN84) ====== */}
+      <section className="relative py-24 md:py-32 px-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Section Header */}
           <div className="text-center mb-16">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-            >
-              <span className="inline-flex items-center px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm mb-6">
-                <Sparkles className="w-4 h-4 mr-2" />
-                What is Veefore?
-              </span>
-            </motion.div>
-
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 leading-tight"
-            >
-              AI-Powered Instagram Growth Platform
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight text-white mb-4">
+              A complete growth engine,
               <br />
-              <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                for Content Creators & Businesses
-              </span>
-            </motion.h2>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-base md:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed"
-            >
-              Veefore helps content creators, influencers, and businesses grow their Instagram presence 
-              through intelligent automation, AI-powered content optimization, and data-driven engagement strategies. 
-              Save time, increase reach, and grow your audience authentically with our comprehensive social media toolkit.
-            </motion.p>
+              <span className="text-zinc-400">Powered by intelligence.</span>
+            </h2>
           </div>
 
-          {/* Core Features Grid */}
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-blue-500/30 transition-colors"
-            >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 flex items-center justify-center mb-4">
-                <Clock className="w-6 h-6 text-blue-400" />
+          {/* Bento Grid Container */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 auto-rows-fr">
+            
+            {/* Large Card 1: AI Generation (2/3 width) */}
+            <div className="lg:col-span-2 group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+              {/* Hidden glow that reveals on hover */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px]" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Smart Content Scheduling</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                AI-powered posting scheduler that identifies optimal times for maximum engagement based on your audience behavior and Instagram analytics.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-purple-500/30 transition-colors"
-            >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/10 flex items-center justify-center mb-4">
-                <Brain className="w-6 h-6 text-purple-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">AI Caption Generation</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Generate viral-worthy captions instantly using advanced AI language models. Get hook suggestions, trending patterns, and engagement-optimized copy.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-pink-500/30 transition-colors"
-            >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-600/10 flex items-center justify-center mb-4">
-                <BarChart3 className="w-6 h-6 text-pink-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Growth Analytics & Insights</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Track performance metrics, audience growth, engagement rates, and content effectiveness with comprehensive analytics dashboards and reports.
-              </p>
-            </motion.div>
-          </div>
-
-          {/* Who It's For */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10"
-          >
-            <h3 className="text-xl font-semibold text-white mb-4 text-center">Who Benefits from Veefore?</h3>
-            <div className="grid sm:grid-cols-3 gap-6 text-center">
-              <div>
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
-                  <Users className="w-5 h-5 text-blue-400" />
+              
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="w-12 h-12 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                    <Brain className="w-6 h-6 text-indigo-400" />
+                  </div>
+                  <span className="bg-white/5 border border-white/10 rounded-full px-3 py-1 text-xs text-zinc-300">AI-Powered</span>
                 </div>
-                <h4 className="text-white font-medium mb-1">Content Creators</h4>
-                <p className="text-xs text-white/60">Influencers and creators looking to grow their audience and engagement</p>
-              </div>
-              <div>
-                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
-                  <TrendingUp className="w-5 h-5 text-purple-400" />
-                </div>
-                <h4 className="text-white font-medium mb-1">Small Businesses</h4>
-                <p className="text-xs text-white/60">Brands wanting to build an authentic social media presence</p>
-              </div>
-              <div>
-                <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center mx-auto mb-3">
-                  <Layers className="w-5 h-5 text-pink-400" />
-                </div>
-                <h4 className="text-white font-medium mb-1">Marketing Agencies</h4>
-                <p className="text-xs text-white/60">Agencies managing multiple client social media accounts</p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Why We Use Google Sign-In */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.7 }}
-            className="mt-12 p-6 rounded-2xl bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-blue-500/20"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                <Shield className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Secure Authentication with Google Sign-In</h3>
-                <p className="text-sm text-white/70 leading-relaxed mb-3">
-                  We use Google Sign-In to provide secure, passwordless authentication for your Veefore account. 
-                  This allows you to sign up and log in quickly without creating yet another password to remember.
+                
+                <h3 className="text-2xl font-semibold text-white mb-3 tracking-tight">Context-Aware AI Engine</h3>
+                <p className="text-base text-zinc-400 leading-relaxed mb-6">
+                  Our AI understands your niche, audience demographics, and content style to generate perfectly tailored captions, hashtags, and posting strategies that resonate with your unique brand voice.
                 </p>
-                <div className="space-y-2 text-sm text-white/60">
-                  <p>✓ <strong className="text-white/80">We only access:</strong> Your name, email address, and profile photo</p>
-                  <p>✓ <strong className="text-white/80">We never access:</strong> Gmail, Google Drive, Calendar, or any other Google services</p>
-                  <p>✓ <strong className="text-white/80">Your privacy:</strong> You can revoke access anytime from your Google account settings</p>
+                
+                {/* Mock AI Interface */}
+                <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4 space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="text-xs text-zinc-500 uppercase tracking-widest">Operational</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-2 bg-zinc-800 rounded-full w-full" />
+                    <div className="h-2 bg-zinc-800 rounded-full w-4/5" />
+                    <div className="h-2 bg-indigo-500/20 rounded-full w-3/5" />
+                  </div>
                 </div>
               </div>
             </div>
-          </motion.div>
+
+            {/* Small Card 1: Multi-platform (1/3 width) */}
+            <div className="group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
+              </div>
+              
+              <div className="relative z-10">
+                <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                  <Layers className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-3 tracking-tight">Multi-platform</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Publish across Instagram, TikTok, and YouTube from one unified dashboard.
+                </p>
+              </div>
+            </div>
+
+            {/* Small Card 2: Analytics (1/3 width) */}
+            <div className="group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
+              </div>
+              
+              <div className="relative z-10">
+                <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-3 tracking-tight">Analytics</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Deep insights into engagement, reach, and audience growth patterns.
+                </p>
+              </div>
+            </div>
+
+            {/* Large Card 2: Collaboration (2/3 width) */}
+            <div className="lg:col-span-2 group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px]" />
+              </div>
+              
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="bg-amber-500/10 border border-amber-500/20 rounded-full px-3 py-1 text-xs text-amber-400">Team Ready</span>
+                </div>
+                
+                <h3 className="text-2xl font-semibold text-white mb-3 tracking-tight">Seamless Collaboration</h3>
+                <p className="text-base text-zinc-400 leading-relaxed mb-6">
+                  Work together with your team in real-time. Assign roles, share workspaces, and maintain brand consistency across all your content creation workflows.
+                </p>
+                
+                {/* Mock Avatar Cluster */}
+                <div className="flex items-center space-x-2">
+                  <div className="flex -space-x-2">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="w-8 h-8 rounded-full bg-zinc-800 border-2 border-zinc-900" />
+                    ))}
+                  </div>
+                  <span className="text-xs text-zinc-500 ml-2">+12 team members</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </section>
-      {/* ====== END GOOGLE OAUTH VERIFICATION SECTION ====== */}
+      {/* ====== END FEATURE BENTO GRID ====== */}
 
       {/* Growth Engine Section - "How It Works" (New Premium Design) */}
       <GrowthEngineSection />
