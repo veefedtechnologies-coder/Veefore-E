@@ -109,12 +109,9 @@ router.get('/google/start', (req: OAuthRequest, res: Response) => {
       ip: req.ip,
     });
     
-    // Requirement 1.6: Return Google OAuth URL as JSON for client-side redirect
-    // This prevents api.veefore.com from showing in browser URL bar
-    res.json({
-      redirectUrl: authUrl.toString(),
-      correlationId: req.correlationId
-    });
+    // Requirement 1.6: Redirect user to Google OAuth authorization page
+    // TODO: Once frontend is deployed with fetch(), switch back to res.json()
+    res.redirect(authUrl.toString());
     
   } catch (error) {
     console.error('[OAuth] Start endpoint error:', {
