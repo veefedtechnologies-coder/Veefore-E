@@ -82,6 +82,24 @@ function App() {
   // tokens 5 minutes before they expire (Requirement 19.7)
   useTokenRefresh(!loading && !!user)
 
+  // Handle OAuth callback redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('oauth_success') === 'true') {
+      console.log('[App] OAuth success detected, cleaning up URL')
+      // Remove oauth_success and welcome params from URL
+      params.delete('oauth_success')
+      params.delete('welcome')
+      const newSearch = params.toString()
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '')
+      window.history.replaceState({}, '', newUrl)
+      
+      // The useFirebaseAuth hook will automatically call /api/auth/session
+      // and restore the session - we just need to wait for it
+      console.log('[App] Waiting for useFirebaseAuth to restore session...')
+    }
+  }, [])
+
   const handleNavigate = useCallback((page: string) => {
     setLocation(`/${page}`)
   }, [setLocation])
