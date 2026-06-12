@@ -903,6 +903,26 @@ function SignUpIntegrated() {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
       console.log('✅ Firebase user created successfully:', userCredential.user.uid)
 
+      // CRITICAL: Create backend session after Firebase user creation
+      // This ensures the user has both Firebase auth AND backend session
+      console.log('[SignUp] Creating backend session after Firebase user creation')
+      try {
+        const signinResponse = await fetch('/api/auth/signin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email.trim().toLowerCase() })
+        })
+
+        if (!signinResponse.ok) {
+          console.warn('[SignUp] Backend session creation failed, but continuing with signup')
+        } else {
+          console.log('[SignUp] Backend session created successfully')
+        }
+      } catch (sessionError) {
+        console.warn('[SignUp] Backend session creation error:', sessionError)
+        // Don't fail signup if session creation fails - user can still complete onboarding
+      }
+
       const abortController = new AbortController()
       const timeoutId = setTimeout(() => abortController.abort(), 15000)
 
