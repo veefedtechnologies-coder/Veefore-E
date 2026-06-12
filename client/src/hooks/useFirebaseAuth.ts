@@ -22,7 +22,6 @@ export const useFirebaseAuth = () => {
     // Check if Firebase auth is available
     if (!auth) {
       console.error('useFirebaseAuth: Firebase auth not available')
-      alert('❌ OAUTH DEBUG\n\nFirebase auth not available\n\nThis is a critical error - Firebase SDK not loaded')
       setLoading(false)
       setIsInitialized(true)
       return
@@ -62,33 +61,25 @@ export const useFirebaseAuth = () => {
                 try {
                   await signInWithCustomToken(auth!, data.customToken)
                   console.log('useFirebaseAuth: ✅ Firebase sign-in successful!')
-                  // Show success popup
-                  alert('✅ OAUTH DEBUG - SUCCESS\n\nOAuth session restored successfully!\n\nYou should be logged in now.')
                   // onAuthStateChanged will fire again with the authenticated user
                 } catch (firebaseError: any) {
                   console.error('useFirebaseAuth: ❌ Firebase signInWithCustomToken failed:', {
                     code: firebaseError.code,
-                    message: firebaseError.message,
-                    stack: firebaseError.stack
+                    message: firebaseError.message
                   })
-                  // Show detailed error popup
-                  alert(`❌ OAUTH DEBUG - FIREBASE SIGN-IN FAILED\n\nStep: Signing in with Firebase custom token\nError Code: ${firebaseError.code}\nError Message: ${firebaseError.message}\n\nThis is the root cause! The custom token from the server is invalid or Firebase is rejecting it.\n\nCheck:\n1. FIREBASE_PROJECT_ID in Railway matches your Firebase project\n2. FIREBASE_SERVICE_ACCOUNT_KEY is correct\n3. Firebase Auth is enabled in console`)
                   setUser(null)
                   setLoading(false)
                   setIsInitialized(true)
                 }
               } else {
                 console.warn('useFirebaseAuth: No customToken in response data')
-                alert(`❌ OAUTH DEBUG - NO TOKEN IN RESPONSE\n\nStep: Parsing /api/auth/session response\nResponse Status: ${response.status}\nHas customToken: false\n\nThe backend returned 200 OK but the response doesn't contain a customToken field!`)
                 setUser(null)
                 setLoading(false)
                 setIsInitialized(true)
               }
             } else {
               // No server session either — user is truly logged out
-              const errorText = await response.text()
-              console.log('useFirebaseAuth: No server session found:', { status: response.status, error: errorText })
-              alert(`ℹ️ OAUTH DEBUG - NO SESSION\n\nStep: Calling /api/auth/session\nResponse Status: ${response.status}\nError: ${errorText}\n\nNo auth_token cookie found - you are logged out.`)
+              console.log('useFirebaseAuth: No server session found:', { status: response.status })
               setUser(null)
               setLoading(false)
               setIsInitialized(true)
@@ -96,10 +87,8 @@ export const useFirebaseAuth = () => {
           } catch (error: any) {
             console.error('useFirebaseAuth: Session restore failed:', {
               message: error.message,
-              stack: error.stack,
               name: error.name
             })
-            alert(`❌ OAUTH DEBUG - FETCH FAILED\n\nStep: Fetching /api/auth/session\nError: ${error.name}\nMessage: ${error.message}\n\nNetwork error or fetch failed!\n\nCheck:\n1. Vercel proxy is working\n2. Railway backend is running\n3. Browser network tab for details`)
             setUser(null)
             setLoading(false)
             setIsInitialized(true)
