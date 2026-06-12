@@ -19,7 +19,6 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
 
 /**
  * Hook to manage background token refresh
@@ -31,16 +30,6 @@ import { useQuery } from '@tanstack/react-query';
  * @param enabled - Whether background refresh is enabled (default: true)
  */
 export function useTokenRefresh(enabled: boolean = true) {
-  // Check if user is authenticated by checking for auth_token cookie
-  const { data: isAuthenticated } = useQuery({
-    queryKey: ['auth-status'],
-    queryFn: async () => {
-      // Check if auth cookie exists (basic check - actual validation happens server-side)
-      return document.cookie.split(';').some(cookie => cookie.trim().startsWith('auth_token='));
-    },
-    refetchInterval: 60000, // Recheck every minute
-  });
-
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef<boolean>(false);
   const retryCountRef = useRef<number>(0);
@@ -153,10 +142,8 @@ export function useTokenRefresh(enabled: boolean = true) {
    * Initialize background refresh when user is authenticated
    */
   useEffect(() => {
-    // Only start background refresh if:
-    // 1. Feature is enabled
-    // 2. User is authenticated
-    if (!enabled || !isAuthenticated) {
+    // Only start background refresh if feature is enabled
+    if (!enabled) {
       return;
     }
 
@@ -173,7 +160,7 @@ export function useTokenRefresh(enabled: boolean = true) {
         refreshTimerRef.current = null;
       }
     };
-  }, [enabled, isAuthenticated, scheduleNextRefresh]);
+  }, [enabled, scheduleNextRefresh]);
 
   /**
    * Handle visibility change - refresh when tab becomes visible
@@ -182,7 +169,7 @@ export function useTokenRefresh(enabled: boolean = true) {
    * to refresh the token to ensure it's still valid.
    */
   useEffect(() => {
-    if (!enabled || !isAuthenticated) {
+    if (!enabled) {
       return;
     }
 
@@ -204,7 +191,7 @@ export function useTokenRefresh(enabled: boolean = true) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [enabled, isAuthenticated, performBackgroundRefresh]);
+  }, [enabled, performBackgroundRefresh]);
 
   // Return refresh function for manual triggering if needed
   return {
