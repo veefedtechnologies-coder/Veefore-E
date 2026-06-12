@@ -13,8 +13,12 @@ const taglines = [
 
 const RotatingCinematicText = () => {
   const [index, setIndex] = useState(0)
+  const [isFirstRender, setIsFirstRender] = useState(true)
 
   useEffect(() => {
+    // Mark that first render is complete
+    setIsFirstRender(false)
+    
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % taglines.length)
     }, 4000)
@@ -26,7 +30,7 @@ const RotatingCinematicText = () => {
       <AnimatePresence mode="popLayout">
         <motion.h1
           key={index}
-          initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
+          initial={isFirstRender ? { opacity: 1, y: 0, filter: 'blur(0px)' } : { opacity: 0, y: 40, filter: 'blur(10px)' }}
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           exit={{ opacity: 0, y: -40, filter: 'blur(10px)' }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
