@@ -34,92 +34,49 @@ export const useFirebaseAuth = () => {
       // Set up auth state listener only once
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
-          // ENTERPRISE OPTIMIZATION: Validate backend session with caching & retry logic
-          console.log('useFirebaseAuth: Firebase user detected, validating with enterprise validator...')
-          
-          // IMPORTANT: Keep loading=true during validation to prevent flickering
-          setLoading(true)
-          
-          try {
-            const validation = await authSessionValidator.validateSession(firebaseUser.uid)
-            
-            console.log(`useFirebaseAuth: Validation result:`, {
-              isValid: validation.isValid,
-              fromCache: validation.fromCache,
-              responseTime: `${validation.responseTime}ms`
-            })
-            
-            if (validation.isValid) {
-              // Backend has valid session
-              console.log('useFirebaseAuth: ✅ Session valid, user authenticated')
-              setUser(firebaseUser)
-              setLoading(false) // Now safe to show authenticated UI
-              setIsInitialized(true)
-            } else {
-              // Backend has no session - Firebase session is stale
-              console.warn('useFirebaseAuth: ❌ Backend session invalid, signing out stale Firebase session')
-              authSessionValidator.clearCache()
-              await auth.signOut()
-              setUser(null)
-              setLoading(false)
-              setIsInitialized(true)
-            }
-          } catch (error: any) {
-            console.error('useFirebaseAuth: 💥 Session validation failed critically:', error)
-            // On critical error, sign out to be safe
-            authSessionValidator.clearCache()
-            await auth.signOut()
-            setUser(null)
-            setLoading(false)
-            setIsInitialized(true)
-          }
+          // User is signed in - simple and direct
+          console.log('useFirebaseAuth: Firebase user detected:', firebaseUser.uid)
+          console.log('useFirebaseAuth: ✅ User authenticated')
+          setUser(firebaseUser)
+          setLoading(false)
+          setIsInitialized(true)
         } else if (!sessionRestoreAttempted.current) {
           // No Firebase user — try to restore session from server-side OAuth cookie
           sessionRestoreAttempted.current = true
           console.log('useFirebaseAuth: No Firebase user, attempting session restore...')
           
           try {
-            console.log('useFirebaseAuth: Using enterprise validator for session restore...')
-            
-            // Use a temporary ID for validation during restore
-            const validation = await authSessionValidator.validateSession('restore_attempt')
-            
-            console.log(`useFirebaseAuth: Restore validation:`, {
-              isValid: validation.isValid,
-              hasToken: !!validation.customToken,
-              responseTime: `${validation.responseTime}ms`
+            // Try to get custom token from backend session
+            const response = await fetch('/api/v1/auth/session', {
+              method: 'GET',
+              credentials: 'include',
             })
             
-            if (validation.isValid && validation.customToken) {
-              console.log('useFirebaseAuth: ✅ Session restore successful, signing in with custom token...')
-              try {
-                await signInWithCustomToken(auth!, validation.customToken)
+            if (response.ok) {
+              const data = await response.json()
+              
+              if (data.data?.customToken || data.customToken) {
+                const customToken = data.data?.customToken || data.customToken
+                console.log('useFirebaseAuth: ✅ Got custom token, signing in...')
+                
+                const { signInWithCustomToken } = await import('firebase/auth')
+                await signInWithCustomToken(auth!, customToken)
                 console.log('useFirebaseAuth: ✅ Firebase sign-in successful!')
                 // onAuthStateChanged will fire again with the authenticated user
-              } catch (firebaseError: any) {
-                console.error('useFirebaseAuth: ❌ Firebase signInWithCustomToken failed:', {
-                  code: firebaseError.code,
-                  message: firebaseError.message
-                })
-                authSessionValidator.clearCache()
+              } else {
+                console.log('useFirebaseAuth: No custom token in response')
                 setUser(null)
                 setLoading(false)
                 setIsInitialized(true)
               }
             } else {
-              // No server session either — user is truly logged out
               console.log('useFirebaseAuth: No server session found')
-              authSessionValidator.clearCache()
               setUser(null)
               setLoading(false)
               setIsInitialized(true)
             }
           } catch (error: any) {
-            console.error('useFirebaseAuth: Session restore failed:', {
-              message: error.message,
-              name: error.name
-            })
-            authSessionValidator.clearCache()
+            console.error('useFirebaseAuth: Session restore failed:', error)
             setUser(null)
             setLoading(false)
             setIsInitialized(true)
