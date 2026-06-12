@@ -3,6 +3,9 @@ import { User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 
 export const useFirebaseAuth = () => {
+  // DEBUG: Add version marker to confirm deployment
+  console.log('🔥 useFirebaseAuth v2.0 - Enhanced OAuth logging enabled')
+  
   // Always call hooks at the top level - React rules require this
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
