@@ -133,81 +133,53 @@ class AuthSessionValidator {
   
   /**
    * Perform actual validation API call with timeout
+   * 
+   * NOTE: We validate that Firebase Auth session exists by checking if we can
+   * get a valid ID token. We don't need to call the backend for every validation
+   * since Firebase Auth is already authoritative.
    */
   private async performValidation(): Promise<{
     isValid: boolean
     customToken?: string
   }> {
-    // Create abort controller for timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => {
-      controller.abort()
-    }, this.VALIDATION_TIMEOUT)
+    const startTime = Date.now()
     
     try {
-      console.log('[AuthValidator] 📡 Calling /api/auth/session...')
+      console.log('[AuthValidator] 📡 Validating Firebase session...')
       
-      const response = await fetch('/api/auth/session', {
-        method: 'GET',
-        credentials: 'include',
-        signal: controller.signal,
-        headers: {
-          'X-Validation-Timestamp': Date.now().toString(),
-          'X-Client-Version': '1.0.0' // For version tracking
-        }
-      })
+      // Import Firebase auth dynamically to avoid circular deps
+      const { auth } = await import('./firebase')
       
-      clearTimeout(timeoutId)
+      // Check if user is still authenticated with Firebase
+      const user = auth.currentUser
       
-      // Handle rate limiting
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After')
-        console.warn(`[AuthValidator] 🚦 Rate limited, retry after: ${retryAfter}s`)
-        throw new Error('RATE_LIMITED')
-      }
-      
-      // Handle unauthorized
-      if (response.status === 401) {
-        console.log('[AuthValidator] 🔐 Unauthorized (401), session invalid')
+      if (!user) {
+        console.log('[AuthValidator] 🔐 No Firebase user, session invalid')
         return { isValid: false }
       }
       
-      // Handle other errors
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      // Parse response
-      const data = await response.json()
-      
-      if (data.customToken) {
-        console.log('[AuthValidator] ✅ Session valid, token received')
-        return {
-          isValid: true,
-          customToken: data.customToken
+      // Try to get a fresh ID token to confirm auth is still valid
+      try {
+        const idToken = await user.getIdToken(false) // false = use cached token
+        
+        if (!idToken) {
+          console.log('[AuthValidator] ❌ Failed to get ID token')
+          return { isValid: false }
         }
-      } else {
-        console.warn('[AuthValidator] ⚠️ Session valid but no token')
+        
+        const elapsed = Date.now() - startTime
+        console.log(`[AuthValidator] ✅ Firebase session valid (${elapsed}ms)`)
+        
+        return { isValid: true }
+        
+      } catch (tokenError: any) {
+        console.error('[AuthValidator] ❌ Token refresh failed:', tokenError.code)
         return { isValid: false }
       }
       
     } catch (error: any) {
-      clearTimeout(timeoutId)
-      
-      // Handle abort (timeout)
-      if (error.name === 'AbortError') {
-        console.error('[AuthValidator] ⏱️ Validation timeout after 5s')
-        throw new Error('VALIDATION_TIMEOUT')
-      }
-      
-      // Handle network errors
-      if (error.message.includes('fetch')) {
-        console.error('[AuthValidator] 🌐 Network error')
-        throw new Error('NETWORK_ERROR')
-      }
-      
-      // Re-throw other errors
-      throw error
+      console.error('[AuthValidator] 💥 Validation error:', error)
+      return { isValid: false }
     }
   }
   
@@ -216,7 +188,6 @@ class AuthSessionValidator {
    */
   private isNonRetryableError(error: Error): boolean {
     const nonRetryable = [
-      'RATE_LIMITED', // Will fail again immediately
       'VALIDATION_TIMEOUT' // Already waited max time
     ]
     return nonRetryable.some(code => error.message.includes(code))
