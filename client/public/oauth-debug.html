@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Debug Tool</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #4f46e5;
+        }
+        .result {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 OAuth Debug Tool</h1>
+        <p>This tool will test the OAuth session restoration flow step by step.</p>
+        
+        <button onclick="testSession()">Test /api/auth/session</button>
+        <button onclick="testCookies()">Check Cookies</button>
+        <button onclick="testFirebase()">Test Firebase Sign-In</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js'
+        import { getAuth, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js'
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXk8VeRRAZldbE8R4tnXYLbp2h8yW3sxE",
+            authDomain: "veefore-8433.firebaseapp.com",
+            projectId: "veefore-8433",
+            storageBucket: "veefore-8433.firebasestorage.app",
+            appId: "1:1021346796886:web:e0f831f06ba4f4b0e3d99c"
+        }
+
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+
+        window.testSession = async function() {
+            const resultDiv = document.getElementById('result')
+            resultDiv.innerHTML = '<div class="warning">⏳ Testing /api/auth/session...</div>'
+            
+            try {
+                const response = await fetch('/api/auth/session', { credentials: 'include' })
+                const data = await response.json()
+                
+                if (response.ok && data.customToken) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ SUCCESS - Session endpoint works!</div>
+                        <div>Status: ${response.status}</div>
+                        <div>Has customToken: ${!!data.customToken}</div>
+                        <div>Token length: ${data.customToken.length}</div>
+                        <div>Token preview: ${data.customToken.substring(0, 50)}...</div>
+                    `
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ ERROR - No custom token</div>
+                        <div>Status: ${response.status}</div>
+                        <div>Response: ${JSON.stringify(data, null, 2)}</div>
+                    `
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">❌ FETCH FAILED</div>
+                    <div>${error.message}</div>
+                `
+            }
+        }
+
+        window.testCookies = function() {
+            const resultDiv = document.getElementById('result')
+            const cookies = document.cookie
+            resultDiv.innerHTML = `
+                <div class="warning">🍪 Cookies (browser can only see non-httpOnly):</div>
+                <div>${cookies || 'No cookies visible to JavaScript'}</div>
+                <div style="margin-top: 20px; color: #888;">
+                    Note: auth_token cookie is httpOnly and won't appear here.
+                    Check Network tab → Cookies to see it.
+                </div>
+            `
+        }
+
+        window.testFirebase = async function() {
+            const resultDiv = document.getElementById('result')
+            resultDiv.innerHTML = '<div class="warning">⏳ Testing Firebase sign-in...</div>'
+            
+            try {
+                const response = await fetch('/api/auth/session', { credentials: 'include' })
+                const data = await response.json()
+                
+                if (!data.customToken) {
+                    resultDiv.innerHTML = '<div class="error">❌ No custom token from server</div>'
+                    return
+                }
+                
+                resultDiv.innerHTML += '<div class="warning">⏳ Signing in with Firebase...</div>'
+                
+                const userCredential = await signInWithCustomToken(auth, data.customToken)
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅✅✅ FIREBASE SIGN-IN SUCCESS!</div>
+                    <div>User ID: ${userCredential.user.uid}</div>
+                    <div>Email: ${userCredential.user.email}</div>
+                    <div style="margin-top: 20px;">
+                        <strong>OAuth is working! The issue is in your main app code.</strong>
+                    </div>
+                `
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">❌ FIREBASE SIGN-IN FAILED</div>
+                    <div>Error Code: ${error.code}</div>
+                    <div>Error Message: ${error.message}</div>
+                    <div style="margin-top: 20px; color: #f59e0b;">
+                        <strong>This is the root cause!</strong><br>
+                        The custom token from Railway is invalid or Firebase rejects it.
+                    </div>
+                `
+            }
+        }
+    </script>
+</body>
+</html>
