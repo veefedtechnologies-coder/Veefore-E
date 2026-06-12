@@ -348,7 +348,8 @@ export class AuthController extends BaseController {
     });
   });
 
-  getSession = this.wrapAsync(async (
+  // Renamed from getSession to avoid conflict with OAuth session endpoint
+  getAuthStatus = this.wrapAsync(async (
     req: TypedRequest,
     res: Response
   ) => {
