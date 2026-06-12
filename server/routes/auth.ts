@@ -352,15 +352,25 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
     
     // Requirement 5: Set auth_token cookie with Firebase custom token
     // Requirement 5.1-5.7: Set all required cookie attributes
-    res.cookie('auth_token', firebaseResult.customToken, {
+    const cookieOptions = {
       httpOnly: true,                           // Requirement 5.1: Prevent JavaScript access
       secure: process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false, // Requirement 5.2: HTTPS only in production or if frontend is HTTPS
-      sameSite: 'lax',                          // Use lax for OAuth cross-site redirects
+      sameSite: 'lax' as const,                 // Use lax for OAuth cross-site redirects
       path: '/',                                // Requirement 5.4: Available to all routes
       maxAge: 3600000,                          // Requirement 5.5: 1 hour (3600 seconds)
       domain: process.env.NODE_ENV === 'production' 
         ? process.env.COOKIE_DOMAIN 
         : undefined,                            // Requirement 5.6: Set domain in production
+    };
+    
+    res.cookie('auth_token', firebaseResult.customToken, cookieOptions);
+    
+    console.log('[OAuth] Set auth_token cookie:', {
+      correlationId,
+      cookieDomain: cookieOptions.domain,
+      cookieSecure: cookieOptions.secure,
+      cookieSameSite: cookieOptions.sameSite,
+      tokenLength: firebaseResult.customToken.length,
     });
     
     // Log successful token exchange (Requirement 18.2)
