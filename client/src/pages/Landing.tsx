@@ -922,8 +922,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       <CinematicHeroSection />
 
-      {/* Live Dashboard Preview Section - Hidden for Google OAuth Verification */}
-      {false && (
+      {/* Live Dashboard Preview Section */}
       <section className="relative pt-8 pb-20 md:pb-32 -mt-20 z-20 w-full overflow-visible">
         <div className="w-full px-4 md:px-8">
           <motion.div
@@ -1081,7 +1080,6 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </motion.div>
         </div>
       </section>
-      )}
 
       {/* Trusted By Top Brands Section - Hidden in Phase 1 Review Mode */}
       {!isPhase1 && (
