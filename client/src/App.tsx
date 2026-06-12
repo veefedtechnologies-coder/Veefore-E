@@ -180,9 +180,9 @@ function App() {
       // Allow if they're resuming onboarding
       const urlParams = new URLSearchParams(window.location.search)
       if (urlParams.get('resume') !== 'true') {
-        // Not resuming onboarding, redirect to dashboard
-        console.log('[App] Redirecting authenticated user from auth page to dashboard')
-        setLocation('/')
+        // Not resuming onboarding, user just signed in - App.tsx will render AuthenticatedApp automatically
+        // No need to redirect, just let the render logic handle it
+        console.log('[App] User authenticated, AuthenticatedApp will render automatically')
       }
     }
 
@@ -289,6 +289,7 @@ function App() {
             <CookieConsentBanner />
           </React.Suspense>
 
+          {/* CRITICAL: Always show AuthenticatedApp for logged-in users, regardless of route */}
           {user ? (
             <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
               <AuthenticatedApp />

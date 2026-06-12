@@ -211,11 +211,12 @@ const SignIn = ({ onNavigate }: SignInProps) => {
             description: 'Signed in with Google successfully',
           })
           
-          // Show success message for 1 second then redirect (Requirement 19.4)
-          setTimeout(() => {
-            clearOAuthSuccess()
-            setLocation('/')
-          }, 1000)
+          // Clear OAuth success state
+          clearOAuthSuccess()
+          
+          // Don't manually redirect - App.tsx will automatically show AuthenticatedApp
+          // when the useFirebaseAuth hook detects the user change
+          console.log('[OAuth] Sign-in complete, auth state will propagate automatically')
           
         } catch (error: any) {
           console.error('[OAuth] Session exchange failed:', error)
@@ -321,8 +322,11 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     if (!newErrors.email && !newErrors.password) {
       setIsEmailLoading(true)
       try {
-        await signInWithEmailAndPassword(auth, formData.email.trim().toLowerCase(), formData.password)
+        // Sign in with Firebase
+        const userCredential = await signInWithEmailAndPassword(auth, formData.email.trim().toLowerCase(), formData.password)
+        console.log('[SignIn] Firebase sign-in successful for user:', userCredential.user.uid)
 
+        // Call backend signin endpoint (optional, for session management)
         const signinResponse = await fetch('/api/auth/signin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -335,7 +339,11 @@ const SignIn = ({ onNavigate }: SignInProps) => {
         }
 
         toast({ title: "Success", description: "Signed in successfully!" })
-        setLocation('/')
+        
+        // Don't manually redirect - App.tsx will automatically show AuthenticatedApp
+        // when the useFirebaseAuth hook detects the user change
+        console.log('[SignIn] Sign-in complete, auth state will propagate automatically')
+        
       } catch (error: any) {
         console.error('Sign in error:', error)
 

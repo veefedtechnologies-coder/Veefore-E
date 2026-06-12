@@ -331,11 +331,12 @@ function SignUpIntegrated() {
             description: 'Signed up with Google successfully',
           })
           
-          // Show success message for 1 second then redirect
-          setTimeout(() => {
-            clearOAuthSuccess()
-            setLocation('/')
-          }, 1000)
+          // Clear OAuth success state
+          clearOAuthSuccess()
+          
+          // Don't manually redirect - App.tsx will automatically show AuthenticatedApp
+          // when the useFirebaseAuth hook detects the user change
+          console.log('[OAuth SignUp] Sign-up complete, auth state will propagate automatically')
           
         } catch (error: any) {
           console.error('[OAuth SignUp] Session exchange failed:', error)
