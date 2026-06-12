@@ -77,6 +77,15 @@ function App() {
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
   
+  // Debug logging to see auth state in App
+  useEffect(() => {
+    console.log('[App] Auth state changed:', {
+      user: user ? `User(${user.email})` : 'null',
+      loading,
+      location
+    })
+  }, [user, loading, location])
+  
   // [SERVER-SIDE OAUTH - Task 16.4] Initialize background token refresh
   // This maintains user sessions without interruption by proactively refreshing
   // tokens 5 minutes before they expire (Requirement 19.7)
@@ -290,6 +299,14 @@ function App() {
           </React.Suspense>
 
           {/* CRITICAL: Always show AuthenticatedApp for logged-in users, regardless of route */}
+          {(() => {
+            console.log('[App] Render decision:', {
+              user: user ? `User(${user.email})` : 'null',
+              willRenderAuthenticatedApp: !!user,
+              currentLocation: effectiveLocation
+            })
+            return null
+          })()}
           {user ? (
             <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
               <AuthenticatedApp />

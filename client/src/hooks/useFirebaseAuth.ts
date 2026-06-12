@@ -36,10 +36,13 @@ export const useFirebaseAuth = () => {
         if (firebaseUser) {
           // User is signed in - simple and direct
           console.log('useFirebaseAuth: Firebase user detected:', firebaseUser.uid)
-          console.log('useFirebaseAuth: ✅ User authenticated')
+          console.log('useFirebaseAuth: User email:', firebaseUser.email)
+          console.log('useFirebaseAuth: Email verified:', firebaseUser.emailVerified)
+          console.log('useFirebaseAuth: ✅ User authenticated - setting user state')
           setUser(firebaseUser)
           setLoading(false)
           setIsInitialized(true)
+          console.log('useFirebaseAuth: State updated - user should now be set')
         } else if (!sessionRestoreAttempted.current) {
           // No Firebase user — try to restore session from server-side OAuth cookie
           sessionRestoreAttempted.current = true
@@ -126,9 +129,20 @@ export const useFirebaseAuth = () => {
   }, [])
 
   // Return appropriate values based on server-side state
-  return {
+  const returnValue = {
     user: isServerSide ? null : user,
     loading: isServerSide ? false : (loading && !isInitialized),
     isAuthenticated: isServerSide ? false : !!user
   }
+  
+  // Debug logging to see what's being returned
+  if (!isServerSide && typeof window !== 'undefined') {
+    console.log('useFirebaseAuth: Returning:', {
+      user: returnValue.user ? `User(${returnValue.user.email})` : 'null',
+      loading: returnValue.loading,
+      isAuthenticated: returnValue.isAuthenticated
+    })
+  }
+  
+  return returnValue
 }
