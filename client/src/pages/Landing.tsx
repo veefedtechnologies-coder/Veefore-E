@@ -920,6 +920,16 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       {/* MainNavigation is rendered by App.tsx */}
 
+      {/* ====== GOOGLE OAUTH: IMMEDIATE APP PURPOSE - FIRST THING VISIBLE ====== */}
+      <div className="relative w-full bg-[#030303] py-4 px-4 sm:px-6 border-b border-white/10 z-50">
+        <div className="max-w-5xl mx-auto text-center">
+          <p className="text-sm md:text-base text-white/90 leading-relaxed">
+            <strong className="text-white">Veefore</strong> is an <strong className="text-blue-400">AI-powered Instagram growth platform</strong> that helps content creators, influencers, and businesses grow their social media presence through automated content scheduling, AI-generated captions, and data-driven engagement strategies. 
+            <span className="text-white/70"> We use Google Sign-In for secure authentication (accessing only your name, email, and profile photo).</span>
+          </p>
+        </div>
+      </div>
+
       <CinematicHeroSection />
 
       {/* Live Dashboard Preview Section - Hidden for Google OAuth Verification */}
