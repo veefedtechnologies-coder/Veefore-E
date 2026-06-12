@@ -37,6 +37,13 @@ router.post('/check-early-access', authRateLimiter, authController.checkEarlyAcc
 
 router.get('/session', authController.getSession);
 
+// Sign in endpoint - creates backend session after Firebase authentication
+router.post('/signin',
+  authRateLimiter,
+  validateRequest({ body: z.object({ email: z.string().email() }) }),
+  authController.signIn
+);
+
 router.post('/link-firebase',
   authRateLimiter,
   validateRequest({ body: LinkFirebaseSchema }),
