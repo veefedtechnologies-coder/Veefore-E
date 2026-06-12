@@ -207,10 +207,17 @@ function App() {
   }, [loading, user, isProtectedRoute, setLocation, hasEarlyAccess, earlyAccessLoading, effectiveLocation])
 
   // Show loading spinner while Firebase auth is resolving
-  // For protected routes: always show loading
-  // For root path: show loading since it could be Landing OR Dashboard depending on auth
-  if (loading && (!isPublicRoute || effectiveLocation === '/')) {
-    return <LoadingSpinner type="dashboard" />
+  // IMPORTANT: Show loading for ANY auth state transition to prevent flickering
+  if (loading) {
+    // For protected routes or root path, always show loading
+    if (!isPublicRoute || effectiveLocation === '/') {
+      return <LoadingSpinner type="dashboard" />
+    }
+    // For public routes (except root), only show loading if we think user might be authenticated
+    // This prevents flickering on public pages during auth initialization
+    if (user !== null) {
+      return <LoadingSpinner type="dashboard" />
+    }
   }
 
   const renderPublicPage = () => {
