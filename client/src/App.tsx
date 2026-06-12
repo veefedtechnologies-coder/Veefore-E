@@ -74,10 +74,6 @@ function App() {
   const webVitalsInitialized = useRef(false)
   const componentModernizationInitialized = useRef(false)
 
-  // CRITICAL: Check for auth cookie BEFORE any rendering to prevent landing page flash
-  const hasAuthCookie = typeof document !== 'undefined' && 
-    document.cookie.split(';').some(c => c.trim().startsWith('auth_token='));
-
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
   
@@ -200,13 +196,6 @@ function App() {
   // Show loading spinner while Firebase auth is resolving
   // For protected routes: always show loading
   // For root path: show loading since it could be Landing OR Dashboard depending on auth
-  // CRITICAL FIX: On root path, if auth cookie exists, show loading spinner to prevent landing page flash
-  if (effectiveLocation === '/' && hasAuthCookie && !user) {
-    // User has auth cookie but Firebase hasn't restored session yet
-    // Show loading spinner to prevent landing page flash
-    return <LoadingSpinner type="dashboard" />
-  }
-  
   if (loading && (!isPublicRoute || effectiveLocation === '/')) {
     return <LoadingSpinner type="dashboard" />
   }
