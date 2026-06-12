@@ -196,8 +196,23 @@ function App() {
   // Show loading spinner while Firebase auth is resolving
   // For protected routes: always show loading
   // For root path: show loading since it could be Landing OR Dashboard depending on auth
+  // CRITICAL FIX: Also show loading on root path when auth is initializing (not just when loading=true)
+  // This prevents landing page flash before authenticated app loads
   if (loading && (!isPublicRoute || effectiveLocation === '/')) {
     return <LoadingSpinner type="dashboard" />
+  }
+  
+  // CRITICAL FIX: On root path, if we haven't checked auth yet and there's an auth cookie,
+  // show loading spinner to prevent landing page flash
+  if (effectiveLocation === '/' && !loading && user === null) {
+    // Check if auth cookie exists
+    const hasAuthCookie = typeof document !== 'undefined' && 
+      document.cookie.split(';').some(c => c.trim().startsWith('auth_token='));
+    
+    if (hasAuthCookie) {
+      // User likely logged in, show loading while Firebase restores session
+      return <LoadingSpinner type="dashboard" />
+    }
   }
 
   const renderPublicPage = () => {
