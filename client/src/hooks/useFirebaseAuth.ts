@@ -37,6 +37,9 @@ export const useFirebaseAuth = () => {
           // ENTERPRISE OPTIMIZATION: Validate backend session with caching & retry logic
           console.log('useFirebaseAuth: Firebase user detected, validating with enterprise validator...')
           
+          // IMPORTANT: Keep loading=true during validation to prevent flickering
+          setLoading(true)
+          
           try {
             const validation = await authSessionValidator.validateSession(firebaseUser.uid)
             
@@ -50,7 +53,7 @@ export const useFirebaseAuth = () => {
               // Backend has valid session
               console.log('useFirebaseAuth: ✅ Session valid, user authenticated')
               setUser(firebaseUser)
-              setLoading(false)
+              setLoading(false) // Now safe to show authenticated UI
               setIsInitialized(true)
             } else {
               // Backend has no session - Firebase session is stale
