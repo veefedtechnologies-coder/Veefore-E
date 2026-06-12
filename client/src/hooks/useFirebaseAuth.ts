@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
-import { authSessionValidator } from '@/lib/auth-session-validator'
 
 export const useFirebaseAuth = () => {
   // Always call hooks at the top level - React rules require this
@@ -12,21 +11,28 @@ export const useFirebaseAuth = () => {
   const [isInitialized, setIsInitialized] = useState(false)
   const unsubscribeRef = useRef<(() => void) | null>(null)
   const sessionRestoreAttempted = useRef(false)
+  const isSettingUp = useRef(false)
 
-  // Check if we're in a server environment - use state instead of early return
+  // Check if we're in a server environment
   const isServerSide = typeof window === 'undefined'
 
   useEffect(() => {
-    // Prevent multiple listeners or server-side execution
-    if (isInitialized || isServerSide) return
+    // Prevent multiple listeners, server-side execution, or re-runs
+    if (isInitialized || isServerSide || isSettingUp.current) {
+      return
+    }
 
-    console.log('useFirebaseAuth: Setting up Firebase auth listener')
+    // Mark that we're setting up to prevent re-entry
+    isSettingUp.current = true
+
+    console.log('useFirebaseAuth: Setting up Firebase auth listener (ONCE)')
     
     // Check if Firebase auth is available
     if (!auth) {
       console.error('useFirebaseAuth: Firebase auth not available')
       setLoading(false)
       setIsInitialized(true)
+      isSettingUp.current = false
       return
     }
     
@@ -36,13 +42,9 @@ export const useFirebaseAuth = () => {
         if (firebaseUser) {
           // User is signed in - simple and direct
           console.log('useFirebaseAuth: Firebase user detected:', firebaseUser.uid)
-          console.log('useFirebaseAuth: User email:', firebaseUser.email)
-          console.log('useFirebaseAuth: Email verified:', firebaseUser.emailVerified)
-          console.log('useFirebaseAuth: ✅ User authenticated - setting user state')
           setUser(firebaseUser)
           setLoading(false)
           setIsInitialized(true)
-          console.log('useFirebaseAuth: State updated - user should now be set')
         } else if (!sessionRestoreAttempted.current) {
           // No Firebase user — try to restore session from server-side OAuth cookie
           sessionRestoreAttempted.current = true
@@ -62,8 +64,7 @@ export const useFirebaseAuth = () => {
                 const customToken = data.data?.customToken || data.customToken
                 console.log('useFirebaseAuth: ✅ Got custom token, signing in...')
                 
-                const { signInWithCustomToken } = await import('firebase/auth')
-                await signInWithCustomToken(auth!, customToken)
+                await signInWithCustomToken(auth, customToken)
                 console.log('useFirebaseAuth: ✅ Firebase sign-in successful!')
                 // onAuthStateChanged will fire again with the authenticated user
               } else {
@@ -86,7 +87,7 @@ export const useFirebaseAuth = () => {
           }
         } else {
           // Session restore already attempted, user is logged out
-          console.log('useFirebaseAuth: Auth state changed: User logged out')
+          console.log('useFirebaseAuth: User logged out')
           setUser(null)
           setLoading(false)
           setIsInitialized(true)
@@ -97,52 +98,32 @@ export const useFirebaseAuth = () => {
 
       // Set a maximum timeout to prevent infinite loading
       const timeout = setTimeout(() => {
-        if (!isInitialized) {
-          console.log('useFirebaseAuth: Timeout reached, stopping loading state')
-          setLoading(false)
-          setIsInitialized(true)
-        }
+        console.log('useFirebaseAuth: Timeout reached, stopping loading state')
+        setLoading(false)
+        setIsInitialized(true)
       }, 10000)
 
       return () => {
+        console.log('useFirebaseAuth: Cleaning up...')
         clearTimeout(timeout)
         if (unsubscribeRef.current) {
           unsubscribeRef.current()
           unsubscribeRef.current = null
         }
+        isSettingUp.current = false
       }
     } catch (error) {
       console.error('useFirebaseAuth: Error setting up auth listener:', error)
       setLoading(false)
       setIsInitialized(true)
+      isSettingUp.current = false
     }
-  }, [isInitialized, isServerSide])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current()
-        unsubscribeRef.current = null
-      }
-    }
-  }, [])
+  }, []) // EMPTY dependency array - run only once on mount
 
   // Return appropriate values based on server-side state
-  const returnValue = {
+  return {
     user: isServerSide ? null : user,
-    loading: isServerSide ? false : (loading && !isInitialized),
+    loading: isServerSide ? false : loading,
     isAuthenticated: isServerSide ? false : !!user
   }
-  
-  // Debug logging to see what's being returned
-  if (!isServerSide && typeof window !== 'undefined') {
-    console.log('useFirebaseAuth: Returning:', {
-      user: returnValue.user ? `User(${returnValue.user.email})` : 'null',
-      loading: returnValue.loading,
-      isAuthenticated: returnValue.isAuthenticated
-    })
-  }
-  
-  return returnValue
 }

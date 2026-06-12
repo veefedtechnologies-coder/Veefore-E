@@ -299,14 +299,6 @@ function App() {
           </React.Suspense>
 
           {/* CRITICAL: Always show AuthenticatedApp for logged-in users, regardless of route */}
-          {(() => {
-            console.log('[App] Render decision:', {
-              user: user ? `User(${user.email})` : 'null',
-              willRenderAuthenticatedApp: !!user,
-              currentLocation: effectiveLocation
-            })
-            return null
-          })()}
           {user ? (
             <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
               <AuthenticatedApp />
