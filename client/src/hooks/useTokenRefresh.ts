@@ -19,6 +19,8 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
+import { auth } from '@/lib/firebase';
+import { signInWithCustomToken } from 'firebase/auth';
 
 /**
  * Hook to manage background token refresh
@@ -63,6 +65,35 @@ export function useTokenRefresh(enabled: boolean = true) {
 
       if (response.ok) {
         console.log('[TokenRefresh] Background refresh successful (silent)');
+        
+        // Get the custom token from response
+        const data = await response.json();
+        const customToken = data.customToken;
+        
+        if (customToken) {
+          try {
+            // Exchange custom token for ID token
+            console.log('[TokenRefresh] Exchanging custom token for ID token...');
+            const userCredential = await signInWithCustomToken(auth, customToken);
+            const idToken = await userCredential.user.getIdToken();
+            
+            // Update server cookie with ID token
+            await fetch('/api/auth/update-token', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ idToken })
+            });
+            
+            console.log('[TokenRefresh] ✅ Token exchange complete, cookie updated');
+          } catch (exchangeError) {
+            console.error('[TokenRefresh] Token exchange failed:', exchangeError);
+            // Continue with retry logic below
+            throw exchangeError;
+          }
+        }
         
         // Reset retry count on success
         retryCountRef.current = 0;

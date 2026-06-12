@@ -630,20 +630,9 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
       }
     );
     
-    // Requirement 6.9: Update auth_token cookie with new token
-    res.cookie('auth_token', customToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Match OAuth callback setting
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days (Instagram-style persistent session)
-      domain: process.env.NODE_ENV === 'production' 
-        ? process.env.COOKIE_DOMAIN 
-        : undefined,
-    });
-    
-    // Log successful token refresh (Requirement 18.5)
-    console.log('[OAuth] Token refresh successful:', {
+    // Return the custom token in the response body so client can exchange it for an ID token
+    // The client will then call /api/auth/update-token to update the cookie with the ID token
+    console.log('[OAuth] Token refresh successful, returning custom token:', {
       correlationId,
       userId,
       email: user.email,
@@ -660,10 +649,11 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
     const refreshDuration = Date.now() - refreshStartTime;
     oauthMetrics.recordTokenRefresh(true, refreshDuration, userId, correlationId);
     
-    // Requirement 6.10: Return 200 with success message
+    // Requirement 6.10: Return 200 with success message and custom token
     return res.status(200).json({
       success: true,
       message: 'Token refreshed successfully',
+      customToken, // Client will exchange this for ID token
       correlationId,
     });
     
@@ -845,6 +835,94 @@ router.get('/session', (req: OAuthRequest, res: Response) => {
     customToken: authToken,
   });
 });
+
+/**
+ * POST /api/auth/update-token
+ * 
+ * Update the auth_token cookie with a Firebase ID token
+ * 
+ * After the client exchanges a custom token for an ID token using
+ * signInWithCustomToken(), it sends the ID token back to the server
+ * to update the cookie. This ensures the cookie contains an ID token
+ * (not a custom token) which can be properly verified during refresh.
+ * 
+ * Flow:
+ * 1. Client gets custom token from /api/auth/session
+ * 2. Client calls signInWithCustomToken() → gets ID token
+ * 3. Client sends ID token to this endpoint
+ * 4. Server updates cookie with ID token
+ * 5. Future /api/auth/refresh calls can verify the ID token
+ */
+router.post('/update-token', async (req: OAuthRequest, res: Response) => {
+  const correlationId = req.correlationId || `update_token_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  
+  try {
+    const { idToken } = req.body;
+    
+    if (!idToken || typeof idToken !== 'string') {
+      console.warn('[OAuth] Update token called without valid ID token:', { correlationId });
+      return res.status(400).json({
+        error: 'invalid_request',
+        message: 'ID token is required',
+        correlationId,
+      });
+    }
+    
+    // Verify the ID token is valid before storing it
+    try {
+      await firebaseTokenService.verifyToken(idToken);
+      console.log('[OAuth] ID token verified successfully:', { correlationId });
+    } catch (error) {
+      console.error('[OAuth] ID token verification failed:', {
+        correlationId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return res.status(401).json({
+        error: 'invalid_token',
+        message: 'Invalid ID token',
+        correlationId,
+      });
+    }
+    
+    // Update the cookie with the ID token
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      domain: process.env.NODE_ENV === 'production' 
+        ? process.env.COOKIE_DOMAIN 
+        : undefined,
+    };
+    
+    res.cookie('auth_token', idToken, cookieOptions);
+    
+    console.log('[OAuth] Updated auth_token cookie with ID token:', {
+      correlationId,
+      tokenLength: idToken.length,
+    });
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Token updated successfully',
+      correlationId,
+    });
+    
+  } catch (error) {
+    console.error('[OAuth] Update token error:', {
+      correlationId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to update token',
+      correlationId,
+    });
+  }
+});
+
 
 
 /**

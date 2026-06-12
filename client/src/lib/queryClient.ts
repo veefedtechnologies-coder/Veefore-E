@@ -158,7 +158,38 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
       })
       
       if (refreshResponse.ok) {
-        console.log('[Auth] Token refresh successful, retrying original request...')
+        console.log('[Auth] Token refresh successful, exchanging tokens...')
+        
+        // Get the custom token and exchange it for ID token
+        const refreshData = await refreshResponse.json();
+        const customToken = refreshData.customToken;
+        
+        if (customToken) {
+          try {
+            // Import Firebase auth dynamically to avoid circular dependencies
+            const { auth } = await import('@/lib/firebase');
+            const { signInWithCustomToken } = await import('firebase/auth');
+            
+            // Exchange custom token for ID token
+            const userCredential = await signInWithCustomToken(auth, customToken);
+            const idToken = await userCredential.user.getIdToken();
+            
+            // Update server cookie with ID token
+            await fetch('/api/auth/update-token', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ idToken })
+            });
+            
+            console.log('[Auth] Token exchange complete, retrying original request...');
+          } catch (exchangeError) {
+            console.error('[Auth] Token exchange failed:', exchangeError);
+            throw exchangeError;
+          }
+        }
         
         // Retry the original request with new token
         const retryController = new AbortController()
