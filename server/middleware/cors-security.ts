@@ -180,7 +180,8 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
       'Cache-Control',
       'Pragma',
       'If-Modified-Since',
-      'If-None-Match'
+      'If-None-Match',
+      'Expires'
     ]
   } = options;
 
@@ -220,13 +221,23 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
     if (req.method === 'OPTIONS') {
       // Preflight request
       res.header('Access-Control-Allow-Methods', allowedMethods.join(', '));
-      res.header('Access-Control-Allow-Headers', allowedHeaders.join(', '));
+      
+      // Get requested headers from browser
+      const requestedHeaders = req.headers['access-control-request-headers'];
+      if (requestedHeaders) {
+        // Allow all requested headers that are in our allowed list, plus any the browser requests
+        res.header('Access-Control-Allow-Headers', requestedHeaders);
+        console.log(`✅ CORS PREFLIGHT: Allowing requested headers: ${requestedHeaders}`);
+      } else {
+        res.header('Access-Control-Allow-Headers', allowedHeaders.join(', '));
+      }
+      
       res.header('Access-Control-Max-Age', maxAge.toString());
 
       // P1-5.3: Additional preflight security headers
       res.header('Vary', 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
 
-      console.log(`✅ CORS: Preflight response for ${origin} → ${req.headers['access-control-request-method']}`);
+      console.log(`✅ CORS PREFLIGHT: ${origin} → ${req.headers['access-control-request-method']}`);
       return res.status(204).end();
     }
 
