@@ -3,13 +3,14 @@
  * 
  * This hook implements proactive background token refresh to maintain user sessions
  * without interrupting their activity. It refreshes tokens before they expire,
- * ensuring seamless authentication.
+ * ensuring seamless authentication with Instagram-like persistence.
  * 
  * Features:
  * - Proactive refresh 5 minutes before token expiry
- * - Silent refresh without user interaction
- * - Automatic retry on failure
+ * - Silent refresh without user interaction or loading states
+ * - Exponential backoff retry on failure
  * - Activity-based refresh scheduling
+ * - 30-day session persistence
  * 
  * Requirements: 6.10, 19.7
  * 
@@ -25,6 +26,7 @@ import { useQuery } from '@tanstack/react-query';
  * 
  * Automatically refreshes authentication tokens in the background to maintain
  * user sessions without interruption. Refreshes tokens 5 minutes before expiry.
+ * Implements Instagram-style seamless authentication with 30-day persistence.
  * 
  * @param enabled - Whether background refresh is enabled (default: true)
  */
@@ -41,12 +43,14 @@ export function useTokenRefresh(enabled: boolean = true) {
 
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef<boolean>(false);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 3;
 
   /**
-   * Perform background token refresh
+   * Perform background token refresh with exponential backoff retry
    * 
    * Silently calls the /api/auth/refresh endpoint to refresh the authentication
-   * token without interrupting the user's current activity.
+   * token without interrupting the user's current activity or showing loading states.
    */
   const performBackgroundRefresh = useCallback(async () => {
     // Prevent concurrent refresh attempts
@@ -58,7 +62,7 @@ export function useTokenRefresh(enabled: boolean = true) {
     isRefreshingRef.current = true;
 
     try {
-      console.log('[TokenRefresh] Performing background token refresh...');
+      console.log('[TokenRefresh] Performing background token refresh (silent)...');
       
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
@@ -69,7 +73,10 @@ export function useTokenRefresh(enabled: boolean = true) {
       });
 
       if (response.ok) {
-        console.log('[TokenRefresh] Background refresh successful');
+        console.log('[TokenRefresh] Background refresh successful (silent)');
+        
+        // Reset retry count on success
+        retryCountRef.current = 0;
         
         // Schedule next refresh
         scheduleNextRefresh();
@@ -77,22 +84,44 @@ export function useTokenRefresh(enabled: boolean = true) {
         console.warn('[TokenRefresh] Background refresh failed:', response.status, response.statusText);
         
         // If refresh fails with 401, user needs to re-authenticate
-        // The main queryClient will handle this on the next API request
+        // The main app will handle this on the next protected API request
         if (response.status === 401) {
           console.log('[TokenRefresh] Session expired, user will be prompted to sign in on next action');
           // Don't schedule next refresh - session is invalid
+        } else if (response.status === 429) {
+          // Rate limited - wait longer before retry
+          console.log('[TokenRefresh] Rate limited, scheduling retry in 5 minutes...');
+          refreshTimerRef.current = setTimeout(performBackgroundRefresh, 5 * 60000); // 5 minutes
         } else {
-          // For other errors, retry after a shorter interval (1 minute)
-          console.log('[TokenRefresh] Scheduling retry in 1 minute...');
-          refreshTimerRef.current = setTimeout(performBackgroundRefresh, 60000); // 1 minute
+          // For other errors, implement exponential backoff
+          retryCountRef.current += 1;
+          
+          if (retryCountRef.current <= maxRetries) {
+            // Exponential backoff: 1min, 2min, 4min
+            const retryDelay = Math.min(60000 * Math.pow(2, retryCountRef.current - 1), 4 * 60000);
+            console.log(`[TokenRefresh] Retry ${retryCountRef.current}/${maxRetries} in ${retryDelay/60000} minutes...`);
+            refreshTimerRef.current = setTimeout(performBackgroundRefresh, retryDelay);
+          } else {
+            console.error('[TokenRefresh] Max retries reached, giving up');
+            retryCountRef.current = 0; // Reset for next scheduled refresh
+          }
         }
       }
     } catch (error) {
       console.error('[TokenRefresh] Background refresh error:', error);
       
-      // Retry after 1 minute on network errors
-      console.log('[TokenRefresh] Scheduling retry in 1 minute...');
-      refreshTimerRef.current = setTimeout(performBackgroundRefresh, 60000); // 1 minute
+      // Implement exponential backoff for network errors
+      retryCountRef.current += 1;
+      
+      if (retryCountRef.current <= maxRetries) {
+        // Exponential backoff: 1min, 2min, 4min
+        const retryDelay = Math.min(60000 * Math.pow(2, retryCountRef.current - 1), 4 * 60000);
+        console.log(`[TokenRefresh] Network error, retry ${retryCountRef.current}/${maxRetries} in ${retryDelay/60000} minutes...`);
+        refreshTimerRef.current = setTimeout(performBackgroundRefresh, retryDelay);
+      } else {
+        console.error('[TokenRefresh] Max retries reached after network errors, giving up');
+        retryCountRef.current = 0; // Reset for next scheduled refresh
+      }
     } finally {
       isRefreshingRef.current = false;
     }
