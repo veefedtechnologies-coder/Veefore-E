@@ -1,4 +1,5 @@
 import { VoiceProfileViewer } from './index'
+import { ApiClient } from '@/lib/api'
 
 /**
  * Example 1: Full Voice Profile View
@@ -196,8 +197,7 @@ export function ConditionalVoiceProfileExample() {
 
   useEffect(() => {
     // Check if user has a voice profile
-    fetch(`/api/voice-profile/${workspaceId}`)
-      .then(res => res.json())
+    ApiClient.get(`/api/voice-profile/${workspaceId}`)
       .then(data => {
         setHasProfile(data.success && data.voiceProfile)
       })

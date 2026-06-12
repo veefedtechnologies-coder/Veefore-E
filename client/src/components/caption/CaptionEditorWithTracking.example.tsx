@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { CaptionEditorWithTracking, CaptionVariation } from './index';
 import { Button } from '@/components/ui/button';
+import { ApiClient } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -74,15 +75,11 @@ export function EditorWithVariationExample() {
 
     // Record feedback to backend
     try {
-      await fetch('/api/v1/ai/record-caption-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          captionId: 'generated-caption-123',
-          workspaceId: 'workspace-456',
-          feedbackType: 'edited',
-          editedVersion: editedCaption
-        })
+      await ApiClient.post('/api/v1/ai/record-caption-feedback', {
+        captionId: 'generated-caption-123',
+        workspaceId: 'workspace-456',
+        feedbackType: 'edited',
+        editedVersion: editedCaption
       });
       
       alert('Caption saved and learning updated!');
@@ -221,16 +218,12 @@ export function CompleteWorkflowExample() {
     setFinalCaption(editedCaption);
     
     // Record feedback
-    await fetch('/api/v1/ai/record-caption-feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        feedbackType: 'edited',
-        originalCaption,
-        editedCaption,
-        captionId: 'caption-123',
-        workspaceId: 'workspace-456'
-      })
+    await ApiClient.post('/api/v1/ai/record-caption-feedback', {
+      feedbackType: 'edited',
+      originalCaption,
+      editedCaption,
+      captionId: 'caption-123',
+      workspaceId: 'workspace-456'
     });
     
     alert('Caption saved! Voice profile will be updated.');

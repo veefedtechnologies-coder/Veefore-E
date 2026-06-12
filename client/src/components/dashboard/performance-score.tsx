@@ -14,6 +14,7 @@ import { DataStory } from './DataStory'
 import { MetricsGrid, MetricsGridSkeleton } from './MetricsGrid'
 import { PlatformCard } from './PlatformCard'
 import { PerformanceBreakdown } from './PerformanceBreakdown'
+import { ApiClient } from '@/lib/api'
 
 function TikTokIcon({ className = '' }: { className?: string }) {
   return (
@@ -104,15 +105,9 @@ export function PerformanceScore() {
     if (!currentWorkspace?.id || !analytics) return;
     const fetchInsight = async () => {
       try {
-        const response = await fetch(`/api/v1/analytics/workspace/${currentWorkspace.id}/generate-insight`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ metricsData: analytics })
+        const data = await ApiClient.post(`/api/v1/analytics/workspace/${currentWorkspace.id}/generate-insight`, {
+          metricsData: analytics
         });
-        const data = await response.json();
         if (data.success && data.insight) {
           setDynamicInsight(data.insight);
         }
