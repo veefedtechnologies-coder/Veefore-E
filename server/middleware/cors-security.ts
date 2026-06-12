@@ -38,6 +38,7 @@ const getAllowedOrigins = (): string[] => {
     allowedOrigins.push(
       'https://veefore.com',
       'https://www.veefore.com',
+      'https://api.veefore.com',
       'https://app.veefore.com',
       'https://dashboard.veefore.com',
       'https://veefore-webhook.veefore.com',
