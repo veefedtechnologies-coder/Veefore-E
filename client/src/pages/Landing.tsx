@@ -922,36 +922,9 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
       <CinematicHeroSection />
 
-      {/* ====== GOOGLE OAUTH: PROMINENT APP PURPOSE - ABOVE THE FOLD ====== */}
-      <section className="relative py-8 md:py-12 px-4 sm:px-6 -mt-20 z-30 bg-gradient-to-b from-transparent via-[#030303] to-transparent">
-        <div className="max-w-5xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-pink-500/10 border border-white/20 backdrop-blur-sm"
-          >
-            <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-4">
-              <Sparkles className="w-3.5 h-3.5 mr-2" />
-              What is Veefore?
-            </div>
-            
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 leading-tight">
-              AI-Powered <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">Instagram Growth Platform</span>
-            </h2>
-            
-            <p className="text-base md:text-lg text-white/80 leading-relaxed max-w-3xl mx-auto mb-4">
-              <strong className="text-white">Veefore helps content creators, influencers, and businesses grow their Instagram presence</strong> through AI-powered content scheduling, automated caption generation, and data-driven engagement strategies.
-            </p>
-            
-            <p className="text-sm md:text-base text-white/60 leading-relaxed max-w-3xl mx-auto">
-              We use Google Sign-In to provide secure authentication for your account. We only access your basic profile information (name, email, photo) to personalize your experience. We do NOT access your Gmail, Google Drive, or any other Google services.
-            </p>
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="relative pt-8 pb-20 md:pb-32 -mt-8 z-20 w-full overflow-visible">
+      {/* Live Dashboard Preview Section - Hidden for Google OAuth Verification */}
+      {false && (
+      <section className="relative pt-8 pb-20 md:pb-32 -mt-20 z-20 w-full overflow-visible">
         <div className="w-full px-4 md:px-8">
           <motion.div
             initial={{ opacity: 0, y: 160, scale: 0.95, rotateX: 5 }}
@@ -1108,6 +1081,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </motion.div>
         </div>
       </section>
+      )}
 
       {/* Trusted By Top Brands Section - Hidden in Phase 1 Review Mode */}
       {!isPhase1 && (
