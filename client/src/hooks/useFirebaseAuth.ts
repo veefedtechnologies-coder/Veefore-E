@@ -5,10 +5,13 @@ import { auth } from '@/lib/firebase'
 export const useFirebaseAuth = () => {
   // Always call hooks at the top level - React rules require this
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Start with loading=false for Instagram-style seamless experience
+  // Only show loading if session restore takes longer than 500ms
+  const [loading, setLoading] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const unsubscribeRef = useRef<(() => void) | null>(null)
   const sessionRestoreAttempted = useRef(false)
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check if we're in a server environment - use state instead of early return
   const isServerSide = typeof window === 'undefined'
@@ -27,6 +30,14 @@ export const useFirebaseAuth = () => {
       return
     }
     
+    // Delay showing loading state for 500ms for Instagram-like seamless UX
+    // Only show loading if session restore takes longer than this
+    loadingTimerRef.current = setTimeout(() => {
+      if (!isInitialized) {
+        setLoading(true)
+      }
+    }, 500)
+    
     try {
       // Set up auth state listener only once
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -34,6 +45,12 @@ export const useFirebaseAuth = () => {
           // Firebase already has an authenticated user
           console.log('useFirebaseAuth: Auth state changed:', `User logged in: ${firebaseUser.email}`)
           setUser(firebaseUser)
+          
+          // Clear loading timer and set loading to false immediately
+          if (loadingTimerRef.current) {
+            clearTimeout(loadingTimerRef.current)
+            loadingTimerRef.current = null
+          }
           setLoading(false)
           setIsInitialized(true)
         } else if (!sessionRestoreAttempted.current) {
@@ -68,12 +85,24 @@ export const useFirebaseAuth = () => {
                     message: firebaseError.message
                   })
                   setUser(null)
+                  
+                  // Clear loading timer
+                  if (loadingTimerRef.current) {
+                    clearTimeout(loadingTimerRef.current)
+                    loadingTimerRef.current = null
+                  }
                   setLoading(false)
                   setIsInitialized(true)
                 }
               } else {
                 console.warn('useFirebaseAuth: No customToken in response data')
                 setUser(null)
+                
+                // Clear loading timer
+                if (loadingTimerRef.current) {
+                  clearTimeout(loadingTimerRef.current)
+                  loadingTimerRef.current = null
+                }
                 setLoading(false)
                 setIsInitialized(true)
               }
@@ -81,6 +110,12 @@ export const useFirebaseAuth = () => {
               // No server session either — user is truly logged out
               console.log('useFirebaseAuth: No server session found:', { status: response.status })
               setUser(null)
+              
+              // Clear loading timer
+              if (loadingTimerRef.current) {
+                clearTimeout(loadingTimerRef.current)
+                loadingTimerRef.current = null
+              }
               setLoading(false)
               setIsInitialized(true)
             }
@@ -90,6 +125,12 @@ export const useFirebaseAuth = () => {
               name: error.name
             })
             setUser(null)
+            
+            // Clear loading timer
+            if (loadingTimerRef.current) {
+              clearTimeout(loadingTimerRef.current)
+              loadingTimerRef.current = null
+            }
             setLoading(false)
             setIsInitialized(true)
           }
@@ -97,6 +138,12 @@ export const useFirebaseAuth = () => {
           // Session restore already attempted, user is logged out
           console.log('useFirebaseAuth: Auth state changed: User logged out')
           setUser(null)
+          
+          // Clear loading timer
+          if (loadingTimerRef.current) {
+            clearTimeout(loadingTimerRef.current)
+            loadingTimerRef.current = null
+          }
           setLoading(false)
           setIsInitialized(true)
         }
@@ -108,6 +155,12 @@ export const useFirebaseAuth = () => {
       const timeout = setTimeout(() => {
         if (!isInitialized) {
           console.log('useFirebaseAuth: Timeout reached, stopping loading state')
+          
+          // Clear loading timer
+          if (loadingTimerRef.current) {
+            clearTimeout(loadingTimerRef.current)
+            loadingTimerRef.current = null
+          }
           setLoading(false)
           setIsInitialized(true)
         }
@@ -115,6 +168,10 @@ export const useFirebaseAuth = () => {
 
       return () => {
         clearTimeout(timeout)
+        if (loadingTimerRef.current) {
+          clearTimeout(loadingTimerRef.current)
+          loadingTimerRef.current = null
+        }
         if (unsubscribeRef.current) {
           unsubscribeRef.current()
           unsubscribeRef.current = null
@@ -122,6 +179,12 @@ export const useFirebaseAuth = () => {
       }
     } catch (error) {
       console.error('useFirebaseAuth: Error setting up auth listener:', error)
+      
+      // Clear loading timer
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current)
+        loadingTimerRef.current = null
+      }
       setLoading(false)
       setIsInitialized(true)
     }
@@ -130,6 +193,10 @@ export const useFirebaseAuth = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current)
+        loadingTimerRef.current = null
+      }
       if (unsubscribeRef.current) {
         unsubscribeRef.current()
         unsubscribeRef.current = null
