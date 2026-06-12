@@ -1234,7 +1234,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       )}
 
       {/* ====== GOOGLE OAUTH VERIFICATION: Clear App Purpose Section ====== */}
-      <section className="relative py-16 md:py-24 px-4 sm:px-6 bg-gradient-to-b from-[#030303] via-[#0a0520] to-[#030303] z-20">
+      <section className="relative py-16 md:py-24 px-4 sm:px-6 -mt-20 pt-24 md:pt-32 bg-gradient-to-b from-transparent via-[#030303]/95 to-[#030303] z-20">
         <div className="max-w-6xl mx-auto">
           {/* Main Purpose Statement */}
           <div className="text-center mb-16">
