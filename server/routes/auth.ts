@@ -357,7 +357,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       secure: process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false, // Requirement 5.2: HTTPS only in production or if frontend is HTTPS
       sameSite: 'lax' as const,                 // Use lax for OAuth cross-site redirects
       path: '/',                                // Requirement 5.4: Available to all routes
-      maxAge: 3600000,                          // Requirement 5.5: 1 hour (3600 seconds)
+      maxAge: 7 * 24 * 60 * 60 * 1000,          // 7 days (standard session duration)
       domain: process.env.NODE_ENV === 'production' 
         ? process.env.COOKIE_DOMAIN 
         : undefined,                            // Requirement 5.6: Set domain in production
@@ -633,9 +633,9 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
     res.cookie('auth_token', customToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Match OAuth callback setting
       path: '/',
-      maxAge: 3600000, // 1 hour
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (match OAuth callback)
       domain: process.env.NODE_ENV === 'production' 
         ? process.env.COOKIE_DOMAIN 
         : undefined,
