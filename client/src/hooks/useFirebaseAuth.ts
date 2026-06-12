@@ -65,7 +65,29 @@ export const useFirebaseAuth = () => {
 
             if (customToken) {
               console.log('useFirebaseAuth: Got custom token, signing in...')
-              await signInWithCustomToken(auth, customToken)
+              const userCredential = await signInWithCustomToken(auth, customToken)
+              console.log('useFirebaseAuth: ✅ Signed in with custom token')
+              
+              // Get the ID token from Firebase after signing in
+              const idToken = await userCredential.user.getIdToken()
+              console.log('useFirebaseAuth: Got ID token, updating server cookie...')
+              
+              // Send the ID token back to server to update the cookie
+              try {
+                await fetch('/api/auth/update-token', {
+                  method: 'POST',
+                  credentials: 'include',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ idToken })
+                })
+                console.log('useFirebaseAuth: ✅ Server cookie updated with ID token')
+              } catch (error) {
+                console.error('useFirebaseAuth: Failed to update server cookie:', error)
+                // Continue anyway - the session is still valid on client side
+              }
+              
               console.log('useFirebaseAuth: ✅ Session restored successfully')
               // onAuthStateChanged will fire again with the user
               return // Don't set loading=false yet, wait for onAuthStateChanged
