@@ -41,22 +41,57 @@ export const useFirebaseAuth = () => {
           sessionRestoreAttempted.current = true
           console.log('useFirebaseAuth: No Firebase user, attempting session restore from server cookie...')
           try {
+            console.log('useFirebaseAuth: Fetching session from /api/auth/session...')
             const response = await fetch('/api/auth/session', { credentials: 'include' })
+            console.log('useFirebaseAuth: Session endpoint response:', { 
+              status: response.status, 
+              ok: response.ok,
+              contentType: response.headers.get('content-type')
+            })
+            
             if (response.ok) {
-              const { customToken } = await response.json()
-              console.log('useFirebaseAuth: Got custom token from server, signing in with Firebase...')
+              const data = await response.json()
+              console.log('useFirebaseAuth: Session data received:', { 
+                hasCustomToken: !!data.customToken,
+                tokenLength: data.customToken?.length 
+              })
               
-              await signInWithCustomToken(auth!, customToken)
-              // onAuthStateChanged will fire again with the authenticated user
+              if (data.customToken) {
+                console.log('useFirebaseAuth: Signing in with Firebase custom token...')
+                try {
+                  await signInWithCustomToken(auth!, data.customToken)
+                  console.log('useFirebaseAuth: ✅ Firebase sign-in successful!')
+                  // onAuthStateChanged will fire again with the authenticated user
+                } catch (firebaseError: any) {
+                  console.error('useFirebaseAuth: ❌ Firebase signInWithCustomToken failed:', {
+                    code: firebaseError.code,
+                    message: firebaseError.message,
+                    stack: firebaseError.stack
+                  })
+                  setUser(null)
+                  setLoading(false)
+                  setIsInitialized(true)
+                }
+              } else {
+                console.warn('useFirebaseAuth: No customToken in response data')
+                setUser(null)
+                setLoading(false)
+                setIsInitialized(true)
+              }
             } else {
               // No server session either — user is truly logged out
-              console.log('useFirebaseAuth: No server session found, user is logged out')
+              const errorText = await response.text()
+              console.log('useFirebaseAuth: No server session found:', { status: response.status, error: errorText })
               setUser(null)
               setLoading(false)
               setIsInitialized(true)
             }
           } catch (error: any) {
-            console.error('useFirebaseAuth: Session restore failed:', error)
+            console.error('useFirebaseAuth: Session restore failed:', {
+              message: error.message,
+              stack: error.stack,
+              name: error.name
+            })
             setUser(null)
             setLoading(false)
             setIsInitialized(true)
