@@ -47,7 +47,7 @@ export const useFirebaseAuth = () => {
           
           try {
             // Try to get custom token from backend session
-            const response = await fetch('/api/v1/auth/session', {
+            const response = await fetch('/api/auth/session', {
               method: 'GET',
               credentials: 'include',
             })
