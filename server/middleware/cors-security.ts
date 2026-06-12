@@ -80,7 +80,8 @@ const getAllowedOrigins = (): string[] => {
     }
   }
 
-  // console.log(`🔒 CORS: Configured ${allowedOrigins.length} allowed origins for ${process.env.NODE_ENV} environment`);
+  console.log(`🔒 CORS: Configured ${allowedOrigins.length} allowed origins for ${process.env.NODE_ENV} environment:`);
+  console.log(`🔒 CORS Origins:`, JSON.stringify(allowedOrigins, null, 2));
   return allowedOrigins;
 };
 
@@ -90,6 +91,10 @@ const getAllowedOrigins = (): string[] => {
  */
 function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  console.log(`🔍 isOriginAllowed DEBUG: origin="${origin}" | NODE_ENV="${process.env.NODE_ENV}" | isDev=${isDevelopment} | isProd=${isProduction}`);
+  
   if (isDevelopment) {
     // In development, allow ALL origins to simplify mobile/local testing
     // This resolves issues where physical devices might have unexpected origins
@@ -99,6 +104,7 @@ function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): 
 
   if (!origin) {
     // Allow same-origin requests (no origin header)
+    console.log(`✅ [CORS] No origin header - allowing same-origin request`);
     return true;
   }
 
@@ -124,7 +130,7 @@ function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): 
     return false;
   }
 
-  console.warn(`🚨 [CORS] BLOCKED Origin: "${origin}" | Method: ${process.env.NODE_ENV} | Headers: ${JSON.stringify(allowedOrigins)}`);
+  console.warn(`🚨 [CORS] BLOCKED Origin: "${origin}" | Env: ${process.env.NODE_ENV} | Allowed origins: ${JSON.stringify(allowedOrigins)}`);
   return false;
 }
 
@@ -183,12 +189,20 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
   return (req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin;
 
+    // DEBUG: Log CORS request details
+    console.log(`🔍 CORS DEBUG: ${req.method} ${req.path} | Origin: ${origin || 'none'} | Allowed: ${JSON.stringify(allowedOrigins)}`);
+
     // P1-5.1: Origin validation with explicit allowlist
     if (origin && !isOriginAllowed(origin, allowedOrigins)) {
+      console.error(`❌ CORS REJECTED: ${origin} not in allowlist`);
       return res.status(403).json({
         error: 'CORS policy violation: Origin not allowed',
         code: 'CORS_ORIGIN_DENIED',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        debug: {
+          requestedOrigin: origin,
+          allowedOrigins: allowedOrigins
+        }
       });
     }
 
