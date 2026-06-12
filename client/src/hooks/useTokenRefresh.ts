@@ -106,6 +106,19 @@ export function useTokenRefresh(enabled: boolean = true) {
         // If refresh fails with 401, user needs to re-authenticate
         // The main app will handle this on the next protected API request
         if (response.status === 401) {
+          // Check if this is a migration error (old token format)
+          try {
+            const errorData = await response.json();
+            if (errorData.error === 'token_format_migration' || errorData.requiresReauth) {
+              console.warn('[TokenRefresh] Old token format detected, redirecting to sign in...');
+              // Redirect to sign in page for re-authentication
+              window.location.href = '/signin?reason=token_migration&message=Please sign in again to update your session';
+              return;
+            }
+          } catch (e) {
+            // Ignore JSON parse errors
+          }
+          
           console.log('[TokenRefresh] Session expired, user will be prompted to sign in on next action');
           // Don't schedule next refresh - session is invalid
         } else if (response.status === 429) {

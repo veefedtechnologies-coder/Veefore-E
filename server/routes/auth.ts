@@ -483,6 +483,30 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       
+      // MIGRATION FIX: Check if this is a custom token (old format)
+      // Custom tokens can't be verified, so we need user to get a new token
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (errorMessage.includes('expects an ID token') || errorMessage.includes('argument-error')) {
+        console.warn('[OAuth] Detected old custom token format, clearing cookie:', { correlationId });
+        
+        // Clear the old cookie
+        res.clearCookie('auth_token', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+        });
+        
+        // Return special error code so client knows to re-authenticate
+        return res.status(401).json({
+          error: 'token_format_migration',
+          message: 'Please sign in again to update your session',
+          requiresReauth: true,
+          correlationId,
+        });
+      }
+      
       // Requirement 6.3: Return 401 if session cookie is invalid
       return res.status(401).json({
         error: 'no_valid_session',
