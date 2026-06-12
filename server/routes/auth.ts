@@ -798,33 +798,49 @@ router.get('/metrics', (req: Request, res: Response) => {
  * an HTTP-only cookie) and the Firebase client SDK (which needs the token).
  */
 router.get('/session', (req: OAuthRequest, res: Response) => {
-  console.log('[GET /api/auth/session] Endpoint hit');
-  console.log('[GET /api/auth/session] Cookie header:', req.headers.cookie);
-  console.log('[GET /api/auth/session] Parsed cookies:', JSON.stringify(req.cookies));
+  console.log('[GET /api/auth/session] ========== REQUEST START ==========');
+  console.log('[GET /api/auth/session] URL:', req.url);
+  console.log('[GET /api/auth/session] Method:', req.method);
+  console.log('[GET /api/auth/session] Headers:', JSON.stringify({
+    cookie: req.headers.cookie,
+    origin: req.headers.origin,
+    referer: req.headers.referer,
+    host: req.headers.host,
+  }, null, 2));
+  console.log('[GET /api/auth/session] Parsed cookies:', JSON.stringify(req.cookies, null, 2));
+  console.log('[GET /api/auth/session] Environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
+    FRONTEND_URL: process.env.FRONTEND_URL,
+  });
   
   const authToken = req.cookies?.auth_token;
 
   if (!authToken) {
-    console.warn('[GET /api/auth/session] No auth_token found in cookies');
-    console.warn('[GET /api/auth/session] Available cookies:', Object.keys(req.cookies || {}));
+    console.warn('[GET /api/auth/session] ❌ No auth_token found in cookies');
+    console.warn('[GET /api/auth/session] Available cookie keys:', Object.keys(req.cookies || {}));
+    console.warn('[GET /api/auth/session] Raw cookie header:', req.headers.cookie);
     return res.status(401).json({
       error: 'no_session',
       message: 'No active session found',
+      debug: {
+        hasCookieHeader: !!req.headers.cookie,
+        cookieKeys: Object.keys(req.cookies || {}),
+        environment: process.env.NODE_ENV,
+      }
     });
   }
 
   // Enhanced logging for debugging
-  console.log('[GET /api/auth/session] Token details:', {
+  console.log('[GET /api/auth/session] ✅ Token found:', {
     tokenLength: authToken.length,
-    tokenPrefix: authToken.substring(0, 50) + '...',
-    tokenSuffix: '...' + authToken.substring(authToken.length - 20),
-    tokenType: typeof authToken,
-    isString: typeof authToken === 'string',
-    hasJWTFormat: authToken.split('.').length === 3,
+    tokenPrefix: authToken.substring(0, 30) + '...',
+    tokenSuffix: '...' + authToken.substring(authToken.length - 10),
   });
 
   // Return the custom token so the client can call signInWithCustomToken()
   console.log('[GET /api/auth/session] Sending custom token to frontend');
+  console.log('[GET /api/auth/session] ========== REQUEST END ==========');
   return res.status(200).json({
     customToken: authToken,
   });
