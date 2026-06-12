@@ -420,7 +420,8 @@ function SignUpIntegrated() {
     // Preserve form data before initiating OAuth (Requirement 19.6)
     preserveFormData(formData)
     setIsResending(true)
-    window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
+    // Use relative path so URL stays on veefore.com (Vercel proxies to api.veefore.com)
+    window.location.href = '/api/auth/google/start'
   }
 
   // Handle dismissing OAuth error
@@ -1779,8 +1780,8 @@ function SignUpIntegrated() {
                     preserveFormData(formData)
                     // Show loading state during redirect (Requirement 19.1)
                     setIsResending(true)
-                    // Redirect to server-side OAuth start endpoint
-                    window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
+                    // Use relative path so URL stays on veefore.com (Vercel proxies to api.veefore.com)
+                    window.location.href = '/api/auth/google/start'
                   }}
                   disabled={isLoading || isCheckingEmail || showOAuthSuccess}
                   className="w-full h-11 rounded-md bg-white text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors border border-gray-300 disabled:opacity-70"
