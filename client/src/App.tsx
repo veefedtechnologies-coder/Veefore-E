@@ -173,6 +173,19 @@ function App() {
       setLocation('/signin')
     }
 
+    // If user is logged in but on signin/signup pages (shouldn't happen in normal flow)
+    // This catches the case where Firebase has stale auth but user wants to sign in fresh
+    if (!loading && user && (effectiveLocation === '/signin' || effectiveLocation === '/signup')) {
+      console.log('[App] User is authenticated but on auth page, checking if this is intentional...')
+      // Allow if they're resuming onboarding
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('resume') !== 'true') {
+        // Not resuming onboarding, redirect to dashboard
+        console.log('[App] Redirecting authenticated user from auth page to dashboard')
+        setLocation('/')
+      }
+    }
+
     // EARLY ACCESS GATING (UX Only)
     // 1. If trying to access signup but NOT approved -> Go to waitlist
     // (We do not gate /signin because returning users on new devices/domains won't have the localStorage flag)

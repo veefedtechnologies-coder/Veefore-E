@@ -222,6 +222,7 @@ function SignUpIntegrated() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isVerifying, setIsVerifying] = useState(false)
   const [isResending, setIsResending] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const isLoading = isVerifying || isResending
   const [showPassword, setShowPassword] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState(0)
@@ -273,8 +274,12 @@ function SignUpIntegrated() {
 
     // Check for OAuth errors on mount
     const error = parseOAuthError(urlParams)
+    const hasOAuthSuccess = checkOAuthSuccess(urlParams)
+    
     if (error) {
       setOauthError(error)
+      // Reset Google loading state when returning from failed OAuth
+      setIsGoogleLoading(false)
       toast({
         title: 'Authentication Failed',
         description: error.userMessage,
@@ -282,19 +287,82 @@ function SignUpIntegrated() {
       })
     }
 
-    // Check for OAuth success
-    if (checkOAuthSuccess(urlParams)) {
+    // If no OAuth success or error params, reset Google loading state
+    // This handles the case where user cancels/closes Google sign-in window
+    if (!hasOAuthSuccess && !error) {
+      setIsGoogleLoading(false)
+    }
+
+    // Check for OAuth success - now with session token exchange
+    if (hasOAuthSuccess) {
       setShowOAuthSuccess(true)
-      toast({
-        title: 'Success!',
-        description: 'Signed up with Google successfully',
-      })
+      setIsGoogleLoading(true)
       
-      // Show success message for 2 seconds then redirect (Requirement 19.4)
-      setTimeout(() => {
-        clearOAuthSuccess()
-        setLocation('/')
-      }, 2000)
+      // Exchange the HTTP-only cookie for a Firebase custom token
+      const exchangeSession = async () => {
+        try {
+          console.log('[OAuth SignUp] Exchanging session token...')
+          const response = await fetch('/api/auth/session', {
+            method: 'GET',
+            credentials: 'include', // Include cookies
+          })
+          
+          if (!response.ok) {
+            throw new Error('Failed to get custom token')
+          }
+          
+          const data = await response.json()
+          console.log('[OAuth SignUp] Received custom token of length:', data.customToken?.length)
+          
+          if (!data.customToken) {
+            throw new Error('MISSING_CUSTOM_TOKEN')
+          }
+          
+          // Import signInWithCustomToken
+          const { signInWithCustomToken } = await import('firebase/auth')
+          
+          // Sign in with the custom token
+          console.log('[OAuth SignUp] Signing in with custom token...')
+          await signInWithCustomToken(auth, data.customToken)
+          
+          console.log('[OAuth SignUp] Firebase sign-in successful')
+          toast({
+            title: 'Success!',
+            description: 'Signed up with Google successfully',
+          })
+          
+          // Show success message for 1 second then redirect
+          setTimeout(() => {
+            clearOAuthSuccess()
+            setLocation('/')
+          }, 1000)
+          
+        } catch (error: any) {
+          console.error('[OAuth SignUp] Session exchange failed:', error)
+          toast({
+            title: 'Authentication Error',
+            description: error.message || 'Failed to complete sign-up',
+            variant: 'destructive',
+          })
+          setShowOAuthSuccess(false)
+          setIsGoogleLoading(false)
+          
+          // Show the error to the user
+          const errorMessage = error.message === 'MISSING_CUSTOM_TOKEN' 
+            ? 'Session token not found. Please try signing up again.'
+            : 'Failed to complete authentication. Please try again.'
+            
+          setOauthError({
+            code: 'session_exchange_failed',
+            message: errorMessage,
+            userMessage: errorMessage,
+            severity: 'error',
+            canRetry: true,
+          })
+        }
+      }
+      
+      exchangeSession()
     }
 
     // Restore form data if user is returning from OAuth (Requirement 19.6)
@@ -302,6 +370,24 @@ function SignUpIntegrated() {
     if (restored) {
       setFormData(prev => ({ ...prev, ...restored }))
     }
+  }, [])
+
+  // Add visibility change listener to reset loading state if user returns without OAuth params
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const urlParams = new URLSearchParams(window.location.search)
+        const hasOAuthParams = checkOAuthSuccess(urlParams) || parseOAuthError(urlParams)
+        
+        // If page becomes visible without OAuth params, reset Google loading
+        if (!hasOAuthParams) {
+          setIsGoogleLoading(false)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   // Persistence Keys
@@ -419,7 +505,7 @@ function SignUpIntegrated() {
     setOauthError(null)
     // Preserve form data before initiating OAuth (Requirement 19.6)
     preserveFormData(formData)
-    setIsResending(true)
+    setIsGoogleLoading(true)
     window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
   }
 
@@ -1600,7 +1686,7 @@ function SignUpIntegrated() {
                       {oauthError.canRetry && (
                         <button
                           onClick={handleOAuthRetry}
-                          disabled={isLoading}
+                          disabled={isGoogleLoading}
                           className={`mt-3 px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
                             oauthError.severity === 'error' 
                               ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200' 
@@ -1610,7 +1696,7 @@ function SignUpIntegrated() {
                           } disabled:opacity-50`}
                         >
                           <RefreshCw className="w-3 h-3" />
-                          {isLoading ? 'Retrying...' : 'Try Again'}
+                          {isGoogleLoading ? 'Retrying...' : 'Try Again'}
                         </button>
                       )}
                     </div>
@@ -1778,14 +1864,14 @@ function SignUpIntegrated() {
                     // Preserve form data before OAuth initiation (Requirement 19.6)
                     preserveFormData(formData)
                     // Show loading state during redirect (Requirement 19.1)
-                    setIsResending(true)
+                    setIsGoogleLoading(true)
                     // Redirect to server-side OAuth start endpoint
                     window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
                   }}
-                  disabled={isLoading || isCheckingEmail || showOAuthSuccess}
+                  disabled={isGoogleLoading || isCheckingEmail || showOAuthSuccess}
                   className="w-full h-11 rounded-md bg-white text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors border border-gray-300 disabled:opacity-70"
                 >
-                  {isLoading ? (
+                  {isGoogleLoading ? (
                     <><Loader2 className="w-5 h-5 animate-spin" /> Redirecting to Google...</>
                   ) : (
                     <>
