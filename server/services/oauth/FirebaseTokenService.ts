@@ -241,6 +241,15 @@ export class FirebaseTokenService {
         errorType: error instanceof Error ? error.name : 'Unknown',
       });
 
+      // Preserve the original error message for migration detection
+      // Check if this is a custom token (not an ID token)
+      const errorMessage = error instanceof Error ? error.message : '';
+      const errorCode = (error as any)?.code || '';
+      
+      if (errorMessage.includes('expects an ID token') || errorCode === 'auth/argument-error') {
+        throw new Error('Token type mismatch: Expected ID token but received custom token');
+      }
+
       throw new Error('Invalid or expired authentication token');
     }
   }

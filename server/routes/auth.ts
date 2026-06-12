@@ -486,8 +486,12 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
       // MIGRATION FIX: Check if this is a custom token (old format)
       // Custom tokens can't be verified, so we need user to get a new token
       const errorMessage = error instanceof Error ? error.message : '';
-      if (errorMessage.includes('expects an ID token') || errorMessage.includes('argument-error')) {
-        console.warn('[OAuth] Detected old custom token format, clearing cookie:', { correlationId });
+      const errorCode = (error as any)?.code || '';
+      
+      if (errorMessage.includes('Token type mismatch') || 
+          errorMessage.includes('expects an ID token') || 
+          errorCode === 'auth/argument-error') {
+        console.warn('[OAuth] Detected old custom token format, clearing cookie:', { correlationId, errorMessage });
         
         // Clear the old cookie
         res.clearCookie('auth_token', {
