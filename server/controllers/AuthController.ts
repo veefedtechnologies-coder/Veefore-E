@@ -30,7 +30,64 @@ const ResendVerificationSchema = z.object({
   email: z.string().email(),
 });
 
+const SignInSchema = z.object({
+  email: z.string().email(),
+});
+
 export class AuthController extends BaseController {
+  /**
+   * POST /api/auth/signin
+   * Create backend session after Firebase sign-in
+   * This is called by the client after successful Firebase authentication
+   */
+  signIn = this.wrapAsync(async (
+    req: TypedRequest<ParamsDictionary, z.infer<typeof SignInSchema>>,
+    res: Response
+  ) => {
+    const input = SignInSchema.parse(req.body);
+    const normalizedEmail = input.email.trim().toLowerCase();
+
+    console.log('[SignIn] Creating backend session for:', normalizedEmail);
+
+    // Find user by email
+    const user = await userService.getUserByEmail(normalizedEmail);
+    
+    if (!user) {
+      console.warn('[SignIn] User not found:', normalizedEmail);
+      return this.sendError(res, new NotFoundError('User not found'));
+    }
+
+    // Create Firebase custom token for session
+    const admin = getFirebaseAdmin();
+    const customToken = await admin.auth().createCustomToken(
+      String(user._id),
+      {
+        email: user.email,
+        emailVerified: user.isEmailVerified,
+        sessionVersion: user.sessionVersion || 1,
+      }
+    );
+
+    // Set auth cookie (same as OAuth flow)
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false,
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+    };
+
+    res.cookie('auth_token', customToken, cookieOptions);
+
+    console.log('[SignIn] Backend session created for:', normalizedEmail);
+
+    this.sendSuccess(res, { 
+      success: true,
+      message: 'Session created successfully' 
+    });
+  });
+
   getCurrentUser = this.wrapAsync(async (
     req: TypedRequest,
     res: Response
