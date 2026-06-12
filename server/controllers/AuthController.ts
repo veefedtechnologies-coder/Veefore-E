@@ -36,6 +36,39 @@ const SignInSchema = z.object({
 
 export class AuthController extends BaseController {
   /**
+   * GET /api/auth/session
+   * Exchange auth_token cookie for Firebase custom token
+   * Used by frontend after OAuth redirect to get the custom token
+   */
+  getSession = this.wrapAsync(async (
+    req: TypedRequest,
+    res: Response
+  ) => {
+    console.log('[Session] Session endpoint called');
+    console.log('[Session] Cookie header:', req.headers.cookie);
+    console.log('[Session] Parsed cookies:', req.cookies);
+
+    const authToken = req.cookies?.auth_token;
+
+    if (!authToken) {
+      console.log('[Session] No auth_token found in cookies');
+      console.log('[Session] Available cookies:', Object.keys(req.cookies || {}));
+      return res.status(401).json({
+        error: 'no_session',
+        message: 'No active session found'
+      });
+    }
+
+    console.log('[Session] auth_token found, length:', authToken.length);
+
+    // The auth_token cookie already contains the Firebase custom token
+    // Just return it to the frontend
+    this.sendSuccess(res, {
+      customToken: authToken
+    });
+  });
+
+  /**
    * POST /api/auth/signin
    * Create backend session after Firebase sign-in
    * This is called by the client after successful Firebase authentication
