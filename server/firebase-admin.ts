@@ -1,12 +1,15 @@
-import * as admin from 'firebase-admin';
+import * as firebaseAdmin from 'firebase-admin';
 
-let firebaseAdmin: admin.app.App | null = null;
+let firebaseApp: firebaseAdmin.app.App | null = null;
 
-export function getFirebaseAdmin(): admin.app.App {
-  if (firebaseAdmin) return firebaseAdmin;
-  if (admin.apps && admin.apps.length > 0) {
-    firebaseAdmin = admin.app();
-    return firebaseAdmin;
+export function getFirebaseAdmin(): firebaseAdmin.app.App {
+  if (firebaseApp) return firebaseApp;
+  
+  // Check if Firebase app already initialized
+  const apps = firebaseAdmin.apps || [];
+  if (apps.length > 0) {
+    firebaseApp = apps[0] as firebaseAdmin.app.App;
+    return firebaseApp;
   }
 
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
@@ -18,13 +21,13 @@ export function getFirebaseAdmin(): admin.app.App {
         throw new Error('Service account missing required fields');
       }
     } catch (parseError) {
-      console.error('[FIREBASE ADMIN] JSON parsing error');
+      console.error('[FIREBASE ADMIN] JSON parsing error:', parseError);
       throw parseError;
     }
     
     try {
-      firebaseAdmin = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+      firebaseApp = firebaseAdmin.initializeApp({
+        credential: firebaseAdmin.credential.cert(serviceAccount as firebaseAdmin.ServiceAccount),
         projectId: serviceAccount.project_id,
       });
       console.log('[FIREBASE ADMIN] Initialized with service account for project:', serviceAccount.project_id);
@@ -34,7 +37,7 @@ export function getFirebaseAdmin(): admin.app.App {
     }
   } else {
     try {
-      firebaseAdmin = admin.initializeApp({
+      firebaseApp = firebaseAdmin.initializeApp({
         projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID
       });
       console.log('[FIREBASE ADMIN] Initialized using default application credentials');
@@ -44,8 +47,8 @@ export function getFirebaseAdmin(): admin.app.App {
     }
   }
   
-  if (!firebaseAdmin) throw new Error('Failed to initialize Firebase Admin');
-  return firebaseAdmin;
+  if (!firebaseApp) throw new Error('Failed to initialize Firebase Admin');
+  return firebaseApp;
 }
 
-export { admin };
+export { firebaseAdmin as admin };
