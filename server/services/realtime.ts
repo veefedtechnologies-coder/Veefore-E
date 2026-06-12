@@ -28,6 +28,10 @@ export class RealtimeService {
           process.env.FRONTEND_URL || "http://localhost:5173",
           "http://localhost:3000",
           "http://localhost:5173",
+          "https://veefore.com",
+          "https://www.veefore.com",
+          "https://api.veefore.com",
+          "https://app.veefore.com",
           "https://veefore-webhook.veefore.com",
           /\.vercel\.app$/
         ],
