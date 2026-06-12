@@ -260,22 +260,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     // Preserve form data before initiating OAuth (Requirement 19.6)
     preserveFormData(formData)
     setIsEmailLoading(true)
-    
-    // Fetch Google OAuth URL from backend (prevents api.veefore.com from showing in URL bar)
-    fetch('/api/auth/google/start', {
-      method: 'GET',
-      credentials: 'include'
-    })
-      .then(res => res.json())
-      .then(data => {
-        // Client-side redirect to Google (URL stays on veefore.com until Google)
-        window.location.href = data.redirectUrl
-      })
-      .catch(error => {
-        console.error('OAuth initiation failed:', error)
-        setIsEmailLoading(false)
-        alert('Failed to start Google sign-in. Please try again.')
-      })
+    window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
   }
 
   // Handle dismissing OAuth error
@@ -598,20 +583,8 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   preserveFormData(formData)
                   // Show loading state during redirect (Requirement 19.1)
                   setIsEmailLoading(true)
-                  // Fetch Google OAuth URL from backend (prevents api.veefore.com from showing)
-                  fetch('/api/auth/google/start', {
-                    method: 'GET',
-                    credentials: 'include'
-                  })
-                    .then(res => res.json())
-                    .then(data => {
-                      // Client-side redirect to Google
-                      window.location.href = data.redirectUrl
-                    })
-                    .catch(error => {
-                      console.error('OAuth failed:', error)
-                      setIsEmailLoading(false)
-                    })
+                  // Redirect to server-side OAuth start endpoint
+                  window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
                 }}
                 disabled={isEmailLoading || showOAuthSuccess}
                 className="w-full h-11 rounded-md bg-white text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors border border-gray-300 disabled:opacity-70"
