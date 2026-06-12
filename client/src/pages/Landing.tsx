@@ -1080,20 +1080,21 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </section>
 
-      {/* Trusted By Top Brands Section */}
-      <section className="py-16 md:py-24 relative overflow-hidden bg-transparent w-full">
-        <div className="w-full px-4 md:px-8">
-          <div className="text-center mb-12 md:mb-16">
-            <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-400 uppercase tracking-widest mb-6">
-              <span>Trusted Partners</span>
+      {/* Trusted By Top Brands Section - Hidden in Phase 1 Review Mode */}
+      {!isPhase1 && (
+        <section className="py-16 md:py-24 relative overflow-hidden bg-transparent w-full">
+          <div className="w-full px-4 md:px-8">
+            <div className="text-center mb-12 md:mb-16">
+              <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-400 uppercase tracking-widest mb-6">
+                <span>Trusted Partners</span>
+              </div>
+              <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Trusted By Top Brands</h3>
+              <p className="text-base text-white/50">Join thousands of creators using Veefore to grow their presence</p>
             </div>
-            <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Trusted By Top Brands</h3>
-            <p className="text-base text-white/50">Join thousands of creators using Veefore to grow their presence</p>
-          </div>
 
-          {/* Infinite Scrolling Logos Container */}
-          <div className="relative">
-            <Marquee>
+            {/* Infinite Scrolling Logos Container */}
+            <div className="relative">
+              <Marquee>
               {[
                 {
                   name: "Meta",
@@ -1227,6 +1228,166 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
         </div>
       </section>
+      )}
+
+      {/* ====== GOOGLE OAUTH VERIFICATION: Clear App Purpose Section ====== */}
+      <section className="relative py-16 md:py-24 px-4 sm:px-6 bg-gradient-to-b from-[#030303] via-[#0a0520] to-[#030303] z-20">
+        <div className="max-w-6xl mx-auto">
+          {/* Main Purpose Statement */}
+          <div className="text-center mb-16">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <span className="inline-flex items-center px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm mb-6">
+                <Sparkles className="w-4 h-4 mr-2" />
+                What is Veefore?
+              </span>
+            </motion.div>
+
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 leading-tight"
+            >
+              AI-Powered Instagram Growth Platform
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                for Content Creators & Businesses
+              </span>
+            </motion.h2>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-base md:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed"
+            >
+              Veefore helps content creators, influencers, and businesses grow their Instagram presence 
+              through intelligent automation, AI-powered content optimization, and data-driven engagement strategies. 
+              Save time, increase reach, and grow your audience authentically with our comprehensive social media toolkit.
+            </motion.p>
+          </div>
+
+          {/* Core Features Grid */}
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-blue-500/30 transition-colors"
+            >
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 flex items-center justify-center mb-4">
+                <Clock className="w-6 h-6 text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Smart Content Scheduling</h3>
+              <p className="text-sm text-white/60 leading-relaxed">
+                AI-powered posting scheduler that identifies optimal times for maximum engagement based on your audience behavior and Instagram analytics.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-purple-500/30 transition-colors"
+            >
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/10 flex items-center justify-center mb-4">
+                <Brain className="w-6 h-6 text-purple-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">AI Caption Generation</h3>
+              <p className="text-sm text-white/60 leading-relaxed">
+                Generate viral-worthy captions instantly using advanced AI language models. Get hook suggestions, trending patterns, and engagement-optimized copy.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-pink-500/30 transition-colors"
+            >
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-600/10 flex items-center justify-center mb-4">
+                <BarChart3 className="w-6 h-6 text-pink-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Growth Analytics & Insights</h3>
+              <p className="text-sm text-white/60 leading-relaxed">
+                Track performance metrics, audience growth, engagement rates, and content effectiveness with comprehensive analytics dashboards and reports.
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Who It's For */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+            className="p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10"
+          >
+            <h3 className="text-xl font-semibold text-white mb-4 text-center">Who Benefits from Veefore?</h3>
+            <div className="grid sm:grid-cols-3 gap-6 text-center">
+              <div>
+                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
+                  <Users className="w-5 h-5 text-blue-400" />
+                </div>
+                <h4 className="text-white font-medium mb-1">Content Creators</h4>
+                <p className="text-xs text-white/60">Influencers and creators looking to grow their audience and engagement</p>
+              </div>
+              <div>
+                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
+                  <TrendingUp className="w-5 h-5 text-purple-400" />
+                </div>
+                <h4 className="text-white font-medium mb-1">Small Businesses</h4>
+                <p className="text-xs text-white/60">Brands wanting to build an authentic social media presence</p>
+              </div>
+              <div>
+                <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center mx-auto mb-3">
+                  <Layers className="w-5 h-5 text-pink-400" />
+                </div>
+                <h4 className="text-white font-medium mb-1">Marketing Agencies</h4>
+                <p className="text-xs text-white/60">Agencies managing multiple client social media accounts</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Why We Use Google Sign-In */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+            className="mt-12 p-6 rounded-2xl bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-blue-500/20"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2">Secure Authentication with Google Sign-In</h3>
+                <p className="text-sm text-white/70 leading-relaxed mb-3">
+                  We use Google Sign-In to provide secure, passwordless authentication for your Veefore account. 
+                  This allows you to sign up and log in quickly without creating yet another password to remember.
+                </p>
+                <div className="space-y-2 text-sm text-white/60">
+                  <p>✓ <strong className="text-white/80">We only access:</strong> Your name, email address, and profile photo</p>
+                  <p>✓ <strong className="text-white/80">We never access:</strong> Gmail, Google Drive, Calendar, or any other Google services</p>
+                  <p>✓ <strong className="text-white/80">Your privacy:</strong> You can revoke access anytime from your Google account settings</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+      {/* ====== END GOOGLE OAUTH VERIFICATION SECTION ====== */}
 
       {/* Growth Engine Section - "How It Works" (New Premium Design) */}
       <GrowthEngineSection />

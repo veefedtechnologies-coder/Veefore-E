@@ -53,6 +53,7 @@ const PrivacyPolicy = () => {
   const sections = [
     { id: 'introduction', title: 'Introduction' },
     { id: 'information-collected', title: 'Information We Collect' },
+    { id: 'data-retention', title: 'Data Retention' },
     { id: 'how-we-use', title: 'How We Use Your Information' },
     { id: 'data-sharing', title: 'Data Sharing & Disclosure' },
     { id: 'data-security', title: 'Data Security' },
@@ -217,6 +218,56 @@ const PrivacyPolicy = () => {
                   <li><strong>Log Data:</strong> Server logs containing access times, referring URLs, and error reports.</li>
                   <li><strong>Cookies & Similar Technologies:</strong> We use cookies and local storage to enhance your experience and gather analytics.</li>
                 </ul>
+
+                <h4 className="text-white font-semibold mt-6 mb-2">Google Sign-In Data</h4>
+                <p className="mb-4">
+                  When you choose to sign in with Google, we collect limited information from your Google account
+                  to create and manage your Veefore account. This provides a secure, passwordless authentication experience.
+                </p>
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg mb-4">
+                  <p className="font-semibold text-white mb-2">What We Access from Google:</p>
+                  <ul className="list-disc pl-6 space-y-1 text-sm">
+                    <li>Your name</li>
+                    <li>Your email address</li>
+                    <li>Your profile photo</li>
+                    <li>Your Google Account ID (unique identifier for authentication)</li>
+                  </ul>
+                </div>
+                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <p className="font-semibold text-white mb-2">What We DO NOT Access:</p>
+                  <ul className="list-disc pl-6 space-y-1 text-sm">
+                    <li>Gmail messages or email content</li>
+                    <li>Google Drive files or documents</li>
+                    <li>Google Calendar events</li>
+                    <li>Google Photos or any other Google services</li>
+                    <li>Your Google passwords or security credentials</li>
+                  </ul>
+                  <p className="text-sm mt-3">
+                    <strong>You can revoke our access at any time</strong> by visiting your{' '}
+                    <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                      Google Account Permissions page
+                    </a>.
+                  </p>
+                </div>
+              </PolicySection>
+
+              <PolicySection id="data-retention" icon={Database} title="Data Retention">
+                <p>
+                  We retain your personal information only for as long as necessary to fulfill the purposes outlined
+                  in this Privacy Policy and to comply with our legal obligations.
+                </p>
+                <h4 className="text-white font-semibold mt-6 mb-2">Retention Periods</h4>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Active Accounts:</strong> Your data is retained for as long as your account remains active and you continue using our Services.</li>
+                  <li><strong>Inactive Accounts:</strong> Accounts inactive for more than 2 years may be deleted after email notification.</li>
+                  <li><strong>Deleted Accounts:</strong> When you delete your account, your personal data is permanently deleted within 90 days. Some data may persist in backups for up to 30 days.</li>
+                  <li><strong>Legal Requirements:</strong> Certain data may be retained longer if required by law, to resolve disputes, enforce agreements, or prevent fraud (typically 3-7 years).</li>
+                  <li><strong>Aggregated Analytics:</strong> Anonymized and aggregated data (with no personal identifiers) may be retained indefinitely for statistical analysis and service improvement.</li>
+                </ul>
+                <p className="mt-4">
+                  To request immediate deletion of your data, contact us at{' '}
+                  <a href="mailto:privacy@veefore.com" className="text-blue-400 hover:underline">privacy@veefore.com</a>.
+                </p>
               </PolicySection>
 
               <PolicySection id="how-we-use" icon={Eye} title="How We Use Your Information">
