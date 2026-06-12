@@ -5,6 +5,10 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://api.veefore.com/api/:path*"
+    },
+    {
       "source": "/__/auth/:path*",
       "destination": "https://veefore-b84c8.firebaseapp.com/__/auth/:path*"
     },
