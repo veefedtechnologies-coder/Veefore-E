@@ -12,6 +12,80 @@
   --font-body: 'Inter', sans-serif;
 }
 
+/* ========================================
+   MOBILE PERFORMANCE OPTIMIZATIONS
+   ======================================== */
+
+/* Force GPU acceleration for animated elements */
+/* REMOVED: backfaceVisibility causes flickering - only use for 3D flips */
+.transform-gpu {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Optimize text rendering on mobile */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Prevent flickering during animations */
+/* REMOVED: backfaceVisibility - causes issues on mobile */
+.animate-fade-rise,
+.animate-fade-rise-delay,
+.animate-fade-rise-delay-2,
+[class*="motion-"],
+[class*="animate-"] {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* Remove will-change after animations complete to free GPU memory */
+.animation-complete {
+  will-change: auto;
+}
+
+/* Optimize marquee and continuous animations */
+.marquee,
+.gradient-orb,
+[class*="motion-"] {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Mobile-specific optimizations */
+/* REMOVED: The * selector was breaking all animations! */
+@media (max-width: 768px) {
+  /* Disable expensive blur effects on mobile */
+  .blur-3xl {
+    filter: none;
+  }
+  
+  /* Simplify backdrop blur on mobile */
+  .backdrop-blur-xl,
+  .backdrop-blur-lg {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ========================================
+   EXISTING STYLES
+   ======================================== */
+
 /* Liquid Glass effect */
 .liquid-glass {
   background: rgba(255, 255, 255, 0.01);
@@ -827,35 +901,36 @@ html {
 }
 
 /* Optimize framer-motion animations */
+/* REMOVED: backfaceVisibility causes flickering */
 [style*="will-change"] {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* =================================================
    CRITICAL FIX: PREVENT LAYOUT THRASHING & BLINKING
    ================================================= */
 
-/* RULE #2: Content-visibility for large sections - allows browser to skip off-screen rendering */
-/* MOVED OFF GENERIC SECTION TAG TO PREVENT JITTER ON DYNAMIC PAGES */
+/* RULE #2: Content-visibility REMOVED - causes flickering on scroll back on mobile
+ * Mobile browsers struggle with content-visibility: auto when scrolling backwards
+ * The browser has to re-render content, causing visible flash/flicker
+ * Instead, rely on natural browser optimizations and GPU acceleration
+ */
 .landing-section,
 [data-section] {
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 1000px;
-  contain: layout style paint;
+  /* REMOVED: content-visibility: auto; - causes scroll-back flickering */
+  /* REMOVED: contain-intrinsic-size - not needed without content-visibility */
+  contain: layout style paint;  /* Keep containment for performance */
 }
 
 /* RULE #3: GPU Compositing for animated elements - SCALED FOR MOBILE STABILITY */
+/* REMOVED: backfaceVisibility causes flickering on mobile */
 [data-framer-motion],
 [style*="transform"],
 [style*="opacity"] {
   transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
   /* Ensure we don't create layers for every single child */
   isolation: isolate;
 }
-
 /* RULE #4: Fast, smooth animation timing - 0.3s with snappy ease-out */
 .fade-in-section,
 .scroll-reveal,
@@ -930,12 +1005,11 @@ html {
 /* Now handled by RULE #3 above */
 
 /* Force GPU layers for gradient orbs and background elements */
+/* REMOVED: backfaceVisibility causes flickering */
 .gradient-orb,
 .fallback-orb,
 [class*="blur-"] {
   transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
   isolation: isolate;
 }
 
@@ -957,6 +1031,14 @@ section {
   contain: layout style;
 }
 
+/* OPTIMIZATION: Only apply will-change on desktop to prevent GPU layer explosion on mobile */
+@media (min-width: 769px) {
+  [data-framer-motion][style*="opacity"],
+  [data-framer-motion][style*="transform"] {
+    will-change: opacity, transform;
+    contain: layout paint;
+  }
+}
 /* Ensure smooth scrolling on mobile */
 @supports (overflow: overlay) {
   :root {
@@ -992,12 +1074,6 @@ a,
   touch-action: manipulation;
 }
 
-/* Ensure animated elements don't cause layout shifts when they animate */
-[data-framer-motion][style*="opacity"],
-[data-framer-motion][style*="transform"] {
-  will-change: opacity, transform;
-  contain: layout paint;
-}
 /* Remove focus ring from PostPreviewDialog / Shadcn DialogContent */
 [role="dialog"]:focus,
 [role="dialog"]:focus-visible,

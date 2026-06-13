@@ -1,7 +1,0 @@
-tunnel: cf822810-ff3e-4be3-858b-6dcf7d40b006
-credentials-file: C:\Users\ASUS\.cloudflared\cf822810-ff3e-4be3-858b-6dcf7d40b006.json
-
-ingress:
-  - hostname: veefore-webhook.veefore.com
-    service: http://localhost:5000
-  - service: http_status:404

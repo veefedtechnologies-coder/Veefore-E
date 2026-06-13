@@ -74,6 +74,74 @@ const CinematicHeroSection: React.FC = () => {
   const { openWaitlist } = useWaitlist()
   const { hasEarlyAccess } = useEarlyAccessCheck()
   const { scrollY } = useScroll()
+  const videoRef = React.useRef<HTMLVideoElement>(null)
+
+  // Ensure video plays on mount and after any interruption
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    console.log('[Hero Video] Initializing...')
+
+    let playAttempt = 0
+    const maxAttempts = 5
+
+    const playVideo = async () => {
+      if (playAttempt >= maxAttempts) return
+      playAttempt++
+
+      try {
+        console.log(`[Hero Video] Play attempt ${playAttempt}`)
+        // Force critical attributes
+        video.muted = true
+        video.volume = 0
+        video.playsInline = true
+        
+        await video.play()
+        console.log('[Hero Video] ✓ Playing!')
+      } catch (err: any) {
+        console.log(`[Hero Video] ✗ Play failed: ${err.name}`)
+        if (err.name === 'NotAllowedError') {
+          console.log('[Hero Video] Browser blocked autoplay - need user interaction')
+        }
+      }
+    }
+
+    // Prevent video from pausing
+    const preventPause = (e: Event) => {
+      console.log('[Hero Video] ⚠️ Pause event detected!')
+      e.preventDefault()
+      e.stopPropagation()
+      setTimeout(() => playVideo(), 10)
+    }
+
+    video.addEventListener('pause', preventPause)
+
+    // Try immediately
+    playVideo()
+
+    // Try when ready
+    video.addEventListener('canplay', playVideo, { once: true })
+    video.addEventListener('loadeddata', playVideo, { once: true })
+
+    // Try on first interaction
+    const onInteraction = () => {
+      console.log('[Hero Video] User interaction detected')
+      playVideo()
+    }
+
+    const events = ['touchstart', 'touchend', 'click', 'mousemove'] as const
+    events.forEach(event => {
+      document.addEventListener(event, onInteraction, { once: true, passive: true, capture: true })
+    })
+
+    return () => {
+      video.removeEventListener('pause', preventPause)
+      events.forEach(event => {
+        document.removeEventListener(event, onInteraction)
+      })
+    }
+  }, [])
 
   // Parallax / Shrink effect as user scrolls down
   const opacity = useTransform(scrollY, [0, 800], [1, 0])
@@ -129,13 +197,31 @@ const CinematicHeroSection: React.FC = () => {
 
         {/* ── Video Background ── */}
         <video
+          ref={videoRef}
           autoPlay
           loop
           muted
           playsInline
           preload="auto"
+          disablePictureInPicture
+          disableRemotePlayback
           className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
           aria-hidden="true"
+          // @ts-ignore - webkit-playsinline is needed for old iOS
+          webkit-playsinline="true"
+          x5-playsinline="true"
+          x5-video-player-type="h5"
+          x5-video-player-fullscreen="true"
+          onLoadedMetadata={(e) => {
+            const vid = e.currentTarget
+            vid.muted = true
+            vid.play().catch(() => {})
+          }}
+          onCanPlay={(e) => {
+            const vid = e.currentTarget
+            vid.muted = true
+            vid.play().catch(() => {})
+          }}
         >
           <source
             src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4"

@@ -13,9 +13,10 @@ import { useIsMobile } from '../hooks/use-is-mobile';
 import { useWaitlist } from '../context/WaitlistContext';
 import { VIEWPORT_ONCE } from '../lib/animation-performance';
 
+// Clean GPU hint without backfaceVisibility (causes flickering)
 const GPU_STYLE = {
     willChange: 'transform',
-    backfaceVisibility: 'hidden' as const,
+    transform: 'translateZ(0)',
 } as const;
 
 // ============================================

@@ -15,13 +15,14 @@ interface LazySectionProps {
  * 1. Children are ALWAYS rendered immediately - no conditional rendering
  * 2. Only CSS opacity is used for fade-in effect
  * 3. No spinners or fallback elements that could cause layout shifts
- * 4. Uses content-visibility: auto for browser optimization
+ * 4. NO content-visibility (causes scroll-back flickering on mobile)
  * 
  * The component only controls opacity to create a fade-in effect when
  * the section enters the viewport. This prevents:
  * - Layout thrashing (reflow/repaint)
  * - Component unmounting/remounting
  * - Height calculation issues
+ * - Scroll-back flickering (from content-visibility)
  */
 export function LazySection({
   children,
@@ -59,9 +60,8 @@ export function LazySection({
     <div
       ref={ref}
       style={{
-        // Browser-level optimization - skips rendering for off-screen content
-        contentVisibility: 'auto',
-        containIntrinsicSize: `1px ${minHeight}`,
+        // REMOVED: contentVisibility causes flickering on scroll back
+        // Browser will handle optimization naturally
       }}
     >
       {/* ALWAYS render children - only opacity changes */}

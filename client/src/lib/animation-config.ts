@@ -426,12 +426,13 @@ export const featureCardTiming = {
 // ============================================================================
 
 /**
- * CSS properties for GPU acceleration
+ * CSS properties for GPU acceleration (safe for 2D animations)
+ * REMOVED backfaceVisibility - only use for actual 3D flips
  */
 export const gpuAcceleration = {
   transform: 'translateZ(0)',
   willChange: 'transform, opacity',
-  backfaceVisibility: 'hidden' as const,
+  // REMOVED: backfaceVisibility causes flickering with 2D animations
 };
 
 /**

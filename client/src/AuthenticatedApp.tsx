@@ -7,7 +7,7 @@ import { getAuth } from 'firebase/auth'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest, queryClient } from '@/lib/queryClient'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { RealtimeProvider } from './contexts/RealtimeContext'
+import { RealtimeProvider } from './context/RealtimeContext'
 
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'

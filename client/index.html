@@ -120,8 +120,16 @@
   <link rel="dns-prefetch" href="//api.anthropic.com">
 
   <!-- Font Optimization with display=swap for immediate text rendering -->
-  <link rel="stylesheet"
+  <!-- MOBILE OPTIMIZATION: Preload critical fonts to prevent FOUT/FOIT flickering -->
+  <link rel="preload" as="style"
     href="https://fonts.googleapis.com/css2?display=swap&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=Instrument+Serif:ital@0;1" />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?display=swap&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=Instrument+Serif:ital@0;1"
+    media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?display=swap&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=Instrument+Serif:ital@0;1" />
+  </noscript>
 
   <style>
     /* P7-5: Critical above-the-fold styles for instant LCP */

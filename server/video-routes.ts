@@ -3,8 +3,6 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import CompleteVideoGenerator from './services/complete-video-generator';
-import { SimpleVideoGenerator } from './services/simple-video-generator';
 import { WorkingVideoGenerator } from './services/working-video-generator';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
@@ -144,9 +142,6 @@ const userVideos = new Map();
 
 // WebSocket connections for real-time updates
 const wsConnections = new Map<string, WebSocket>();
-
-// Initialize complete video generator
-const videoGenerator = new CompleteVideoGenerator();
 
 // WebSocket server setup function
 export function setupVideoWebSocket(server: Server) {
@@ -949,7 +944,7 @@ router.post('/test-simple', async (req, res) => {
     console.log('[TEST SIMPLE] Starting simple video generation...');
     
     const { prompt = 'Test video', duration = 5 } = req.body;
-    const simpleGenerator = new SimpleVideoGenerator();
+    const workingGenerator = new WorkingVideoGenerator();
     
     const jobId = uuidv4();
     const job = createVideoJob('test-user', { prompt, duration });
@@ -961,7 +956,7 @@ router.post('/test-simple', async (req, res) => {
     broadcastProgress(jobId, 20, 'Generating simple video...');
 
     // Generate simple video
-    simpleGenerator.generateSimpleVideo(prompt, duration)
+    workingGenerator.generateSimpleVideo(prompt, duration)
       .then(result => {
         job.status = 'completed';
         job.progress = 100;

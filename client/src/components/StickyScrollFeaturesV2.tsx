@@ -3,6 +3,7 @@ import { motion, useScroll, useSpring, useMotionValueEvent, useTransform } from 
 import { MessageSquare, DollarSign, Search, CheckCircle, Calendar, Clock } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
 import { GPU_ACCELERATED_STYLES, MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
+import { useIsMobile } from '../hooks/use-is-mobile';
 
 // Lightning fast spring config - low solver overhead
 const springConfig = { stiffness: 200, damping: 30, mass: 1 };
@@ -448,25 +449,38 @@ interface TextSlideProps {
     y: any;
 }
 
+// Adaptive spring configs - mobile gets gentler springs (still smooth, less CPU intensive)
 const textSpringConfig = { stiffness: 70, damping: 20, mass: 1.2 };
+const mockupSpringConfig = { stiffness: 70, damping: 20, mass: 1.2 };
+
+// Mobile-optimized spring config (slightly gentler, imperceptible difference but better performance)
+const textSpringConfigMobile = { stiffness: 120, damping: 25, mass: 1 };
+const mockupSpringConfigMobile = { stiffness: 120, damping: 25, mass: 1 };
 
 const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     const colors = colorMap[feature.color];
-    const opacityValue = useSpring(opacity as any, textSpringConfig);
-    const yValue = useSpring(y as any, textSpringConfig);
-
-    useEffect(() => {
-        if (typeof opacity === 'number') opacityValue.set(opacity as any);
-        if (typeof y === 'number') yValue.set(y as any);
-    }, [opacity, y]);
+    const isMobile = useIsMobile();
+    
+    // Use adaptive spring config based on device
+    const springCfg = isMobile ? textSpringConfigMobile : textSpringConfig;
 
     return (
         <motion.div
+            // OPTIMIZATION: Use combined animate instead of individual springs (reduces GPU layers)
+            animate={{
+                opacity: typeof opacity === 'number' ? opacity : 1,
+                y: typeof y === 'number' ? y : 0
+            }}
+            transition={{
+                type: "spring",
+                ...springCfg
+            }}
             style={{ 
-                opacity: opacityValue, 
-                y: yValue, 
+                // Keep these - needed for proper 3D layering
                 backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden'
+                WebkitBackfaceVisibility: 'hidden',
+                // OPTIMIZATION: Isolate rendering to prevent cascade repaints
+                contain: 'layout paint style'
             }}
             className="w-full max-w-lg"
         >
@@ -489,23 +503,17 @@ interface MockupSlideProps {
     opacity?: any; // Allow MotionValue or number
 }
 
-// Luxurious, smooth mockup spring for visible sliding transitions
-const mockupSpringConfig = { stiffness: 70, damping: 20, mass: 1.2 };
-
+// Adaptive mockup spring for visible sliding transitions
 const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opacity }: MockupSlideProps) => {
-    // Cast to any to bypass strict type checking
-    const springY = useSpring(y as any, mockupSpringConfig);
-    const springScale = useSpring(scale as any, mockupSpringConfig);
+    const isMobile = useIsMobile();
+    
+    // Use adaptive spring config based on device
+    const springCfg = isMobile ? mockupSpringConfigMobile : mockupSpringConfig;
     
     // Determine final opacity to use
     const targetOpacity = opacity !== undefined ? opacity : (isVisible ? 1 : 0);
-    const springOpacity = useSpring(targetOpacity as any, mockupSpringConfig);
-
-    useEffect(() => {
-        if (typeof y === 'number') springY.set(y);
-        if (typeof scale === 'number') springScale.set(scale);
-        if (typeof targetOpacity === 'number') springOpacity.set(targetOpacity);
-    }, [y, scale, targetOpacity]);
+    const targetY = typeof y === 'number' ? y : 0;
+    const targetScale = typeof scale === 'number' ? scale : 1;
 
     if (isStatic) {
         return (
@@ -513,6 +521,8 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
                 style={{
                     ...GPU_ACCELERATED_STYLES,
                     opacity: 1,
+                    // OPTIMIZATION: Isolate rendering
+                    contain: 'layout paint style'
                 }}
                 className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
             >
@@ -524,13 +534,24 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
 
     return (
         <motion.div
+            // OPTIMIZATION: Combined animation instead of individual springs (reduces GPU layers from 5 to 1)
+            animate={{
+                y: targetY,
+                scale: targetScale,
+                opacity: targetOpacity
+            }}
+            transition={{
+                type: "spring",
+                ...springCfg
+            }}
             style={{
-                y: springY,
-                scale: springScale,
-                opacity: springOpacity,
-                willChange: 'transform, opacity',
+                // OPTIMIZATION: Only hint GPU when visible (reduces offscreen GPU layers)
+                willChange: isVisible ? 'transform, opacity' : 'auto',
+                // Keep these - needed for proper 3D layering
                 backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden'
+                WebkitBackfaceVisibility: 'hidden',
+                // OPTIMIZATION: Isolate rendering to prevent cascade repaints
+                contain: 'layout paint style'
             }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
@@ -541,15 +562,22 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
 });
 
 const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKey], opacity: number }) => {
-    const springOpacity = useSpring(opacity, springConfig);
-
-    useEffect(() => {
-        springOpacity.set(opacity);
-    }, [opacity]);
+    const isMobile = useIsMobile();
 
     return (
         <motion.div
-            style={{ opacity: springOpacity, ...MOBILE_OPTIMIZED_LAYER }}
+            // OPTIMIZATION: Use direct animate instead of spring for background glow (simpler, less CPU)
+            animate={{ opacity: opacity }}
+            transition={{
+                type: "tween",  // Tween is sufficient for background glow
+                duration: 0.4,
+                ease: [0.22, 1, 0.36, 1]
+            }}
+            style={{ 
+                ...MOBILE_OPTIMIZED_LAYER,
+                // OPTIMIZATION: Isolate rendering
+                contain: 'layout paint style'
+            }}
             className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`}
         />
     );
