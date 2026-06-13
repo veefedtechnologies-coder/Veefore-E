@@ -1,8 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import {
-  Clock, MessageSquare, TrendingDown, Zap, Bot, BarChart3,
-  ArrowRight, CheckCircle, X, Calendar, Sparkles, Users
+  Clock, MessageSquare, TrendingDown, Zap, Bot,
+  CheckCircle, X, Calendar, Sparkles
 } from 'lucide-react';
 
 const bottlenecks = [
@@ -147,15 +147,22 @@ export const AlgorithmScienceSection = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, amount: 0.1 });
   const [activeCard, setActiveCard] = useState<string>('time');
-  const [direction, setDirection] = useState<1 | -1>(1);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => window.innerWidth < 768;
+    setIsMobile(checkMobile());
+    const handleResize = () => setIsMobile(checkMobile());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const ids = bottlenecks.map(b => b.id);
 
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setDirection(1);
       setActiveCard(prev => {
         const idx = ids.indexOf(prev);
         return ids[(idx + 1) % ids.length];
@@ -176,9 +183,6 @@ export const AlgorithmScienceSection = () => {
 
   // Pure state update — no side effects, responds instantly
   const handleTabClick = (id: string) => {
-    const prevIdx = ids.indexOf(activeCard);
-    const nextIdx = ids.indexOf(id);
-    setDirection(nextIdx >= prevIdx ? 1 : -1);
     setActiveCard(id);
   };
 
@@ -186,58 +190,32 @@ export const AlgorithmScienceSection = () => {
 
   return (
     <section ref={containerRef} className="pt-16 sm:pt-20 md:pt-28 pb-6 md:pb-10 relative overflow-hidden w-full bg-[#030303]">
-      <div className="absolute -top-[20%] -right-[5%] w-[45vw] h-[45vw] rounded-full bg-purple-600/6 blur-[130px] pointer-events-none" />
-      <div className="absolute -bottom-[10%] -left-[5%] w-[40vw] h-[40vw] rounded-full bg-blue-600/6 blur-[130px] pointer-events-none" />
+      {/* Removed unused blur orbs that were causing mobile flickering */}
 
       <div className="w-full px-4 sm:px-6 md:px-12 lg:px-20 relative z-10">
         <div className="max-w-[1400px] w-full mx-auto">
 
           {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7 }}
-            className="text-center mb-14 md:mb-20"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={isInView ? { opacity: 1, scale: 1 } : {}}
-              transition={{ delay: 0.1, duration: 0.5 }}
-              className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 text-[10px] sm:text-xs font-bold text-orange-400 uppercase tracking-widest mb-6"
-            >
+          <div className="text-center mb-14 md:mb-20">
+            <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 text-[10px] sm:text-xs font-bold text-orange-400 uppercase tracking-widest mb-6">
               <Zap className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>Why creators plateau</span>
-            </motion.div>
+            </div>
 
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-5 leading-tight tracking-tight"
-            >
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-5 leading-tight tracking-tight">
               The 3 things that{' '}
               <span className="bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
                 kill your growth
               </span>
-            </motion.h2>
+            </h2>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-white/50 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed"
-            >
+            <p className="text-white/50 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
               It's not your content. It's the invisible bottlenecks eating your reach, your time, and your momentum — every single day.
-            </motion.p>
-          </motion.div>
+            </p>
+          </div>
 
           {/* Tab Selector */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.4 }}
-            className="flex flex-wrap justify-center gap-3 mb-10"
-          >
+          <div className="flex flex-wrap justify-center gap-3 mb-10">
             {bottlenecks.map((b) => {
               const Icon = b.painIcon;
               return (
@@ -255,31 +233,17 @@ export const AlgorithmScienceSection = () => {
                 </button>
               );
             })}
-          </motion.div>
+          </div>
 
           {/* Main Comparison Panel */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.5 }}
-          >
-            <AnimatePresence mode="popLayout" custom={direction}>
-              <motion.div
-                key={activeCard}
-                custom={direction}
-                variants={{
-                  enter: (dir: number) => ({ opacity: 0, x: dir * 40 }),
-                  center: { opacity: 1, x: 0 },
-                  exit: (dir: number) => ({ opacity: 0, x: dir * -40 }),
-                }}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-5"
-              >
+          <div className="relative" style={{ minHeight: '400px' }}>
+            {isMobile ? (
+              // Mobile: No animation, instant swap to prevent double gradient GPU load
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Pain Side */}
-                <div className={`p-6 md:p-8 rounded-2xl bg-gradient-to-br ${active.painColor} border ${active.painBorder} relative overflow-hidden`}>
+                <div 
+                  className={`p-6 md:p-8 rounded-2xl bg-gradient-to-br ${active.painColor} border ${active.painBorder} relative overflow-hidden`}
+                >
                   <div className="flex items-center space-x-2 mb-4">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${active.painTag} flex items-center space-x-1`}>
                       <X className="w-3 h-3" />
@@ -292,7 +256,9 @@ export const AlgorithmScienceSection = () => {
                 </div>
 
                 {/* Fix Side */}
-                <div className={`p-6 md:p-8 rounded-2xl bg-gradient-to-br ${active.fixColor} border ${active.fixBorder} relative overflow-hidden`}>
+                <div 
+                  className={`p-6 md:p-8 rounded-2xl bg-gradient-to-br ${active.fixColor} border ${active.fixBorder} relative overflow-hidden`}
+                >
                   <div className="flex items-center space-x-2 mb-4">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${active.fixTag} flex items-center space-x-1`}>
                       <CheckCircle className="w-3 h-3" />
@@ -303,24 +269,61 @@ export const AlgorithmScienceSection = () => {
                   <p className="text-white/50 text-sm leading-relaxed">{active.fixDesc}</p>
                   {active.mockAfter}
                 </div>
-              </motion.div>
-            </AnimatePresence>
-          </motion.div>
+              </div>
+            ) : (
+              // Desktop: Smooth animation
+              <AnimatePresence initial={false}>
+                <motion.div
+                  key={activeCard}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-5 absolute inset-0"
+                >
+                  {/* Pain Side */}
+                  <div 
+                    className={`p-6 md:p-8 rounded-2xl bg-gradient-to-br ${active.painColor} border ${active.painBorder} relative overflow-hidden`}
+                  >
+                    <div className="flex items-center space-x-2 mb-4">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${active.painTag} flex items-center space-x-1`}>
+                        <X className="w-3 h-3" />
+                        <span>Without Veefore</span>
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">{active.painTitle}</h3>
+                    <p className="text-white/50 text-sm leading-relaxed">{active.painDesc}</p>
+                    {active.mockBefore}
+                  </div>
+
+                  {/* Fix Side */}
+                  <div 
+                    className={`p-6 md:p-8 rounded-2xl bg-gradient-to-br ${active.fixColor} border ${active.fixBorder} relative overflow-hidden`}
+                  >
+                    <div className="flex items-center space-x-2 mb-4">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${active.fixTag} flex items-center space-x-1`}>
+                        <CheckCircle className="w-3 h-3" />
+                        <span>With Veefore</span>
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">{active.fixTitle}</h3>
+                    <p className="text-white/50 text-sm leading-relaxed">{active.fixDesc}</p>
+                    {active.mockAfter}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
 
           {/* Bottom CTA hint */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            transition={{ delay: 0.9 }}
-            className="mt-10 text-center"
-          >
+          <div className="mt-10 text-center">
             <p className="text-white/30 text-sm">
               These are the exact workflows Veefore automates from day one.{' '}
               <span className="text-white/60 underline underline-offset-4 decoration-white/20 cursor-pointer hover:text-white transition-colors">
                 See the full feature list →
               </span>
             </p>
-          </motion.div>
+          </div>
 
         </div>
       </div>

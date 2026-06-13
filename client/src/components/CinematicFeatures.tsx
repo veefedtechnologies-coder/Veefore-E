@@ -22,6 +22,16 @@ interface CinematicFeaturesProps {
 const luxuriousSpringConfig = { stiffness: 70, damping: 20, mass: 1.2 };
 
 const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index: number, activeFeature: number }) => {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => window.innerWidth < 768;
+    setIsMobile(checkMobile());
+    const handleResize = () => setIsMobile(checkMobile());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const isPast = index < activeFeature;
   const isUpcoming = index > activeFeature;
   const isActive = index === activeFeature;
@@ -60,9 +70,9 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
       }}
       className="absolute inset-0 h-[100dvh] w-full flex items-center justify-center overflow-hidden"
     >
-      {/* Background with blur effects restored */}
+      {/* Background with mobile-optimized effects */}
       <motion.div style={{ opacity }} className="absolute inset-0 pointer-events-none">
-        <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-[0.08] blur-xl md:blur-3xl`} />
+        <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-[0.08] ${isMobile ? '' : 'blur-xl md:blur-3xl'}`} />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#000_100%)]" />
       </motion.div>
 
@@ -119,9 +129,9 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
               </div>
             </div>
 
-            {/* Glows with enhanced blur */}
-            <div className={`absolute -top-10 -right-10 w-40 h-40 md:w-64 md:h-64 bg-gradient-to-br ${feature.gradient} rounded-full blur-[40px] md:blur-[150px] opacity-40 pointer-events-none`} />
-            <div className={`absolute -bottom-10 -left-10 w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr ${feature.gradient} rounded-full blur-[40px] md:blur-[120px] opacity-30 pointer-events-none`} />
+            {/* Glows with mobile-optimized blur */}
+            <div className={`absolute -top-10 -right-10 w-40 h-40 md:w-64 md:h-64 bg-gradient-to-br ${feature.gradient} rounded-full ${isMobile ? 'blur-[20px]' : 'blur-[40px] md:blur-[150px]'} opacity-40 pointer-events-none`} />
+            <div className={`absolute -bottom-10 -left-10 w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr ${feature.gradient} rounded-full ${isMobile ? 'blur-[20px]' : 'blur-[40px] md:blur-[120px]'} opacity-30 pointer-events-none`} />
           </motion.div>
         </div>
       </div>

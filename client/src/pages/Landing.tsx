@@ -72,6 +72,8 @@ const GradientOrb = ({ className, color = 'blue' }: { className?: string, color?
 const MagneticButton = ({ children, className = '', onClick }: { children: React.ReactNode, className?: string, onClick?: () => void }) => {
   const isMobile = useIsMobile()
   const ref = useRef<HTMLButtonElement>(null)
+  
+  // IMPORTANT: All hooks must be called unconditionally (Rules of Hooks)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   const springX = useSpring(x, { stiffness: 300, damping: 20 })
@@ -92,9 +94,11 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
     y.set(0)
   }
 
+  // MOBILE OPTIMIZATION: No motion on mobile devices
+  // Return regular button AFTER all hooks have been called
   if (isMobile) {
     return (
-      <button ref={ref} onClick={onClick} className={className}>
+      <button ref={ref} onClick={onClick} className={`${className} transform-gpu`}>
         {children}
       </button>
     )
@@ -107,7 +111,7 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={onClick}
-      className={className}
+      className={`${className} transform-gpu`}
     >
       {children}
     </motion.button>
@@ -164,6 +168,8 @@ const Marquee = memo(({ children, direction = 'left' }: { children: React.ReactN
 const TiltCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => {
   const isMobile = useIsMobile()
   const ref = useRef<HTMLDivElement>(null)
+  
+  // IMPORTANT: All hooks must be called unconditionally (Rules of Hooks)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   const rotateX = useTransform(y, [-100, 100], [8, -8])
@@ -184,8 +190,10 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
     y.set(0)
   }
 
+  // MOBILE OPTIMIZATION: No tilt effect on mobile devices
+  // Return regular div AFTER all hooks have been called
   if (isMobile) {
-    return <div ref={ref} className={className}>{children}</div>
+    return <div ref={ref} className={`${className} transform-gpu`}>{children}</div>
   }
 
   return (
@@ -194,7 +202,7 @@ const TiltCard = ({ children, className = '' }: { children: React.ReactNode, cla
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className={`${className} `}
+      className={`${className} transform-gpu`}
     >
       {children}
     </motion.div>
@@ -434,6 +442,165 @@ const HooksPageContent = memo(() => (
 const BASE_WIDTH = 1000
 const BASE_HEIGHT = 600
 
+// Static Dashboard Preview for Mobile (Performance Optimization)
+const StaticDashboardPreview = memo(() => {
+  return (
+    <div className="relative mx-auto max-w-[380px] w-full px-4">
+      <div className="relative">
+        {/* iPhone mockup shell */}
+        <div className="relative bg-[#1a1a1a] rounded-[3rem] p-2 shadow-2xl border-[6px] border-[#2a2a2a]">
+          <div className="relative bg-black rounded-[2.5rem] overflow-hidden">
+            {/* Status bar */}
+            <div className="bg-[#0a0a0a] px-6 pt-3 pb-2 flex items-center justify-between">
+              <span className="text-white text-sm font-semibold">10:57</span>
+              <div className="flex items-center space-x-1">
+                {/* Signal strength */}
+                <div className="flex items-end space-x-[2px]">
+                  <div className="w-[3px] h-2 bg-white rounded-full"></div>
+                  <div className="w-[3px] h-3 bg-white rounded-full"></div>
+                  <div className="w-[3px] h-4 bg-white rounded-full"></div>
+                  <div className="w-[3px] h-5 bg-white rounded-full"></div>
+                </div>
+                {/* WiFi icon */}
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2.166 8.606a.5.5 0 01.708-.708A8 8 0 0117.126 7.9a.5.5 0 11.708.708 9 9 0 00-15.668-.002zm2.828 2.829a.5.5 0 01.708-.708 5 5 0 017.071 0 .5.5 0 11.707.707 6 6 0 00-8.486 0zm2.829 2.828a.5.5 0 01.707-.707 2 2 0 012.828 0 .5.5 0 11.708.707 3 3 0 00-4.243 0zM10 15a1 1 0 100-2 1 1 0 000 2z"/>
+                </svg>
+                {/* Battery */}
+                <div className="flex items-center space-x-0.5">
+                  <div className="w-6 h-3 border border-white rounded-sm relative">
+                    <div className="absolute inset-0.5 bg-white rounded-[1px]" style={{ width: '80%' }}></div>
+                  </div>
+                  <div className="w-[2px] h-2 bg-white rounded-full"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* App header */}
+            <div className="bg-[#0a0a0a] px-4 py-3 flex items-center justify-between border-b border-white/10">
+              <div className="flex items-center space-x-2">
+                <img src="/veefore-logo.png" alt="V" className="w-7 h-7 object-contain" />
+                <span className="text-white font-bold text-lg">eefore</span>
+              </div>
+              <button className="text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Main content - NON-SCROLLABLE, fits in viewport */}
+            <div className="bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] flex flex-col" style={{ height: '540px' }}>
+              <div className="p-3 flex flex-col flex-1 space-y-2.5">
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20">
+                    <TrendingUp className="w-4 h-4 text-blue-400 mb-1.5" />
+                    <div className="text-xl font-bold text-white">24,847</div>
+                    <div className="text-[10px] text-white/60 mt-0.5">Engagements</div>
+                    <div className="text-[10px] text-blue-400 font-semibold mt-0.5">+18%</div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20">
+                    <Clock className="w-4 h-4 text-purple-400 mb-1.5" />
+                    <div className="text-xl font-bold text-white">3,291</div>
+                    <div className="text-[10px] text-white/60 mt-0.5">Posts</div>
+                    <div className="text-[10px] text-purple-400 font-semibold mt-0.5">+42%</div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-pink-500/10 to-pink-600/5 border border-pink-500/20">
+                    <Sparkles className="w-4 h-4 text-pink-400 mb-1.5" />
+                    <div className="text-xl font-bold text-white">847</div>
+                    <div className="text-[10px] text-white/60 mt-0.5">Hooks</div>
+                    <div className="text-[10px] text-pink-400 font-semibold mt-0.5">+28%</div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/20">
+                    <Crown className="w-4 h-4 text-amber-400 mb-1.5" />
+                    <div className="text-base font-bold text-white">892/1200</div>
+                    <div className="text-[10px] text-white/60 mt-0.5">Credits</div>
+                    <div className="text-[10px] text-amber-400 font-semibold mt-0.5">74%</div>
+                  </div>
+                </div>
+
+                {/* Chart section - flex-1 fills remaining space */}
+                <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08] flex flex-col flex-1">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h3 className="text-sm font-semibold text-white">Engagement Velocity</h3>
+                    <div className="flex space-x-2 text-[10px]">
+                      <span className="flex items-center text-white/60">
+                        <span className="w-2 h-2 rounded-full bg-blue-500 mr-1" />
+                        Posts
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex-1 flex items-end space-x-1.5">
+                    {[40, 55, 45, 70, 60, 80, 75, 90, 85, 95, 88, 100].map((h, i) => (
+                      <div key={i} style={{ height: `${h}%` }} className="flex-1 rounded-t-md bg-gradient-to-t from-blue-600 to-blue-400" />
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI status card */}
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/20">
+                  <div className="flex items-start space-x-2.5">
+                    <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-green-300">AI is optimizing</h3>
+                      <p className="text-[10px] text-white/60 mt-0.5">3 posts scheduled for peak engagement</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom navigation */}
+            <div className="bg-[#0a0a0a] border-t border-white/10 px-6 py-2 flex justify-around">
+              <button className="flex flex-col items-center space-y-0.5 text-white/60">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span className="text-[9px]">Home</span>
+              </button>
+              <button className="flex flex-col items-center space-y-0.5 text-blue-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span className="text-[9px] font-medium">Dashboard</span>
+              </button>
+              <button className="flex flex-col items-center space-y-0.5 text-white/60">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="text-[9px]">Create</span>
+              </button>
+              <button className="flex flex-col items-center space-y-0.5 text-white/60">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span className="text-[9px]">Alerts</span>
+              </button>
+              <button className="flex flex-col items-center space-y-0.5 text-white/60">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span className="text-[9px]">Profile</span>
+              </button>
+            </div>
+
+            {/* iPhone home indicator */}
+            <div className="bg-[#0a0a0a] pb-2 flex justify-center">
+              <div className="w-28 h-1 bg-white/30 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Physical buttons */}
+        <div className="absolute -left-[2px] top-24 w-[2px] h-8 bg-[#1a1a1a] rounded-l"></div>
+        <div className="absolute -left-[2px] top-36 w-[2px] h-12 bg-[#1a1a1a] rounded-l"></div>
+        <div className="absolute -left-[2px] top-52 w-[2px] h-12 bg-[#1a1a1a] rounded-l"></div>
+        <div className="absolute -right-[2px] top-32 w-[2px] h-16 bg-[#1a1a1a] rounded-r"></div>
+      </div>
+    </div>
+  )
+})
+
 const AnimatedDashboard = memo(() => {
   const [activePage, setActivePage] = useState(0)
   const [cursorPos, setCursorPos] = useState({ x: 50, y: 12 })
@@ -444,6 +611,7 @@ const AnimatedDashboard = memo(() => {
   const sidebarRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
+  // IMPORTANT: Detect mobile state first with useEffect (must be unconditional)
   useEffect(() => {
     const checkMobile = () => window.innerWidth < 768
     setIsMobile(checkMobile())
@@ -466,6 +634,7 @@ const AnimatedDashboard = memo(() => {
     { name: 'Analytics', pageIndex: null }
   ]
 
+  // IMPORTANT: All hooks must be called unconditionally (Rules of Hooks)
   const getCursorPosition = useCallback((itemIndex: number) => {
     const item = itemRefs.current[itemIndex]
     const sidebar = sidebarRef.current
@@ -484,6 +653,9 @@ const AnimatedDashboard = memo(() => {
   }, [])
 
   useEffect(() => {
+    // Skip animation logic on mobile
+    if (isMobile) return
+    
     let isMounted = true
     const timeouts: NodeJS.Timeout[] = []
 
@@ -575,6 +747,9 @@ const AnimatedDashboard = memo(() => {
   }, [getCursorPosition, isMobile])
 
   useEffect(() => {
+    // Skip resize observer on mobile
+    if (isMobile) return
+    
     const wrapper = wrapperRef.current
     if (!wrapper) return
 
@@ -590,7 +765,13 @@ const AnimatedDashboard = memo(() => {
     resizeObserver.observe(wrapper)
 
     return () => resizeObserver.disconnect()
-  }, [])
+  }, [isMobile])
+  
+  // MOBILE OPTIMIZATION: Show static preview instead of heavy animation
+  // Return AFTER all hooks have been called
+  if (isMobile) {
+    return <StaticDashboardPreview />
+  }
 
   return (
     <div ref={wrapperRef} className="relative mx-auto max-w-[1000px] w-full">
@@ -925,22 +1106,8 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       {/* Live Dashboard Preview Section */}
       <section className="relative pt-8 pb-20 md:pb-32 -mt-20 z-20 w-full overflow-visible">
         <div className="w-full px-4 md:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 160, scale: 0.95, rotateX: 5 }}
-            whileInView={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
-            viewport={{ once: false, amount: 0, margin: "0px 0px 300px 0px" }}
-            onViewportEnter={() => {
-              // Gentle haptic feedback as it locks into place
-              if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate(20);
-              }
-            }}
-            transition={{
-              opacity: { duration: 0.5, delay: 0.1 },
-              y: { type: 'spring', stiffness: 120, damping: 20, mass: 1.8, delay: 0.1 },
-              scale: { type: 'spring', stiffness: 100, damping: 20, mass: 1.5, delay: 0.1 },
-              rotateX: { type: 'spring', stiffness: 100, damping: 20, mass: 1.5, delay: 0.1 },
-            }}
+          {/* FIXED: Removed scroll reveal animation (once: false) that caused dashboard to disappear/reappear on scroll */}
+          <div
             style={{ perspective: 1200, transformStyle: 'preserve-3d' }}
             className="relative w-full"
           >
@@ -1077,7 +1244,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 </div>
               </motion.div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
@@ -1232,11 +1399,11 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       )}
 
       {/* ====== FEATURE BENTO GRID (DESIGN84) ====== */}
-      <section className="relative py-24 md:py-32 px-6">
-        <div className="max-w-7xl mx-auto">
+      <section className="relative py-12 sm:py-16 md:py-24 lg:py-32 px-3 sm:px-4 md:px-6 lg:px-8">
+        <div className="w-full max-w-7xl mx-auto">
           {/* Section Header */}
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight text-white mb-4">
+          <div className="text-center mb-8 sm:mb-12 md:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-semibold tracking-tight text-white mb-3 sm:mb-4 px-2 sm:px-4">
               A complete growth engine,
               <br />
               <span className="text-zinc-400">Powered by intelligence.</span>
@@ -1244,104 +1411,104 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           </div>
 
           {/* Bento Grid Container */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 auto-rows-fr">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 sm:gap-3 md:gap-4 auto-rows-fr">
             
             {/* Large Card 1: AI Generation (2/3 width) */}
-            <div className="lg:col-span-2 group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+            <div className="lg:col-span-2 group relative overflow-hidden rounded-lg sm:rounded-xl md:rounded-2xl bg-zinc-900/30 border border-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
               {/* Hidden glow that reveals on hover */}
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px]" />
               </div>
               
               <div className="relative z-10">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="w-12 h-12 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                    <Brain className="w-6 h-6 text-indigo-400" />
+                <div className="flex items-start justify-between mb-3 sm:mb-4 md:mb-6">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                    <Brain className="w-4.5 h-4.5 sm:w-5 sm:h-5 md:w-6 md:h-6 text-indigo-400" />
                   </div>
-                  <span className="bg-white/5 border border-white/10 rounded-full px-3 py-1 text-xs text-zinc-300">AI-Powered</span>
+                  <span className="bg-white/5 border border-white/10 rounded-full px-2 sm:px-2.5 md:px-3 py-0.5 sm:py-0.5 md:py-1 text-[9px] sm:text-[10px] md:text-xs text-zinc-300">AI-Powered</span>
                 </div>
                 
-                <h3 className="text-2xl font-semibold text-white mb-3 tracking-tight">Context-Aware AI Engine</h3>
-                <p className="text-base text-zinc-400 leading-relaxed mb-6">
+                <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-1.5 sm:mb-2 md:mb-3 tracking-tight">Context-Aware AI Engine</h3>
+                <p className="text-xs sm:text-sm md:text-base text-zinc-400 leading-relaxed mb-3 sm:mb-4 md:mb-6">
                   Our AI understands your niche, audience demographics, and content style to generate perfectly tailored captions, hashtags, and posting strategies that resonate with your unique brand voice.
                 </p>
                 
                 {/* Mock AI Interface */}
-                <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4 space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-xs text-zinc-500 uppercase tracking-widest">Operational</span>
+                <div className="rounded-lg bg-white/[0.02] border border-white/5 p-2.5 sm:p-3 md:p-4 space-y-1.5 sm:space-y-2 md:space-y-3">
+                  <div className="flex items-center space-x-1.5 sm:space-x-2">
+                    <div className="w-1.5 h-1.5 sm:w-1.5 sm:h-1.5 md:w-2 md:h-2 rounded-full bg-green-500" />
+                    <span className="text-[9px] sm:text-[10px] md:text-xs text-zinc-500 uppercase tracking-widest">Operational</span>
                   </div>
-                  <div className="space-y-2">
-                    <div className="h-2 bg-zinc-800 rounded-full w-full" />
-                    <div className="h-2 bg-zinc-800 rounded-full w-4/5" />
-                    <div className="h-2 bg-indigo-500/20 rounded-full w-3/5" />
+                  <div className="space-y-1 sm:space-y-1.5 md:space-y-2">
+                    <div className="h-1.5 sm:h-1.5 md:h-2 bg-zinc-800 rounded-full w-full" />
+                    <div className="h-1.5 sm:h-1.5 md:h-2 bg-zinc-800 rounded-full w-4/5" />
+                    <div className="h-1.5 sm:h-1.5 md:h-2 bg-indigo-500/20 rounded-full w-3/5" />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Small Card 1: Multi-platform (1/3 width) */}
-            <div className="group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+            <div className="group relative overflow-hidden rounded-lg sm:rounded-xl md:rounded-2xl bg-zinc-900/30 border border-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
               </div>
               
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                  <Layers className="w-6 h-6 text-white" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-3 sm:mb-4 md:mb-6">
+                  <Layers className="w-4.5 h-4.5 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3 tracking-tight">Multi-platform</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-1.5 sm:mb-2 md:mb-3 tracking-tight">Multi-platform</h3>
+                <p className="text-xs sm:text-xs md:text-sm text-zinc-400 leading-relaxed">
                   Publish across Instagram, TikTok, and YouTube from one unified dashboard.
                 </p>
               </div>
             </div>
 
             {/* Small Card 2: Analytics (1/3 width) */}
-            <div className="group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+            <div className="group relative overflow-hidden rounded-lg sm:rounded-xl md:rounded-2xl bg-zinc-900/30 border border-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
               </div>
               
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                  <BarChart3 className="w-6 h-6 text-white" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-3 sm:mb-4 md:mb-6">
+                  <BarChart3 className="w-4.5 h-4.5 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3 tracking-tight">Analytics</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-1.5 sm:mb-2 md:mb-3 tracking-tight">Analytics</h3>
+                <p className="text-xs sm:text-xs md:text-sm text-zinc-400 leading-relaxed">
                   Deep insights into engagement, reach, and audience growth patterns.
                 </p>
               </div>
             </div>
 
             {/* Large Card 2: Collaboration (2/3 width) */}
-            <div className="lg:col-span-2 group relative overflow-hidden rounded-2xl bg-zinc-900/30 border border-white/5 p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
+            <div className="lg:col-span-2 group relative overflow-hidden rounded-lg sm:rounded-xl md:rounded-2xl bg-zinc-900/30 border border-white/5 p-4 sm:p-6 md:p-8 backdrop-blur-sm transition-colors hover:bg-zinc-900/50">
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px]" />
               </div>
               
               <div className="relative z-10">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-                    <Users className="w-6 h-6 text-white" />
+                <div className="flex items-start justify-between mb-3 sm:mb-4 md:mb-6">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                    <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
                   </div>
-                  <span className="bg-amber-500/10 border border-amber-500/20 rounded-full px-3 py-1 text-xs text-amber-400">Team Ready</span>
+                  <span className="bg-amber-500/10 border border-amber-500/20 rounded-full px-2 sm:px-2.5 md:px-3 py-0.5 sm:py-0.5 md:py-1 text-[9px] sm:text-[10px] md:text-xs text-amber-400">Team Ready</span>
                 </div>
                 
-                <h3 className="text-2xl font-semibold text-white mb-3 tracking-tight">Seamless Collaboration</h3>
-                <p className="text-base text-zinc-400 leading-relaxed mb-6">
+                <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-1.5 sm:mb-2 md:mb-3 tracking-tight">Seamless Collaboration</h3>
+                <p className="text-xs sm:text-sm md:text-base text-zinc-400 leading-relaxed mb-3 sm:mb-4 md:mb-6">
                   Work together with your team in real-time. Assign roles, share workspaces, and maintain brand consistency across all your content creation workflows.
                 </p>
                 
                 {/* Mock Avatar Cluster */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
                   <div className="flex -space-x-2">
                     {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="w-8 h-8 rounded-full bg-zinc-800 border-2 border-zinc-900" />
+                      <div key={i} className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full bg-zinc-800 border-2 border-zinc-900" />
                     ))}
                   </div>
-                  <span className="text-xs text-zinc-500 ml-2">+12 team members</span>
+                  <span className="text-[9px] sm:text-[10px] md:text-xs text-zinc-500 ml-1 sm:ml-2">+12 team members</span>
                 </div>
               </div>
             </div>
@@ -1489,13 +1656,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <GradientOrb className="w-[500px] h-[500px] top-1/2 right-0 translate-x-1/2 -translate-y-1/2 opacity-30" color="indigo" />
 
         <div className="max-w-[1100px] mx-auto px-6 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
+          <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-400 uppercase tracking-widest mb-6">
               <BarChart3 className="w-4 h-4" />
               <span>The Evolution</span>
@@ -1506,7 +1667,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
             <p className="text-lg text-white/40 max-w-2xl mx-auto">
               Traditional tools were built for 2015. VeeFore is built for the AI era.
             </p>
-          </motion.div>
+          </div>
 
           <div className="space-y-4">
             {[
@@ -1541,16 +1702,10 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 metric: "94% Accuracy"
               }
             ].map((card, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-              >
+              <div key={i}>
                 <div className="group relative overflow-hidden rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all duration-500">
                   {/* Subtle hover glow */}
-                  <div className={`absolute inset - 0 bg - gradient - to - r ${card.gradient} opacity - 0 group - hover: opacity - [0.03] transition - opacity duration - 500 pointer - events - none`} />
+                  <div className={`absolute inset-0 bg-gradient-to-r ${card.gradient} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-500 pointer-events-none`} />
 
                   <div className="flex flex-col md:flex-row items-stretch">
                     {/* Old Way - 40% width */}
@@ -1574,7 +1729,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         </div>
                         {/* Metric */}
                         <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 w-fit">
-                          <div className={`w - 1.5 h - 1.5 rounded - full bg - gradient - to - r ${card.gradient} `} />
+                          <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${card.gradient}`} />
                           <span className="text-xs font-mono font-medium text-white/70">{card.metric}</span>
                         </div>
                       </div>
@@ -1584,7 +1739,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
 
@@ -1722,13 +1877,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           {/* FAQ Grid */}
           <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
             {faqs.map((faq, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-              >
+              <div key={i}>
                 <div className="h-full bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] rounded-xl sm:rounded-2xl overflow-hidden hover:border-white/10 transition-colors duration-300">
                   <button
                     onClick={() => setActiveFaq(activeFaq === i ? null : i)}
@@ -1762,7 +1911,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     )}
                   </AnimatePresence>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
 
@@ -1794,11 +1943,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         <GradientOrb className="w-[800px] h-[800px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" color="purple" />
 
         <div className="max-w-[900px] mx-auto px-6 text-center relative">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.05, margin: "0px 0px -100px 0px" }}
-          >
+          <div>
             <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-8">
               Don't miss the <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">beta launch</span>
             </h2>
@@ -1815,7 +1960,7 @@ const Landing = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                 <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
               </span>
             </button>
-          </motion.div>
+          </div>
         </div>
       </section>
 
