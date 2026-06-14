@@ -48,6 +48,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
+    "@aws-sdk/client-s3": "^3.1068.0",
+    "@aws-sdk/s3-request-presigner": "^3.1068.0",
     "@bull-board/api": "^7.1.5",
     "@bull-board/express": "^7.1.5",
     "@google/genai": "^1.15.0",
