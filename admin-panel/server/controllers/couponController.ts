@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import Coupon from '../models/Coupon';
 import AuditLog from '../models/AuditLog';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 
 export class CouponController {
   // Get all coupons with filtering

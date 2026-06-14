@@ -1,6 +1,6 @@
 import express from 'express';
 import { AIModerationController } from '../controllers/aiModerationController';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/adminAuth';
 import { validatePagination, validateSearch } from '../middleware/validation';
 
 const router = express.Router();

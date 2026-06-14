@@ -2,13 +2,110 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
+import crypto from 'crypto';
 import Admin from '../models/Admin';
 import AdminInvite from '../models/AdminInvite';
 import AuditLog from '../models/AuditLog';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 import { validateLogin, validatePasswordChange } from '../middleware/validation';
 import { sendEmail } from '../utils/email';
 import { generateDeviceFingerprint } from '../utils/security';
+
+/**
+ * Parse User-Agent string to extract device information
+ */
+function parseUserAgent(userAgent: string) {
+  const ua = userAgent.toLowerCase();
+  
+  let deviceType: 'desktop' | 'mobile' | 'tablet' = 'desktop';
+  if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)) {
+    deviceType = 'mobile';
+  } else if (/tablet|ipad/i.test(ua)) {
+    deviceType = 'tablet';
+  }
+
+  let os = 'unknown';
+  if (/windows/i.test(ua)) os = 'Windows';
+  else if (/mac os x/i.test(ua)) os = 'macOS';
+  else if (/linux/i.test(ua)) os = 'Linux';
+  else if (/android/i.test(ua)) os = 'Android';
+  else if (/ios|iphone|ipad/i.test(ua)) os = 'iOS';
+
+  let browser = 'unknown';
+  let version = 'unknown';
+  if (/chrome/i.test(ua) && !/edge|edg/i.test(ua)) {
+    browser = 'Chrome';
+    const match = ua.match(/chrome\/(\d+)/);
+    if (match) version = match[1];
+  } else if (/firefox/i.test(ua)) {
+    browser = 'Firefox';
+    const match = ua.match(/firefox\/(\d+)/);
+    if (match) version = match[1];
+  } else if (/safari/i.test(ua) && !/chrome/i.test(ua)) {
+    browser = 'Safari';
+    const match = ua.match(/version\/(\d+)/);
+    if (match) version = match[1];
+  } else if (/edge|edg/i.test(ua)) {
+    browser = 'Edge';
+    const match = ua.match(/edg\/(\d+)/);
+    if (match) version = match[1];
+  }
+
+  return {
+    type: deviceType,
+    os,
+    browser,
+    version
+  };
+}
+
+/**
+ * Parse User-Agent string to extract device information
+ */
+function parseUserAgent(userAgent: string) {
+  const ua = userAgent.toLowerCase();
+  
+  let deviceType: 'desktop' | 'mobile' | 'tablet' = 'desktop';
+  if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)) {
+    deviceType = 'mobile';
+  } else if (/tablet|ipad/i.test(ua)) {
+    deviceType = 'tablet';
+  }
+
+  let os = 'unknown';
+  if (/windows/i.test(ua)) os = 'Windows';
+  else if (/mac os x/i.test(ua)) os = 'macOS';
+  else if (/linux/i.test(ua)) os = 'Linux';
+  else if (/android/i.test(ua)) os = 'Android';
+  else if (/ios|iphone|ipad/i.test(ua)) os = 'iOS';
+
+  let browser = 'unknown';
+  let version = 'unknown';
+  if (/chrome/i.test(ua) && !/edge|edg/i.test(ua)) {
+    browser = 'Chrome';
+    const match = ua.match(/chrome\/(\d+)/);
+    if (match) version = match[1];
+  } else if (/firefox/i.test(ua)) {
+    browser = 'Firefox';
+    const match = ua.match(/firefox\/(\d+)/);
+    if (match) version = match[1];
+  } else if (/safari/i.test(ua) && !/chrome/i.test(ua)) {
+    browser = 'Safari';
+    const match = ua.match(/version\/(\d+)/);
+    if (match) version = match[1];
+  } else if (/edge|edg/i.test(ua)) {
+    browser = 'Edge';
+    const match = ua.match(/edg\/(\d+)/);
+    if (match) version = match[1];
+  }
+
+  return {
+    type: deviceType,
+    os,
+    browser,
+    version
+  };
+}
 
 export class AuthController {
   // Login
@@ -182,11 +279,33 @@ export class AuthController {
       }
       await admin.save();
 
+      // Generate username if missing
+      if (!admin.username) {
+        const emailPrefix = admin.email.split('@')[0];
+        const baseUsername = emailPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        
+        // Ensure username is unique
+        let username = baseUsername;
+        let counter = 1;
+        
+        while (await Admin.findOne({ username })) {
+          username = `${baseUsername}${counter}`;
+          counter++;
+        }
+        
+        admin.username = username;
+      }
+
+      // Update last login
+      admin.lastLogin = new Date();
+      if (deviceFingerprint) {
+        if (!admin.deviceFingerprints.includes(deviceFingerprint)) {
+          admin.deviceFingerprints.push(deviceFingerprint);
+        }
+      }
+      await admin.save();
+
       // Generate JWT token
-      console.log('🔍 Login Debug:');
-      console.log('  - JWT_SECRET exists:', !!process.env.JWT_SECRET);
-      console.log('  - JWT_SECRET length:', process.env.JWT_SECRET?.length);
-      
       let token;
       try {
         token = jwt.sign(
@@ -200,9 +319,6 @@ export class AuthController {
           process.env.JWT_SECRET!,
           { expiresIn: '24h' }
         );
-        
-        console.log('  - Generated token length:', token.length);
-        console.log('  - Generated token preview:', token.substring(0, 50) + '...');
       } catch (jwtError) {
         console.error('❌ JWT Generation Error:', jwtError);
         return res.status(500).json({
@@ -554,20 +670,21 @@ export class AuthController {
   // Get admin sessions
   static async getSessions(req: AuthRequest, res: Response) {
     try {
-      // This would typically be stored in Redis or similar
-      // For now, we'll return a mock response
+      // Return sessions from admin model
+      const sessions = req.admin.getActiveSessions();
+      
       res.json({
         success: true,
         data: {
-          sessions: [
-            {
-              id: '1',
-              ipAddress: req.ip || 'unknown',
-              userAgent: req.get('User-Agent') || 'unknown',
-              lastActive: new Date(),
-              isCurrent: true
-            }
-          ]
+          sessions: sessions.map((session: any) => ({
+            id: session.sessionId,
+            ipAddress: session.ipAddress,
+            userAgent: session.userAgent,
+            deviceInfo: session.deviceInfo,
+            location: session.location,
+            lastActivity: session.lastActivity,
+            isActive: session.isActive
+          }))
         }
       });
     } catch (error) {

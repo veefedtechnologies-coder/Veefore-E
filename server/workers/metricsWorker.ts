@@ -9,11 +9,14 @@ import {
   redisConnection,
   isRedisAvailable
 } from '../queues/metricsQueue';
-import InstagramApiService, { InstagramApiError } from '../services/instagramApi';
+import { InstagramService, InstagramApiError } from '../features/instagram/services/instagram.service';
 import TokenManager from '../services/tokenManager';
 import Metrics, { IMetrics } from '../models/Metrics';
 import IORedis from 'ioredis';
 import { getRedisOptions } from '../lib/redis';
+
+// Create singleton instance of InstagramService
+const instagramService = new InstagramService();
 
 export class MetricsWorker {
   private static metricsWorker: Worker;
@@ -148,7 +151,7 @@ export class MetricsWorker {
                     if (!token) continue;
                     
                     // forceRefresh=true: daily snapshots must use real counts, not cached values
-                    const igInfo = await InstagramApiService.getAccountInfo(token, account.accountId, true);
+                    const igInfo = await instagramService.getUserProfile(token, account.accountId);
                     if (igInfo && typeof igInfo.followers_count === 'number') {
                       const today = new Date();
                       today.setUTCHours(0, 0, 0, 0);

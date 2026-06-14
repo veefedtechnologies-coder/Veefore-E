@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import MaintenanceBanner from '../models/MaintenanceBanner';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 
 export class MaintenanceBannerController {
   // Get all maintenance banners

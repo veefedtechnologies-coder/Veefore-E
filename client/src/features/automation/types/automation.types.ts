@@ -107,6 +107,8 @@ export interface AutomationRule {
   targetMediaIds: string[]
   responses: any
   isActive: boolean
+  createdAt?: string | Date
+  updatedAt?: string | Date
 }
 
 export interface Step {

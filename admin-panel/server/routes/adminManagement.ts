@@ -1,9 +1,9 @@
 import express from 'express';
 import Admin from '../models/Admin';
-import { rbac } from '../middleware/auth';
+import { rbac } from '../middleware/adminAuth';
 import { auditLog } from '../middleware/auditLog';
 import CredentialGenerator from '../utils/credentialGenerator';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 
 const router = express.Router();
 

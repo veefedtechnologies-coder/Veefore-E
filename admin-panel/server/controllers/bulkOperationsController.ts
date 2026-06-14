@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 import User from '../models/User';
 import Admin from '../models/Admin';
 import Subscription from '../models/Subscription';

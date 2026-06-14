@@ -8,6 +8,9 @@
 
 // Components
 export { VideoPromptStep } from './components/VideoPromptStep';
+export { VideoSettingsStep } from './components/VideoSettingsStep';
+export { VideoScriptEditor } from './components/VideoScriptEditor';
+export { VideoPreview } from './components/VideoPreview';
 
 // Hooks
 export { useVideoGeneration } from './hooks/useVideoGeneration';

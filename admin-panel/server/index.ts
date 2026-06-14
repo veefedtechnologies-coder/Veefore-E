@@ -51,7 +51,7 @@ import adminManagementRoutes from './routes/adminManagement';
 import { SystemMonitoringService } from './services/systemMonitoringService';
 
 // Import middleware
-import { authenticate } from './middleware/auth';
+import { authenticate } from './middleware/adminAuth';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 

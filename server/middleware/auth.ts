@@ -1,49 +1,26 @@
-import { Request, Response, NextFunction } from 'express'
-import { admin } from '../firebase-admin'
+/**
+ * Main App Authentication Middleware
+ * 
+ * This file now re-exports the shared authentication middleware from /shared/middleware/auth.middleware.ts
+ * Maintains backward compatibility with existing imports.
+ * 
+ * Migration: Task 11.7 - Migrate Main_App to use shared auth modules
+ * Requirements: 8.3, 8.4
+ */
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    uid: string
-    email?: string
-    displayName?: string
-  }
-}
+// Re-export everything from shared auth middleware
+export {
+  authenticateUser,
+  requireAdmin,
+  requireWorkspace,
+  checkPermission,
+  optionalAuth,
+  authenticateToken,
+  authenticateJWT,
+  AuthenticationError,
+  type AuthenticatedRequest
+} from '../shared/middleware/auth.middleware';
 
-export const authenticateToken = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const authHeader = req.headers.authorization
-    const token = authHeader && authHeader.split(' ')[1]
+// Backward compatibility: requireAuth is an alias for authenticateUser
+export { authenticateUser as requireAuth } from '../shared/middleware/auth.middleware';
 
-    if (!token) {
-      return res.status(401).json({ error: 'Access token is required' })
-    }
-
-    // Verify Firebase ID token
-    const decodedToken = await admin.auth().verifyIdToken(token)
-    
-    req.user = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      displayName: decodedToken.name
-    }
-
-    next()
-  } catch (error) {
-    console.error('Authentication error:', error)
-    return res.status(403).json({ error: 'Invalid or expired token' })
-  }
-}
-
-// Export authenticateJWT as alias for backward compatibility
-export const authenticateJWT = authenticateToken
-
-export const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' })
-  }
-  next()
-}

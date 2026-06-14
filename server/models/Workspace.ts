@@ -226,4 +226,4 @@ WorkspaceSchema.index({ ownerId: 1 });
 WorkspaceSchema.index({ members: 1 });
 WorkspaceSchema.index({ plan: 1 });
 
-export default mongoose.model<IWorkspace>('Workspace', WorkspaceSchema);
+export default mongoose.models.Workspace || mongoose.model<IWorkspace>('Workspace', WorkspaceSchema);

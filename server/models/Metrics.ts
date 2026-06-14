@@ -310,4 +310,4 @@ MetricsSchema.index({ startDate: 1, endDate: 1 });
 // TTL index to automatically clean old metrics (optional - 90 days)
 MetricsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
 
-export default mongoose.model<IMetrics>('Metrics', MetricsSchema);
+export default mongoose.models.Metrics || mongoose.model<IMetrics>('Metrics', MetricsSchema);

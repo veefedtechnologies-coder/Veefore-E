@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/adminController';
 import { validateAdminCreate, validateAdminUpdate, validatePagination, validateSearch } from '../middleware/validation';
-import { requireRole, requirePermission, auditLog } from '../middleware/auth';
+import { requireRole, requirePermission, auditLog } from '../middleware/adminAuth';
 
 const router = Router();
 

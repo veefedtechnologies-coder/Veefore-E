@@ -9,7 +9,7 @@ import {
   exportUsers, 
   getUserDetails 
 } from '../controllers/userController';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/adminAuth';
 
 const router = Router();
 

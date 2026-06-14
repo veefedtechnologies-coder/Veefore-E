@@ -21,13 +21,30 @@
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "test": "vitest run",
+    "test:server": "npx vitest run server/features/",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
     "test:bug-exploration": "vitest run tests/ai-generation-bug-exploration.test.ts",
     "test:landing-bug": "vitest run tests/landing-early-access-bug-exploration.client.test.tsx --config vitest.client.config.ts",
     "admin:dev": "cd admin-panel && npm run dev",
     "admin:build": "cd admin-panel && npm run build",
-    "admin:start": "cd admin-panel && npm run start"
+    "admin:start": "cd admin-panel && npm run start",
+    "lint": "npx eslint \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" --max-warnings 50",
+    "lint:fix": "npx eslint \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" --fix",
+    "format": "npx prettier --write \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\"",
+    "format:check": "npx prettier --check \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\"",
+    "build:parallel": "node -e \"const {execSync} = require('child_process'); const {spawnSync} = require('child_process'); Promise.all([import('child_process').then(cp => new Promise((r,j) => { const p = cp.spawn('npm', ['run','client:build'], {stdio:'inherit',shell:true}); p.on('close', c => c===0?r():j(c)); })), import('child_process').then(cp => new Promise((r,j) => { const p = cp.spawn('npm', ['run','server:build'], {stdio:'inherit',shell:true}); p.on('close', c => c===0?r():j(c)); }))]).catch(process.exit)\"",
+    "prepare": "husky || true"
+  },
+  "lint-staged": {
+    "client/src/**/*.{ts,tsx}": [
+      "prettier --write"
+    ],
+    "server/**/*.ts": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
@@ -124,6 +141,7 @@
     "zod-validation-error": "^3.5.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "4.17.21",
@@ -144,6 +162,7 @@
     "@vitest/ui": "^4.1.8",
     "axios": "^1.17.0",
     "fast-check": "^4.8.0",
+    "happy-dom": "^20.10.3",
     "selfsigned": "^3.0.1",
     "supertest": "^7.2.2",
     "tsx": "^4.20.3",

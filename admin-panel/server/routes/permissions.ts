@@ -12,7 +12,7 @@ import {
   getPermissionCategories, 
   getPermissionsByRiskLevel 
 } from '../utils/permissions';
-import { rbac } from '../middleware/auth';
+import { rbac } from '../middleware/adminAuth';
 
 const router = express.Router();
 

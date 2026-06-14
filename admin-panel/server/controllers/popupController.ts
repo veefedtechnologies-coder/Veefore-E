@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import Popup from '../models/Popup';
 import AuditLog from '../models/AuditLog';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 
 export class PopupController {
   // Get all popups with filtering

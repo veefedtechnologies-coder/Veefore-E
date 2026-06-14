@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 import SystemMetrics from '../models/SystemMetrics';
 import { SystemMonitoringService } from '../services/systemMonitoringService';
 

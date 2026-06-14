@@ -38,6 +38,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
+    "@aws-sdk/client-s3": "^3.1068.0",
+    "@aws-sdk/s3-request-presigner": "^3.1068.0",
     "@google/generative-ai": "^0.24.1",
     "@sendgrid/mail": "^8.1.5",
     "axios": "^1.9.0",

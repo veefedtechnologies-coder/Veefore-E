@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requirePermission, auditLog } from '../middleware/auth';
+import { requirePermission, auditLog } from '../middleware/adminAuth';
 import { validatePagination, validateSearch } from '../middleware/validation';
 
 const router = Router();

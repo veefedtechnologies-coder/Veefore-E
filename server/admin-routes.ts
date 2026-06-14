@@ -1,8 +1,21 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { storage } from "./storage";
-import { requireAdminAuth, requireRole, logAdminAction, hashPassword, verifyPassword, generateToken, AdminRequest } from "./admin-auth";
+import { requireAdminAuth, logAdminAction, hashPassword, verifyPassword, generateToken, AdminRequest } from "./admin-auth";
+// Task 18.5: use the modular permission middleware (Task 18.3) backed by the
+// PermissionService (Task 18.2) instead of the inline role check from
+// ./admin-auth. The service-backed checker applies role hierarchy so a
+// superadmin implicitly satisfies an `admin` requirement.
+import { requireRole } from "./features/admin/middleware";
+import { configureAdminPermissions } from "./features/admin/permissionChecker";
 import { insertAdminSchema, insertNotificationSchema, insertPopupSchema, insertAppSettingSchema, insertFeedbackMessageSchema } from "@shared/schema";
+// Task 23.3: asyncHandler eliminates repetitive try-catch blocks by forwarding
+// rejected promises directly to the centralized error handler.
+import { asyncHandler } from "./shared/middleware/errorHandler";
+
+// Activate the service-backed permission checker (role hierarchy + permission
+// inheritance) for all admin permission middleware. Idempotent.
+configureAdminPermissions();
 
 export function registerAdminRoutes(app: Express) {
   // Admin Authentication
@@ -74,84 +87,68 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Admin Dashboard Analytics
-  app.get("/api/admin/stats", requireAdminAuth, async (req: AdminRequest, res) => {
-    try {
-      const stats = await storage.getAdminStats();
-      res.json(stats);
-    } catch (error) {
-      console.error('[ADMIN STATS] Error:', error);
-      res.status(500).json({ error: "Failed to fetch stats" });
-    }
-  });
+  // Task 23.3: wrapped with asyncHandler - eliminates try-catch boilerplate
+  app.get("/api/admin/stats", requireAdminAuth, asyncHandler(async (req: AdminRequest, res) => {
+    const stats = await storage.getAdminStats();
+    res.json(stats);
+  }));
 
   // User Management
-  app.get("/api/admin/users", requireAdminAuth, async (req: AdminRequest, res) => {
-    try {
-      const { page = 1, limit = 10, search, filter } = req.query;
-      const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
-      
-      // Get users from MongoDB with pagination and search
-      const result = await storage.getAdminUsers({
-        page: pageNum,
-        limit: limitNum,
-        search: search as string,
-        filter: filter as string
-      });
-      
-      res.json(result);
-    } catch (error) {
-      console.error('[ADMIN USERS] Error:', error);
-      res.status(500).json({ error: "Failed to fetch users" });
+  // Task 23.3: wrapped with asyncHandler - eliminates try-catch boilerplate
+  app.get("/api/admin/users", requireAdminAuth, asyncHandler(async (req: AdminRequest, res) => {
+    const { page = 1, limit = 10, search, filter } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    
+    // Get users from MongoDB with pagination and search
+    const result = await storage.getAdminUsers({
+      page: pageNum,
+      limit: limitNum,
+      search: search as string,
+      filter: filter as string
+    });
+    
+    res.json(result);
+  }));
+
+  // Task 23.3: wrapped with asyncHandler - eliminates try-catch boilerplate
+  app.patch("/api/admin/users/:id", requireAdminAuth, requireRole(["admin", "superadmin"]), asyncHandler(async (req: AdminRequest, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const oldUser = await storage.getUser(parseInt(id));
+    if (!oldUser) {
+      return res.status(404).json({ error: "User not found" });
     }
-  });
 
-  app.patch("/api/admin/users/:id", requireAdminAuth, requireRole(["admin", "superadmin"]), async (req: AdminRequest, res) => {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
+    const updatedUser = await storage.updateUser(parseInt(id), updates);
 
-      const oldUser = await storage.getUser(parseInt(id));
-      if (!oldUser) {
-        return res.status(404).json({ error: "User not found" });
-      }
+    await logAdminAction(
+      req.admin!.id,
+      "UPDATE_USER",
+      "user",
+      id,
+      oldUser,
+      updates,
+      req.ip,
+      req.get('User-Agent')
+    );
 
-      const updatedUser = await storage.updateUser(parseInt(id), updates);
-
-      await logAdminAction(
-        req.admin!.id,
-        "UPDATE_USER",
-        "user",
-        id,
-        oldUser,
-        updates,
-        req.ip,
-        req.get('User-Agent')
-      );
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error('[ADMIN USER UPDATE] Error:', error);
-      res.status(500).json({ error: "Failed to update user" });
-    }
-  });
+    res.json(updatedUser);
+  }));
 
   // Content Management
-  app.get("/api/admin/content", requireAdminAuth, async (req: AdminRequest, res) => {
-    try {
-      const { page = 1, limit = 10, search, filter } = req.query;
-      const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
-      
-      const filters = filter !== 'all' ? { status: filter } : {};
-      const result = await storage.getAdminContent(pageNum, limitNum, filters);
-      
-      res.json(result);
-    } catch (error) {
-      console.error('[ADMIN CONTENT] Error:', error);
-      res.status(500).json({ error: "Failed to fetch content" });
-    }
-  });
+  // Task 23.3: wrapped with asyncHandler - eliminates try-catch boilerplate
+  app.get("/api/admin/content", requireAdminAuth, asyncHandler(async (req: AdminRequest, res) => {
+    const { page = 1, limit = 10, search, filter } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    
+    const filters = filter !== 'all' ? { status: filter } : {};
+    const result = await storage.getAdminContent(pageNum, limitNum, filters);
+    
+    res.json(result);
+  }));
 
   app.patch("/api/admin/content/:id", requireAdminAuth, requireRole(["admin", "superadmin"]), async (req: AdminRequest, res) => {
     try {

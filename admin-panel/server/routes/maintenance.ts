@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { MaintenanceController } from '../controllers/maintenanceController';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/adminAuth';
 import { validatePagination, validateSearch } from '../middleware/validation';
 
 const router = Router();

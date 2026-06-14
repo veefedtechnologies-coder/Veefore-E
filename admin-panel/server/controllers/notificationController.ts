@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import Notification from '../models/Notification';
 import User from '../models/User';
 import AuditLog from '../models/AuditLog';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 
 export class NotificationController {
   // Get all notifications with filtering

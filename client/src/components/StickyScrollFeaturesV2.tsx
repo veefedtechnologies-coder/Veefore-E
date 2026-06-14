@@ -1,12 +1,12 @@
 import { useRef, useState, memo, useEffect } from 'react';
-import { motion, useScroll, useSpring, useMotionValueEvent, useTransform } from 'framer-motion';
+import { motion, useScroll, useSpring, useMotionValueEvent, useTransform, useReducedMotion } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle, Calendar, Clock } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
 import { GPU_ACCELERATED_STYLES, MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 import { useIsMobile } from '../hooks/use-is-mobile';
 
 // Lightning fast spring config - low solver overhead
-const springConfig = { stiffness: 200, damping: 30, mass: 1 };
+// const springConfig = { stiffness: 200, damping: 30, mass: 1 };
 
 const colorMap = {
     blue: {
@@ -187,6 +187,7 @@ function mapRange(value: number, inMin: number, inMax: number, outMin: number, o
 
 const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, isMobile?: boolean }) => {
     const colors = colorMap[feature.color];
+    const prefersReducedMotion = useReducedMotion();
 
     const baseClasses = isMobile
         ? "h-full w-full flex flex-col relative z-10 bg-[#0A0A0A] overflow-hidden"
@@ -217,12 +218,14 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                             </div>
                         </div>
                         {/* Scanning laser line */}
-                        <motion.div 
-                            animate={{ x: ["0%", "100%", "0%"] }} 
-                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                            className={`absolute top-0 bottom-0 left-0 w-0.5 ${colors.bgLight} z-10`}
-                            style={{ boxShadow: `0 0 15px ${colors.orbPrimary}` }}
-                        />
+                        {!prefersReducedMotion && (
+                            <motion.div 
+                                animate={{ x: ["0%", "100%", "0%"] }} 
+                                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                className={`absolute top-0 bottom-0 left-0 w-0.5 ${colors.bgLight} z-10`}
+                                style={{ boxShadow: `0 0 15px ${colors.orbPrimary}` }}
+                            />
+                        )}
                     </div>
 
                     {/* Stats Grid */}
@@ -460,9 +463,24 @@ const mockupSpringConfigMobile = { stiffness: 120, damping: 25, mass: 1 };
 const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
     const colors = colorMap[feature.color];
     const isMobile = useIsMobile();
+    const prefersReducedMotion = useReducedMotion();
     
     // Use adaptive spring config based on device
     const springCfg = isMobile ? textSpringConfigMobile : textSpringConfig;
+
+    // Disable animations if user prefers reduced motion
+    if (prefersReducedMotion) {
+        return (
+            <div className="w-full max-w-lg">
+                <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6 md:backdrop-blur-md`}>
+                    <feature.icon className="w-3 h-3 md:w-4 md:h-4" />
+                    <span>{feature.highlight}</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 md:mb-6 leading-tight">{feature.title}</h2>
+                <p className="text-xs sm:text-sm md:text-lg md:text-xl text-white/50 leading-relaxed max-w-sm md:max-w-none">{feature.description}</p>
+            </div>
+        );
+    }
 
     return (
         <motion.div
@@ -506,6 +524,7 @@ interface MockupSlideProps {
 // Adaptive mockup spring for visible sliding transitions
 const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opacity }: MockupSlideProps) => {
     const isMobile = useIsMobile();
+    const prefersReducedMotion = useReducedMotion();
     
     // Use adaptive spring config based on device
     const springCfg = isMobile ? mockupSpringConfigMobile : mockupSpringConfig;
@@ -532,6 +551,24 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
         );
     }
 
+    // Disable animations if user prefers reduced motion
+    if (prefersReducedMotion) {
+        return (
+            <div
+                style={{
+                    ...GPU_ACCELERATED_STYLES,
+                    opacity: isVisible ? 1 : 0,
+                    display: isVisible ? 'flex' : 'none',
+                    contain: 'layout paint style'
+                }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            >
+                <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
+                <div className="block md:hidden w-full h-full"><IPhoneScreen feature={feature} /></div>
+            </div>
+        );
+    }
+
     return (
         <motion.div
             // OPTIMIZATION: Combined animation instead of individual springs (reduces GPU layers from 5 to 1)
@@ -545,8 +582,6 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
                 ...springCfg
             }}
             style={{
-                // OPTIMIZATION: Only hint GPU when visible (reduces offscreen GPU layers)
-                willChange: isVisible ? 'transform, opacity' : 'auto',
                 // Keep these - needed for proper 3D layering
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
@@ -561,31 +596,8 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
     );
 });
 
-const AmbientGlow = memo(({ colors, opacity }: { colors: typeof colorMap[ColorKey], opacity: number }) => {
-    const isMobile = useIsMobile();
-
-    return (
-        <motion.div
-            // OPTIMIZATION: Use direct animate instead of spring for background glow (simpler, less CPU)
-            animate={{ opacity: opacity }}
-            transition={{
-                type: "tween",  // Tween is sufficient for background glow
-                duration: 0.4,
-                ease: [0.22, 1, 0.36, 1]
-            }}
-            style={{ 
-                ...MOBILE_OPTIMIZED_LAYER,
-                // OPTIMIZATION: Isolate rendering
-                contain: 'layout paint style'
-            }}
-            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${colors.bg} blur-[80px] md:blur-[120px] rounded-full`}
-        />
-    );
-});
-
 const MotionTextSlide = ({ feature, index, activeFeature }: { feature: Feature; index: number; activeFeature: number }) => {
     const isPast = index < activeFeature;
-    const isUpcoming = index > activeFeature;
     const isActive = index === activeFeature;
 
     const y = isActive ? 0 : isPast ? -40 : 40;
@@ -643,7 +655,17 @@ const MotionAmbientGlow = ({ color, index, progress }: { color: any; index: numb
         }
     });
 
-    return <AmbientGlow colors={color} opacity={opacity} />;
+    return (
+        <motion.div
+            // GPU-accelerated property: opacity only
+            style={{ 
+                opacity,
+                ...MOBILE_OPTIMIZED_LAYER,
+                contain: 'layout paint style'
+            }}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${color.bg} blur-[80px] md:blur-[120px] rounded-full`}
+        />
+    );
 };
 
 export default function StickyScrollFeaturesV2() {
@@ -651,6 +673,7 @@ export default function StickyScrollFeaturesV2() {
     const [activeFeature, setActiveFeature] = useState(0);
     const [targetFeature, setTargetFeature] = useState(0);
     const lastTransitionTimeRef = useRef(0);
+    const prefersReducedMotion = useReducedMotion();
 
     const { scrollYProgress } = useScroll({
         target: containerRef,
@@ -715,7 +738,14 @@ export default function StickyScrollFeaturesV2() {
                         {features.map((_, i) => (
                             <div key={i} className={`h-1 rounded-full transition-all duration-700 ease-out relative overflow-hidden ${activeFeature === i ? 'w-14' : 'w-6'}`}>
                                 <div className="absolute inset-0 bg-white/20 rounded-full" />
-                                <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 origin-left transition-transform duration-700 ease-out ${activeFeature === i ? 'scale-x-100' : 'scale-x-0'}`} />
+                                {!prefersReducedMotion && (
+                                    <div 
+                                        className={`absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 origin-left transition-transform duration-700 ease-out ${activeFeature === i ? 'scale-x-100' : 'scale-x-0'}`}
+                                    />
+                                )}
+                                {prefersReducedMotion && activeFeature === i && (
+                                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" />
+                                )}
                             </div>
                         ))}
                     </motion.div>
@@ -737,14 +767,20 @@ export default function StickyScrollFeaturesV2() {
                             <div className="absolute inset-0 rounded-3xl opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 21px)' }} />
                             <motion.div
                                 className="absolute top-0 right-0 w-[200px] h-[200px] md:w-[500px] md:h-[500px] rounded-full transition-all duration-500"
-                                style={{ background: `radial-gradient(circle, ${activeColors.orbPrimary} 0%, transparent 60%)`, filter: 'blur(60px)' }}
-                                animate={{ scale: [1, 1.15, 1] }}
+                                style={{ 
+                                    background: `radial-gradient(circle, ${activeColors.orbPrimary} 0%, transparent 60%)`, 
+                                    filter: 'blur(60px)'
+                                }}
+                                animate={prefersReducedMotion ? { scale: 1 } : { scale: [1, 1.15, 1] }}
                                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                             />
                             <motion.div
                                 className="absolute bottom-0 left-0 w-[150px] h-[150px] md:w-[400px] md:h-[400px] rounded-full transition-all duration-500"
-                                style={{ background: `radial-gradient(circle, ${activeColors.orbSecondary} 0%, transparent 60%)`, filter: 'blur(50px)' }}
-                                animate={{ scale: [1, 1.2, 1] }}
+                                style={{ 
+                                    background: `radial-gradient(circle, ${activeColors.orbSecondary} 0%, transparent 60%)`, 
+                                    filter: 'blur(50px)'
+                                }}
+                                animate={prefersReducedMotion ? { scale: 1 } : { scale: [1, 1.2, 1] }}
                                 transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                             />
                         </motion.div>

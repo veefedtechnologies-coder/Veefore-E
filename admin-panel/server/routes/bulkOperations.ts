@@ -1,6 +1,6 @@
 import express from 'express';
 import { BulkOperationsController } from '../controllers/bulkOperationsController';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/adminAuth';
 
 const router = express.Router();
 

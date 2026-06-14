@@ -6,10 +6,6 @@ import LoadingSpinner from './components/LoadingSpinner'
 import { initializeTheme } from './lib/theme'
 import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
 import { initializeAccessibilityCompliance, useAccessibilityRouteAnnouncements } from './lib/accessibility-compliance'
-// DISABLED: initializeMobileExcellence was causing mobile flickering - see comment in useEffect below
-// import { initializeMobileExcellence } from './lib/mobile-excellence'
-// DISABLED: AdaptiveAnimationProvider had event listeners causing performance issues
-// import { AdaptiveAnimationProvider } from '@/lib/mobile-performance-optimizer'
 import { initializeSEO } from './lib/seo-optimization'
 import { initializeCoreWebVitals } from './lib/core-web-vitals'
 import { initializeComponentModernization } from './lib/component-modernization'
@@ -18,8 +14,9 @@ import { useEarlyAccessCheck } from './hooks/useEarlyAccessCheck'
 // import { WaitlistModal } from './components/waitlist/WaitlistModal'
 import { MainNavigation } from './components/MainNavigation'
 import MainFooter from './components/MainFooter'
+import { RouteErrorBoundary } from './shared/components/ErrorBoundary'
 
-import Landing from './pages/Landing'
+const Landing = React.lazy(() => import('./features/landing/Landing').then(m => ({ default: m.Landing })))
 
 const AuthenticatedApp = React.lazy(() => import('./AuthenticatedApp'))
 
@@ -43,8 +40,7 @@ const Community = React.lazy(() => import('./pages/Community'))
 const Status = React.lazy(() => import('./pages/Status'))
 const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
 const CookieConsentBanner = React.lazy(() => import('./components/CookieConsentBanner'))
-// Eagerly load WaitlistPage to prevent chunk loading errors
-import WaitlistPage from './pages/WaitlistPage'
+const WaitlistPage = React.lazy(() => import('./pages/WaitlistPage'))
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
 
 const publicRoutes = [
@@ -65,7 +61,6 @@ function App() {
   const themeInitialized = useRef(false)
   const p6Initialized = useRef(false)
   const accessibilityInitialized = useRef(false)
-  // const mobileInitialized = useRef(false)  // DISABLED with initializeMobileExcellence
   const seoInitialized = useRef(false)
   const webVitalsInitialized = useRef(false)
   const componentModernizationInitialized = useRef(false)
@@ -125,12 +120,6 @@ function App() {
         initializeAccessibilityCompliance()
         accessibilityInitialized.current = true
       }
-      // DISABLED - mobile-excellence adds many event listeners, ResizeObservers,
-      // setIntervals, and class manipulations that cause flickering on mobile
-      // if (!mobileInitialized.current) {
-      //   initializeMobileExcellence()
-      //   mobileInitialized.current = true
-      // }
       if (!seoInitialized.current) {
         initializeSEO()
         seoInitialized.current = true
@@ -228,52 +217,51 @@ function App() {
   const renderPublicPage = () => {
     switch (effectiveLocation) {
       case '/':
-        return <Landing onNavigate={handleNavigate} />
+        return <RouteErrorBoundary routeName="Home"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
       case '/features':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Features /></React.Suspense>
+        return <RouteErrorBoundary routeName="Features"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Features /></React.Suspense></RouteErrorBoundary>
       case '/pricing':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Pricing /></React.Suspense>
+        return <RouteErrorBoundary routeName="Pricing"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Pricing /></React.Suspense></RouteErrorBoundary>
       case '/changelog':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Changelog /></React.Suspense>
+        return <RouteErrorBoundary routeName="Changelog"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Changelog /></React.Suspense></RouteErrorBoundary>
       case '/about':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><About /></React.Suspense>
+        return <RouteErrorBoundary routeName="About"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><About /></React.Suspense></RouteErrorBoundary>
       case '/blog':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Blog /></React.Suspense>
+        return <RouteErrorBoundary routeName="Blog"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Blog /></React.Suspense></RouteErrorBoundary>
       case '/careers':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Careers /></React.Suspense>
+        return <RouteErrorBoundary routeName="Careers"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Careers /></React.Suspense></RouteErrorBoundary>
       case '/contact':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Contact /></React.Suspense>
+        return <RouteErrorBoundary routeName="Contact"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Contact /></React.Suspense></RouteErrorBoundary>
       case '/security':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Security /></React.Suspense>
+        return <RouteErrorBoundary routeName="Security"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Security /></React.Suspense></RouteErrorBoundary>
       case '/gdpr':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><GDPR /></React.Suspense>
+        return <RouteErrorBoundary routeName="GDPR"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><GDPR /></React.Suspense></RouteErrorBoundary>
       case '/privacy-policy':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><PrivacyPolicyPage /></React.Suspense>
+        return <RouteErrorBoundary routeName="Privacy Policy"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><PrivacyPolicyPage /></React.Suspense></RouteErrorBoundary>
       case '/terms-of-service':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><TermsOfServicePage /></React.Suspense>
+        return <RouteErrorBoundary routeName="Terms of Service"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><TermsOfServicePage /></React.Suspense></RouteErrorBoundary>
       case '/free-trial':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><FreeTrial /></React.Suspense>
+        return <RouteErrorBoundary routeName="Free Trial"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><FreeTrial /></React.Suspense></RouteErrorBoundary>
       case '/help':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><HelpCenter /></React.Suspense>
+        return <RouteErrorBoundary routeName="Help Center"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><HelpCenter /></React.Suspense></RouteErrorBoundary>
       case '/community':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Community /></React.Suspense>
+        return <RouteErrorBoundary routeName="Community"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Community /></React.Suspense></RouteErrorBoundary>
       case '/status':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><Status /></React.Suspense>
+        return <RouteErrorBoundary routeName="Status"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Status /></React.Suspense></RouteErrorBoundary>
       case '/cookies':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><CookiePolicy /></React.Suspense>
+        return <RouteErrorBoundary routeName="Cookie Policy"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><CookiePolicy /></React.Suspense></RouteErrorBoundary>
       case '/signup':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignUpIntegrated /></React.Suspense>
+        return <RouteErrorBoundary routeName="Sign Up"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignUpIntegrated /></React.Suspense></RouteErrorBoundary>
       case '/signin':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignIn onNavigate={handleNavigate} /></React.Suspense>
+        return <RouteErrorBoundary routeName="Sign In"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignIn onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
       case '/admin-login':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><AdminLogin /></React.Suspense>
-
+        return <RouteErrorBoundary routeName="Admin Login"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><AdminLogin /></React.Suspense></RouteErrorBoundary>
       case '/landing':
-        return <Landing onNavigate={handleNavigate} />
+        return <RouteErrorBoundary routeName="Landing"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
       case '/waitlist':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><WaitlistPage /></React.Suspense>
+        return <RouteErrorBoundary routeName="Waitlist"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><WaitlistPage /></React.Suspense></RouteErrorBoundary>
       case '/auth/reset-password':
-        return <React.Suspense fallback={<LoadingSpinner type="minimal" />}><ResetPassword /></React.Suspense>
+        return <RouteErrorBoundary routeName="Reset Password"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><ResetPassword /></React.Suspense></RouteErrorBoundary>
       default:
         return null
     }
@@ -290,24 +278,32 @@ function App() {
 
           {/* CRITICAL: Always show AuthenticatedApp for logged-in users, regardless of route */}
           {user ? (
-            <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
-              <AuthenticatedApp />
-            </React.Suspense>
+            <RouteErrorBoundary routeName="App">
+              <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
+                <AuthenticatedApp />
+              </React.Suspense>
+            </RouteErrorBoundary>
           ) : isPublicRoute ? (
             effectiveLocation === '/waitlist' || effectiveLocation === '/signin' || effectiveLocation === '/signup' ? (
               // Waitlist, SignIn, and SignUp pages render without header/footer
               effectiveLocation === '/waitlist' ? (
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <WaitlistPage />
-                </React.Suspense>
+                <RouteErrorBoundary routeName="Waitlist">
+                  <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                    <WaitlistPage />
+                  </React.Suspense>
+                </RouteErrorBoundary>
               ) : effectiveLocation === '/signin' ? (
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <SignIn onNavigate={handleNavigate} />
-                </React.Suspense>
+                <RouteErrorBoundary routeName="Sign In">
+                  <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                    <SignIn onNavigate={handleNavigate} />
+                  </React.Suspense>
+                </RouteErrorBoundary>
               ) : (
-                <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
-                  <SignUpIntegrated />
-                </React.Suspense>
+                <RouteErrorBoundary routeName="Sign Up">
+                  <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                    <SignUpIntegrated />
+                  </React.Suspense>
+                </RouteErrorBoundary>
               )
             ) : (
               <div className="min-h-screen bg-black text-white">
