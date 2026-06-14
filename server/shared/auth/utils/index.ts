@@ -6,7 +6,7 @@
  */
 
 import { Request } from 'express';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { authConfig } from '../config/auth.config';
 import { AuthError, AuthErrorType } from '../types';
