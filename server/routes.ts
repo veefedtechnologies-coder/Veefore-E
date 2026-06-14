@@ -19,6 +19,7 @@ import { auditTrailMiddleware } from './middleware/security-monitoring';
 import { defaultWorkspaceEnforcer } from './middleware/default-workspace-enforcer';
 import { mountV1Routes } from './routes/v1/index';
 import { createMediaUpload } from './infrastructure/media-upload';
+import storageRoutes from './features/storage/routes/storage.routes';
 
 import { default as earlyAccessRoutes } from './routes/v1/early-access.routes';
 
@@ -27,6 +28,7 @@ export { initializeLeaderElection } from './infrastructure/leader-election';
 export async function registerRoutes(app: Express, storage: IStorage, httpServer: Server, _upload?: multer.Multer): Promise<void> {
   const mediaUpload = createMediaUpload();
 
+  // Legacy upload endpoint - maintained for backwards compatibility
   app.post('/api/upload', mediaUpload.single('file'), (req: Request, res: Response) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -41,6 +43,9 @@ export async function registerRoutes(app: Express, storage: IStorage, httpServer
   });
 
   app.use('/api', defaultWorkspaceEnforcer(storage));
+
+  // Mount new storage routes with service layer architecture - Requirement 4.6
+  app.use('/api/storage', storageRoutes);
 
   app.use('/api/ai', aiRateLimiter);
 

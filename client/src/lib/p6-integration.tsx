@@ -8,7 +8,6 @@
 import { initializeSEO, SEOManager, useSEO, SEO } from './seo-optimization';
 import { AccessibilityManager } from './accessibility-compliance';
 import { initializeUXEnhancements, UXManager, useUX, useLoading, useToasts, useAutoSave } from './ux-enhancement';
-import { initializeMobileOptimization, MobileOptimizer, useMobile, useGestures } from './mobile-optimization';
 import { initializeFrontendPerformance, FrontendPerformanceOptimizer, usePerformance, OptimizedImage } from './frontend-performance';
 
 /**

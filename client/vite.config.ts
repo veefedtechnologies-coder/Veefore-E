@@ -32,6 +32,36 @@ export default defineConfig(({ mode }) => {
         secure: false,
       }
     }
-  }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor chunk: core React runtime and router
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/wouter/')
+          ) {
+            return 'vendor'
+          }
+
+          // UI chunk: animation and component libraries
+          if (
+            id.includes('node_modules/framer-motion/') ||
+            id.includes('node_modules/@radix-ui/') ||
+            id.includes('node_modules/lucide-react/')
+          ) {
+            return 'ui'
+          }
+
+          // Firebase chunk: all Firebase packages
+          if (id.includes('node_modules/firebase/') || id.includes('node_modules/@firebase/')) {
+            return 'firebase'
+          }
+        },
+      },
+    },
+  },
   }
 })

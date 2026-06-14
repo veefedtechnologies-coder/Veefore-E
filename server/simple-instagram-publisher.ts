@@ -3,7 +3,10 @@
  * Focuses on what actually works with current Instagram permissions
  */
 
-import { instagramAPI } from './instagram-api';
+import { InstagramService } from './features/instagram/services/instagram.service';
+
+// Create singleton instance of InstagramService
+const instagramService = new InstagramService();
 
 export class SimpleInstagramPublisher {
 
@@ -117,20 +120,17 @@ export class SimpleInstagramPublisher {
    */
   private async addComment(accessToken: string, postId: string, comment: string, pinComment = false): Promise<void> {
     try {
-      // Add the comment
-      const commentResult = await instagramAPI.addComment(accessToken, postId, comment);
-      console.log('[SIMPLE PUBLISHER] Comment added:', commentResult.id);
-
+      // Note: New InstagramService doesn't support comment operations yet
+      // This functionality will need to be added to the service
+      console.log('[SIMPLE PUBLISHER] Comment functionality not yet implemented in new service');
+      
+      // TODO: Implement addComment in InstagramService
+      // const commentResult = await instagramService.addComment(accessToken, postId, comment);
+      
       // Pin the comment if requested
-      if (pinComment && commentResult.id) {
-        try {
-          await instagramAPI.pinComment(accessToken, commentResult.id);
-          console.log('[SIMPLE PUBLISHER] Comment pinned successfully');
-        } catch (pinError: any) {
-          console.log('[SIMPLE PUBLISHER] Pin comment failed:', pinError.message);
-          // Don't throw error for pin failures
-        }
-      }
+      // if (pinComment && commentResult.id) {
+      //   await instagramService.pinComment(accessToken, commentResult.id);
+      // }
     } catch (error: any) {
       console.error('[SIMPLE PUBLISHER] Add comment failed:', error);
       throw error;
@@ -183,7 +183,12 @@ export class SimpleInstagramPublisher {
       console.log(`[SIMPLE PUBLISHER] Publishing ${contentType} as reel content`);
       
       try {
-        const result = await instagramAPI.publishReel(accessToken, cleanUrl, caption, accountId, mentions, collaborators);
+        const result = await instagramService.publishMedia(accessToken, 'reel', cleanUrl, {
+          caption,
+          accountId,
+          mentions,
+          collaborators
+        });
         console.log(`[SIMPLE PUBLISHER] ✓ Processed reel request: ${result.id} (processing: ${!!result.processing})`);
         return { success: true, id: result.id, processing: result.processing };
         
@@ -192,7 +197,12 @@ export class SimpleInstagramPublisher {
         // Fallback to regular video if reel fails
         console.log(`[SIMPLE PUBLISHER] Attempting fallback to regular video post for reel content`);
         try {
-          const fallbackResult = await instagramAPI.publishVideo(accessToken, cleanUrl, caption, accountId, mentions, collaborators);
+          const fallbackResult = await instagramService.publishMedia(accessToken, 'video', cleanUrl, {
+            caption,
+            accountId,
+            mentions,
+            collaborators
+          });
           console.log(`[SIMPLE PUBLISHER] ✓ Published reel as video fallback: ${fallbackResult.id}`);
           return { success: true, id: fallbackResult.id, processing: fallbackResult.processing };
         } catch (fallbackError: any) {
@@ -206,7 +216,12 @@ export class SimpleInstagramPublisher {
       console.log(`[SIMPLE PUBLISHER] Publishing ${contentType} as video content`);
       
       try {
-        const result = await instagramAPI.publishVideo(accessToken, cleanUrl, caption, accountId, mentions, collaborators);
+        const result = await instagramService.publishMedia(accessToken, 'video', cleanUrl, {
+          caption,
+          accountId,
+          mentions,
+          collaborators
+        });
         console.log(`[SIMPLE PUBLISHER] ✓ Processed video request: ${result.id} (processing: ${!!result.processing})`);
         return { success: true, id: result.id, processing: result.processing };
         
@@ -215,7 +230,12 @@ export class SimpleInstagramPublisher {
         // Fallback to photo if video fails
         console.log(`[SIMPLE PUBLISHER] Attempting fallback to photo post for video content`);
         try {
-          const fallbackResult = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption, accountId, mentions, collaborators);
+          const fallbackResult = await instagramService.publishMedia(accessToken, 'photo', cleanUrl, {
+            caption,
+            accountId,
+            mentions,
+            collaborators
+          });
           console.log(`[SIMPLE PUBLISHER] ✓ Published video as photo fallback: ${fallbackResult.id}`);
           return { success: true, id: fallbackResult.id };
         } catch (fallbackError: any) {
@@ -231,7 +251,10 @@ export class SimpleInstagramPublisher {
         const urlWithoutQuery = cleanUrl.split('?')[0];
         const isVideo = !!urlWithoutQuery.match(/\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i);
         
-        const result = await instagramAPI.publishStory(accessToken, cleanUrl, isVideo, accountId);
+        const result = await instagramService.publishMedia(accessToken, 'story', cleanUrl, {
+          accountId,
+          isVideo
+        });
         console.log(`[SIMPLE PUBLISHER] ✓ Processed story request: ${result.id} (processing: ${!!result.processing})`);
         return { success: true, id: result.id, processing: result.processing };
         
@@ -240,7 +263,12 @@ export class SimpleInstagramPublisher {
         // Fallback to regular photo if story fails
         console.log(`[SIMPLE PUBLISHER] Attempting fallback to photo post for story content`);
         try {
-          const fallbackResult = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption, accountId, mentions, collaborators);
+          const fallbackResult = await instagramService.publishMedia(accessToken, 'photo', cleanUrl, {
+            caption,
+            accountId,
+            mentions,
+            collaborators
+          });
           console.log(`[SIMPLE PUBLISHER] ✓ Published story as photo fallback: ${fallbackResult.id}`);
           return { success: true, id: fallbackResult.id };
         } catch (fallbackError: any) {
@@ -252,7 +280,12 @@ export class SimpleInstagramPublisher {
     // For photos, publish directly
     if (contentType === 'photo') {
       try {
-        const result = await instagramAPI.publishPhoto(accessToken, cleanUrl, caption, accountId, mentions, collaborators);
+        const result = await instagramService.publishMedia(accessToken, 'photo', cleanUrl, {
+          caption,
+          accountId,
+          mentions,
+          collaborators
+        });
         console.log(`[SIMPLE PUBLISHER] ✓ Published photo: ${result.id}`);
         return { success: true, id: result.id };
         

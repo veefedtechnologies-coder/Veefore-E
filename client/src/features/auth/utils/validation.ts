@@ -2,6 +2,118 @@
 // ENTERPRISE-LEVEL VALIDATION UTILITIES
 // ============================================
 
+import { z } from 'zod';
+
+// ============================================
+// ZOD SCHEMAS
+// ============================================
+
+// Email validation schema
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1, 'Email address is required')
+  .refine(
+    (email) => {
+      // RFC 5322 compliant email regex
+      const emailRegex = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
+      return emailRegex.test(email);
+    },
+    { message: 'Please enter a valid email address' }
+  )
+  .refine(
+    (email) => {
+      const disposableDomains = [
+        'tempmail.com', 'throwaway.com', 'mailinator.com', 'guerrillamail.com',
+        'temp-mail.org', 'fakeinbox.com', '10minutemail.com', 'trashmail.com',
+        'getairmail.com', 'yopmail.com', 'sharklasers.com', 'spam4.me',
+        'tempinbox.com', 'discard.email', 'mailnesia.com', 'maildrop.cc',
+        'guerrillamail.org', 'guerrillamail.net', 'throwawaymail.com',
+        'getnada.com', 'tempail.com', 'mohmal.com', 'emailondeck.com'
+      ];
+      const domain = email.split('@')[1]?.toLowerCase();
+      return !disposableDomains.includes(domain);
+    },
+    { message: 'Disposable/temporary emails are not allowed' }
+  );
+
+// Name validation schema
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(2, 'Name must be at least 2 characters')
+  .max(100, 'Name is too long (max 100 characters)')
+  .refine(
+    (name) => /^[a-zA-ZÀ-ÿ\s'-]+$/.test(name),
+    { message: 'Name contains invalid characters' }
+  )
+  .refine(
+    (name) => /[a-zA-ZÀ-ÿ]/.test(name),
+    { message: 'Name must contain at least one letter' }
+  );
+
+// Password validation schema
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128, 'Password is too long')
+  .refine(
+    (password) => {
+      const hasUppercase = /[A-Z]/.test(password);
+      const hasLowercase = /[a-z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password);
+      const typesCount = [hasUppercase, hasLowercase, hasNumber, hasSpecial].filter(Boolean).length;
+      return typesCount >= 3;
+    },
+    { message: 'Password must include at least 3 types: uppercase, lowercase, number, special' }
+  )
+  .refine(
+    (password) => {
+      const commonPatterns = ['password', '12345678', 'qwerty', 'abc123', 'letmein', 'welcome', 'admin', 'login'];
+      return !commonPatterns.some(pattern => password.toLowerCase().includes(pattern));
+    },
+    { message: 'Password is too common. Please choose a stronger password.' }
+  );
+
+// Sign up form schema
+export const signUpSchema = z.object({
+  fullName: nameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+});
+
+// Sign in form schema
+export const signInSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, 'Password is required'),
+});
+
+// Password reset request schema
+export const passwordResetRequestSchema = z.object({
+  email: emailSchema,
+});
+
+// Password reset schema
+export const passwordResetSchema = z.object({
+  password: passwordSchema,
+  confirmPassword: z.string().min(1, 'Please confirm your password'),
+}).refine(
+  (data) => data.password === data.confirmPassword,
+  { message: 'Passwords do not match', path: ['confirmPassword'] }
+);
+
+// Type exports for TypeScript
+export type SignUpFormData = z.infer<typeof signUpSchema>;
+export type SignInFormData = z.infer<typeof signInSchema>;
+export type PasswordResetRequestData = z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetData = z.infer<typeof passwordResetSchema>;
+
+// ============================================
+// UTILITY VALIDATION FUNCTIONS
+// ============================================
+
 // Strict email validation (matching waitlist standards)
 export const isValidEmail = (email: string): boolean => {
   // RFC 5322 compliant email regex - stricter than basic validation

@@ -5,7 +5,7 @@ import AdminInvite from '../models/AdminInvite';
 import Role from '../models/Role';
 import AuditLog from '../models/AuditLog';
 import { EmailService } from '../utils/email';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 import CredentialGenerator from '../utils/credentialGenerator';
 
 const emailService = new EmailService();

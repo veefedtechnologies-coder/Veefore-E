@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import Team from '../models/Team';
 import Admin from '../models/Admin';
 import AuditLog from '../models/AuditLog';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 
 export class TeamController {
   // Get all teams with filtering

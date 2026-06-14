@@ -9,7 +9,7 @@ import {
   cloneRole,
   getRoleStatistics
 } from '../controllers/roleController';
-import { rbac, auditLog } from '../middleware/auth';
+import { rbac, auditLog } from '../middleware/adminAuth';
 
 const router = express.Router();
 

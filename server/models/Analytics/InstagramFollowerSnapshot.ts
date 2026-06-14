@@ -40,4 +40,4 @@ const InstagramFollowerSnapshotSchema: Schema = new Schema(
 // Compound index to ensure only one snapshot per account per day
 InstagramFollowerSnapshotSchema.index({ accountId: 1, instagramUserId: 1, snapshotDate: 1 }, { unique: true });
 
-export default mongoose.model<IInstagramFollowerSnapshot>('InstagramFollowerSnapshot', InstagramFollowerSnapshotSchema);
+export default mongoose.models.InstagramFollowerSnapshot || mongoose.model<IInstagramFollowerSnapshot>('InstagramFollowerSnapshot', InstagramFollowerSnapshotSchema);

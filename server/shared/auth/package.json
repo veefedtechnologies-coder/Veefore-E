@@ -1,0 +1,31 @@
+{
+  "name": "@veefore/auth",
+  "version": "1.0.0",
+  "description": "Shared authentication package for Veefore-E application",
+  "main": "index.ts",
+  "types": "index.ts",
+  "private": true,
+  "keywords": [
+    "authentication",
+    "authorization",
+    "jwt",
+    "oauth",
+    "session",
+    "security"
+  ],
+  "author": "Veefore Team",
+  "license": "PRIVATE",
+  "dependencies": {
+    "express": "^4.18.0",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.0"
+  },
+  "peerDependencies": {
+    "express": "^4.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/bcrypt": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.0"
+  }
+}

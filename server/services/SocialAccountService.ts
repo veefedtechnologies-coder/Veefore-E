@@ -2,7 +2,7 @@ import { BaseService } from './BaseService';
 import { socialAccountRepository, Platform } from '../repositories';
 import { ISocialAccount } from '../models/Social';
 import { NotFoundError, ValidationError, ConflictError } from '../errors';
-import InstagramApiService from './instagramApi';
+import { InstagramService } from '../features/instagram/services/instagram.service';
 import BestActiveTimeService from './bestActiveTime';
 import { getAccessTokenFromAccount } from '../storage/converters';
 import * as fs from 'fs';
@@ -11,6 +11,9 @@ import { checkInstagramAccountExists, validateInstagramConnection } from '../uti
 import { MongoStorage } from '../mongodb-storage';
 import { InstagramOAuthService } from '../instagram-oauth';
 import { MetricsQueueManager } from '../queues/metricsQueue';
+
+// Create singleton instance of InstagramService
+const instagramService = new InstagramService();
 
 const traceLog = (msg: string, data?: any) => {
   try {
@@ -408,11 +411,88 @@ export class SocialAccountService extends BaseService {
         const daysLimit = options?.forceRefresh ? 90 : 14;
         const minPosts = options?.forceRefresh ? 100 : 10;
         
-        const data = await InstagramApiService.getComprehensiveMetrics(
-          accessToken,
-          account.accountId,
-          { fetchMedia, fetchInsights, forceRefresh: options?.forceRefresh, daysLimit, minPosts }
-        );
+        // Fetch data using new InstagramService.
+        // Profile is required; insights and media are best-effort so a single
+        // failing call (or a partially-degraded token) doesn't sink the sync.
+        const [profileResult, insightsResult, mediaResult] = await Promise.allSettled([
+          instagramService.getUserProfile(accessToken, account.accountId),
+          fetchInsights ? instagramService.getAccountInsights(accessToken, account.accountId) : Promise.resolve({} as any),
+          fetchMedia ? instagramService.getUserMedia(accessToken, minPosts, account.accountId) : Promise.resolve([])
+        ]);
+
+        // Profile is mandatory: without it there is nothing meaningful to persist.
+        if (profileResult.status === 'rejected') {
+          throw profileResult.reason;
+        }
+        const accountProfile = profileResult.value;
+
+        if (insightsResult.status === 'rejected') {
+          console.warn(`[SYNC] ⚠️ Insights fetch failed for @${account.username}, continuing without insights:`, insightsResult.reason?.message || insightsResult.reason);
+        }
+        const accountInsights = insightsResult.status === 'fulfilled' ? insightsResult.value : ({} as any);
+
+        if (mediaResult.status === 'rejected') {
+          console.warn(`[SYNC] ⚠️ Media fetch failed for @${account.username}, continuing without media:`, mediaResult.reason?.message || mediaResult.reason);
+        }
+        const mediaList = mediaResult.status === 'fulfilled' ? mediaResult.value : [];
+
+        // Build compatible data structure for existing code
+        const data = {
+          account: {
+            id: accountProfile.id,
+            username: accountProfile.username,
+            name: accountProfile.name,
+            biography: accountProfile.biography,
+            website: accountProfile.website,
+            account_type: accountProfile.account_type,
+            media_count: accountProfile.media_count,
+            followers_count: accountProfile.followers_count,
+            follows_count: accountProfile.follows_count,
+            profile_picture_url: accountProfile.profile_picture_url
+          },
+          insights: accountInsights || {},
+          recentMedia: mediaList.map(media => ({
+            id: media.id,
+            media_type: media.media_type,
+            media_url: media.media_url,
+            permalink: media.permalink,
+            thumbnail_url: media.thumbnail_url,
+            timestamp: media.timestamp,
+            caption: media.caption,
+            like_count: media.like_count,
+            comments_count: media.comments_count,
+            insights: {
+              impressions: media.impressions,
+              reach: media.reach,
+              shares: 0, // Not available in new service response
+              saves: 0,  // Not available in new service response
+              video_views: media.views
+            }
+          })),
+          aggregated: {
+            totalLikes: mediaList.reduce((sum, m) => sum + (m.like_count || 0), 0),
+            totalComments: mediaList.reduce((sum, m) => sum + (m.comments_count || 0), 0),
+            totalShares: 0,
+            totalSaves: 0,
+            totalReach: mediaList.reduce((sum, m) => sum + (m.reach || 0), 0),
+            totalImpressions: mediaList.reduce((sum, m) => sum + (m.impressions || 0), 0),
+            totalPosts: mediaList.length,
+            averageEngagementRate: 0
+          },
+          demographics: {
+            audienceCity: accountInsights?.audience_city,
+            audienceCountry: accountInsights?.audience_country,
+            audienceGenderAge: accountInsights?.audience_gender_age,
+            audienceActiveTime: accountInsights?.audience_active_time
+          }
+        };
+
+        // Calculate engagement rate
+        if (data.recentMedia.length > 0 && data.account.followers_count > 0) {
+          const totalEngagements = data.aggregated.totalLikes + data.aggregated.totalComments;
+          const denominator = data.account.followers_count * data.recentMedia.length;
+          data.aggregated.averageEngagementRate = denominator > 0 ? (totalEngagements / denominator) * 100 : 0;
+        }
 
         traceLog('Sync data received', {
           mediaCount: data.recentMedia?.length,

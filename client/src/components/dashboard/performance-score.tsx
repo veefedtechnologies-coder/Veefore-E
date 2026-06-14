@@ -189,15 +189,19 @@ export function PerformanceScore() {
   const hasAnyValid = socialAccountsArray.some((a: any) => a?.tokenStatus === 'valid' || a?.hasAccessToken)
 
   const calculateRealGrowthData = (historicalData: any, currentData: any, period: string) => {
+    // Pick the period-specific reach field so growth reflects the selected window.
+    const reachField = period === 'day' ? 'reachDay' : period === 'week' ? 'reachWeek' : 'reachDays28';
+
     if (!historicalData || !historicalData.length) {
+      // No history yet → report neutral 0.0% instead of fabricated growth.
       return {
         followers: { value: '+0.0%', isPositive: true },
-        likes: { value: '+100%', isPositive: true },
-        engagement: { value: '+100%', isPositive: true },
+        likes: { value: '+0.0%', isPositive: true },
+        engagement: { value: '+0.0%', isPositive: true },
         reach: { value: '+0.0%', isPositive: true },
         views: { value: `+${currentData.views || 0}`, isPositive: (currentData.views || 0) > 0 },
         posts: { value: `+${currentData.posts || 0}`, isPositive: (currentData.posts || 0) > 0 },
-        contentScore: { value: '+100%', isPositive: true }
+        contentScore: { value: '+0.0%', isPositive: true }
       }
     }
 
@@ -215,13 +219,15 @@ export function PerformanceScore() {
     if (oldFollowers === 0 && currentData.followers > 0) followerGrowth = 100;
     else if (oldFollowers > 0) followerGrowth = ((currentData.followers - oldFollowers) / oldFollowers) * 100;
     
-    // Calculate Reach Growth using actual total reach for the snapshot period
-    const currentReachPeriod = currentData.reach || newestRecord.reach || 0;
-    const oldReachPeriod = oldestRecord.reach || 0;
+    // Reach growth: compare authentic period reach (newest vs oldest snapshot in
+    // the window). Both use the same window-specific field so we never mix a
+    // lifetime total with a windowed value.
+    const currentReachPeriod = newestRecord[reachField] || 0;
+    const oldReachPeriod = oldestRecord[reachField] || 0;
 
     let reachGrowth = 0;
-    if (oldReachPeriod === 0 && currentReachPeriod > 0) reachGrowth = 100;
-    else if (oldReachPeriod > 0) reachGrowth = ((currentReachPeriod - oldReachPeriod) / oldReachPeriod) * 100;
+    if (oldReachPeriod > 0) reachGrowth = ((currentReachPeriod - oldReachPeriod) / oldReachPeriod) * 100;
+    // If there's no prior reach baseline, growth stays 0.0% (no fabricated +100%).
 
     let likesGrowth = 0;
     if (oldLikes === 0 && currentData.likes > 0) likesGrowth = 100;
@@ -392,22 +398,20 @@ export function PerformanceScore() {
         followerGains += 0;
         likesGains += 0;
       }
-      // Reach is fundamentally not cumulative (unique accounts), so we MUST use period snapshots
+      // Reach is NOT cumulative (it counts unique accounts), so we use the
+      // authentic de-duplicated per-window values the backend fetches from Meta
+      // (reachDay / reachWeek / reachDays28). We deliberately do NOT fall back to
+      // the lifetime `reach` field here — doing so would leak the all-time total
+      // into a period tab and make Today/Week/Month look identical.
       if (newestRecord) {
-        const rDay = newestRecord.reachDay || newestRecord.reach || 0;
-        const rWeek = newestRecord.reachWeek || newestRecord.reach || 0;
-        const rMonth = newestRecord.reachDays28 || newestRecord.reach || 0;
-        
         let finalReachGain = 0;
-        if (period === 'day') finalReachGain = rDay;
-        else if (period === 'week') finalReachGain = Math.max(rWeek, rDay);
-        else finalReachGain = Math.max(rMonth, rWeek, rDay);
-        
+        if (period === 'day') finalReachGain = newestRecord.reachDay || 0;
+        else if (period === 'week') finalReachGain = newestRecord.reachWeek || 0;
+        else finalReachGain = newestRecord.reachDays28 || 0;
+
         reachGains += finalReachGain;
-      } else {
-        // Absolute fallback if no history
-        reachGains += (platform.reach || 0);
       }
+      // No history → leave reach at 0 rather than surfacing a lifetime total.
     });
 
     const periodData = {

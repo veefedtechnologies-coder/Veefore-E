@@ -11,12 +11,43 @@ interface Feature {
   description: string;
   details: string[];
   gradient: string;
-  visual: React.ReactNode;
+  visual: React.ReactNode | null;
 }
 
 interface CinematicFeaturesProps {
-  features: Feature[];
+  features?: Feature[];
 }
+
+// Default features used when none are passed via props
+const DEFAULT_FEATURES: Feature[] = [
+  {
+    id: 'engagement-automation',
+    title: 'AI Engagement Automation',
+    tagline: 'Increase engagement velocity and consistency.',
+    description: 'Fast, meaningful engagement directly boosts algorithmic reach. This is VeeFore\'s strongest differentiator.',
+    details: ['Context-aware comment replies', 'Priority handling of high-value comments', 'Human-like tone control', 'Platform-safe automation limits'],
+    gradient: 'from-blue-500 to-cyan-500',
+    visual: null,
+  },
+  {
+    id: 'dm-automation',
+    title: 'Smart DM Automation',
+    tagline: 'Turn DMs into scalable growth and monetization channels.',
+    description: 'Creators lose opportunities in DMs. VeeFore captures them without spam.',
+    details: ['Keyword-triggered replies', 'Lead qualification logic', 'Creator-defined safety boundaries', 'Advanced follow-up funnels'],
+    gradient: 'from-purple-500 to-pink-500',
+    visual: null,
+  },
+  {
+    id: 'hook-intelligence',
+    title: 'AI Hook & Trend Intelligence',
+    tagline: 'Remove guesswork from content creation.',
+    description: 'Creators don\'t need trends. They need explanations. VeeFore provides intelligence, not noise.',
+    details: ['Competitor hook extraction', 'Emotional pattern analysis', 'Niche-specific suggestions', 'Viral pattern prediction'],
+    gradient: 'from-indigo-500 to-purple-500',
+    visual: null,
+  },
+];
 
 // Luxurious, smooth spring for visible sliding transitions (matched to StickyScrollFeaturesV2)
 const luxuriousSpringConfig = { stiffness: 70, damping: 20, mass: 1.2 };
@@ -139,7 +170,7 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
   );
 });
 
-export const CinematicFeatures = ({ features }: CinematicFeaturesProps) => {
+export const CinematicFeatures = ({ features = DEFAULT_FEATURES }: CinematicFeaturesProps) => {
   const targetRef = useRef<HTMLDivElement>(null);
   const [activeFeature, setActiveFeature] = useState(0);
   const [targetFeature, setTargetFeature] = useState(0);

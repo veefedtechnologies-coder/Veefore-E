@@ -1,6 +1,9 @@
 import express from 'express'
 import type { Request, Response } from 'express'
-import InstagramApiService from '../services/instagramApi'
+import { InstagramService } from '../features/instagram/services/instagram.service'
+
+// Create singleton instance of InstagramService
+const instagramService = new InstagramService();
 
 const router = express.Router()
 
@@ -46,13 +49,14 @@ router.post('/instagram', async (req: Request, res: Response) => {
   }
 
   try {
-    // Token validation: Use a live call to /me as a reliable check (debug_token requires app token)
-    let tokenValid = false
+    // Token validation: Use a live call to /me as a reliable check
+    let tokenValid = false;
+    let acct: any = null;
     try {
-      const me = await InstagramApiService.getAccountInfo(tokenToUse)
-      tokenValid = !!me?.id
+      acct = await instagramService.getUserProfile(tokenToUse, igAccount?.accountId);
+      tokenValid = !!acct?.id;
     } catch (e: any) {
-      tokenValid = false
+      tokenValid = false;
     }
 
     // If token is invalid, return a clear error instead of continuing and spamming per-row errors
@@ -64,39 +68,51 @@ router.post('/instagram', async (req: Request, res: Response) => {
       })
     }
 
-    // Fetch account info to detect token/app type (Insights require Business/Creator)
-    const acct = await InstagramApiService.getAccountInfo(tokenToUse)
-    const supportsInsights = acct?.account_type === 'BUSINESS' || acct?.account_type === 'CREATOR'
+    // Detect if account supports insights (Business/Creator)
+    const supportsInsights = acct?.account_type === 'BUSINESS' || acct?.account_type === 'CREATOR';
 
-    // Compatibility check: Prefer Instagram Graph v22, fall back to Facebook Graph
-    const igGraphCompatible = await InstagramApiService.isInstagramGraphCompatible(tokenToUse)
-    const fbGraphCompatible = igGraphCompatible ? true : await InstagramApiService.isFacebookGraphCompatible(tokenToUse)
+    // Compatibility check - new service always uses compatible endpoints
+    const igGraphCompatible = true;
+    const fbGraphCompatible = true;
 
     // Fetch last N media using standard limits
-    const mediaResp = await InstagramApiService.getUserMedia(tokenToUse)
-    const items = mediaResp?.data || []
+    const items = await instagramService.getUserMedia(tokenToUse, limit);
 
-    // Also fetch Stories separately (they have a different endpoint)
-    const storiesResp = await InstagramApiService.getUserStories(tokenToUse)
-    // Tag story items so we can normalize mediaType reliably
-    const stories = (storiesResp?.data || []).map((s: any) => ({ ...s, __source: 'stories' }))
+    // Note: Stories endpoint not yet implemented in new service
+    // const stories: any[] = [];
+    const stories: any[] = [];
 
     // Selection policy:
     // - Always include the latest `limit` posts (default 6)
     // - If stories are available, include up to the latest 4 stories in addition
     const postItems = items
       .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, limit)
+      .slice(0, limit);
     const storyItems = stories
       .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 4)
-    const allItems = [...storyItems, ...postItems]
+      .slice(0, 4);
+    const allItems = [...storyItems, ...postItems];
 
     // Batch fetch insights for ALL items (up to 50) in ONE call
     const allMediaIds = allItems.map(m => m.id);
-    const batchInsights = (supportsInsights && (igGraphCompatible || fbGraphCompatible))
-      ? await InstagramApiService.getBatchMediaInsights(allMediaIds, tokenToUse)
-      : {};
+    const batchInsights: Record<string, any> = {};
+    
+    if (supportsInsights && (igGraphCompatible || fbGraphCompatible)) {
+      // Fetch insights individually (batch not yet implemented in new service)
+      await Promise.allSettled(
+        allMediaIds.map(async (id) => {
+          const media = allItems.find(m => m.id === id);
+          if (media) {
+            try {
+              const insights = await instagramService.getMediaInsights(id, tokenToUse, media.media_type);
+              batchInsights[id] = insights;
+            } catch (err) {
+              batchInsights[id] = {};
+            }
+          }
+        })
+      );
+    }
 
     const diagnostics: any[] = []
     for (const m of allItems) {

@@ -8,7 +8,12 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.client.ts'],
-    include: ['**/*.client.test.ts', '**/*.client.test.tsx'],
+    include: [
+      'client/**/*.test.ts',
+      'client/**/*.test.tsx',
+      'client/**/*.spec.ts',
+      'client/**/*.spec.tsx'
+    ],
     testTimeout: 30000,
   },
   resolve: {

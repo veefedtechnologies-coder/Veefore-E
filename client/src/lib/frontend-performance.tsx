@@ -887,7 +887,7 @@ export class FrontendPerformanceOptimizer {
    */
   private getCriticalChunksForRoute(path: string): string[] {
     const chunkMap: Record<string, string[]> = {
-      '/': ['/src/pages/Landing.tsx', '/src/components/analytics/analytics-dashboard.tsx'],
+      '/': ['/src/features/landing/Landing.tsx', '/src/components/analytics/analytics-dashboard.tsx'],
       '/dashboard': ['/src/components/analytics/analytics-dashboard.tsx', '/src/components/create/create-post.tsx'],
       '/automation': ['/src/pages/Automation.tsx', '/src/components/create/create-post.tsx'],
       '/analytics': ['/src/components/analytics/analytics-dashboard.tsx', '/src/components/calendar/calendar-view.tsx']

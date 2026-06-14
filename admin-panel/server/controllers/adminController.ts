@@ -3,7 +3,7 @@ import Admin from '../models/Admin';
 import AdminInvite from '../models/AdminInvite';
 import Role from '../models/Role';
 import AuditLog from '../models/AuditLog';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 import { validateAdminCreate, validateAdminUpdate, validatePagination, validateSearch } from '../middleware/validation';
 import { sendEmail } from '../utils/email';
 import { generateRandomPassword } from '../utils/security';

@@ -72,7 +72,7 @@ const SafetyFeedbackSchema = new Schema<ISafetyFeedback>(
 SafetyFeedbackSchema.index({ userId: 1, workspaceId: 1, createdAt: -1 });
 SafetyFeedbackSchema.index({ feedbackType: 1 });
 
-export const SafetyFeedbackModel = mongoose.model<ISafetyFeedback>(
+export const SafetyFeedbackModel = mongoose.models.SafetyFeedback || mongoose.model<ISafetyFeedback>(
   'SafetyFeedback',
   SafetyFeedbackSchema
 );
@@ -125,7 +125,7 @@ const SafetyCalibrationSchema = new Schema<ISafetyCalibration>(
 // Unique index on userId + workspaceId
 SafetyCalibrationSchema.index({ userId: 1, workspaceId: 1 }, { unique: true });
 
-export const SafetyCalibrationModel = mongoose.model<ISafetyCalibration>(
+export const SafetyCalibrationModel = mongoose.models.SafetyCalibration || mongoose.model<ISafetyCalibration>(
   'SafetyCalibration',
   SafetyCalibrationSchema
 );

@@ -5,6 +5,9 @@ import { validateRequest, safeJsonParse } from './middleware/validation'
 import { z } from 'zod'
 import rateLimit from 'express-rate-limit'
 
+// Import shared auth middleware
+import { authenticateUser, AuthenticatedRequest } from './shared/middleware/auth.middleware'
+
 const router = Router()
 
 // Rate limiter for verification endpoints to prevent brute-forcing
@@ -16,33 +19,12 @@ const verificationRateLimiter = rateLimit({
   message: { error: 'Too many verification attempts, please try again after 15 minutes' }
 })
 
-// Middleware to verify Firebase ID token
-const verifyFirebaseToken = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const authHeader = req.headers.authorization
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' })
-    }
-
-    const token = authHeader.split(' ')[1]
-
-    const adminApp = getFirebaseAdmin();
-    if (!adminApp) {
-      return res.status(500).json({ error: 'Firebase Admin not initialized' })
-    }
-
-    const decodedToken = await adminApp.auth().verifyIdToken(token);
-    req.user = decodedToken as Express.Request['user'];
-    next()
-  } catch (error) {
-    console.error('Token verification failed:', error)
-    res.status(401).json({ error: 'Invalid token' })
-  }
-}
+// Use shared auth middleware instead of local implementation
+const verifyFirebaseToken = authenticateUser
 
 // Register or login user
 // Send email verification code with validation
-router.post('/send-verification', verifyFirebaseToken, verificationRateLimiter, async (req: Request, res: Response) => {
+router.post('/send-verification', verifyFirebaseToken, verificationRateLimiter, async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -89,7 +71,7 @@ const verifyEmailValidation = validateRequest({
   })
 });
 
-router.post('/verify-email', verifyFirebaseToken, verificationRateLimiter, verifyEmailValidation, async (req: Request, res: Response) => {
+router.post('/verify-email', verifyFirebaseToken, verificationRateLimiter, verifyEmailValidation, async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.user?.uid) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -332,7 +314,7 @@ router.post('/register', async (req, res) => {
 })
 
 // Get current user
-router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
+router.get('/user', verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const uid = req.user!.uid!
     let user = await storage.getUserByFirebaseId(uid)
@@ -357,7 +339,7 @@ router.get('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
 })
 
 // Update user profile
-router.put('/user', verifyFirebaseToken, async (req: Request, res: Response) => {
+router.put('/user', verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const uid = req.user!.uid!
     const { displayName, profilePictureUrl, niche } = req.body
@@ -397,7 +379,7 @@ router.put('/user', verifyFirebaseToken, async (req: Request, res: Response) => 
 })
 
 // Logout (invalidate token on server side if needed)
-router.post('/logout', verifyFirebaseToken, async (req: Request, res: Response) => {
+router.post('/logout', verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     // For now, just return success
     // In a more complex setup, you might want to blacklist the token

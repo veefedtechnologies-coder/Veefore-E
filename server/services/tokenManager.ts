@@ -1,6 +1,9 @@
-import InstagramApiService, { InstagramApiError } from './instagramApi';
+import { InstagramService, InstagramApiError } from '../features/instagram/services/instagram.service';
 import { User as UserModel } from '../models/User/User';
 // import { MetricsQueueManager } from '../queues/metricsQueue';
+
+// Create singleton instance of InstagramService
+const instagramService = new InstagramService();
 
 // Token status tracking
 export interface TokenInfo {
@@ -172,7 +175,7 @@ export class TokenManager {
       }
 
       // Refresh the token using Instagram API
-      const refreshResult = await InstagramApiService.refreshAccessToken(user.instagramRefreshToken);
+      const refreshResult = await instagramService.refreshAccessToken(user.instagramRefreshToken);
 
       // Update user with new token
       await UserModel.findOneAndUpdate(
@@ -281,8 +284,11 @@ export class TokenManager {
       console.log(`➕ Adding new token to workspace ${workspaceId} for @${instagramUsername}`);
 
       // Validate token first
-      const validation = await InstagramApiService.validateToken(token);
-      if (!validation.is_valid) {
+      // Note: The new InstagramService doesn't expose a validateToken method,
+      // but we can use getUserProfile to validate
+      try {
+        await instagramService.getUserProfile(token, instagramAccountId);
+      } catch (error) {
         throw new Error('Invalid Instagram token');
       }
 
@@ -295,7 +301,7 @@ export class TokenManager {
           tokenStatus: 'active',
           instagramAccountId,
           instagramUsername,
-          instagramTokenExpiry: validation.expires_at ? new Date(validation.expires_at * 1000) : undefined,
+          instagramTokenExpiry: undefined, // Token expiry not available from validation
           lastApiCallTimestamp: new Date(),
         },
         { upsert: true }
@@ -317,7 +323,7 @@ export class TokenManager {
           userId,
           token,
           refreshToken,
-          expiryDate: validation.expires_at ? new Date(validation.expires_at * 1000) : undefined,
+          expiryDate: undefined, // Token expiry not available from validation
           status: 'active',
           lastUsed: new Date(),
           apiCallCount: 0,

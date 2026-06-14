@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { TeamController } from '../controllers/teamController';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/adminAuth';
 import { validatePagination, validateSearch } from '../middleware/validation';
 
 const router = Router();

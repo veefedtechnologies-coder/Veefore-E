@@ -1,6 +1,6 @@
 import express from 'express';
 import { MaintenanceBannerController } from '../controllers/maintenanceBannerController';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/adminAuth';
 
 const router = express.Router();
 

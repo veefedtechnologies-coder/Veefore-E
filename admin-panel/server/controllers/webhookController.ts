@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import Webhook from '../models/Webhook';
 import WebhookDelivery from '../models/WebhookDelivery';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 import { WebhookService } from '../services/webhookService';
 
 export class WebhookController {

@@ -9,7 +9,7 @@ import {
   resendInvitation,
   getInvitationStatistics
 } from '../controllers/adminOnboardingController';
-import { rbac, auditLog } from '../middleware/auth';
+import { rbac, auditLog } from '../middleware/adminAuth';
 
 const router = express.Router();
 

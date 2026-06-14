@@ -8,7 +8,10 @@ import { openaiService } from './openai-service';
 import { getAccessTokenFromAccount } from '../storage/converters';
 import { SimpleInstagramPublisher } from '../simple-instagram-publisher';
 import { getSchedulerService } from '../scheduler-service';
-import InstagramApiService from './instagramApi';
+import { InstagramService } from '../features/instagram/services/instagram.service';
+
+// Create singleton instance of InstagramService
+const instagramService = new InstagramService();
 
 interface CreateContentInput {
   workspaceId: string;
@@ -443,12 +446,10 @@ export class ContentService extends BaseService {
       // Fetch recent media from Instagram
       const accountId = instagramAccount.accountId || (instagramAccount as any)._id?.toString();
       
-      // Using dynamic import to avoid circular dependencies if any
-      const { InstagramApiService } = await import('./instagramApi');
+      // Using new InstagramService
+      const mediaList = await instagramService.getUserMedia(token, 50, accountId);
       
-      const mediaResponse = await InstagramApiService.getUserMedia(token, 50, accountId);
-      
-      if (!mediaResponse.data || mediaResponse.data.length === 0) {
+      if (!mediaList || mediaList.length === 0) {
         throw new Error('Could not find any recent posts on Instagram');
       }
 
@@ -458,14 +459,14 @@ export class ContentService extends BaseService {
       const contentText = content.contentData?.text?.trim() || content.title?.trim();
       
       if (contentText) {
-        matchedMedia = mediaResponse.data.find(m => m.caption && m.caption.includes(contentText.substring(0, 50)));
+        matchedMedia = mediaList.find(m => m.caption && m.caption.includes(contentText.substring(0, 50)));
       }
       
       // Fallback: match by timestamp within a 2-hour window
       if (!matchedMedia) {
         const targetTime = new Date(content.publishedAt || content.scheduledAt || content.createdAt).getTime();
         
-        for (const media of mediaResponse.data) {
+        for (const media of mediaList) {
           const mediaTime = new Date(media.timestamp).getTime();
           const diffHours = Math.abs(mediaTime - targetTime) / (1000 * 60 * 60);
           
@@ -599,7 +600,7 @@ export class ContentService extends BaseService {
           else if (content.type === 'story') mediaType = 'STORY';
           else if (content.contentData?.mediaUrls && content.contentData.mediaUrls.length > 1) mediaType = 'CAROUSEL_ALBUM';
 
-          const freshInsights = await InstagramApiService.getMediaInsights(
+          const freshInsights = await instagramService.getMediaInsights(
             mediaId,
             token,
             mediaType

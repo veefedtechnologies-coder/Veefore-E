@@ -4,7 +4,13 @@ import {
   isDisposableEmail,
   validateName,
   validatePassword,
-  validateEmailComplete
+  validateEmailComplete,
+  emailSchema,
+  nameSchema,
+  passwordSchema,
+  signUpSchema,
+  signInSchema,
+  passwordResetSchema,
 } from './validation'
 
 describe('Email Validation', () => {
@@ -91,5 +97,128 @@ describe('Password Validation', () => {
     expect(result.requirements.number).toBe(true)
     expect(result.requirements.special).toBe(true)
     expect(result.requirements.typesCount).toBe(4)
+  })
+})
+
+describe('Zod Schema Validation', () => {
+  describe('emailSchema', () => {
+    it('should validate correct emails', () => {
+      expect(() => emailSchema.parse('test@example.com')).not.toThrow()
+      expect(() => emailSchema.parse('user.name@company.co.uk')).not.toThrow()
+    })
+
+    it('should reject invalid emails', () => {
+      expect(() => emailSchema.parse('invalid')).toThrow()
+      expect(() => emailSchema.parse('@example.com')).toThrow()
+      expect(() => emailSchema.parse('test@tempmail.com')).toThrow()
+    })
+
+    it('should trim and lowercase emails', () => {
+      const result = emailSchema.parse('  Test@Example.COM  ')
+      expect(result).toBe('test@example.com')
+    })
+  })
+
+  describe('nameSchema', () => {
+    it('should validate correct names', () => {
+      expect(() => nameSchema.parse('John Doe')).not.toThrow()
+      expect(() => nameSchema.parse("Mary O'Connor")).not.toThrow()
+      expect(() => nameSchema.parse('Jean-Pierre')).not.toThrow()
+    })
+
+    it('should reject invalid names', () => {
+      expect(() => nameSchema.parse('')).toThrow()
+      expect(() => nameSchema.parse('A')).toThrow()
+      expect(() => nameSchema.parse('123')).toThrow()
+      expect(() => nameSchema.parse('A'.repeat(101))).toThrow()
+    })
+
+    it('should trim names', () => {
+      const result = nameSchema.parse('  John Doe  ')
+      expect(result).toBe('John Doe')
+    })
+  })
+
+  describe('passwordSchema', () => {
+    it('should validate strong passwords', () => {
+      expect(() => passwordSchema.parse('SecureP@ss123')).not.toThrow()
+      expect(() => passwordSchema.parse('MyP@ssw0rd!')).not.toThrow()
+    })
+
+    it('should reject weak passwords', () => {
+      expect(() => passwordSchema.parse('short')).toThrow()
+      expect(() => passwordSchema.parse('onlylowercase')).toThrow()
+      expect(() => passwordSchema.parse('NoNumbers')).toThrow()
+      expect(() => passwordSchema.parse('password123!')).toThrow()
+    })
+
+    it('should reject passwords that are too long', () => {
+      const longPassword = 'A'.repeat(129)
+      expect(() => passwordSchema.parse(longPassword)).toThrow()
+    })
+  })
+
+  describe('signUpSchema', () => {
+    it('should validate correct sign up data', () => {
+      const validData = {
+        fullName: 'John Doe',
+        email: 'john@example.com',
+        password: 'SecureP@ss123'
+      }
+      expect(() => signUpSchema.parse(validData)).not.toThrow()
+    })
+
+    it('should reject invalid sign up data', () => {
+      const invalidData = {
+        fullName: 'A',
+        email: 'invalid',
+        password: 'weak'
+      }
+      expect(() => signUpSchema.parse(invalidData)).toThrow()
+    })
+  })
+
+  describe('signInSchema', () => {
+    it('should validate correct sign in data', () => {
+      const validData = {
+        email: 'john@example.com',
+        password: 'anypassword'
+      }
+      expect(() => signInSchema.parse(validData)).not.toThrow()
+    })
+
+    it('should reject invalid sign in data', () => {
+      const invalidData = {
+        email: 'invalid',
+        password: ''
+      }
+      expect(() => signInSchema.parse(invalidData)).toThrow()
+    })
+  })
+
+  describe('passwordResetSchema', () => {
+    it('should validate matching passwords', () => {
+      const validData = {
+        password: 'NewP@ssw0rd!',
+        confirmPassword: 'NewP@ssw0rd!'
+      }
+      expect(() => passwordResetSchema.parse(validData)).not.toThrow()
+    })
+
+    it('should reject non-matching passwords', () => {
+      const invalidData = {
+        password: 'NewP@ssw0rd!',
+        confirmPassword: 'DifferentP@ss123'
+      }
+      expect(() => passwordResetSchema.parse(invalidData)).toThrow()
+    })
+
+    it('should reject weak passwords', () => {
+      const invalidData = {
+        password: 'weak',
+        confirmPassword: 'weak'
+      }
+      expect(() => passwordResetSchema.parse(invalidData)).toThrow()
+    })
   })
 })

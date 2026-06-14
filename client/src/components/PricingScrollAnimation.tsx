@@ -17,8 +17,39 @@ interface PricingPlan {
 }
 
 interface PricingScrollAnimationProps {
-    pricingPlans: PricingPlan[];
+    pricingPlans?: PricingPlan[];
 }
+
+const DEFAULT_PRICING_PLANS: PricingPlan[] = [
+    {
+        name: 'Starter',
+        credits: 300,
+        description: 'For new creators testing growth',
+        features: ['AI Hook Generator', 'Caption & CTA Engine', 'Basic Scheduler', '1 Competitor', 'Read-only Analytics'],
+        locked: ['Advanced Analytics', 'Bulk Scheduler', 'Adaptive AI'],
+        gradient: 'from-slate-500/20 to-slate-600/10',
+        border: 'border-white/10',
+    },
+    {
+        name: 'Growth',
+        credits: 1200,
+        description: 'For serious creators ready to scale',
+        features: ['Everything in Starter', 'AI Smart Scheduler', 'Social Listening', 'Hook Intelligence', 'Unlimited Scheduling', '3 Competitors', 'Adaptive AI Loop', 'Full Analytics'],
+        locked: [],
+        gradient: 'from-blue-500/20 to-purple-600/10',
+        border: 'border-blue-500/30',
+        popular: true,
+    },
+    {
+        name: 'Pro',
+        credits: 3000,
+        description: 'For agencies and power creators',
+        features: ['Everything in Growth', 'Unlimited Competitors', 'Priority Support', 'White-label Reports', 'API Access'],
+        locked: [],
+        gradient: 'from-purple-500/20 to-pink-600/10',
+        border: 'border-purple-500/30',
+    },
+];
 
 // Simplified components for Desktop-only use
 const TiltCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => {
@@ -95,7 +126,7 @@ const MagneticButton = ({ children, className = '', onClick }: { children: React
     )
 }
 
-export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ pricingPlans }) => {
+export const PricingScrollAnimation: React.FC<PricingScrollAnimationProps> = ({ pricingPlans = DEFAULT_PRICING_PLANS }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const { scrollYProgress } = useScroll({
         target: containerRef,

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import AICompliance from '../models/AICompliance';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 import { validatePagination, validateSearch } from '../middleware/validation';
 
 export class AIModerationController {

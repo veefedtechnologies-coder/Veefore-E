@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import Role from '../models/Role';
 import Admin from '../models/Admin';
 import AuditLog from '../models/AuditLog';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest } from '../middleware/adminAuth';
 
 // Get all roles
 export const getAllRoles = async (req: AuthRequest, res: Response) => {
