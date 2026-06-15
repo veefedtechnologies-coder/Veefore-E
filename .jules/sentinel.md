@@ -1,0 +1,4 @@
+## 2025-06-15 - [Information Leakage in Error Responses]
+**Vulnerability:** The application was exposing sensitive internal system information (`error.stack` and `req.headers`) in the HTTP 401 error responses from the `/api/video/` endpoints within `server/video-routes.ts`.
+**Learning:** Returning detailed error objects to the client, especially stack traces, makes reconnaissance easier for attackers by leaking the internal paths, technologies, and structural workings of the backend server.
+**Prevention:** Always implement centralized or generic error handling for client-facing API responses. Specifically, avoid sending `error.stack`, `error.message`, or raw `req.headers` directly in a 4xx or 5xx JSON response body. Ensure that sensitive debugging information remains solely within the server logs.
