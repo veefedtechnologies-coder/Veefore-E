@@ -13,7 +13,7 @@ const verifyWebhookSignature = (req: express.Request, res: express.Response, nex
     const payload = (req as any).rawBody || JSON.stringify(req.body);
     
     // Get webhook secret from environment or database. Meta uses the App Secret to sign webhooks.
-    const webhookSecret = process.env.INSTAGRAM_WEBHOOK_SECRET || process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET || 'default-webhook-secret';
+    const webhookSecret = process.env.INSTAGRAM_WEBHOOK_SECRET || process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('Webhook secret required in production'); })() : 'default-webhook-secret');
     
     if (!signature) {
       console.warn('⚠️ Webhook received without signature');

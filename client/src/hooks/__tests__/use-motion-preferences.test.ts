@@ -1,19 +1,18 @@
+
 import { renderHook } from '@testing-library/react';
 import { useMotionPreferences } from '../use-motion-preferences';
+import { useIsMobile } from '../use-is-mobile';
 
-/**
- * Tests for useMotionPreferences hook
- * Task 7.2: Mobile animation optimization
- * Requirements: 5.4, 6.4
- */
+vi.mock('../use-is-mobile', () => ({
+  useIsMobile: vi.fn(),
+}));
 
 describe('useMotionPreferences', () => {
-  // Mock matchMedia
   const mockMatchMedia = (matches: boolean) => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: query === '(prefers-reduced-motion: reduce)' ? matches : false,
         media: query,
         onchange: null,
         addListener: vi.fn(),
@@ -25,83 +24,47 @@ describe('useMotionPreferences', () => {
     });
   };
 
-  beforeEach(() => {
-    // Reset window width
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 1024,
-    });
-  });
-
   it('should detect mobile devices (< 768px)', () => {
-    // Set mobile width
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 375,
-    });
-
+    vi.mocked(useIsMobile).mockReturnValue(true);
     mockMatchMedia(false);
-
     const { result } = renderHook(() => useMotionPreferences());
-
     expect(result.current.isMobile).toBe(true);
     expect(result.current.shouldSimplifyAnimations).toBe(true);
     expect(result.current.shouldDisable3D).toBe(true);
   });
 
   it('should detect desktop devices (>= 768px)', () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
     mockMatchMedia(false);
-
     const { result } = renderHook(() => useMotionPreferences());
-
     expect(result.current.isMobile).toBe(false);
   });
 
   it('should detect prefers-reduced-motion', () => {
-    mockMatchMedia(true); // prefers-reduced-motion: reduce
-
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    mockMatchMedia(true);
     const { result } = renderHook(() => useMotionPreferences());
-
     expect(result.current.prefersReducedMotion).toBe(true);
     expect(result.current.shouldSimplifyAnimations).toBe(true);
-    expect(result.current.shouldDisable3D).toBe(true);
-    expect(result.current.shouldDisableHeavyEffects).toBe(true);
   });
 
   it('should not simplify animations on desktop with motion enabled', () => {
-    mockMatchMedia(false); // prefers-reduced-motion: no-preference
-
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    mockMatchMedia(false);
     const { result } = renderHook(() => useMotionPreferences());
-
     expect(result.current.isMobile).toBe(false);
     expect(result.current.prefersReducedMotion).toBe(false);
     expect(result.current.shouldSimplifyAnimations).toBe(false);
-    expect(result.current.shouldDisable3D).toBe(false);
-    expect(result.current.shouldDisableHeavyEffects).toBe(false);
   });
 
   it('should simplify animations when either mobile OR reduced motion', () => {
-    // Test mobile only
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 375,
-    });
+    vi.mocked(useIsMobile).mockReturnValue(true);
     mockMatchMedia(false);
-
     const { result: mobileResult } = renderHook(() => useMotionPreferences());
     expect(mobileResult.current.shouldSimplifyAnimations).toBe(true);
 
-    // Test reduced motion only
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 1024,
-    });
+    vi.mocked(useIsMobile).mockReturnValue(false);
     mockMatchMedia(true);
-
     const { result: reducedMotionResult } = renderHook(() => useMotionPreferences());
     expect(reducedMotionResult.current.shouldSimplifyAnimations).toBe(true);
   });

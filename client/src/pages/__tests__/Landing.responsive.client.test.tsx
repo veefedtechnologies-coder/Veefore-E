@@ -13,7 +13,12 @@ import { render, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Router } from 'wouter';
 import React from 'react';
-import Landing from '../Landing';
+import Landing from '../../features/landing/Landing';
+
+vi.mock('wouter', () => ({
+  useLocation: vi.fn().mockReturnValue(['/', vi.fn()]),
+  Link: ({ children }) => <a>{children}</a>,
+}));
 
 // Mock the WaitlistContext
 vi.mock('../../context/WaitlistContext', () => ({

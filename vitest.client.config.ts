@@ -5,20 +5,13 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   test: {
+    environment: 'jsdom',
     globals: true,
-    environment: 'happy-dom',
-    setupFiles: ['./tests/setup.client.ts'],
-    include: [
-      'client/**/*.test.ts',
-      'client/**/*.test.tsx',
-      'client/**/*.spec.ts',
-      'client/**/*.spec.tsx'
-    ],
-    testTimeout: 30000,
-  },
-  resolve: {
+    setupFiles: ['./client/src/setupTests.ts'],
+    include: ['client/src/**/*.test.{ts,tsx}'],
     alias: {
       '@': path.resolve(__dirname, './client/src'),
-    },
-  },
+      '@shared': path.resolve(__dirname, './shared')
+    }
+  }
 });

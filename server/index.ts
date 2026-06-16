@@ -348,7 +348,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // P2 SECURITY: Session management for OAuth 2.0 flows
 import session from 'express-session';
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret-for-development',
+  secret: process.env.SESSION_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('SESSION_SECRET is required in production'); })() : 'fallback-secret-for-development'),
   resave: false,
   saveUninitialized: false,
   cookie: {
