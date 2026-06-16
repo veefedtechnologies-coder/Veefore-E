@@ -618,7 +618,7 @@ export class SessionController {
  */
 export function generateJWT(userId: string, userType: 'user' | 'admin', expiresIn: string = '24h'): string {
   const env = getEnv();
-  const JWT_SECRET = env.JWT_SECRET || 'development-secret';
+  const JWT_SECRET = env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_SECRET is required in production'); })() : 'development-secret');
 
   return jwt.sign(
     {
@@ -637,7 +637,7 @@ export function generateJWT(userId: string, userType: 'user' | 'admin', expiresI
 export function verifyJWT(token: string): { id: string; userType: string } | null {
   try {
     const env = getEnv();
-    const JWT_SECRET = env.JWT_SECRET || 'development-secret';
+    const JWT_SECRET = env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_SECRET is required in production'); })() : 'development-secret');
     
     const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     
