@@ -17,7 +17,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
-import Landing from '../Landing'
+import Landing from '../../features/landing/Landing'
+
+vi.mock('wouter', () => ({
+  useLocation: vi.fn().mockReturnValue(['/', vi.fn()]),
+  Link: ({ children }) => <a>{children}</a>,
+}));
 
 // Mock the WaitlistContext
 vi.mock('../../context/WaitlistContext', () => ({
