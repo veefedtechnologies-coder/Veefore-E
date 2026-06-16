@@ -169,6 +169,7 @@
     "@typescript-eslint/parser": "^8.61.1",
     "@vitest/ui": "^4.1.8",
     "axios": "^1.17.0",
+    "eslint": "^8.57.0",
     "fast-check": "^4.8.0",
     "globals": "^17.6.0",
     "happy-dom": "^20.10.3",
@@ -179,6 +180,7 @@
     "selfsigned": "^3.0.1",
     "supertest": "^7.2.2",
     "tsx": "^4.20.3",
+    "typescript-eslint": "^8.61.1",
     "vitest": "^4.1.8"
   },
   "optionalDependencies": {
