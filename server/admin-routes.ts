@@ -15,11 +15,12 @@ import { asyncHandler } from "./shared/middleware/errorHandler";
 
 // Activate the service-backed permission checker (role hierarchy + permission
 // inheritance) for all admin permission middleware. Idempotent.
+import { authRateLimiter, bruteForceMiddleware } from "./middleware/rate-limiting-working";
 configureAdminPermissions();
 
 export function registerAdminRoutes(app: Express) {
   // Admin Authentication
-  app.post("/api/admin/login", async (req, res) => {
+  app.post("/api/admin/login", authRateLimiter, bruteForceMiddleware, async (req, res) => {
     try {
       const { email, password } = req.body;
 
