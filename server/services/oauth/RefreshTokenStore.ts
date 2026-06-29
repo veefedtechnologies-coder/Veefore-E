@@ -43,10 +43,15 @@ export class RefreshTokenStore {
   private static readonly REFRESH_TOKEN_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
   constructor() {
-    const sessionSecret = process.env.SESSION_SECRET;
+    let sessionSecret = process.env.SESSION_SECRET;
 
     if (!sessionSecret) {
-      throw new Error('SESSION_SECRET environment variable is required for RefreshTokenStore');
+      if (process.env.NODE_ENV === "testing" || process.env.NODE_ENV === "test") {
+        process.env.SESSION_SECRET = "test-session-secret-for-ci-pipelines";
+        sessionSecret = process.env.SESSION_SECRET;
+      } else {
+      throw new Error("SESSION_SECRET environment variable is required for RefreshTokenStore");
+      }
     }
 
     if (sessionSecret.length < 32) {
