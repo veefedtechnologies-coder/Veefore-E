@@ -1,0 +1,4 @@
+## 2025-02-27 - [CRITICAL] Information Disclosure in Debug Endpoint
+**Vulnerability:** A `/api/debug-config` endpoint was left active in production environments (in `server/src/index.ts`). Even though the database connection string masked the password, it still exposed the exact connection host, database name, list of collections, and the server environment variables state.
+**Learning:** Diagnostic endpoints are often added during development but neglected when pushing to production. Without proper environment gating (e.g., `if (process.env.NODE_ENV !== 'production')`), they become low-hanging fruit for attackers to map the internal architecture and target specific collections.
+**Prevention:** Always remove debug/testing endpoints before committing, or secure them rigidly to non-production environments. Implement automated checks or ESLint rules against "debug" routes in critical paths.

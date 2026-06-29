@@ -122,30 +122,6 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// DEBUG ENDPOINT - TO BE REMOVED
-app.get('/api/debug-config', async (_req, res) => {
-  const mongoose = await import('mongoose');
-  const uri = process.env.MONGODB_URI || 'not-set';
-  const maskedUri = uri.replace(/:([^:@]+)@/, ':****@');
-
-  // Get list of collections
-  let collections: string[] = [];
-  try {
-    if (mongoose.connection && mongoose.connection.db) {
-      const cols = await mongoose.connection.db.listCollections().toArray();
-      collections = cols.map(c => c.name);
-    }
-  } catch (e) { collections = ['error-listing-collections']; }
-
-  res.json({
-    maskedUri,
-    dbName: mongoose.connection.name,
-    host: mongoose.connection.host,
-    collections,
-    env: process.env.NODE_ENV
-  });
-});
-
 // API routes would be imported here
 // import { authRoutes } from './routes/auth.js';
 // import { userRoutes } from './routes/user.js';
