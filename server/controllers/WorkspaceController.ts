@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { BaseController, TypedRequest } from './BaseController';
 import { workspaceService } from '../services';
 import { storage } from '../mongodb-storage';
@@ -354,7 +355,7 @@ export class WorkspaceController extends BaseController {
       email,
       role,
       invitedBy: user.id,
-      token: Math.random().toString(36).substring(2, 15),
+      token: crypto.randomBytes(32).toString('hex'),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
 
