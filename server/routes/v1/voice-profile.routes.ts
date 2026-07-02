@@ -173,7 +173,6 @@ router.post('/analyze',
       
       res.status(500).json({ 
         error: 'Failed to analyze voice profile',
-        details: error.message 
       });
     }
   }
@@ -295,7 +294,6 @@ router.get('/:workspaceId',
       
       res.status(500).json({ 
         error: 'Failed to retrieve voice profile',
-        details: error.message 
       });
     }
   }
@@ -502,7 +500,6 @@ router.put('/:workspaceId/recalibrate',
       
       res.status(500).json({ 
         error: 'Failed to recalibrate voice profile',
-        details: error.message 
       });
     }
   }
@@ -592,7 +589,6 @@ router.get('/:workspaceId/evolution',
       
       res.status(500).json({ 
         error: 'Failed to retrieve voice profile evolution data',
-        details: error.message 
       });
     }
   }
