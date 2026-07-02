@@ -395,7 +395,7 @@ router.post('/generate-caption',
 
     } catch (error: any) {
       console.error('[AI CAPTION] Generation failed:', error);
-      res.status(500).json({ error: 'Failed to generate caption', details: error.message });
+      res.status(500).json({ error: 'Failed to generate caption' });
     }
   }
 );
@@ -631,10 +631,7 @@ router.post('/regenerate-captions',
 
     } catch (error: any) {
       console.error('[AI REGENERATE CAPTIONS] Regeneration failed:', error);
-      res.status(500).json({ 
-        error: 'Failed to regenerate caption', 
-        details: error.message 
-      });
+      res.status(500).json({ error: 'Failed to regenerate caption' });
     }
   }
 );
@@ -979,7 +976,7 @@ Format as JSON with: script, caption, hashtags`;
 
     } catch (error: any) {
       console.error('[AI SCRIPT] Error:', error);
-      res.status(500).json({ error: error.message || 'Failed to generate script' });
+      res.status(500).json({ error: 'Failed to generate script' });
     }
   }
 );
@@ -1164,10 +1161,7 @@ router.post('/generate-content',
           workspaceId: req.body.workspaceId || 'none'
         }
       });
-      res.status(500).json({ 
-        error: 'Failed to generate content',
-        details: error.message 
-      });
+      res.status(500).json({ error: 'Failed to generate content' });
     }
   }
 );
@@ -1270,7 +1264,6 @@ router.post('/chat',
 
       res.status(500).json({ 
         error: 'Failed to generate AI response',
-        details: error.message 
       });
     }
   }
@@ -1462,7 +1455,6 @@ router.post('/record-caption-feedback',
       console.error('[CAPTION FEEDBACK] Error recording feedback:', error);
       res.status(500).json({ 
         error: 'Failed to record feedback',
-        details: error.message 
       });
     }
   }
@@ -1581,7 +1573,6 @@ router.post('/record-performance',
       console.error('[AI PERFORMANCE] Recording failed:', error);
       res.status(500).json({ 
         error: 'Failed to record performance metrics',
-        details: error.message 
       });
     }
   }
@@ -1813,7 +1804,6 @@ router.get('/caption-insights/:captionId',
       console.error('[CAPTION INSIGHTS] Failed to retrieve insights:', error);
       res.status(500).json({ 
         error: 'Failed to retrieve caption insights',
-        details: error.message 
       });
     }
   }
@@ -1924,7 +1914,6 @@ router.post('/adapt-caption',
       console.error('[AI ADAPT CAPTION] Adaptation failed:', error);
       res.status(500).json({ 
         error: 'Failed to adapt caption',
-        details: error.message 
       });
     }
   }
@@ -2020,7 +2009,6 @@ router.post('/safety-feedback',
       console.error('[SAFETY FEEDBACK] Submission failed:', error);
       res.status(500).json({ 
         error: 'Failed to submit safety feedback',
-        details: error.message 
       });
     }
   }
@@ -2082,7 +2070,6 @@ router.get('/safety-calibration/:workspaceId',
       console.error('[SAFETY CALIBRATION] Retrieval failed:', error);
       res.status(500).json({ 
         error: 'Failed to retrieve safety calibration',
-        details: error.message 
       });
     }
   }
@@ -2135,7 +2122,6 @@ router.get('/safety-feedback/:workspaceId',
       console.error('[SAFETY FEEDBACK] Retrieval failed:', error);
       res.status(500).json({ 
         error: 'Failed to retrieve safety feedback',
-        details: error.message 
       });
     }
   }
