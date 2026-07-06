@@ -32,7 +32,7 @@ export default [
         },
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/prefer-const': 'error',
+
       'no-console': 'off', // Allow console in server
       'no-debugger': 'error',
       'prefer-const': 'error',
