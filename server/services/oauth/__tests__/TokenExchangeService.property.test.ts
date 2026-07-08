@@ -88,7 +88,7 @@ describe('TokenExchangeService Property Tests', () => {
             }
 
             // Verify refresh was called correct number of times
-            expect(mockOAuth2Client.refreshAccessToken).toHaveBeenCalled();
+            expect(mockOAuth2Client.refreshAccessToken).toHaveBeenCalledTimes(attemptCount);
 
             // Verify same refresh token was used for all attempts
             for (let i = 0; i < attemptCount; i++) {
