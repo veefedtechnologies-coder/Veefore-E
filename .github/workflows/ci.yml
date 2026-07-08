@@ -58,8 +58,6 @@ jobs:
         run: npm run test:server
         env:
           NODE_ENV: test
-          JWT_SECRET: demo-jwt-secret-key-minimum-32-characters-long
-          SESSION_SECRET: demo-session-secret-key-minimum-32-characters-long
           REDIS_URL: redis://localhost:6379
 
       - name: Upload coverage report

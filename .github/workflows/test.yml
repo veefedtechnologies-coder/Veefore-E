@@ -32,8 +32,6 @@ jobs:
         run: npm run test
         env:
           NODE_ENV: test
-          JWT_SECRET: demo-jwt-secret-key-minimum-32-characters-long
-          SESSION_SECRET: demo-session-secret-key-minimum-32-characters-long
 
   client-tests:
     name: Client Tests
@@ -65,5 +63,3 @@ jobs:
         working-directory: client
         env:
           NODE_ENV: test
-          JWT_SECRET: demo-jwt-secret-key-minimum-32-characters-long
-          SESSION_SECRET: demo-session-secret-key-minimum-32-characters-long
