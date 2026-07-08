@@ -249,21 +249,16 @@ describe('StateValidator - Property-Based Tests', () => {
           };
 
           // Attempt to validate with mismatched state
-          try {
-            validator.validateState(mockReq, receivedState);
-            
-            // If we reach here, validation incorrectly succeeded
-            throw new Error('Validation should have failed for mismatched state');
-          } catch (error) {
-            // Expected: validation should fail
-            expect(error).toBeInstanceOf(Error);
-            expect((error as Error).message).toBe('Invalid state parameter');
-            
-            // Security check: session should still exist after mismatch
-            // (not deleted like on success, so security team can investigate)
-            expect(mockReq.session.oauth).toBeDefined();
-            expect(mockReq.session.oauth.state).toBe(storedState);
-          }
+          const result = validator.validateState(mockReq, receivedState);
+
+          // Validation should fail
+          expect(result.isValid).toBe(false);
+          expect(result.error).toBe('Invalid state parameter');
+
+          // Security check: session should still exist after mismatch
+          // (not deleted like on success, so security team can investigate)
+          expect(mockReq.session.oauth).toBeDefined();
+          expect(mockReq.session.oauth.state).toBe(storedState);
 
           return true;
         }
