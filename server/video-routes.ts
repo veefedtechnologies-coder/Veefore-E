@@ -70,7 +70,7 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     try {
       require('fs').appendFileSync('video-auth-debug.log', new Date().toISOString() + ' ERROR: ' + error.message + '\nStack: ' + error.stack + '\nHeaders: ' + JSON.stringify(req.headers) + '\n\n');
     } catch(e) {}
-    return res.status(401).json({ error: 'Unauthorized', details: error.message, stack: error.stack });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 };
 
