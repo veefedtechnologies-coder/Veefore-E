@@ -6,12 +6,16 @@
 import { Router } from 'express';
 import { getThreatIntelligence, activeThreatEvents, ThreatLevel } from '../middleware/threat-detection';
 import { requireAdmin } from '../shared/middleware/auth.middleware';
+import { apiRateLimiter } from '../middleware/rate-limiting-working';
+
+
 
 
 const router = Router();
 
 // Secure all endpoints in this router
 router.use(requireAdmin);
+router.use(apiRateLimiter);
 
 
 /**
