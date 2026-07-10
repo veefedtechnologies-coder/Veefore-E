@@ -5,8 +5,14 @@
 
 import { Router } from 'express';
 import { getThreatIntelligence, activeThreatEvents, ThreatLevel } from '../middleware/threat-detection';
+import { requireAdmin } from '../shared/middleware/auth.middleware';
+
 
 const router = Router();
+
+// Secure all endpoints in this router
+router.use(requireAdmin);
+
 
 /**
  * P8-2.1: Real-time Threat Intelligence Dashboard
