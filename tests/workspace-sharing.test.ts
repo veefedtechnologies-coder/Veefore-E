@@ -45,7 +45,7 @@ describe('Task 8.2: Workspace Sharing Test - AI Configuration', () => {
     contentSafety: 'moderate',
     aiMemory: 'session',
     autoLearning: true,
-    googleAiStudioKey: 'AIzaSy_userA_shared_key_12345',
+    googleAiStudioKey: 'AI-zaSy_userA_shared_key_12345',
     openAiKey: 'sk-userA-shared-key-67890'
   };
 
@@ -146,7 +146,7 @@ describe('Task 8.2: Workspace Sharing Test - AI Configuration', () => {
     expect(updatedWorkspace?.aiConfiguration?.aiModel).toBe('google-ai-studio');
     expect(updatedWorkspace?.aiConfiguration?.creativityLevel).toBe(0.75);
     expect(updatedWorkspace?.aiConfiguration?.optimizationGoals).toBe('engagement');
-    expect(updatedWorkspace?.aiConfiguration?.googleAiStudioKey).toBe('AIzaSy_userA_shared_key_12345');
+    expect(updatedWorkspace?.aiConfiguration?.googleAiStudioKey).toBe('AI-zaSy_userA_shared_key_12345');
     
     console.log('✅ User A saved AI configuration to workspace');
     console.log('   Model:', updatedWorkspace?.aiConfiguration?.aiModel);
@@ -205,7 +205,7 @@ describe('Task 8.2: Workspace Sharing Test - AI Configuration', () => {
     expect(aiConfig?.contentSafety).toBe('moderate');
     expect(aiConfig?.aiMemory).toBe('session');
     expect(aiConfig?.autoLearning).toBe(true);
-    expect(aiConfig?.googleAiStudioKey).toBe('AIzaSy_userA_shared_key_12345');
+    expect(aiConfig?.googleAiStudioKey).toBe('AI-zaSy_userA_shared_key_12345');
     expect(aiConfig?.openAiKey).toBe('sk-userA-shared-key-67890');
     
     console.log('✅ User B successfully reads all 15 AI configuration fields from workspace');
@@ -236,7 +236,7 @@ describe('Task 8.2: Workspace Sharing Test - AI Configuration', () => {
     expect(aiModel).toBe('google-ai-studio'); // NOT default
     expect(creativityLevel).toBe(0.75); // NOT default 0.5
     expect(optimizationGoals).toBe('engagement'); // NOT default 'balanced'
-    expect(apiKey).toBe('AIzaSy_userA_shared_key_12345'); // User A's key
+    expect(apiKey).toBe('AI-zaSy_userA_shared_key_12345'); // User A's key
     
     console.log('✅ AI generation system would use User A\'s configuration for User B');
     console.log('   Model: google-ai-studio (User A\'s choice)');

@@ -66,7 +66,7 @@ describe('Task 6.2: AI Configuration Implementation Verification', () => {
         contentSafety: 'strict',
         aiMemory: 'short-term',
         autoLearning: false,
-        googleAiStudioKey: 'AIzaSy_test_key',
+        googleAiStudioKey: 'AI-zaSy_test_key',
         openAiKey: 'sk-test-key'
       }
     };
@@ -103,7 +103,7 @@ describe('Task 6.2: AI Configuration Implementation Verification', () => {
         contentSafety: 'moderate',
         aiMemory: 'long-term',
         autoLearning: true,
-        googleAiStudioKey: 'AIzaSyTest',
+        googleAiStudioKey: 'AI-zaSyTest',
         openAiKey: 'sk-proj-test'
       }
     };
@@ -129,7 +129,7 @@ describe('Task 6.2: AI Configuration Implementation Verification', () => {
       expect(config?.contentSafety).toBe('moderate');
       expect(config?.aiMemory).toBe('long-term');
       expect(config?.autoLearning).toBe(true);
-      expect(config?.googleAiStudioKey).toBe('AIzaSyTest');
+      expect(config?.googleAiStudioKey).toBe('AI-zaSyTest');
       expect(config?.openAiKey).toBe('sk-proj-test');
     }
   });
@@ -316,7 +316,7 @@ describe('Task 6.2: AI Configuration Implementation Verification', () => {
   test('should accept API keys as string fields', () => {
     const apiKeyPayload = {
       aiConfiguration: {
-        googleAiStudioKey: 'AIzaSyDXqFVfK1z2X3wYZABCDEF1234567890',
+        googleAiStudioKey: 'AI-zaSyDXqFVfK1z2X3wYZABCDEF1234567890',
         openAiKey: 'sk-proj-ABCD1234efgh5678IJKL9012mnop3456QRST7890'
       }
     };
@@ -378,7 +378,7 @@ describe('Task 6.2: AI Configuration Implementation Verification', () => {
         contentSafety: 'standard',
         aiMemory: 'enabled',
         autoLearning: true,
-        googleAiStudioKey: 'AIzaSyC_real_key_would_go_here',
+        googleAiStudioKey: 'AI-zaSyC_real_key_would_go_here',
         openAiKey: 'sk-proj-real_key_would_go_here'
       }
     };

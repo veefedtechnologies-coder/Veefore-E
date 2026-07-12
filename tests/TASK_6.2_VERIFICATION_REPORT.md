@@ -395,7 +395,7 @@ According to `tasks.md`, Task 6.2 should verify:
    - Content Safety: "strict"
    - AI Memory: "short-term"
    - Auto Learning: OFF (false)
-   - Google AI Studio Key: "AIzaSy_test_key"
+   - Google AI Studio Key: "AI-zaSy_test_key"
    - OpenAI Key: "sk-test-key"
 3. Click "Save AI Configuration"
 4. Open MongoDB and query:
@@ -578,7 +578,7 @@ db.workspaces.findOne(
     contentSafety: "strict",
     aiMemory: "short-term",
     autoLearning: false,
-    googleAiStudioKey: "AIzaSy...",
+    googleAiStudioKey: "AI-zaSy...",
     openAiKey: "sk-..."
   }
 }

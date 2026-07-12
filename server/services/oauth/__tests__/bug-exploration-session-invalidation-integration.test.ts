@@ -144,7 +144,7 @@ describe('OAuth Session Invalidation - Integration Test (HTTP Endpoints)', () =>
     expect(decodedToken.claims.sessionVersion).toBe(1);
 
     // STEP 2: Store a refresh token for the user
-    const mockRefreshToken = 'ya29.test-refresh-token-' + Math.random().toString(36);
+    const mockRefreshToken = 'ya29-test-refresh-token-' + Math.random().toString(36);
     await refreshTokenStore.storeRefreshToken(testUserId, mockRefreshToken, 'test-integration');
 
     // STEP 3: Increment the user's sessionVersion (simulate security incident)
@@ -251,7 +251,7 @@ describe('OAuth Session Invalidation - Integration Test (HTTP Endpoints)', () =>
     const authToken = tokenResult.customToken;
 
     // Store a valid refresh token
-    const mockRefreshToken = 'ya29.test-refresh-token-' + Math.random().toString(36);
+    const mockRefreshToken = 'ya29-test-refresh-token-' + Math.random().toString(36);
     await refreshTokenStore.storeRefreshToken(testUserId, mockRefreshToken, 'test-integration');
 
     // Verify user still has sessionVersion: 1

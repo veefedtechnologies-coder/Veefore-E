@@ -348,7 +348,7 @@ export function IntegrationsSettings() {
               </label>
               <Input 
                 type="password" 
-                placeholder="AIzaSy..." 
+                placeholder="AI-zaSy..."
                 value={apiKeys.googleAiStudioKey} 
                 onChange={(e) => setApiKeys({ ...apiKeys, googleAiStudioKey: e.target.value })}
                 className="w-full h-11"

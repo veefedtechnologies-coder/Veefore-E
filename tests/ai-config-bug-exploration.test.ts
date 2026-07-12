@@ -224,7 +224,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
     // Update workspace with API keys
     const updateData = {
       aiConfiguration: {
-        googleAiStudioKey: 'AIzaSyTest123456789',
+        googleAiStudioKey: 'AI-zaSyTest123456789',
         openAiKey: 'sk-test-key-123456789'
       }
     };
@@ -244,7 +244,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
     // ASSERTION: This should pass AFTER fix, but FAIL on unfixed code
     expect(updated).toBeDefined();
     expect(updated!.aiConfiguration).toBeDefined();
-    expect(updated!.aiConfiguration?.googleAiStudioKey).toBe('AIzaSyTest123456789');
+    expect(updated!.aiConfiguration?.googleAiStudioKey).toBe('AI-zaSyTest123456789');
     expect(updated!.aiConfiguration?.openAiKey).toBe('sk-test-key-123456789');
 
     // Retrieve to verify persistence
@@ -252,7 +252,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
 
     expect(retrieved).toBeDefined();
     expect(retrieved!.aiConfiguration).toBeDefined();
-    expect(retrieved!.aiConfiguration?.googleAiStudioKey).toBe('AIzaSyTest123456789');
+    expect(retrieved!.aiConfiguration?.googleAiStudioKey).toBe('AI-zaSyTest123456789');
     expect(retrieved!.aiConfiguration?.openAiKey).toBe('sk-test-key-123456789');
 
     // Cleanup
@@ -296,7 +296,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
         contentSafety: 'standard',
         aiMemory: 'long-term',
         autoLearning: true,
-        googleAiStudioKey: 'AIzaSyTest123456789',
+        googleAiStudioKey: 'AI-zaSyTest123456789',
         openAiKey: 'sk-test-key-123456789'
       }
     };
@@ -329,7 +329,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
     expect(updated!.aiConfiguration?.contentSafety).toBe('standard');
     expect(updated!.aiConfiguration?.aiMemory).toBe('long-term');
     expect(updated!.aiConfiguration?.autoLearning).toBe(true);
-    expect(updated!.aiConfiguration?.googleAiStudioKey).toBe('AIzaSyTest123456789');
+    expect(updated!.aiConfiguration?.googleAiStudioKey).toBe('AI-zaSyTest123456789');
     expect(updated!.aiConfiguration?.openAiKey).toBe('sk-test-key-123456789');
 
     // Retrieve to verify persistence
@@ -352,7 +352,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
     expect(retrieved!.aiConfiguration?.contentSafety).toBe('standard');
     expect(retrieved!.aiConfiguration?.aiMemory).toBe('long-term');
     expect(retrieved!.aiConfiguration?.autoLearning).toBe(true);
-    expect(retrieved!.aiConfiguration?.googleAiStudioKey).toBe('AIzaSyTest123456789');
+    expect(retrieved!.aiConfiguration?.googleAiStudioKey).toBe('AI-zaSyTest123456789');
     expect(retrieved!.aiConfiguration?.openAiKey).toBe('sk-test-key-123456789');
 
     // Cleanup

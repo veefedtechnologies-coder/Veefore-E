@@ -227,7 +227,7 @@ describe('OAuth Error Handling Property Tests', () => {
               timestamp: new Date().toISOString(),
             };
 
-            mockLogger.info(logEntry);
+            mockLogger.info.mockClear(); mockLogger.info(logEntry);
 
             const logString = JSON.stringify(mockLogger.info.mock.calls[0][0]);
 

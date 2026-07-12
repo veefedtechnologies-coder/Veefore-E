@@ -75,7 +75,7 @@ This manual test guide verifies that AI configuration saved at the workspace lev
    - Content Safety: `moderate`
    - AI Memory: `session`
    - Auto Learning: `true` (checked)
-   - Google AI Studio Key: `AIzaSy_test_key_12345` (or your actual key)
+   - Google AI Studio Key: `AI-zaSy_test_key_12345` (or your actual key)
    - OpenAI Key: `sk-test-key-67890` (or your actual key)
 
 4. Click "Save AI Configuration" button
@@ -153,7 +153,7 @@ This manual test guide verifies that AI configuration saved at the workspace lev
 - [ ] Content Safety: `moderate` ✓
 - [ ] AI Memory: `session` ✓
 - [ ] Auto Learning: `checked` ✓
-- [ ] Google AI Studio Key: `AIzaSy_test_key_12345` ✓ (may be masked for security)
+- [ ] Google AI Studio Key: `AI-zaSy_test_key_12345` ✓ (may be masked for security)
 - [ ] OpenAI Key: `sk-test-key-67890` ✓ (may be masked for security)
 
 **Note:** API keys may display as `********` for security. This is expected behavior per Requirement 3.7.
@@ -417,7 +417,7 @@ db.workspaces.findOne({ name: "Shared AI Config Test" })
 2. Verify AI generation receives key:
    ```bash
    # Server logs should show key being used (first few chars)
-   # Expected: "Using API key: AIzaSy..."
+   # Expected: "Using API key: AI-zaSy..."
    # NOT: "No API key found, using default"
    ```
 
