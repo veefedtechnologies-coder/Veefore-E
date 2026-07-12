@@ -3,14 +3,14 @@ import * as fc from 'fast-check';
 
 /**
  * Property-based tests for OAuth error handling
- * 
+ *
  * Feature: server-side-oauth-implementation
- * 
+ *
  * Property 15: Error Response Confidentiality (Task 13.3)
  * Property 16: Sensitive Data Logging Exclusion (Task 13.4)
- * 
+ *
  * **Validates: Requirements 11.4, 11.9, 8.7, 18.6**
- * 
+ *
  * This test verifies that:
  * - Error responses never contain sensitive data (tokens, secrets)
  * - Logs never contain sensitive values
@@ -220,7 +220,7 @@ describe('OAuth Error Handling Property Tests', () => {
           (fullToken) => {
             // Good logging practice: truncate or redact tokens
             const redactedToken = `${fullToken.substring(0, 8)}...[REDACTED]`;
-            
+
             const logEntry = {
               event: 'token_refresh',
               tokenPreview: redactedToken, // Only preview, not full token
@@ -232,7 +232,8 @@ describe('OAuth Error Handling Property Tests', () => {
             const logString = JSON.stringify(mockLogger.info.mock.calls[0][0]);
 
             // Property assertion: Full token not in log
-            if (!fullToken.includes('REDACTED') && fullToken.replace(/[\s\"\\\r\n]/g, '').length > 8 && !logString.includes(fullToken)) { expect(logString).not.toContain(fullToken); }
+            if (!fullToken.includes('REDACTED') && !fullToken.includes('"') && !fullToken.includes('\') && !fullToken.includes('') && !fullToken.includes('
+') && fullToken.trim().length > 8) { expect(logString).not.toContain(fullToken); }
 
             // Property assertion: Redacted version is present
             expect(logString).toContain('[REDACTED]');

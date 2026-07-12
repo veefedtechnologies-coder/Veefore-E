@@ -1,0 +1,13 @@
+--- server/services/oauth/__tests__/errorHandling.property.test.ts
++++ server/services/oauth/__tests__/errorHandling.property.test.ts
+@@ -212,8 +212,8 @@
+             const logString = JSON.stringify(mockLogger.info.mock.calls[0][0]);
+
+             // Property assertion: Full token not in log
+-            if (!fullToken.includes('REDACTED') && !fullToken.includes('"') && !fullToken.includes('\') && !fullToken.includes('') && !fullToken.includes('
+-') && fullToken.trim().length > 8) { expect(logString).not.toContain(fullToken); }
++            const cleanToken = fullToken.replace(/[\s"\\\r\n]/g, '');
++            if (!fullToken.includes('REDACTED') && cleanToken.length > 8) { expect(logString).not.toContain(fullToken); }
+
+             // Property assertion: Redacted version is present
+             expect(logString).toContain('[REDACTED]');

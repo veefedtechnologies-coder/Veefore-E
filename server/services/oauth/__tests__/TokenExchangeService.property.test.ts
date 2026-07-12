@@ -57,7 +57,7 @@ describe('TokenExchangeService Property Tests', () => {
           async (refreshToken, attemptCount) => {
             // Mock successful token refresh
             let callCount = 0;
-            mockOAuth2Client.setCredentials.mockClear();
+            vi.clearAllMocks();
             mockOAuth2Client.refreshAccessToken.mockImplementation(() => {
               callCount++;
               return Promise.resolve({
@@ -122,7 +122,7 @@ describe('TokenExchangeService Property Tests', () => {
           async (refreshToken, concurrentCount) => {
             // Mock successful token refresh with slight delay to simulate concurrency
             let callCount = 0;
-            mockOAuth2Client.setCredentials.mockClear();
+            vi.clearAllMocks();
             mockOAuth2Client.refreshAccessToken.mockImplementation(async () => {
               callCount++;
               // Small random delay to simulate network
@@ -189,7 +189,7 @@ describe('TokenExchangeService Property Tests', () => {
           async (refreshToken) => {
             // Mock: Each call returns different access token
             let callCount = 0;
-            mockOAuth2Client.setCredentials.mockClear();
+            vi.clearAllMocks();
             mockOAuth2Client.refreshAccessToken.mockImplementation(() => {
               callCount++;
               return Promise.resolve({
@@ -242,7 +242,7 @@ describe('TokenExchangeService Property Tests', () => {
           ),
           async (refreshToken) => {
             // Mock successful refresh
-            mockOAuth2Client.setCredentials.mockClear();
+            vi.clearAllMocks();
             mockOAuth2Client.refreshAccessToken.mockResolvedValue({
               credentials: {
                 access_token: 'valid-access-token',
@@ -287,7 +287,7 @@ describe('TokenExchangeService Property Tests', () => {
           async (refreshToken, failureCount) => {
             // Mock: Fail first N times, then succeed
             let callCount = 0;
-            mockOAuth2Client.setCredentials.mockClear();
+            vi.clearAllMocks();
             mockOAuth2Client.refreshAccessToken.mockImplementation(() => {
               callCount++;
               if (callCount <= failureCount) {
@@ -344,7 +344,7 @@ describe('TokenExchangeService Property Tests', () => {
           async (refreshToken, expirySeconds) => {
             const expiryTime = Date.now() + (expirySeconds * 1000);
 
-            mockOAuth2Client.setCredentials.mockClear();
+            vi.clearAllMocks();
             mockOAuth2Client.refreshAccessToken.mockResolvedValue({
               credentials: {
                 access_token: 'test-token',
@@ -378,7 +378,7 @@ describe('TokenExchangeService Property Tests', () => {
         fc.property(
           fc.stringMatching(/^[A-Za-z0-9\-_.]{40,200}$/),
           async (refreshToken) => {
-            mockOAuth2Client.setCredentials.mockClear();
+            vi.clearAllMocks();
             mockOAuth2Client.refreshAccessToken.mockResolvedValue({
               credentials: {
                 access_token: 'new-access-token',
