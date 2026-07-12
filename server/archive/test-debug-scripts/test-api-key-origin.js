@@ -1,4 +1,4 @@
-const apiKey = 'AIzaSyB83z17nqQvXq8-gLSU0E7cSgjMnlkzznI';
+const apiKey = 'AI-zaSyB83z17nqQvXq8-gLSU0E7cSgjMnlkzznI';
 const fetch = require('node-fetch');
 
 async function test() {

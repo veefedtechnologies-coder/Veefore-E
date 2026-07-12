@@ -136,7 +136,7 @@ Fill in the form with these test values:
 | 11 | Content Safety | `strict` |
 | 12 | AI Memory | `long-term` |
 | 13 | Auto Learning | `ON` (enabled) |
-| 14 | Google AI Studio Key | `AIzaSy_test_manual_key_12345` |
+| 14 | Google AI Studio Key | `AI-zaSy_test_manual_key_12345` |
 | 15 | OpenAI Key | `sk-test-manual-key-67890` |
 
 #### Expected Results:
@@ -411,7 +411,7 @@ db.workspaces.findOne(
   - Content Safety: `strict` ✅
   - AI Memory: `long-term` ✅
   - Auto Learning: `ON` ✅
-  - Google AI Studio Key: `AIzaSy_test_manual_key_12345` ✅
+  - Google AI Studio Key: `AI-zaSy_test_manual_key_12345` ✅
   - OpenAI Key: `sk-test-manual-key-67890` ✅
 
 #### Verification:

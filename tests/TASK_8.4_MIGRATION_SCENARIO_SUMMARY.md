@@ -95,7 +95,7 @@ The test simulates a complete migration journey for users who have legacy AI con
   contentSafety: 'moderate',
   aiMemory: 'enabled',
   autoLearning: true,
-  googleAiStudioKey: 'AIzaSy_new_workspace_key_12345',
+  googleAiStudioKey: 'AI-zaSy_new_workspace_key_12345',
   openAiKey: 'sk-new-workspace-key-67890'
 }
 ```
