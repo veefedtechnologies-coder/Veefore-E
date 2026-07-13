@@ -3,6 +3,7 @@ import { useQuery } from 'react-query';
 import { Search, X, Clock, User, Shield, CreditCard, Ticket, Webhook, Megaphone, ExternalLink } from 'lucide-react';
 import { apiClient as api } from '../../services/api';
 import { clsx } from 'clsx';
+import DOMPurify from 'dompurify';
 
 interface SearchResult {
   id: string;
@@ -224,7 +225,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onR
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-medium text-gray-900 truncate">
-                          <span dangerouslySetInnerHTML={{ __html: result.highlighted.title }} />
+                          {/* Security concern: Prevent XSS from search highlighted results */}
+                          <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.highlighted.title) }} />
                         </h3>
                         <div className="flex items-center space-x-2">
                           <span className="text-xs text-gray-500 capitalize">
@@ -234,7 +236,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onR
                         </div>
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
-                        <span dangerouslySetInnerHTML={{ __html: result.highlighted.description }} />
+                          {/* Security concern: Prevent XSS from search highlighted results */}
+                        <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.highlighted.description) }} />
                       </p>
                       {result.metadata && (
                         <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
