@@ -21,6 +21,7 @@
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 18.1
  */
 
+import crypto from "crypto";
 import { Router, Request, Response, NextFunction } from 'express';
 import { stateValidator, generatePKCEPair, OAuthRequest, oauthMetrics } from '../../services/oauth';
 import { logger } from '../../config/logger';
@@ -155,7 +156,7 @@ router.get('/start', async (req: Request, res: Response, next: NextFunction) => 
  */
 function generateCorrelationId(): string {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
+  const random = crypto.randomBytes(3).toString('hex');
   return `${timestamp}-${random}`;
 }
 

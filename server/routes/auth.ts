@@ -20,6 +20,7 @@
  * Requirements: 1.1-1.6, 2.1-2.7, 3.1-3.7, 6.1-6.10, 7.1-7.4
  */
 
+import crypto from "crypto";
 import { Router, Request, Response, NextFunction } from 'express';
 import { 
   stateValidator, 
@@ -46,7 +47,7 @@ router.use(oauthSecurityMiddleware);
  * Generates a unique ID for each OAuth flow to enable request correlation in logs
  */
 router.use((req: OAuthRequest, res: Response, next: NextFunction) => {
-  req.correlationId = req.correlationId || `oauth_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  req.correlationId = req.correlationId || `oauth_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   next();
 });
 
@@ -456,7 +457,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
  * @requirement 6.10 - Return 200 with success message
  */
 router.post('/refresh', async (req: OAuthRequest, res: Response) => {
-  const correlationId = req.correlationId || `refresh_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const correlationId = req.correlationId || `refresh_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   const refreshStartTime = Date.now(); // Track token refresh duration for metrics
   
   try {
@@ -882,7 +883,7 @@ router.get('/session', (req: OAuthRequest, res: Response) => {
  * 5. Future /api/auth/refresh calls can verify the ID token
  */
 router.post('/update-token', async (req: OAuthRequest, res: Response) => {
-  const correlationId = req.correlationId || `update_token_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const correlationId = req.correlationId || `update_token_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   
   try {
     const { idToken } = req.body;
@@ -972,7 +973,7 @@ router.post('/update-token', async (req: OAuthRequest, res: Response) => {
  */
 router.post('/invalidate-sessions/:userId', async (req: Request, res: Response) => {
   const { userId } = req.params;
-  const correlationId = `invalidate_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const correlationId = `invalidate_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   
   try {
     // Import User model
