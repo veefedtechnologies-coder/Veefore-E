@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { BaseController, TypedRequest } from './BaseController';
 import { ValidationError, NotFoundError } from '../errors';
@@ -124,7 +125,7 @@ export class MediaController extends BaseController {
       throw new ValidationError(`File size exceeds maximum limit of ${maxSize / 1024 / 1024}MB`);
     }
 
-    const mediaId = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const mediaId = `media_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
     const extension = path.extname(input.filename) || this.getExtensionFromMimeType(input.mimeType);
     const storedFilename = `${mediaId}${extension}`;
 
@@ -166,7 +167,7 @@ export class MediaController extends BaseController {
       throw new ValidationError('User not authenticated');
     }
 
-    const mediaId = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const mediaId = `media_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
     const extension = path.extname(input.filename) || this.getExtensionFromMimeType(input.mimeType);
     const storedFilename = `${mediaId}${extension}`;
 
@@ -299,7 +300,7 @@ export class MediaController extends BaseController {
       }
     }
 
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const jobId = `job_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     this.sendCreated(res, {
       jobId,
@@ -342,7 +343,7 @@ export class MediaController extends BaseController {
     };
 
     const estimatedOutputSize = Math.ceil(media.size * targetSizeReduction[input.targetSize]);
-    const jobId = `compress_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const jobId = `compress_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     this.sendCreated(res, {
       jobId,
