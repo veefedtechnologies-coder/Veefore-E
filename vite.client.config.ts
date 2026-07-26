@@ -22,6 +22,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "client/src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
+      "@platform-registry": path.resolve(__dirname, "src/shared/platform-registry"),
     },
   },
   build: {
