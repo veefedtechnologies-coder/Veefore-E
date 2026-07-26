@@ -782,6 +782,7 @@ export default function AuthenticatedApp() {
 
         <Route path="/subscription/checkout">
           <ProtectedRoute>
+            {/* skeleton-guard-allow: pre-auth route transition spinner, not a content loader */}
             <React.Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full" /></div>}>
               <SubscriptionCheckoutPage />
             </React.Suspense>

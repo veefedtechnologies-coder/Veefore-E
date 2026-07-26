@@ -343,12 +343,15 @@ function EmptyState({ message }: { message: string }) {
 function SkeletonHeatmap() {
   return (
     <div className={cn(SURFACE_CLASS, 'p-6 space-y-3')}>
+      {/* skeleton-guard-allow: inline skeleton component, these are intentional skeleton placeholders */}
       <div className="h-5 w-56 animate-pulse rounded bg-gray-100 dark:bg-gray-700" />
       <div className="mt-5 grid gap-1" style={{ gridTemplateColumns: 'auto repeat(24, minmax(0, 1fr))' }}>
         {Array.from({ length: 7 }).map((_, r) => (
           <>
+            {/* skeleton-guard-allow: inline skeleton component, intentional skeleton placeholder */}
             <div key={`lbl-${r}`} className="h-6 w-8 animate-pulse rounded bg-gray-100 dark:bg-gray-700" />
             {Array.from({ length: 24 }).map((_, c) => (
+              // skeleton-guard-allow: inline skeleton component, intentional skeleton placeholder
               <div key={`c-${r}-${c}`} className="h-6 animate-pulse rounded-sm bg-gray-100 dark:bg-gray-700" />
             ))}
           </>
@@ -688,6 +691,7 @@ function BestTimePageInner() {
         <div className="space-y-4">
           <div className="flex gap-2">
             {TABS.map((t) => (
+              // skeleton-guard-allow: inline skeleton placeholder for tab buttons during loading
               <div key={t.id} className="h-9 w-32 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-700" />
             ))}
           </div>
