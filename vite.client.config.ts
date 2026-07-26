@@ -17,6 +17,7 @@ export default defineConfig({
       react: path.resolve(__dirname, "client/node_modules/react"),
       "react-dom": path.resolve(__dirname, "client/node_modules/react-dom"),
       "three-mesh-bvh": path.resolve(__dirname, "client/src/stubs/three-mesh-bvh.ts"),
+      "agentation": path.resolve(__dirname, "client/src/stubs/agentation.ts"),
       "react/jsx-runtime": path.resolve(__dirname, "client/node_modules/react/jsx-runtime.js"),
       "react/jsx-dev-runtime": path.resolve(__dirname, "client/node_modules/react/jsx-dev-runtime.js"),
       "@": path.resolve(__dirname, "client/src"),
