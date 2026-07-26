@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast'
 // ── Skeleton pulse primitive ───────────────────────────────────────────────
 
 function Sk({ className }: { className?: string }) {
+  // skeleton-guard-allow: local skeleton primitive used exclusively as page-level skeleton placeholders
   return <div className={cn('animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800', className)} />
 }
 
