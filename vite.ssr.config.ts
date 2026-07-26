@@ -37,6 +37,7 @@ export default defineConfig({
       // "Invalid hook call" that a partial react-dom alias caused (the
       // react-dom/server subpath escaped the alias).
       "three-mesh-bvh": path.resolve(__dirname, "client/src/stubs/three-mesh-bvh.ts"),
+      "agentation": path.resolve(__dirname, "client/src/stubs/agentation.ts"),
       "@": path.resolve(__dirname, "client/src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
