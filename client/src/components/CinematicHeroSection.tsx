@@ -186,9 +186,6 @@ const CinematicHeroSection: React.FC = () => {
           opacity, 
           scale, 
           filter,
-          willChange: 'filter, transform, opacity',
-          WebkitTransform: 'translateZ(0)',
-          transform: 'translateZ(0)'
         }}
         className="absolute inset-0 w-full h-full flex flex-col"
       >

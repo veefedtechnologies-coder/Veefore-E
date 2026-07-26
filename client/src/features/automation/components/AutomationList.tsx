@@ -19,6 +19,7 @@ import React, { useState, useMemo } from 'react'
 import { Bot, Search } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { AutomationTable } from './AutomationTable'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { AutomationRule } from '../types/automation.types'
 
 export interface AutomationListProps {
@@ -291,26 +292,26 @@ const AutomationListSkeleton: React.FC = () => {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-64 mb-2 animate-pulse"></div>
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-96 animate-pulse"></div>
+        <Skeleton variant="text" className="h-8 rounded-lg w-64 mb-2" />
+        <Skeleton variant="text" className="h-4 rounded w-96" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 animate-pulse border border-gray-200 dark:border-gray-700">
+          <div key={i} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+                <Skeleton variant="rectangle" className="w-12 h-12 rounded-xl" />
                 <div>
-                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+                  <Skeleton variant="text" className="h-5 w-32 mb-2" />
+                  <Skeleton variant="text" className="h-4 w-24" />
                 </div>
               </div>
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-16"></div>
+              <Skeleton variant="pill" className="h-6 rounded-full w-16" />
             </div>
             <div className="space-y-3">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              <Skeleton variant="text" className="h-4 w-full" />
+              <Skeleton variant="text" className="h-4 w-3/4" />
+              <Skeleton variant="text" className="h-4 w-1/2" />
             </div>
           </div>
         ))}

@@ -13,9 +13,15 @@ import { useUser } from '@/hooks/useUser'
 import { logout } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
 import { useLocation } from 'wouter'
+import useSubscription from '@/hooks/useSubscription'
 
 export function ProfileDropdown() {
   const { userData } = useUser()
+  const { plan, aiCredits, isLoading: subscriptionLoading } = useSubscription()
+  const creditBalance = aiCredits?.remaining
+  const creditLabel = creditBalance == null
+    ? (subscriptionLoading ? 'Loading…' : 'Unavailable')
+    : new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Math.max(0, creditBalance))
   const { toast } = useToast()
   const [, setLocation] = useLocation()
 
@@ -71,10 +77,10 @@ export function ProfileDropdown() {
             <p className="text-xs leading-none text-muted-foreground">{userData?.email}</p>
             <div className="flex items-center space-x-2 mt-2">
               <div className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 px-2 py-1 rounded-full font-medium">
-                {userData?.plan || 'Free'} Plan
+                {plan || userData?.plan || 'Free'} Plan
               </div>
               <div className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 px-2 py-1 rounded-full font-medium">
-                {userData?.credits || 0} Credits
+                {creditLabel} Credits
               </div>
             </div>
           </div>

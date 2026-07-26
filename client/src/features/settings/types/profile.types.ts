@@ -16,6 +16,7 @@ export interface ProfileFormData {
   
   // Professional Profile
   businessType: 'solo' | 'startup' | 'agency' | 'enterprise';
+
   
   // Creator fields
   primaryPlatform?: string;

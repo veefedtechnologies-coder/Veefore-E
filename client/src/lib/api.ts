@@ -1,4 +1,5 @@
 import { auth } from './firebase'
+import { syncAICreditsFromResponse } from './queryClient'
 
 // Get the correct API base URL based on current environment
 function getApiBaseUrl(): string {
@@ -57,7 +58,11 @@ export class ApiClient {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    return response.json()
+    const payload = await response.json()
+    if ((options.method || 'GET').toUpperCase() !== 'GET') {
+      syncAICreditsFromResponse(payload)
+    }
+    return payload
   }
 
   static async get(url: string) {

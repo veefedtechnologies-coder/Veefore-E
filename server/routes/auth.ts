@@ -33,8 +33,96 @@ import { refreshRateLimiter } from '../services/oauth/RefreshRateLimiter';
 import { oauthSecurityMiddleware } from '../middleware/oauthSecurity';
 import { oauthMetrics } from '../services/oauth/OAuthMetrics';
 import { getFirebaseAdmin } from '../firebase-admin';
+import * as fsAuthDebug from 'fs';
+import * as pathAuthDebug from 'path';
+
+// TEMP DEBUG: file logger to trace auth flow (terminal scrolls too fast).
+function authDebugLog(message: string, data?: unknown): void {
+  try {
+    const dir = pathAuthDebug.join(process.cwd(), 'logs');
+    if (!fsAuthDebug.existsSync(dir)) fsAuthDebug.mkdirSync(dir, { recursive: true });
+    const line = `[${new Date().toISOString()}] ${message}` +
+      (data !== undefined ? ` ${JSON.stringify(data)}` : '') + '\n';
+    fsAuthDebug.appendFileSync(pathAuthDebug.join(dir, 'auth-debug.log'), line);
+  } catch { /* ignore */ }
+}
 
 const router = Router();
+
+/**
+ * Decode a Firebase token (ID token OR custom token) and return its claims
+ * WITHOUT trusting the signature. Used only to read `uid` / `sessionVersion` for
+ * session-invalidation bookkeeping — never for granting access. Returns null if
+ * the payload can't be parsed.
+ */
+function decodeTokenClaims(token: string): { uid?: string; sessionVersion?: number } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    // Firebase ID tokens carry custom claims at the TOP level, but unexchanged
+    // CUSTOM tokens nest them under `claims`. Check both so this works whether the
+    // auth_token cookie currently holds an ID token (post /update-token) or a raw
+    // custom token (right after OAuth).
+    const sessionVersion = payload.sessionVersion ?? payload.claims?.sessionVersion;
+    return {
+      uid: payload.uid || payload.user_id || payload.sub,
+      sessionVersion,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve the uid from an auth_token cookie (verified ID token, else decoded). */
+async function resolveUidFromToken(token: string): Promise<string | undefined> {
+  try {
+    const admin = getFirebaseAdmin();
+    const decoded = await admin.auth().verifyIdToken(token);
+    return decoded.uid;
+  } catch {
+    return decodeTokenClaims(token)?.uid;
+  }
+}
+
+/** Clear both auth cookies (same options used when setting / on logout). */
+function clearAuthCookies(res: Response): void {
+  const isProd = process.env.NODE_ENV === 'production';
+  const domain = isProd ? process.env.COOKIE_DOMAIN : undefined;
+  const clearOpts = { httpOnly: true, secure: isProd, sameSite: 'lax' as const, path: '/', domain };
+  res.clearCookie('auth_token', clearOpts);
+  res.clearCookie('__session', clearOpts);
+  res.clearCookie('auth_token', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+  res.clearCookie('__session', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+}
+
+/**
+ * Returns true when the token's sessionVersion claim is STALE relative to the
+ * user's current sessionVersion (i.e. the session was invalidated by a logout).
+ * Only rejects when the claim is present AND mismatched, so legacy tokens that
+ * predate the claim still work (fail-open) — every freshly minted token carries
+ * the claim, so a post-logout bump always invalidates the right sessions.
+ */
+function isSessionVersionStale(tokenSessionVersion: unknown, userSessionVersion: unknown): boolean {
+  if (tokenSessionVersion === undefined || tokenSessionVersion === null) return false;
+  const userSV = (userSessionVersion as number) || 1;
+  return Number(tokenSessionVersion) !== userSV;
+}
+
+// TEMP DEBUG: client log bridge + request logger.
+router.post('/debug-client-log', (req: Request, res: Response) => {
+  try { authDebugLog('CLIENT', req.body); } catch { /* ignore */ }
+  res.status(204).end();
+});
+router.use((req: Request, _res: Response, next: NextFunction) => {
+  authDebugLog('AUTH ROUTER HIT', {
+    method: req.method,
+    path: req.path,
+    referer: req.headers.referer || null,
+    hasAuthCookie: !!(req as any).cookies?.auth_token,
+  });
+  next();
+});
 
 // Apply OAuth security middleware to all routes
 // This includes: TLS enforcement, security headers, redirect URI validation, and rate limiting
@@ -91,6 +179,14 @@ router.get('/google/start', (req: OAuthRequest, res: Response) => {
     
     // Requirement 1.4: Store state and code_verifier in session with 10-minute expiration
     stateValidator.storeState(req, state, codeVerifier);
+
+    // Capture the user's INTENT (signup vs signin). The sign-in page passes
+    // ?mode=signin; the sign-up page omits it (defaults to signup). We persist it
+    // in the session so the callback knows whether it's allowed to create a brand
+    // new account. Sign-in must NEVER create an account — non-existent users are
+    // sent to the waitlist instead (account creation requires early access).
+    const mode = req.query.mode === 'signin' ? 'signin' : 'signup';
+    ;(req.session as any).oauthMode = mode;
     
     // Requirement 1.5: Construct Google OAuth authorization URL
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -101,6 +197,22 @@ router.get('/google/start', (req: OAuthRequest, res: Response) => {
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('code_challenge', codeChallenge);
     authUrl.searchParams.set('code_challenge_method', codeChallengeMethod);
+
+    // Always show Google's account chooser instead of silently auto-selecting
+    // the single signed-in account. Without this, Google skips the chooser when
+    // exactly one account is signed in and the app is already authorized — which
+    // traps multi-account users on their previous account with no way to switch.
+    // Forcing `select_account` is the standard "Sign in with Google" behaviour
+    // used by most SaaS apps. A caller may override via ?prompt= (e.g. a future
+    // One-Tap-style fast path could pass an empty value).
+    const allowedPrompts = new Set(['select_account', 'consent', 'select_account consent', 'none', '']);
+    const requestedPrompt = typeof req.query.prompt === 'string' ? req.query.prompt : undefined;
+    const promptValue = requestedPrompt !== undefined && allowedPrompts.has(requestedPrompt)
+      ? requestedPrompt
+      : 'select_account';
+    if (promptValue) {
+      authUrl.searchParams.set('prompt', promptValue);
+    }
     
     // Log OAuth flow initiation (Requirement 18.1)
     console.log('[OAuth] Flow initiated:', {
@@ -121,7 +233,7 @@ router.get('/google/start', (req: OAuthRequest, res: Response) => {
     
     // Redirect to frontend with error
     const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-    errorUrl.pathname = '/login';
+    errorUrl.pathname = '/signin';
     errorUrl.searchParams.set('error', 'oauth_init_failed');
     errorUrl.searchParams.set('message', 'Failed to start authentication');
     res.redirect(errorUrl.toString());
@@ -182,7 +294,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       oauthMetrics.recordFlowFailure('unknown', 'google_authorization', correlationId, flowDuration);
       
       const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-      errorUrl.pathname = '/login';
+      errorUrl.pathname = '/signin';
       errorUrl.searchParams.set('error', 'oauth_failed');
       errorUrl.searchParams.set('message', 'Google authentication failed');
       return res.redirect(errorUrl.toString());
@@ -216,7 +328,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       
       // Return 403 Forbidden for state validation failures
       const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-      errorUrl.pathname = '/login';
+      errorUrl.pathname = '/signin';
       errorUrl.searchParams.set('error', 'invalid_state');
       errorUrl.searchParams.set('message', validationResult.error || 'Authentication failed - please try again');
       return res.redirect(errorUrl.toString());
@@ -261,7 +373,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       // Requirement 12.3: Handle redirect_uri_mismatch error from Google (return 400)
       // Requirement 11.3: Handle all retry exhaustion (return 503)
       const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-      errorUrl.pathname = '/login';
+      errorUrl.pathname = '/signin';
       errorUrl.searchParams.set('error', errorCode);
       errorUrl.searchParams.set('message', error instanceof Error ? error.message : 'Authentication failed');
       
@@ -289,7 +401,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       });
       
       const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-      errorUrl.pathname = '/login';
+      errorUrl.pathname = '/signin';
       errorUrl.searchParams.set('error', 'user_info_failed');
       errorUrl.searchParams.set('message', 'Failed to retrieve user information');
       return res.redirect(errorUrl.toString());
@@ -301,10 +413,38 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       email: userInfo.email,
     });
     
+    // Determine the flow intent captured at /google/start. Sign-in must not
+    // create a new account; if the user doesn't exist we send them to the
+    // waitlist (account creation requires early access).
+    const oauthMode = (req.session as any)?.oauthMode === 'signin' ? 'signin' : 'signup';
+
     let firebaseResult;
     try {
-      firebaseResult = await firebaseTokenService.createFirebaseToken(userInfo);
+      firebaseResult = await firebaseTokenService.createFirebaseToken(userInfo, {
+        allowCreate: oauthMode !== 'signin',
+      });
     } catch (error) {
+      // Sign-in attempt for an account that doesn't exist yet. Don't create it —
+      // redirect to the waitlist so the user can request early access. (They only
+      // get an account by being approved off the waitlist and signing up.)
+      if ((error as any)?.code === 'ACCOUNT_NOT_FOUND') {
+        console.log('[OAuth] Sign-in for non-existent account — redirecting to waitlist:', {
+          correlationId,
+          email: userInfo.email,
+        });
+        stateValidator.clearOAuthSession(req);
+        delete (req.session as any).oauthMode;
+
+        const waitlistUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
+        waitlistUrl.pathname = '/signin';
+        waitlistUrl.searchParams.set('error', 'account_not_found');
+        waitlistUrl.searchParams.set(
+          'message',
+          'No VeeFore account found for this Google account. Join the waitlist to get access.'
+        );
+        return res.redirect(waitlistUrl.toString());
+      }
+
       console.error('[OAuth] Firebase token creation failed:', {
         correlationId,
         email: userInfo.email,
@@ -317,7 +457,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       
       // Requirement 3.5: Return 500 if Firebase token creation fails
       const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-      errorUrl.pathname = '/login';
+      errorUrl.pathname = '/signin';
       errorUrl.searchParams.set('error', 'firebase_token_failed');
       errorUrl.searchParams.set('message', 'Failed to create authentication token');
       return res.redirect(errorUrl.toString());
@@ -344,7 +484,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
         
         // Requirement 4.6: Return 500 if encryption fails
         const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-        errorUrl.pathname = '/login';
+        errorUrl.pathname = '/signin';
         errorUrl.searchParams.set('error', 'encryption_failed');
         errorUrl.searchParams.set('message', 'Failed to secure authentication');
         return res.redirect(errorUrl.toString());
@@ -353,15 +493,16 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
     
     // Requirement 5: Set auth_token cookie with Firebase custom token
     // Requirement 5.1-5.7: Set all required cookie attributes
+    const isHttpsFrontend = process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production';
     const cookieOptions = {
       httpOnly: true,                           // Requirement 5.1: Prevent JavaScript access
-      secure: process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false, // Requirement 5.2: HTTPS only in production or if frontend is HTTPS
+      secure: isHttpsFrontend,                  // Requirement 5.2: HTTPS only in production or if frontend is HTTPS
       sameSite: 'lax' as const,                 // Use lax for OAuth cross-site redirects
       path: '/',                                // Requirement 5.4: Available to all routes
       maxAge: 30 * 24 * 60 * 60 * 1000,         // 30 days (Instagram-style persistent session)
-      domain: process.env.NODE_ENV === 'production' 
-        ? process.env.COOKIE_DOMAIN 
-        : undefined,                            // Requirement 5.6: Set domain in production
+      domain: isHttpsFrontend
+        ? process.env.COOKIE_DOMAIN
+        : undefined,                            // Requirement 5.6: Set domain when using HTTPS frontend
     };
     
     res.cookie('auth_token', firebaseResult.customToken, cookieOptions);
@@ -394,13 +535,32 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
     // Clear OAuth session data (state and code_verifier already cleared by validateState)
     // This is redundant but ensures complete cleanup
     stateValidator.clearOAuthSession(req);
+    delete (req.session as any).oauthMode;
     
-    // Redirect to frontend — use '/' which is the AuthenticatedApp dashboard root.
-    // '/dashboard' has no explicit route in AuthenticatedApp and would fall through
-    // to its catch-all redirect to '/' anyway.
+    // Redirect to frontend. Choose the destination based on onboarding status so
+    // the user lands on the RIGHT page in a single hop:
+    //  - Not onboarded  -> /signup?resume=true (onboarding flow)
+    //  - Onboarded       -> / (dashboard root)
+    // Redirecting a not-onboarded user to '/' would force the client to do a
+    // SECOND navigation to /signup?resume=true after the session restores, which
+    // causes the ugly blank-screen flash the user reported. Sending them straight
+    // to the onboarding URL keeps it to one page load.
     const redirectUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-    redirectUrl.pathname = '/';
-    
+    const userIsOnboarded = firebaseResult.user?.isOnboarded === true;
+    authDebugLog('CALLBACK redirect decision', {
+      userId: String(firebaseResult.user?._id || firebaseResult.user?.id || 'unknown'),
+      email: firebaseResult.user?.email,
+      isOnboarded: firebaseResult.user?.isOnboarded,
+      isOnboardedCheck: userIsOnboarded,
+      isNewUser: firebaseResult.isNewUser,
+    });
+    if (userIsOnboarded) {
+      redirectUrl.pathname = '/';
+    } else {
+      redirectUrl.pathname = '/signup';
+      redirectUrl.searchParams.set('resume', 'true');
+    }
+
     // ALWAYS add oauth_success=true to trigger frontend session exchange
     // This tells the frontend to call /api/auth/session to exchange the cookie for a Firebase token
     redirectUrl.searchParams.set('oauth_success', 'true');
@@ -424,7 +584,7 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
     
     // Redirect to frontend with generic error
     const errorUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
-    errorUrl.pathname = '/login';
+    errorUrl.pathname = '/signin';
     errorUrl.searchParams.set('error', 'authentication_failed');
     errorUrl.searchParams.set('message', 'Authentication failed - please try again');
     res.redirect(errorUrl.toString());
@@ -496,10 +656,10 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
         // Clear the old cookie
         res.clearCookie('auth_token', {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production',
           sameSite: 'lax',
           path: '/',
-          domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+          domain: (process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production') ? process.env.COOKIE_DOMAIN : undefined,
         });
         
         // Return special error code so client knows to re-authenticate
@@ -719,31 +879,56 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
  * @requirement 7.3 - Clear session cookie
  * @requirement 7.4 - Return 200 with success message
  */
-router.post('/logout', (req: Request, res: Response) => {
-  // Requirement 7.2: Clear auth_token cookie
-  res.clearCookie('auth_token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-    domain: process.env.NODE_ENV === 'production' 
-      ? process.env.COOKIE_DOMAIN 
-      : undefined,
-  });
-  
-  // Requirement 7.3: Clear session cookie
-  res.clearCookie('session', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-  });
-  
-  console.log('[OAuth] User logged out');
-  
+router.post('/logout', async (req: Request, res: Response) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  const domain = isProd ? process.env.COOKIE_DOMAIN : undefined;
+
+  // AUTHORITATIVE INVALIDATION: bump the user's sessionVersion BEFORE clearing
+  // cookies. This is what makes logout actually stick. Clearing cookies alone is
+  // racy — a still-open tab (or the OAuth/session-restore flow) can re-mint
+  // `auth_token`/`__session` via /session, /session-login or /update-token before
+  // the clear lands, silently logging the user back in. Every token minted for
+  // this user carries a `sessionVersion` claim; once we bump it here, all of
+  // those existing tokens are stale and the session-establishing endpoints below
+  // reject them — so no lingering tab can resurrect the session. A fresh login
+  // mints a token with the new version, so signing back in still works normally.
+  // (This is "logout everywhere", which matches the existing cross-tab logout.)
+  try {
+    const authToken = (req as any).cookies?.auth_token as string | undefined;
+    const uid = authToken ? await resolveUidFromToken(authToken) : undefined;
+    if (uid) {
+      const { User } = await import('../models/User/User');
+      await User.findByIdAndUpdate(uid, { $inc: { sessionVersion: 1 } });
+      authDebugLog('LOGOUT bumped sessionVersion', { uid });
+    }
+  } catch (err) {
+    // Non-fatal: never block logout on this.
+    authDebugLog('LOGOUT sessionVersion bump failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // Clear ALL auth cookies. Options (path/domain) must match how they were set,
+  // or the browser keeps them and the user is silently logged back in:
+  //  - auth_token  → used by /api/auth/session to re-mint a custom token.
+  //  - __session   → the durable SSR session cookie the HTML bootstrap verifies;
+  //    if it survives, the server injects an authed user and the app re-mounts
+  //    the dashboard even though Firebase is signed out. (Previously this route
+  //    cleared a cookie named 'session', which DOES NOT EXIST — the real name is
+  //    '__session' — so logout left the user effectively still signed in.)
+  const clearOpts = { httpOnly: true, secure: isProd, sameSite: 'lax' as const, path: '/', domain };
+  res.clearCookie('auth_token', clearOpts);
+  res.clearCookie('__session', clearOpts);
+  // Defensive: also clear without an explicit domain, in case a cookie was set
+  // host-only (no domain attribute) in some environment.
+  res.clearCookie('auth_token', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+  res.clearCookie('__session', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+
+  console.log('[OAuth] User logged out — cleared auth_token + __session');
+
   // Record logout operation
   oauthMetrics.recordLogout();
-  
+
   // Requirement 7.4: Return success response
   res.json({
     success: true,
@@ -815,7 +1000,7 @@ router.get('/metrics', (req: Request, res: Response) => {
  * This is the bridge between server-side OAuth (which stores the token in
  * an HTTP-only cookie) and the Firebase client SDK (which needs the token).
  */
-router.get('/session', (req: OAuthRequest, res: Response) => {
+router.get('/session', async (req: OAuthRequest, res: Response) => {
   console.log('[GET /api/auth/session] ========== REQUEST START ==========');
   console.log('[GET /api/auth/session] URL:', req.url);
   console.log('[GET /api/auth/session] Method:', req.method);
@@ -849,19 +1034,105 @@ router.get('/session', (req: OAuthRequest, res: Response) => {
     });
   }
 
-  // Enhanced logging for debugging
-  console.log('[GET /api/auth/session] ✅ Token found:', {
-    tokenLength: authToken.length,
-    tokenPrefix: authToken.substring(0, 30) + '...',
-    tokenSuffix: '...' + authToken.substring(authToken.length - 10),
-  });
+  // The auth_token cookie may hold EITHER a Firebase custom token (set right after
+  // OAuth) OR a Firebase ID token (after /update-token swapped it so /refresh can
+  // verify it). The client calls signInWithCustomToken() with whatever we return,
+  // and that ONLY accepts a custom token — returning an ID token throws
+  // auth/invalid-custom-token and leaves the user stuck on the landing page.
+  //
+  // To be robust regardless of which token form is in the cookie, we extract the
+  // uid and always mint a FRESH custom token server-side.
+  try {
+    const admin = getFirebaseAdmin();
 
-  // Return the custom token so the client can call signInWithCustomToken()
-  console.log('[GET /api/auth/session] Sending custom token to frontend');
-  console.log('[GET /api/auth/session] ========== REQUEST END ==========');
-  return res.status(200).json({
-    customToken: authToken,
-  });
+    // 1) Resolve the uid from the cookie token.
+    let uid: string | undefined;
+    try {
+      // Works when the cookie is an ID token.
+      const decoded = await admin.auth().verifyIdToken(authToken);
+      uid = decoded.uid;
+    } catch {
+      // Otherwise it's a custom token (or some other JWT) — decode the payload
+      // (without signature verification) to read the uid claim. We re-mint a
+      // properly signed token below, so decoding here is safe.
+      try {
+        const parts = authToken.split('.');
+        if (parts.length >= 2) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+          uid = payload.uid || payload.user_id || payload.sub;
+        }
+      } catch {
+        // fall through to error handling below
+      }
+    }
+
+    if (!uid) {
+      console.warn('[GET /api/auth/session] ❌ Could not resolve uid from auth_token');
+      authDebugLog('SESSION 401 invalid_session (no uid)');
+      return res.status(401).json({
+        error: 'invalid_session',
+        message: 'Session token could not be validated',
+      });
+    }
+
+    // 2) Load the user to include current claims (e.g. sessionVersion) so the
+    //    minted token stays consistent with the /refresh invalidation checks.
+    const { User } = await import('../models/User/User');
+    const user = await User.findById(uid);
+
+    if (!user) {
+      console.warn('[GET /api/auth/session] ❌ User not found for uid:', uid);
+      authDebugLog('SESSION 401 user_not_found', { uid });
+      // Clear the stale auth_token cookie so the client knows it needs to sign in fresh
+      // rather than looping on an invalid session indefinitely.
+      clearAuthCookies(res);
+      return res.status(401).json({
+        error: 'user_not_found',
+        message: 'User not found',
+        requiresReauth: true,
+      });
+    }
+
+    // SESSION INVALIDATION: if the cookie token's sessionVersion is stale (a
+    // logout bumped the user's sessionVersion), refuse to mint a new token and
+    // clear the cookies. This is what stops a lingering tab / stale auth_token
+    // cookie from silently resurrecting the session after logout.
+    const tokenSessionVersion = decodeTokenClaims(authToken)?.sessionVersion;
+    if (isSessionVersionStale(tokenSessionVersion, user.sessionVersion)) {
+      clearAuthCookies(res);
+      authDebugLog('SESSION 401 session_invalidated', {
+        uid,
+        tokenSessionVersion,
+        userSessionVersion: user.sessionVersion || 1,
+      });
+      return res.status(401).json({
+        error: 'session_invalidated',
+        message: 'Your session has been invalidated. Please sign in again.',
+      });
+    }
+
+    // 3) Mint a fresh custom token the client can exchange via signInWithCustomToken().
+    const customToken = await admin.auth().createCustomToken(String(user._id), {
+      email: user.email,
+      emailVerified: user.isEmailVerified,
+      googleId: user.googleId,
+      sessionVersion: user.sessionVersion || 1,
+    });
+
+    console.log('[GET /api/auth/session] ✅ Minted fresh custom token for uid:', uid);
+    authDebugLog('SESSION 200 minted custom token', { uid });
+
+    return res.status(200).json({ customToken });
+  } catch (error) {
+    console.error('[GET /api/auth/session] Failed to mint custom token:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    authDebugLog('SESSION 500 mint failed', { error: error instanceof Error ? error.message : String(error) });
+    return res.status(500).json({
+      error: 'session_error',
+      message: 'Failed to establish session',
+    });
+  }
 });
 
 /**
@@ -897,8 +1168,9 @@ router.post('/update-token', async (req: OAuthRequest, res: Response) => {
     }
     
     // Verify the ID token is valid before storing it
+    let decodedIdToken: any;
     try {
-      await firebaseTokenService.verifyToken(idToken);
+      decodedIdToken = await firebaseTokenService.verifyToken(idToken);
       console.log('[OAuth] ID token verified successfully:', { correlationId });
     } catch (error) {
       console.error('[OAuth] ID token verification failed:', {
@@ -911,21 +1183,76 @@ router.post('/update-token', async (req: OAuthRequest, res: Response) => {
         correlationId,
       });
     }
+
+    // SESSION INVALIDATION: don't re-mint cookies for a token whose sessionVersion
+    // is stale (a logout bumped it). Without this, a lingering tab calling
+    // /update-token after logout would recreate auth_token + __session and log the
+    // user back in.
+    try {
+      const uid = decodedIdToken?.uid;
+      if (uid) {
+        const { User } = await import('../models/User/User');
+        const user = await User.findById(uid);
+        if (user && isSessionVersionStale((decodedIdToken as any)?.sessionVersion, user.sessionVersion)) {
+          clearAuthCookies(res);
+          authDebugLog('UPDATE-TOKEN 401 session_invalidated', {
+            uid,
+            tokenSessionVersion: (decodedIdToken as any)?.sessionVersion,
+            userSessionVersion: user.sessionVersion || 1,
+          });
+          return res.status(401).json({
+            error: 'session_invalidated',
+            message: 'Your session has been invalidated. Please sign in again.',
+            correlationId,
+          });
+        }
+      }
+    } catch {
+      /* fail-open: a lookup failure must not break a legitimate token update */
+    }
     
     // Update the cookie with the ID token
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production',
       sameSite: 'lax' as const,
       path: '/',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      domain: process.env.NODE_ENV === 'production' 
-        ? process.env.COOKIE_DOMAIN 
+      domain: (process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production')
+        ? process.env.COOKIE_DOMAIN
         : undefined,
     };
     
     res.cookie('auth_token', idToken, cookieOptions);
-    
+
+    // SSR instant-load: also mint the durable, server-VERIFIABLE `__session`
+    // cookie from this freshly-verified ID token. This is the most reliable place
+    // to create it (we already have a valid ID token here, and the client calls
+    // this endpoint after session restore and after every token refresh), so the
+    // HTML route can seed the dashboard data on the first byte of the next load.
+    // The httpOnly `auth_token` holds a CUSTOM token after OAuth, which the HTML
+    // route cannot verify — `__session` is what makes first-byte seeding work.
+    // Best-effort: a failure here must never break token update.
+    try {
+      const admin = getFirebaseAdmin();
+      const expiresIn = 14 * 24 * 60 * 60 * 1000; // 14 days
+      const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
+      res.cookie('__session', sessionCookie, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false,
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: expiresIn,
+        domain: (process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production') ? process.env.COOKIE_DOMAIN : undefined,
+      });
+      console.log('[OAuth] Minted __session cookie alongside auth_token:', { correlationId });
+    } catch (sessionErr) {
+      console.warn('[OAuth] Could not mint __session cookie (non-fatal):', {
+        correlationId,
+        error: sessionErr instanceof Error ? sessionErr.message : 'Unknown error',
+      });
+    }
+
     console.log('[OAuth] Updated auth_token cookie with ID token:', {
       correlationId,
       tokenLength: idToken.length,

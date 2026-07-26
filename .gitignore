@@ -108,11 +108,11 @@ dist/
 .pnp.*
 
 # ===== UPLOADS & MEDIA =====
-# uploads/
-# media/generated/
-# *.mp4
-# *.avi
-# *.mov
+uploads/
+media/generated/
+*.mp4
+*.avi
+*.mov
 
 # ===== IDE FILES =====
 .vscode/
@@ -154,3 +154,5 @@ cloudflared.exe
 !package-lock.json
 !tsconfig.json
 veefore-*-firebase-adminsdk-*.json
+
+testsprite_tests/tmp/config.json

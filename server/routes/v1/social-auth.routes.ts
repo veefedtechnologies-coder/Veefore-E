@@ -122,14 +122,75 @@ router.get('/instagram/callback', async (req: Request, res: Response) => {
 
     logToFile('Account connected successfully via OAuth Service', { username: accountInfo.username });
 
+    // Kick off the analytics history backfill immediately on connect and also
+    // trigger a full account sync so demographics (audienceCountry, etc.) are
+    // populated — both fire-and-forget so they never delay the redirect.
+    if (workspaceId) {
+      // Full account sync (fetches demographics, reach, insights, and per-post metrics).
+      // forceRefresh=true ensures ALL posts get insights fetched (not just age-bucket due),
+      // so metrics.views, saves, shares are populated immediately after OAuth.
+      import('../../services/SocialAccountService')
+        .then(async ({ SocialAccountService }) => {
+          const service = new SocialAccountService()
+          const { socialAccountRepository } = await import('../../repositories/SocialAccountRepository')
+          const accounts = await socialAccountRepository.findActiveByWorkspace(String(workspaceId))
+          for (const acc of accounts) {
+            if (acc.platform === 'instagram') {
+              service.syncAccount(String(acc._id || acc.id), { 
+                metricsType: 'all',
+                forceRefresh: true  // Force all posts to get fresh per-post insights
+              }).catch(() => {})
+            }
+          }
+        })
+        .catch(() => { /* best-effort */ })
+      import('../../features/analytics/history/followsHistory')
+        .then(async ({ prewarmFollowsForWorkspace }) => {
+          const { histLog } = await import('../../features/analytics/history/historyDebugLog');
+          histLog('CONNECT_CALLBACK', {
+            workspaceId: String(workspaceId),
+            username: accountInfo.username,
+            note: 'OAuth connect succeeded — triggering background follows + insights prewarm',
+          });
+          return prewarmFollowsForWorkspace(String(workspaceId));
+        })
+        .catch(() => { /* best-effort; first dashboard load will trigger it */ });
+
+      // Social Listening: trigger an immediate sync on first connect using the
+      // user's onboarding niche so the dashboard widget shows real data right away
+      // (no manual "Sync Live Data" needed). If another workspace has fresh data
+      // for the same niche it's copied instead of re-fetched — saving AI cost.
+      import('../../services/social-listening/background-refresh.service')
+        .then(async ({ triggerFirstConnectSync }) => {
+          // Resolve the niche from the user who owns this workspace.
+          try {
+            const { storage } = await import('../../mongodb-storage');
+            const ws = await storage.getWorkspace(String(workspaceId)).catch(() => null);
+            const userId = (ws as any)?.userId?.toString?.() || (ws as any)?.userId;
+            if (userId) {
+              const user = await storage.getUser(userId).catch(() => null);
+              const { resolveNiche } = await import('../../services/niche.util');
+              const niche = resolveNiche(user);
+              if (niche) {
+                await triggerFirstConnectSync(String(workspaceId), niche);
+              }
+            }
+          } catch (e) {
+            console.warn('[SOCIAL-AUTH] Could not resolve niche for first-connect sync:', (e as Error).message);
+          }
+        })
+        .catch(() => { /* non-fatal — user can still sync manually */ });
+    }
+
     // Finalize state
     logToFile('✅ [SOCIAL-AUTH] Success');
 
     // Determine redirect URL to the app
     const appUrl = process.env.VITE_APP_URL || process.env.BASE_URL || 'http://localhost:5173';
 
-    // 4. Redirect immediately to Settings > Social Accounts
-    const successRedirectUrl = `${appUrl}/settings?tab=social&connected=instagram&username=${accountInfo.username}`;
+    // 4. Redirect to the app root - client-side router will handle navigation to Settings
+    // Using root URL avoids "Cannot GET /settings" during server restarts
+    const successRedirectUrl = `${appUrl}/?connected=instagram&username=${accountInfo.username}`;
     return res.redirect(successRedirectUrl);
   } catch (err: any) {
     logToFile('🚨 Callback Error', { message: err.message, stack: err.stack, response: err.response?.data });

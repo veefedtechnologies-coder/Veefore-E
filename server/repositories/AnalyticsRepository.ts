@@ -170,6 +170,31 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
       let analytics = await this.findOne(queryParams);
 
       if (!analytics) {
+        // Reach metrics (reach, reachDay, reachWeek, reachDays28) are rolling
+        // de-duplicated window values Meta returns per sync — they are NOT
+        // per-day-zero counters. A brand-new calendar-day record must therefore
+        // INHERIT the most recent prior value instead of starting at 0, otherwise
+        // the first sync of the day (often a non-reach job like followers/likes,
+        // which legitimately passes reach=undefined) would leave the day's record
+        // at reach=0 until the next account-insights poll refreshes it — making
+        // "Monthly Reach" flash to 0 each day. Only the account-insights job
+        // writes fresh reach; every other path simply preserves it.
+        let inheritedReach = 0;
+        let inheritedReachDay: number | undefined;
+        let inheritedReachWeek: number | undefined;
+        let inheritedReachDays28: number | undefined;
+        try {
+          const prior = await this.findOneBeforeDate(workspaceId, dateOnly, platform, accountId);
+          if (prior) {
+            inheritedReach = prior.reach || 0;
+            inheritedReachDay = prior.reachDay;
+            inheritedReachWeek = prior.reachWeek;
+            inheritedReachDays28 = prior.reachDays28;
+          }
+        } catch {
+          // Non-critical — fall back to 0 if the prior-record lookup fails.
+        }
+
         analytics = await this.create({
           workspaceId,
           accountId,
@@ -182,8 +207,11 @@ export class AnalyticsRepository extends BaseRepository<IAnalytics> {
           shares: 0,
           followers: 0,
           engagement: 0,
-          reach: 0
-        });
+          reach: inheritedReach,
+          ...(inheritedReachDay !== undefined ? { reachDay: inheritedReachDay } : {}),
+          ...(inheritedReachWeek !== undefined ? { reachWeek: inheritedReachWeek } : {}),
+          ...(inheritedReachDays28 !== undefined ? { reachDays28: inheritedReachDays28 } : {}),
+        } as any);
       }
 
       logger.db.query('getOrCreateForDate', this.entityName, Date.now() - startTime, { workspaceId, platform, date: dateOnly });

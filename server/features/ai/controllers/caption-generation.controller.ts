@@ -1,9 +1,13 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../../types/express';
 import { storage } from '../../../mongodb-storage';
-import { AICreditService } from '../../../services/AICreditService';
+import {
+  aiCreditMeteringService,
+  InsufficientAICreditsError,
+} from '../../subscription/services/AICreditMeteringService';
 import { AIServiceManager } from '../../../services/AIServiceManager';
 import { hashtagGeneratorService } from '../../../services/HashtagGeneratorService';
+import { resolveNiche } from '../../../services/niche.util';
 
 /**
  * Caption Generation Controller
@@ -16,6 +20,12 @@ async function getAIPreferences(userId: string, req: any): Promise<any> {
   try {
     const userObj = await storage.getUser(userId);
     if (userObj && userObj.preferences) preferences = { ...userObj.preferences };
+    // Ensure the niche is always available to the prompt builder, even for
+    // users whose preferences predate niche centralization.
+    if (userObj && !preferences.contentNiche) {
+      const niche = resolveNiche(userObj);
+      if (niche) preferences.contentNiche = niche;
+    }
   } catch (e) {
     console.warn('Failed to load user preferences');
   }
@@ -40,23 +50,11 @@ export class CaptionGenerationController {
    */
   static async generateCaption(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { title, type, platform, mediaUrl, workspaceId, existingCaption } = req.body;
+      const { title, type, platform, mediaUrl, workspaceId, existingCaption, singleVariation } = req.body;
       const userId = req.user.id;
       
       if (!title && !mediaUrl) {
         res.status(400).json({ error: 'Title or media URL is required' });
-        return;
-      }
-
-      // Check credits
-      const creditCost = AICreditService.calculateCost('content_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        res.status(402).json({ 
-          error: 'Insufficient credits',
-          required: creditCost,
-          current: creditCheck.currentCredits
-        });
         return;
       }
 
@@ -97,26 +95,61 @@ export class CaptionGenerationController {
       // Get AI preferences for the user and workspace
       const preferences = await getAIPreferences(userId, req);
 
-      // Use AIServiceManager to generate caption variations with authenticity scoring
       const aiServiceManager = AIServiceManager.getInstance();
+
+      // Reserve the caption ceiling before every provider call, including
+      // optional vision analysis and strategic hashtag generation.
+      const { result: variationsWithHashtags, settlement } = await aiCreditMeteringService.runMetered(
+        'captionGeneration',
+        'caption.generation',
+        { userId, workspaceId: finalWorkspaceId },
+        async () => {
+      // Vision: actually LOOK at the uploaded media (image or video) so captions
+      // and hashtags are grounded in what's shown — not just the title text.
+      let mediaAnalysis: string | undefined;
+      if (mediaUrl) {
+        try {
+          const isVideo = /\.(mp4|mov|webm|m4v)(\?|$)/i.test(String(mediaUrl)) || /video/i.test(String(type));
+          const description = await aiServiceManager.analyzeMedia(
+            mediaUrl,
+            isVideo ? 'video' : 'image',
+            preferences,
+          );
+          if (description) {
+            mediaAnalysis = `Visual analysis of the ${isVideo ? 'video' : 'image'}: ${description}`;
+            console.log('[AI CAPTION] Media analyzed for grounding:', description.slice(0, 120));
+          } else {
+            mediaAnalysis = `Media URL: ${mediaUrl}`;
+          }
+        } catch (e) {
+          console.warn('[AI CAPTION] Media analysis failed, continuing text-only:', (e as Error).message);
+          mediaAnalysis = `Media URL: ${mediaUrl}`;
+        }
+      }
+
+      // Use AIServiceManager to generate caption variations with authenticity scoring
       const variations = await aiServiceManager.generateInstagramCaptions({
-        userId,
-        workspaceId: finalWorkspaceId || userId,
-        topic: title || 'Content based on uploaded media',
-        mediaAnalysis: mediaUrl ? `Media URL: ${mediaUrl}` : undefined,
-        existingCaption,
-        postType: (type === 'story' || type === 'reel') ? type : 'post',
-        platform: platform || 'Instagram',
-        preferences
-      });
+          userId,
+          workspaceId: finalWorkspaceId || userId,
+          topic: title || 'Content based on uploaded media',
+          mediaAnalysis,
+          existingCaption,
+          postType: (type === 'story' || type === 'reel') ? type : 'post',
+          platform: platform || 'Instagram',
+          preferences,
+          singleVariation: !!singleVariation
+        });
+      if (!Array.isArray(variations) || !variations.some((variation) => String(variation?.caption || '').trim())) {
+        throw new Error('AI returned no usable caption variations');
+      }
 
       // Generate hashtags for each variation
-      const variationsWithHashtags = await Promise.all(
+      const enrichedVariations = await Promise.all(
         variations.map(async (variation) => {
           try {
             const hashtagResult = await hashtagGeneratorService.generateStrategicHashtags({
               caption: variation.caption,
-              mediaAnalysis: mediaUrl ? `Media URL: ${mediaUrl}` : undefined,
+              mediaAnalysis,
               niche: preferences.contentNiche || 'general',
               postType: (type === 'story' || type === 'reel') ? type as 'post' | 'story' | 'reel' : 'post',
               platform: platform || 'Instagram',
@@ -177,37 +210,28 @@ export class CaptionGenerationController {
           }
         })
       );
-
-      // Deduct credits
-      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
-        creditsToDeduct: creditCost,
-        workspaceId: finalWorkspaceId,
-        endpoint: '/api/v1/ai/generate-caption'
-      });
-
-      if (!deductResult.success) {
-        console.error('[AI CAPTION] Credit deduction failed:', deductResult.error);
-        res.status(402).json({ error: deductResult.error || 'Failed to deduct credits' });
-        return;
-      }
+      return enrichedVariations;
+        },
+      );
 
       console.log('[AI CAPTION] Successfully generated caption variations with authenticity scoring', {
         variationCount: variationsWithHashtags.length,
         avgAuthenticityScore: variationsWithHashtags.reduce((sum, v) => sum + v.authenticityScore, 0) / variationsWithHashtags.length,
-        creditsUsed: deductResult.creditsDeducted
+        creditsUsed: settlement.charged
       });
 
       res.json({ 
         variations: variationsWithHashtags,
-        creditsUsed: deductResult.creditsDeducted,
-        remainingCredits: deductResult.creditsAfter,
+        creditsUsed: settlement.charged,
+        remainingCredits: settlement.remaining,
         caption: variationsWithHashtags[0]?.caption || '',
         hashtags: variationsWithHashtags[0]?.hashtags || []
       });
 
     } catch (error: any) {
       console.error('[AI CAPTION] Generation failed:', error);
-      res.status(500).json({ error: 'Failed to generate caption', details: error.message });
+      const status = error instanceof InsufficientAICreditsError ? 402 : 500;
+      res.status(status).json({ error: error.message || 'Failed to generate caption', details: error.message });
     }
   }
 
@@ -226,18 +250,6 @@ export class CaptionGenerationController {
         hasAdjustments: !!adjustments,
         adjustments: adjustments || {}
       });
-
-      // Check credits
-      const creditCost = AICreditService.calculateCost('content_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        res.status(402).json({ 
-          error: 'Insufficient credits',
-          required: creditCost,
-          current: creditCheck.currentCredits
-        });
-        return;
-      }
 
       // Validate workspace access
       const workspace = await storage.getWorkspace(workspaceId);
@@ -304,73 +316,73 @@ export class CaptionGenerationController {
       }
 
       // Generate new caption variations
-      const variations = await aiServiceManager.generateInstagramCaptions({
-        userId,
-        workspaceId,
-        topic: postDetails.title || 'Content based on uploaded media',
-        mediaAnalysis: postDetails.mediaUrl 
-          ? `${regenerationContext}Media URL: ${postDetails.mediaUrl}` 
-          : regenerationContext || undefined,
-        existingCaption: postDetails.existingCaption,
-        postType: (postDetails.type === 'story' || postDetails.type === 'reel') 
-          ? postDetails.type as 'post' | 'story' | 'reel'
-          : 'post',
-        platform: postDetails.platform || 'Instagram',
-        preferences: adjustedPreferences
-      });
-
-      // Filter variations that pass authenticity threshold (80+)
-      const validVariations = variations.filter(v => 
-        v.authenticityScore && v.authenticityScore.passesThreshold
+      const { result: validVariations, settlement: captionSettlement } = await aiCreditMeteringService.runMetered(
+        'captionGeneration',
+        'caption.regenerate',
+        { userId, workspaceId },
+        async () => {
+          const generated = await aiServiceManager.generateInstagramCaptions({
+            userId,
+            workspaceId,
+            topic: postDetails.title || 'Content based on uploaded media',
+            mediaAnalysis: postDetails.mediaUrl 
+              ? `${regenerationContext}Media URL: ${postDetails.mediaUrl}` 
+              : regenerationContext || undefined,
+            existingCaption: postDetails.existingCaption,
+            postType: (postDetails.type === 'story' || postDetails.type === 'reel') 
+              ? postDetails.type as 'post' | 'story' | 'reel'
+              : 'post',
+            platform: postDetails.platform || 'Instagram',
+            preferences: adjustedPreferences
+          });
+          const valid = generated.filter((variation) =>
+            variation.authenticityScore?.passesThreshold && String(variation.caption || '').trim()
+          );
+          if (valid.length === 0) {
+            throw new Error('AI returned no caption meeting authenticity standards');
+          }
+          return valid;
+        },
       );
-
-      if (validVariations.length === 0) {
-        console.warn('[AI REGENERATE CAPTIONS] No variations passed authenticity threshold');
-        res.status(500).json({ 
-          error: 'Failed to generate captions meeting authenticity standards',
-          details: 'All generated variations scored below the 80 authenticity threshold. Please try again.' 
-        });
-        return;
-      }
 
       // Generate hashtags for the new variation
       const newVariation = validVariations[0];
       
       let hashtags: string[] = [];
+      let hashtagSettlement: { charged: number; remaining: number } | undefined;
       try {
-        const hashtagResult = await hashtagGeneratorService.generateStrategicHashtags({
-          caption: newVariation.caption,
-          mediaAnalysis: postDetails.mediaUrl ? `Media URL: ${postDetails.mediaUrl}` : undefined,
-          niche: adjustedPreferences.contentNiche || 'general',
-          postType: (postDetails.type === 'story' || postDetails.type === 'reel') 
-            ? postDetails.type as 'post' | 'story' | 'reel'
-            : 'post',
-          platform: postDetails.platform || 'Instagram',
-          userId,
-          workspaceId
-        });
-        hashtags = hashtagResult.hashtags;
+        const meteredHashtags = await aiCreditMeteringService.runMetered(
+          'hashtagGeneration',
+          'hashtag.regenerate',
+          { userId, workspaceId },
+          async () => {
+            const result = await hashtagGeneratorService.generateStrategicHashtags({
+              caption: newVariation.caption,
+              mediaAnalysis: postDetails.mediaUrl ? `Media URL: ${postDetails.mediaUrl}` : undefined,
+              niche: adjustedPreferences.contentNiche || 'general',
+              postType: (postDetails.type === 'story' || postDetails.type === 'reel') 
+                ? postDetails.type as 'post' | 'story' | 'reel'
+                : 'post',
+              platform: postDetails.platform || 'Instagram',
+              userId,
+              workspaceId
+            });
+            if (!Array.isArray(result.hashtags) || result.hashtags.length === 0) {
+              throw new Error('AI returned no usable hashtags');
+            }
+            return result;
+          },
+        );
+        hashtags = meteredHashtags.result.hashtags;
+        hashtagSettlement = meteredHashtags.settlement;
       } catch (error) {
         console.error('[AI REGENERATE CAPTIONS] Failed to generate hashtags:', error);
-      }
-
-      // Deduct credits
-      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
-        creditsToDeduct: creditCost,
-        workspaceId,
-        endpoint: '/api/v1/ai/regenerate-captions'
-      });
-
-      if (!deductResult.success) {
-        console.error('[AI REGENERATE CAPTIONS] Credit deduction failed:', deductResult.error);
-        res.status(402).json({ error: deductResult.error || 'Failed to deduct credits' });
-        return;
       }
 
       console.log('[AI REGENERATE CAPTIONS] Successfully regenerated caption', {
         authenticityScore: newVariation.authenticityScore?.overallScore,
         hashtagCount: hashtags.length,
-        creditsUsed: deductResult.creditsDeducted
+        creditsUsed: captionSettlement.charged + (hashtagSettlement?.charged ?? 0)
       });
 
       // Save regenerated caption to database with metadata
@@ -432,14 +444,15 @@ export class CaptionGenerationController {
             regeneratedAt: new Date().toISOString()
           }
         },
-        creditsUsed: deductResult.creditsDeducted,
-        remainingCredits: deductResult.creditsAfter
+        creditsUsed: captionSettlement.charged + (hashtagSettlement?.charged ?? 0),
+        remainingCredits: hashtagSettlement?.remaining ?? captionSettlement.remaining
       });
 
     } catch (error: any) {
       console.error('[AI REGENERATE CAPTIONS] Regeneration failed:', error);
-      res.status(500).json({ 
-        error: 'Failed to regenerate caption', 
+      const status = error instanceof InsufficientAICreditsError ? 402 : 500;
+      res.status(status).json({ 
+        error: error.message || 'Failed to regenerate caption', 
         details: error.message 
       });
     }

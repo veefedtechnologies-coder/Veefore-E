@@ -17,9 +17,21 @@ export default defineConfig(({ mode }) => {
     },
   plugins: [react()],
   resolve: {
+    // Force a SINGLE React instance. There is a stale React 18 copy in
+    // client/node_modules while the project uses React 19 at the root; without
+    // deduping/aliasing, Vite can load both and React throws
+    // "dispatcher.useState is null" (invalid hook call) crashing the whole app.
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
     alias: {
+      react: path.resolve(__dirname, '../node_modules/react'),
+      'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
+      // Dev-only `agentation` overlay is not a real installed package; map it to
+      // the local stub so `import { Agentation } from 'agentation'` in main.tsx
+      // resolves. Without this the module graph fails to load and the app blanks.
+      agentation: path.resolve(__dirname, "./src/stubs/agentation.ts"),
       "@": path.resolve(__dirname, "./src"),
       "@assets": path.resolve(__dirname, "./src/assets"),
+      "@platform-registry": path.resolve(__dirname, "../src/shared/platform-registry"),
     },
   },
   server: {

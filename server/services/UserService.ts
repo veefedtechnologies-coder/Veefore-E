@@ -2,6 +2,7 @@ import { BaseService } from './BaseService';
 import { userRepository, workspaceRepository } from '../repositories';
 import { IUser } from '../models/User';
 import { NotFoundError, ValidationError, ConflictError } from '../errors';
+import { syncNicheUpdate } from './niche.util';
 
 interface CreateUserInput {
   email: string;
@@ -98,11 +99,16 @@ export class UserService extends BaseService {
 
   async updateProfile(userId: string, input: UpdateProfileInput): Promise<IUser> {
     return this.withErrorHandling('updateProfile', async () => {
+      // Keep `niche` and `preferences.contentNiche` in sync so every feature
+      // (social listening + all AI features) reads a single consistent niche.
+      const existing = await userRepository.findById(userId);
+      const synced = syncNicheUpdate(input, existing?.preferences || {});
+
       const user = await userRepository.updateByIdOrFail(userId, {
-        ...input,
+        ...synced,
         updatedAt: new Date()
       });
-      this.log('updateProfile', 'Profile updated', { userId });
+      this.log('updateProfile', 'Profile updated', { userId, niche: (synced as any).niche });
       return user;
     });
   }

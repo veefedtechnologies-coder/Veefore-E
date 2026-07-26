@@ -32,6 +32,8 @@ export interface IContent extends Document {
     reach?: number;
     impressions?: number;
   };
+  lastInsightsFetchedAt?: Date;
+  disconnectedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -72,6 +74,8 @@ const ContentSchema = new Schema<IContent>({
     reach: { type: Number, default: 0 },
     impressions: { type: Number, default: 0 }
   },
+  lastInsightsFetchedAt: { type: Date, default: null },
+  disconnectedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -83,6 +87,8 @@ ContentSchema.index({ workspaceId: 1, status: 1 }, { background: true });
 ContentSchema.index({ workspaceId: 1, accountId: 1 }, { background: true });
 ContentSchema.index({ workspaceId: 1, status: 1, scheduledAt: 1 }, { background: true });
 ContentSchema.index({ workspaceId: 1, createdAt: -1 }, { background: true });
+ContentSchema.index({ workspaceId: 1, accountId: 1, publishedAt: -1 }, { background: true });
+ContentSchema.index({ 'contentData.id': 1 }, { background: true });
 
 export const ContentModel: Model<IContent> = mongoose.models.Content as Model<IContent> || mongoose.model<IContent>('Content', ContentSchema, 'contents');
 export { ContentSchema };

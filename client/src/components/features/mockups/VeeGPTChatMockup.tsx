@@ -19,6 +19,7 @@ const Header = ({ showActive = true }: { showActive?: boolean }) => (
         </div>
         {showActive && (
             <div className="flex items-center gap-2">
+                {/* skeleton-guard-allow: status-dot — live "Active" status indicator, not a loading placeholder */}
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-xs text-green-400">Active</span>
             </div>
@@ -106,6 +107,7 @@ const Messages = ({ hasMaxHeight = false }: { hasMaxHeight?: boolean }) => {
                             <span className="text-xs text-white/70">Creating 7-day content plan</span>
                         </div>
                         <div className="flex items-center gap-2">
+                            {/* skeleton-guard-allow: status-dot — illustrative "in progress" indicator in static marketing mockup, not a loading placeholder */}
                             <div className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center animate-pulse flex-shrink-0">
                                 <Clock className="w-3 h-3 text-cyan-400" />
                             </div>

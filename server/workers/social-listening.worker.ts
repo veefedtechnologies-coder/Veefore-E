@@ -5,6 +5,8 @@ import { ListeningSourceModel } from '../models/SocialListening/ListeningSource'
 import { ListeningPostModel } from '../models/SocialListening/ListeningPost';
 import { RedditAdapter } from '../services/social-listening/adapters/RedditAdapter';
 import { YouTubeAdapter } from '../services/social-listening/adapters/YouTubeAdapter';
+import { HackerNewsAdapter } from '../services/social-listening/adapters/HackerNewsAdapter';
+import { GoogleNewsAdapter } from '../services/social-listening/adapters/GoogleNewsAdapter';
 
 // Lazy initialization: Worker only starts when first job is queued (Task 5.3)
 let socialListeningWorker: Worker | null = null;
@@ -45,13 +47,21 @@ export const getSocialListeningWorker = (): Worker | null => {
           let adapter;
           if (platform === 'reddit') adapter = new RedditAdapter();
           else if (platform === 'youtube') adapter = new YouTubeAdapter();
+          else if (platform === 'hackernews') adapter = new HackerNewsAdapter();
+          else if (platform === 'news') adapter = new GoogleNewsAdapter();
           else throw new Error(`Unsupported platform: ${platform}`);
 
           const result = await adapter.fetchLatest(source, undefined, sourceNiche);
 
           if (result.posts && result.posts.length > 0) {
+            // Strip transient fields (e.g. relevanceScore) that aren't part of the schema
+            const cleanedPosts = result.posts.map((p: any) => {
+              const { relevanceScore, ...rest } = p;
+              return rest;
+            });
+
             // Process and save posts
-            const operations = result.posts.map(postData => ({
+            const operations = cleanedPosts.map(postData => ({
               updateOne: {
                 filter: { externalId: postData.externalId, platform: postData.platform },
                 update: { 

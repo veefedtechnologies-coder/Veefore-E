@@ -5,3 +5,5 @@ export * from './ListeningTrend';
 export * from './ListeningInsight';
 export * from './ListeningAggregation';
 export * from './ListeningHook';
+export * from './ListeningSyncStatus';
+export * from './ListeningAnalysisCache';

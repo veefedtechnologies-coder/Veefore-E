@@ -1,516 +1,523 @@
+/**
+ * CalendarView — Hootsuite-style weekly content calendar.
+ * Shows scheduled, draft, and veefore-published posts (including failed/partial).
+ * Does NOT show imported posts.
+ */
+
 import React, { useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Settings, 
-  Share2, 
-  Filter, 
-  Grid3X3, 
-  Calendar, 
-  List,
-  Clock,
-  Star,
-  TrendingUp,
-  Users,
-  Heart,
-  Gift,
-  Globe,
-  Zap,
-  Target,
-  Award
+import { useLocation } from 'wouter'
+import {
+  ChevronLeft, ChevronRight, Settings, Share2,
+  SlidersHorizontal, List, LayoutGrid, CalendarDays,
+  Plus, Check, Clock, FileEdit, Instagram, Sparkles,
+  XCircle, AlertTriangle,
 } from 'lucide-react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { cn } from '@/lib/utils'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
-import { useSocialAccounts } from '@/hooks/useSocialAccounts'
+import { useQuery } from '@tanstack/react-query'
+import { apiRequest } from '@/lib/queryClient'
+import useSubscription from '@/hooks/useSubscription'
 
-const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+// ── Hook: best-time API (the real algorithm) ──────────────────────────────
+// Uses /api/v1/analytics/best-time which returns audience + post-performance grids.
+// weeklyGrid keys are "DOW_HOUR" where DOW 0=Sun … 6=Sat, hour 0–23.
 
-// Real social media events mapped to actual dates in 2025
-// Real social media events mapped to MM-DD
-const realSocialEvents: Record<string, any> = {
-  // January
-  '01-01': { title: 'New Year\'s Day', icon: '🎉', hashtags: ['#NewYear', '#2025', '#NewBeginnings'], engagement: 'Very High', category: 'Holiday' },
-  '01-04': { title: 'World Braille Day', icon: '👁️', hashtags: ['#WorldBrailleDay', '#Accessibility', '#Inclusion'], engagement: 'Medium', category: 'Awareness' },
-  '01-20': { title: 'Martin Luther King Jr. Day', icon: '✊', hashtags: ['#MLKDay', '#CivilRights', '#Equality'], engagement: 'High', category: 'Social Impact' },
-  
-  // February
-  '02-04': { title: 'World Cancer Day', icon: '🎗️', hashtags: ['#WorldCancerDay', '#CancerAwareness', '#Hope'], engagement: 'High', category: 'Health' },
-  '02-14': { title: 'Valentine\'s Day', icon: '💕', hashtags: ['#ValentinesDay', '#Love', '#Romance'], engagement: 'Very High', category: 'Holiday' },
-  '02-20': { title: 'World Day of Social Justice', icon: '⚖️', hashtags: ['#SocialJustice', '#Equality', '#HumanRights'], engagement: 'Medium', category: 'Social Impact' },
-  
-  // March
-  '03-08': { title: 'International Women\'s Day', icon: '👩', hashtags: ['#IWD', '#WomensDay', '#GenderEquality'], engagement: 'Very High', category: 'Social Impact' },
-  '03-17': { title: 'St. Patrick\'s Day', icon: '🍀', hashtags: ['#StPatricksDay', '#LuckOfTheIrish', '#Green'], engagement: 'High', category: 'Holiday' },
-  '03-21': { title: 'World Poetry Day', icon: '📝', hashtags: ['#WorldPoetryDay', '#Poetry', '#Literature'], engagement: 'Medium', category: 'Culture' },
-  
-  // April
-  '04-07': { title: 'World Health Day', icon: '🏥', hashtags: ['#WorldHealthDay', '#Health', '#Wellness'], engagement: 'High', category: 'Health' },
-  '04-22': { title: 'Earth Day', icon: '🌍', hashtags: ['#EarthDay', '#ClimateAction', '#Sustainability'], engagement: 'Very High', category: 'Environment' },
-  
-  // May
-  '05-01': { title: 'International Workers\' Day', icon: '👷', hashtags: ['#MayDay', '#WorkersRights', '#Labor'], engagement: 'High', category: 'Social Impact' },
-  '05-11': { title: 'Mother\'s Day', icon: '👩‍👧‍👦', hashtags: ['#MothersDay', '#Mom', '#Family'], engagement: 'Very High', category: 'Holiday' },
-  
-  // June
-  '06-05': { title: 'World Environment Day', icon: '🌱', hashtags: ['#WorldEnvironmentDay', '#ClimateChange', '#GreenLiving'], engagement: 'High', category: 'Environment' },
-  '06-15': { title: 'Father\'s Day', icon: '👨‍👧‍👦', hashtags: ['#FathersDay', '#Dad', '#Family'], engagement: 'Very High', category: 'Holiday' },
-  
-  // July
-  '07-14': { title: 'National Mac and Cheese Day', icon: '🧀', hashtags: ['#MacNCheeseDay', '#ComfortFood', '#Foodie'], engagement: 'High', category: 'Food & Lifestyle' },
-  '07-15': { title: 'Social Media Giving Day', icon: '💝', hashtags: ['#GivingTuesday', '#SocialGood', '#Charity'], engagement: 'Very High', category: 'Social Impact' },
-  '07-17': { title: 'World Emoji Day', icon: '😊', hashtags: ['#WorldEmojiDay', '#Emojis', '#DigitalCommunication'], engagement: 'High', category: 'Digital Culture' },
-  '07-18': { title: 'Nelson Mandela International Day', icon: '🕊️', hashtags: ['#MandelaDay', '#Peace', '#Leadership'], engagement: 'Very High', category: 'Social Impact' },
-  '07-20': { title: 'International Chess Day', icon: '♟️', hashtags: ['#ChessDay', '#Strategy', '#MindGames'], engagement: 'Medium', category: 'Sports & Games' },
-  
-  // August
-  '08-19': { title: 'World Photography Day', icon: '📸', hashtags: ['#WorldPhotographyDay', '#Photography', '#Visual'], engagement: 'High', category: 'Arts & Culture' },
-  
-  // September
-  '09-21': { title: 'International Day of Peace', icon: '🕊️', hashtags: ['#PeaceDay', '#WorldPeace', '#Unity'], engagement: 'High', category: 'Social Impact' },
-  
-  // October
-  '10-10': { title: 'World Mental Health Day', icon: '🧠', hashtags: ['#WorldMentalHealthDay', '#MentalHealth', '#Wellness'], engagement: 'Very High', category: 'Health' },
-  '10-31': { title: 'Halloween', icon: '🎃', hashtags: ['#Halloween', '#SpookySeason', '#TrickOrTreat'], engagement: 'Very High', category: 'Holiday' },
-  
-  // November
-  '11-25': { title: 'Giving Tuesday', icon: '🤝', hashtags: ['#GivingTuesday', '#Charity', '#Generosity'], engagement: 'Very High', category: 'Social Impact' },
-  '11-27': { title: 'Thanksgiving', icon: '🦃', hashtags: ['#Thanksgiving', '#Gratitude', '#Family'], engagement: 'Very High', category: 'Holiday' },
-  
-  // December
-  '12-01': { title: 'World AIDS Day', icon: '🎗️', hashtags: ['#WorldAIDSDay', '#HIVAwareness', '#RedRibbon'], engagement: 'High', category: 'Health' },
-  '12-25': { title: 'Christmas Day', icon: '🎄', hashtags: ['#Christmas', '#Holiday', '#Joy'], engagement: 'Very High', category: 'Holiday' },
-  '12-31': { title: 'New Year\'s Eve', icon: '🎊', hashtags: ['#NYE', '#NewYear', '#Celebration'], engagement: 'Very High', category: 'Holiday' }
+interface BestTimeSlot { dow: number; hour: number; count: number }
+interface SmartDailyBest {
+  dow: number; dayName: string; hour: number; hourLabel: string; score: number; dayScore: number
+}
+interface BestTimeResponse {
+  weeklyGrid: Record<string, number>
+  topDays: BestTimeSlot[]
+  smart?: {
+    dailyBest: SmartDailyBest[]
+    bestSlot: { dow: number; dayName: string; hour: number; hourLabel: string; score: number } | null
+    confidenceLevel: string
+  }
+  hasData: boolean
+  hasPostData: boolean
 }
 
-const socialEvents = [
-  { 
-    day: 'Mon', 
-    title: 'National Mac n Cheese Day', 
-    color: 'bg-gradient-to-r from-orange-500 to-yellow-500',
-    icon: '🧀',
-    hashtags: ['#MacNCheeseDay', '#ComfortFood', '#Foodie'],
-    engagement: 'High',
-    category: 'Food & Lifestyle'
-  },
-  { 
-    day: 'Tue', 
-    title: 'Social Media Giving Day', 
-    color: 'bg-gradient-to-r from-blue-500 to-purple-500',
-    icon: '💝',
-    hashtags: ['#GivingTuesday', '#SocialGood', '#Charity'],
-    engagement: 'Very High',
-    category: 'Social Impact'
-  },
-  { 
-    day: 'Wed',
-    title: 'World Emoji Day',
-    color: 'bg-gradient-to-r from-yellow-400 to-orange-500',
-    icon: '😊',
-    hashtags: ['#WorldEmojiDay', '#Emojis', '#Expression'],
-    engagement: 'High',
-    category: 'Digital Culture'
-  },
-  { 
-    day: 'Thu', 
-    title: 'World Day for International Justice', 
-    color: 'bg-gradient-to-r from-indigo-500 to-blue-600',
-    icon: '⚖️',
-    hashtags: ['#InternationalJustice', '#HumanRights', '#Justice'],
-    engagement: 'Medium',
-    category: 'Social Awareness'
-  },
-  { 
-    day: 'Fri', 
-    title: 'Nelson Mandela International Day', 
-    color: 'bg-gradient-to-r from-green-500 to-teal-500',
-    icon: '🕊️',
-    hashtags: ['#MandelaDay', '#Peace', '#Leadership', '#Inspiration'],
-    engagement: 'Very High',
-    category: 'Social Impact'
-  },
-  {
-    day: 'Sat',
-    title: 'International Chess Day',
-    color: 'bg-gradient-to-r from-gray-600 to-gray-800',
-    icon: '♟️',
-    hashtags: ['#ChessDay', '#Strategy', '#MindGames'],
-    engagement: 'Medium',
-    category: 'Sports & Games'
-  }
-]
+function useBestTimeForCalendar(workspaceId?: string | null) {
+  return useQuery<BestTimeResponse>({
+    queryKey: ['/api/v1/analytics/best-time/calendar', workspaceId],
+    queryFn: () => apiRequest(`/api/v1/analytics/best-time?workspaceId=${workspaceId}`),
+    enabled: !!workspaceId,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  })
+}
 
-const recommendedTimes = [
-  { 
-    day: 'Sun', 
-    time: '7:30 PM', 
-    reason: 'Peak evening engagement',
-    score: '92%',
-    audience: '2.1K active followers'
-  },
-  { 
-    day: 'Mon', 
-    time: '12:00 PM', 
-    reason: 'Lunch break peak',
-    score: '85%',
-    audience: '1.8K active followers'
-  },
-  { 
-    day: 'Tue', 
-    time: '3:00 PM', 
-    reason: 'Afternoon engagement spike',
-    score: '88%',
-    audience: '2.0K active followers'
-  },
-  { 
-    day: 'Wed', 
-    time: '11:00 AM', 
-    reason: 'Mid-morning peak',
-    score: '82%',
-    audience: '1.6K active followers'
-  },
-  { 
-    day: 'Thu', 
-    time: '2:00 PM', 
-    reason: 'Workday break time',
-    score: '90%',
-    audience: '2.2K active followers'
-  },
-  { 
-    day: 'Fri', 
-    time: '6:00 PM', 
-    reason: 'Weekend anticipation peak',
-    score: '95%',
-    audience: '2.5K active followers'
-  },
-  { 
-    day: 'Sat', 
-    time: '11:00 AM', 
-    reason: 'Weekend leisure browsing',
-    score: '87%',
-    audience: '1.9K active followers'
-  }
-]
+// ── DEV FLAG removed — real data only ─────────────────────────────────────
 
-export function CalendarView() {
-  const [selectedView, setSelectedView] = useState('grid')
-  const [showEventDetails, setShowEventDetails] = useState(false)
-  const [currentWeekStart, setCurrentWeekStart] = useState(new Date())
-  
-  // Hooks
-  const { currentWorkspace } = useCurrentWorkspace()
-  const { socialAccounts } = useSocialAccounts(currentWorkspace?.id)
+// ── Social events keyed by MM-DD ──────────────────────────────────────────
 
-  // Extract AI Best Active Time from the first valid account (if any)
-  const bestTimeData = useMemo(() => {
-    if (!socialAccounts || !Array.isArray(socialAccounts)) return null;
-    const accountWithData = socialAccounts.find((a: any) => a.aiBestActiveTime?.daily_best_hours);
-    return accountWithData?.aiBestActiveTime || null;
-  }, [socialAccounts]);
+const SOCIAL_EVENTS: Record<string, { title: string; bg: string; text: string }> = {
+  '01-01': { title: "New Year's Day",             bg: 'bg-blue-500',    text: 'text-white' },
+  '02-14': { title: "Valentine's Day",            bg: 'bg-pink-500',    text: 'text-white' },
+  '03-08': { title: "International Women's Day",  bg: 'bg-purple-500',  text: 'text-white' },
+  '04-22': { title: 'Earth Day',                  bg: 'bg-green-500',   text: 'text-white' },
+  '05-01': { title: "International Workers' Day", bg: 'bg-orange-500',  text: 'text-white' },
+  '06-05': { title: 'World Environment Day',      bg: 'bg-emerald-500', text: 'text-white' },
+  '06-15': { title: "Father's Day",               bg: 'bg-blue-600',    text: 'text-white' },
+  '07-01': { title: 'Social Media Day',           bg: 'bg-indigo-500',  text: 'text-white' },
+  '07-17': { title: 'World Emoji Day',            bg: 'bg-yellow-400',  text: 'text-gray-900' },
+  '07-18': { title: 'Nelson Mandela Day',         bg: 'bg-teal-600',    text: 'text-white' },
+  '07-30': { title: 'Social Media Giving Day',    bg: 'bg-blue-500',    text: 'text-white' },
+  '08-12': { title: 'International Youth Day',    bg: 'bg-green-500',   text: 'text-white' },
+  '09-21': { title: 'Day of Peace',               bg: 'bg-blue-400',    text: 'text-white' },
+  '10-10': { title: 'World Mental Health Day',    bg: 'bg-green-600',   text: 'text-white' },
+  '10-31': { title: 'Halloween',                  bg: 'bg-orange-600',  text: 'text-white' },
+  '11-27': { title: 'Thanksgiving',               bg: 'bg-amber-600',   text: 'text-white' },
+  '12-25': { title: 'Christmas Day',              bg: 'bg-red-500',     text: 'text-white' },
+  '12-31': { title: "New Year's Eve",             bg: 'bg-violet-500',  text: 'text-white' },
+}
 
-  // Generate real dates for current week
-  const weekData = useMemo(() => {
-    const startOfWeek = new Date(currentWeekStart)
-    const day = startOfWeek.getDay()
-    startOfWeek.setDate(startOfWeek.getDate() - day) // Move to Sunday
+const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-    const dates = []
-    const formattedDates = []
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(startOfWeek)
-      date.setDate(startOfWeek.getDate() + i)
-      dates.push(date)
-      formattedDates.push(date.getDate().toString())
-    }
+// Statuses that show in the calendar — everything Veefore manages
+const CALENDAR_STATUSES = new Set([
+  'scheduled', 'queued', 'publishing', 'processing',
+  'published', 'partially_published', 'failed', 'retrying',
+  'draft',
+])
 
-    const weekRange = `${monthNames[dates[0].getMonth()]} ${dates[0].getDate()} - ${dates[6].getDate()}, ${dates[0].getFullYear()}`
-    
-    return { dates, formattedDates, weekRange }
-  }, [currentWeekStart])
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-  // Get real social media event for a specific date (year-agnostic)
-  const getEventForDate = (date: Date) => {
-    // Format: MM-DD
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return realSocialEvents[`${month}-${day}`];
-  }
+function getWeekStart(from: Date): Date {
+  const d = new Date(from)
+  d.setDate(d.getDate() - d.getDay())
+  d.setHours(0, 0, 0, 0)
+  return d
+}
 
-  // Fixed scheduled posts with specific real dates
-  const scheduledPosts = [
-    // Published posts (past dates)
-    {
-      id: 1,
-      date: new Date('2025-07-13T00:20:00'), // July 13, 2025 12:20 AM
-      username: 'rahulc1020',
-      handle: '@barry #lifestyle',
-      time: '12:20AM',
-      image: '/api/placeholder/80/80',
-      status: 'published',
-      platform: 'instagram'
-    },
-    {
-      id: 2,
-      date: new Date('2025-07-13T01:35:00'), // July 13, 2025 1:35 AM
-      username: 'rahulc1020',
-      handle: '@barry #my',
-      time: '1:35AM',
-      image: '/api/placeholder/80/80',
-      status: 'published',
-      platform: 'instagram'
-    },
-    // Scheduled posts (future dates)
-    {
-      id: 3,
-      date: new Date('2025-07-14T09:00:00'), // July 14, 2025 9:00 AM
-      username: 'rahulc1020',
-      handle: '@work #motivation',
-      time: '9:00AM',
-      image: '/api/placeholder/80/80',
-      status: 'scheduled',
-      platform: 'instagram'
-    },
-    {
-      id: 4,
-      date: new Date('2025-07-16T14:30:00'), // July 16, 2025 2:30 PM
-      username: 'rahulc1020',
-      handle: '@midweek #energy',
-      time: '2:30PM',
-      image: '/api/placeholder/80/80',
-      status: 'scheduled',
-      platform: 'instagram'
-    },
-    {
-      id: 5,
-      date: new Date('2025-07-16T18:45:00'), // July 16, 2025 6:45 PM
-      username: 'rahulc1020',
-      handle: '@wellness #tips',
-      time: '6:45PM',
-      image: '/api/placeholder/80/80',
-      status: 'draft',
-      platform: 'instagram'
-    },
-    {
-      id: 6,
-      date: new Date('2025-07-18T17:00:00'), // July 18, 2025 5:00 PM
-      username: 'rahulc1020',
-      handle: '@friday #vibes',
-      time: '5:00PM',
-      image: '/api/placeholder/80/80',
-      status: 'scheduled',
-      platform: 'instagram'
-    },
-    // Additional posts for other weeks/months
-    {
-      id: 7,
-      date: new Date('2025-07-21T10:00:00'), // July 21, 2025 10:00 AM
-      username: 'rahulc1020',
-      handle: '@monday #motivation',
-      time: '10:00AM',
-      image: '/api/placeholder/80/80',
-      status: 'scheduled',
-      platform: 'instagram'
-    },
-    {
-      id: 8,
-      date: new Date('2025-08-01T12:00:00'), // August 1, 2025 12:00 PM
-      username: 'rahulc1020',
-      handle: '@august #newmonth',
-      time: '12:00PM',
-      image: '/api/placeholder/80/80',
-      status: 'scheduled',
-      platform: 'instagram'
-    }
-  ]
+function formatWeekRange(start: Date, end: Date): string {
+  const s = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const e = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return `${s} – ${e}`
+}
 
-  const getPostsForDate = (date: Date) => scheduledPosts.filter(post => 
-    post.date.toDateString() === date.toDateString()
-  )
+function mmdd(d: Date): string {
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
-  // Generate recommended times from AI Best Active Time payload
-  const getRecommendedTimeForDay = (dayIndex: number) => {
-    if (!bestTimeData?.daily_best_hours) return null;
-    
-    // dayIndex corresponds to Calendar Grid (0=Sun, 1=Mon, ..., 6=Sat)
-    // AI Payload uses 0=Mon, ..., 6=Sun
-    const aiIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-    const dayStats = bestTimeData.daily_best_hours.find((d: any) => d.day === aiIndex);
-    
-    if (!dayStats || dayStats.score === 0) return null; // No strong historical signal for this day
-    
-    const displayHour = dayStats.best_hour % 12 || 12;
-    const ampm = dayStats.best_hour >= 12 ? 'PM' : 'AM';
-    const timeString = `${displayHour}:00 ${ampm}`;
-    
-    let reason = "High Engagement Window";
-    if (dayStats.is_peak) {
-        reason = "Weekly Peak Engagement";
-    } else if (dayStats.score >= 0.8) {
-        reason = "Very High Engagement";
-    }
-    
-    return {
-      time: timeString,
-      reason: reason,
-      score: `${Math.round(dayStats.score * 100)}%`
-    }
-  }
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
 
-  const navigateWeek = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentWeekStart)
-    newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7))
-    setCurrentWeekStart(newDate)
-  }
+// ── Status config ──────────────────────────────────────────────────────────
+
+const STATUS_CONFIG: Record<string, { Icon: any; bg: string; text: string; label: string; dot: string }> = {
+  published:           { Icon: Check,          bg: 'bg-emerald-50 dark:bg-emerald-900/25', text: 'text-emerald-700 dark:text-emerald-400', label: 'Published',  dot: 'bg-emerald-500' },
+  scheduled:           { Icon: Clock,          bg: 'bg-blue-50 dark:bg-blue-900/25',       text: 'text-blue-700 dark:text-blue-400',       label: 'Scheduled',  dot: 'bg-blue-500'    },
+  draft:               { Icon: FileEdit,       bg: 'bg-gray-100 dark:bg-gray-700',         text: 'text-gray-500 dark:text-gray-400',       label: 'Draft',      dot: 'bg-gray-400'    },
+  failed:              { Icon: XCircle,        bg: 'bg-red-50 dark:bg-red-900/25',         text: 'text-red-600 dark:text-red-400',         label: 'Failed',     dot: 'bg-red-500'     },
+  partially_published: { Icon: AlertTriangle,  bg: 'bg-amber-50 dark:bg-amber-900/25',     text: 'text-amber-700 dark:text-amber-400',     label: 'Partial',    dot: 'bg-amber-500'   },
+  queued:              { Icon: Clock,          bg: 'bg-violet-50 dark:bg-violet-900/25',   text: 'text-violet-700 dark:text-violet-400',   label: 'Queued',     dot: 'bg-violet-500'  },
+  publishing:          { Icon: Clock,          bg: 'bg-blue-50 dark:bg-blue-900/25',       text: 'text-blue-700 dark:text-blue-400',       label: 'Publishing', dot: 'bg-blue-400'    },
+  processing:          { Icon: Clock,          bg: 'bg-blue-50 dark:bg-blue-900/25',       text: 'text-blue-700 dark:text-blue-400',       label: 'Processing', dot: 'bg-blue-400'    },
+  retrying:            { Icon: AlertTriangle,  bg: 'bg-amber-50 dark:bg-amber-900/25',     text: 'text-amber-700 dark:text-amber-400',     label: 'Retrying',   dot: 'bg-amber-400'   },
+}
+
+// ── Post card ──────────────────────────────────────────────────────────────
+
+function PostCard({ post, onClick }: { post: any; onClick?: () => void }) {
+  const thumb = post.mediaUrls?.[0] || post.contentData?.thumbnail_url || post.contentData?.media_url || null
+  const caption = post.title || post.contentData?.caption || post.description || ''
+
+  // Pick the most relevant timestamp for display
+  const timeIso = post.scheduledAt || post.publishedAt || post.failedAt || null
+  const time = timeIso ? fmtTime(timeIso) : null
+
+  const cfg = STATUS_CONFIG[post.status] ?? STATUS_CONFIG.draft
+  const { Icon: StatusIcon } = cfg
 
   return (
-    <div className="w-full h-full">
-      {/* Full Width Calendar Container */}
-      <div className="bg-white dark:bg-gray-900 min-h-screen">
-        {/* Simple Calendar Header matching reference */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="icon" onClick={() => navigateWeek('prev')}>
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="font-semibold text-lg text-gray-900 dark:text-gray-100">Today</span>
-              <Button variant="ghost" size="icon" onClick={() => navigateWeek('next')}>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-            <span className="text-gray-600 dark:text-gray-400">{weekData.weekRange}</span>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">
-              <Settings className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">
-              <Share2 className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">
-              Filters
-              <Filter className="w-4 h-4 ml-2" />
-            </Button>
-            <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
-              <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300">
-                <List className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300">
-                <Calendar className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                <Grid3X3 className="w-4 h-4" />
-              </Button>
-            </div>
+    <div
+      onClick={onClick}
+      className="group rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-sm hover:border-gray-200 dark:hover:border-gray-600 hover:shadow-md transition-all cursor-pointer"
+    >
+      {/* Thumbnail or placeholder */}
+      {thumb ? (
+        <div className="relative">
+          <img src={thumb} alt="" className="w-full h-[100px] object-cover" />
+          <div className="absolute bottom-2 left-2 h-6 w-6 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 flex items-center justify-center shadow">
+            <Instagram className="h-3 w-3 text-white" />
           </div>
         </div>
+      ) : (
+        <div className="w-full h-[60px] bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-750 flex items-center justify-center">
+          <Instagram className="h-5 w-5 text-gray-200 dark:text-gray-600" />
+        </div>
+      )}
 
-        {/* Full Width Calendar Grid */}
-        <div className="w-full">
-          {/* Calendar Header */}
-          <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-            <div className="grid grid-cols-7">
-              {weekDays.map((day, index) => {
-                const currentDate = weekData.dates[index]
-                const isToday = currentDate.toDateString() === new Date().toDateString()
-                
-                return (
-                  <div key={day} className="text-center p-4 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
-                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{day}</div>
-                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center text-sm font-medium ${
-                      isToday ? 'bg-slate-700 text-white' : 'text-gray-900 dark:text-gray-100'
-                    }`}>
-                      {weekData.formattedDates[index]}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+      {/* Body */}
+      <div className="px-3 py-2.5 space-y-2">
+        {/* Caption */}
+        {caption ? (
+          <p className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-snug">
+            {caption}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-400 dark:text-gray-500 italic leading-snug">Untitled post</p>
+        )}
+
+        {/* Time */}
+        {time && (
+          <div className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+            <Clock className="h-3 w-3 flex-shrink-0" />
+            <span className="font-medium">{time}</span>
           </div>
-          
-          {/* Calendar Body */}
-          <div className="grid grid-cols-7 min-h-[600px]">
-            {weekData.dates.map((date, index) => {
-              const event = getEventForDate(date)
-              const recommendedTime = getRecommendedTimeForDay(index)
-              const posts = getPostsForDate(date)
-              
-              return (
-                <div key={index} className={`p-4 space-y-3 min-h-[600px] bg-white dark:bg-gray-900 ${index < 6 ? 'border-r border-gray-200 dark:border-gray-700' : ''}`}>
-                  
-                  {/* Real Social Events - Compact blue badges */}
-                  {event && (
-                    <div className="bg-blue-600 text-white text-xs px-3 py-1 rounded-md font-medium flex items-center space-x-1">
-                      <span>{event.icon}</span>
-                      <span className="truncate">{event.title}</span>
-                    </div>
-                  )}
+        )}
 
-                  {/* Scheduled Posts - Cards with thumbnails matching reference */}
-                  {posts.map((post) => (
-                    <div key={post.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
-                      {/* Post image */}
-                      <div className="relative">
-                        <img 
-                          src={post.image} 
-                          alt="Post content" 
-                          className="w-full h-24 object-cover"
-                        />
-                        <div className="absolute bottom-2 left-2">
-                          <Avatar className="w-6 h-6 border-2 border-white">
-                            <AvatarImage src="/api/placeholder/32/32" />
-                            <AvatarFallback className="text-xs bg-pink-500 text-white">R</AvatarFallback>
-                          </Avatar>
-                        </div>
-                      </div>
-                      
-                      {/* Post details */}
-                      <div className="p-3">
-                        <div className="text-xs font-medium text-gray-900 dark:text-gray-100 mb-1">{post.username}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{post.handle}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{post.time}</div>
-                        
-                        <div className="flex items-center space-x-1">
-                          {post.status === 'published' && (
-                            <>
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              <span className="text-xs text-green-600 dark:text-green-400 font-medium">Published</span>
-                            </>
-                          )}
-                          {post.status === 'scheduled' && (
-                            <>
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Scheduled</span>
-                            </>
-                          )}
-                          {post.status === 'draft' && (
-                            <>
-                              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                              <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">Draft</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+        {/* Status badge */}
+        <div className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-1', cfg.bg)}>
+          <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', cfg.dot)} />
+          <StatusIcon className={cn('h-3 w-3', cfg.text)} />
+          <span className={cn('text-[11px] font-bold leading-none', cfg.text)}>{cfg.label}</span>
+        </div>
 
-                  {/* Recommended Times - Simple purple cards */}
-                  {recommendedTime && (
-                    <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
-                      <div className="text-xs text-purple-600 dark:text-purple-400 font-medium mb-1">Recommended time</div>
-                      <div className="text-sm font-bold text-purple-700 dark:text-purple-300">{recommendedTime.time}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{recommendedTime.reason}</div>
-                    </div>
-                  )}
+        {/* Error reason for failed posts */}
+        {(post.status === 'failed' || post.status === 'partially_published') && post.lastError && (
+          <p className="text-[10px] text-red-500 dark:text-red-400 line-clamp-2 leading-snug border-t border-red-100 dark:border-red-900/30 pt-1.5">
+            {post.lastError}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── AI recommended time card ───────────────────────────────────────────────
+
+function RecommendedCard({ time, reason, onClick }: { time: string; reason: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left rounded-xl border border-violet-200 dark:border-violet-800/60 bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20 px-3 py-3 shadow-sm hover:border-violet-300 dark:hover:border-violet-700 hover:shadow-md transition-all group"
+    >
+      <div className="flex items-start gap-2.5">
+        <div className="h-7 w-7 rounded-lg bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-200 dark:group-hover:bg-violet-800/60 transition-colors">
+          <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold text-violet-500 dark:text-violet-400 uppercase tracking-wider leading-none mb-1.5">Best time to post</p>
+          <p className="text-sm font-bold text-violet-800 dark:text-violet-200 leading-none">{time}</p>
+          <p className="text-xs text-violet-500 dark:text-violet-400 mt-1.5 leading-snug">{reason}</p>
+        </div>
+      </div>
+      <div className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-violet-600 dark:text-violet-400 group-hover:text-violet-700 dark:group-hover:text-violet-300 transition-colors">
+        <Plus className="h-3 w-3" />
+        Schedule at this time
+      </div>
+    </button>
+  )
+}
+
+// ── Drop zone ─────────────────────────────────────────────────────────────
+
+function DropZone({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full py-4 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-xl text-gray-300 dark:text-gray-700 hover:border-blue-200 dark:hover:border-blue-800 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 hover:text-blue-400 dark:hover:text-blue-500 transition-colors flex flex-col items-center justify-center gap-1 group"
+    >
+      <Plus className="h-4 w-4" />
+      <span className="text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Add post</span>
+    </button>
+  )
+}
+
+// ── Main CalendarView ──────────────────────────────────────────────────────
+
+export function CalendarView() {
+  const [, setLocation] = useLocation()
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()))
+  const [view, setView] = useState<'list' | 'grid' | 'month'>('grid')
+
+  const { currentWorkspaceId } = useCurrentWorkspace()
+  const { limits } = useSubscription()
+  // Drafts are a Creator+ feature — don't fetch or show them on the calendar for Free.
+  const canUseDrafts = limits?.features?.draftPosts === true
+
+  // Best-time data from the real algorithm (audience online + post performance)
+  const { data: bestTimeData } = useBestTimeForCalendar(currentWorkspaceId)
+
+  const weekEnd = useMemo(() => {
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + 6)
+    d.setHours(23, 59, 59, 999)
+    return d
+  }, [weekStart])
+
+  const days = useMemo(() =>
+    Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart)
+      d.setDate(d.getDate() + i)
+      return d
+    }), [weekStart])
+
+  // Fetch all workspace content then filter on the client
+  // We need scheduled, drafts, AND published/failed posts that came through Veefore
+  const { data: postsData } = useQuery({
+    queryKey: ['/api/content/calendar-all', currentWorkspaceId],
+    queryFn: () => apiRequest(`/api/content/workspace/${currentWorkspaceId}?page=1&limit=200&excludeImported=true`),
+    enabled: !!currentWorkspaceId,
+    staleTime: 60_000,
+  })
+  const { data: scheduledData } = useQuery({
+    queryKey: ['/api/content/calendar-scheduled', currentWorkspaceId],
+    queryFn: () => apiRequest(`/api/content/workspace/${currentWorkspaceId}/scheduled?limit=100`),
+    enabled: !!currentWorkspaceId,
+    staleTime: 60_000,
+  })
+  const { data: draftsData } = useQuery({
+    queryKey: ['/api/content/calendar-drafts', currentWorkspaceId],
+    queryFn: () => apiRequest(`/api/content/workspace/${currentWorkspaceId}/drafts?limit=50`),
+    enabled: !!currentWorkspaceId && canUseDrafts,
+    staleTime: 60_000,
+  })
+
+  // Merge and deduplicate by _id; keep only calendar-relevant statuses
+  const allPosts: any[] = useMemo(() => {
+    const norm = (d: any, overrideStatus?: string) => {
+      const arr = d?.data ?? d ?? []
+      return (Array.isArray(arr) ? arr : []).map((p: any) => ({
+        ...p,
+        status: overrideStatus ?? p.status ?? 'draft',
+      }))
+    }
+
+    const combined = [
+      ...norm(postsData),
+      ...norm(scheduledData, 'scheduled'),
+      ...norm(draftsData, 'draft'),
+    ]
+
+    const seen = new Set<string>()
+    return combined.filter(p => {
+      const id = String(p._id ?? p.id ?? '')
+      if (!id || seen.has(id)) return false
+      seen.add(id)
+      return CALENDAR_STATUSES.has(p.status)
+    })
+  }, [postsData, scheduledData, draftsData])
+
+  // AI best-time per day — from the unified Smart engine (audience + engagement + reach).
+  // Keyed by DOW (0=Sun … 6=Sat) to match the calendar's day columns directly.
+  const bestTimeByDay = useMemo(() => {
+    const daily = bestTimeData?.smart?.dailyBest
+    if (!Array.isArray(daily)) return {} as Record<number, { hour: number; time: string; reason: string }>
+    const bestDow = bestTimeData?.smart?.bestSlot?.dow
+    const map: Record<number, { hour: number; time: string; reason: string }> = {}
+    for (const d of daily) {
+      if (!d || d.dayScore <= 0) continue // no signal for this day → no recommendation
+      map[d.dow] = {
+        hour: d.hour,
+        time: d.hourLabel,
+        reason: d.dow === bestDow
+          ? 'Best day of the week'
+          : d.dayScore >= 70 ? 'High-opportunity window'
+          : d.dayScore >= 40 ? 'Good time to post'
+          : 'Worth a try',
+      }
+    }
+    return map
+  }, [bestTimeData])
+
+  const getPostsForDay = (d: Date) =>
+    allPosts.filter(p => {
+      // Use the most relevant date for placement
+      const dateStr = p.scheduledAt || p.publishedAt || p.failedAt || p.createdAt
+      if (!dateStr) return false
+      return new Date(dateStr).toDateString() === d.toDateString()
+    })
+
+  const getAiTimeForDay = (dayIndex: number) => {
+    // dayIndex is the calendar column's DOW (0=Sun … 6=Sat) — same convention as smart data.
+    return bestTimeByDay[dayIndex] ?? null
+  }
+
+  const isToday = (d: Date) => d.toDateString() === new Date().toDateString()
+  const isPast = (d: Date) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return d < today
+  }
+
+  const goToday = () => setWeekStart(getWeekStart(new Date()))
+  const prevWeek = () => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
+  const nextWeek = () => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
+
+  return (
+    <div className="flex flex-col h-full w-full bg-white dark:bg-gray-900">
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h1>
+        <div className="flex items-center gap-2">
+          <button className="p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 transition-colors">
+            <Settings className="h-4 w-4" />
+          </button>
+          <button className="p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 transition-colors">
+            <Share2 className="h-4 w-4" />
+          </button>
+          <div className="h-5 w-px bg-gray-200 dark:bg-gray-700 mx-1" />
+          <button
+            onClick={() => setLocation('/create')}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-semibold transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Create a post
+          </button>
+        </div>
+      </div>
+
+      {/* ── Toolbar ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-6 py-2.5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+        <div className="flex items-center gap-1.5">
+          <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500 transition-colors">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={goToday}
+            className="px-3 py-1 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-colors"
+          >
+            Today
+          </button>
+          <button onClick={nextWeek} className="p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500 transition-colors">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 ml-1">
+            {formatWeekRange(weekStart, weekEnd)}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {([
+              { id: 'list' as const, icon: List },
+              { id: 'grid' as const, icon: LayoutGrid },
+              { id: 'month' as const, icon: CalendarDays },
+            ]).map(({ id, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setView(id)}
+                className={cn(
+                  'p-2 transition-colors',
+                  view === id
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                    : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            ))}
+          </div>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filters
+          </button>
+        </div>
+      </div>
+
+
+      {/* ── Calendar grid ────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto min-h-0">
+
+        {/* Day header row */}
+        <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+          {days.map((d, i) => {
+            const today = isToday(d)
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'py-3 text-center border-r border-gray-100 dark:border-gray-800 last:border-r-0',
+                  today && 'bg-blue-50/50 dark:bg-blue-900/10'
+                )}
+              >
+                <p className={cn(
+                  'text-[11px] font-semibold uppercase tracking-wide mb-2',
+                  today ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
+                )}>
+                  {WEEK_DAYS[i]}
+                </p>
+                <div className={cn(
+                  'h-8 w-8 mx-auto rounded-full flex items-center justify-center text-sm font-bold transition-colors',
+                  today
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer'
+                )}>
+                  {d.getDate()}
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Day content columns */}
+        <div className="grid grid-cols-7 min-h-[600px]">
+          {days.map((d, i) => {
+            const socialEvent = SOCIAL_EVENTS[mmdd(d)]
+            const posts = getPostsForDay(d)
+            const aiTime = getAiTimeForDay(i)
+            const today = isToday(d)
+            const past = isPast(d) && !today
+
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'p-2 space-y-2 border-r border-gray-100 dark:border-gray-800 last:border-r-0 min-h-[600px]',
+                  today && 'bg-blue-50/20 dark:bg-blue-900/5',
+                  past && 'bg-gray-50/60 dark:bg-gray-900/40'
+                )}
+              >
+                {/* Social media event banner */}
+                {socialEvent && (
+                  <div className={cn(
+                    'rounded-lg px-2.5 py-1.5 text-xs font-bold truncate',
+                    socialEvent.bg, socialEvent.text
+                  )}>
+                    {socialEvent.title}
+                  </div>
+                )}
+
+                {/* Post cards */}
+                {posts.map((post, pi) => (
+                  <PostCard
+                    key={post._id ?? post.id ?? pi}
+                    post={post}
+                    onClick={() => {
+                      if (post.status === 'draft' || post.status === 'scheduled') {
+                        setLocation(`/create?edit=${post._id ?? post.id}`)
+                      }
+                    }}
+                  />
+                ))}
+
+                {/* AI recommended time card — always visible when data available */}
+                {aiTime && (
+                  <RecommendedCard
+                    time={aiTime.time}
+                    reason={aiTime.reason}
+                    onClick={() => {
+                      const dt = new Date(d)
+                      dt.setHours(aiTime.hour, 0, 0, 0)
+                      setLocation(`/create?scheduledAt=${encodeURIComponent(dt.toISOString())}`)
+                    }}
+                  />
+                )}
+
+                {/* Drop zone — empty future day with no AI time */}
+                {posts.length === 0 && !aiTime && !past && (
+                  <DropZone onClick={() => setLocation('/create')} />
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

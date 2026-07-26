@@ -35,6 +35,7 @@ export const EngagementVisual = () => {
           transition={{ delay: 1, duration: 0.5 }}
           className="flex items-center gap-2 text-[10px] md:text-xs text-blue-400 pl-8 md:pl-12"
         >
+          {/* skeleton-guard-allow: status-dot — illustrative 'AI analyzing' marketing animation, not a loading placeholder */}
           <Sparkles className="w-2.5 h-2.5 md:w-3 md:h-3 animate-pulse" />
           <span className="font-medium tracking-wide">AI analyzing context...</span>
         </motion.div>
@@ -159,6 +160,7 @@ export const HookVisual = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {/* skeleton-guard-allow: status-dot — decorative 'Viral Analysis' accent dot in marketing mockup */}
             <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-pink-500 animate-pulse" />
             <span className="text-[10px] md:text-xs font-bold text-pink-400 uppercase tracking-wider">Viral Analysis</span>
           </div>
@@ -271,6 +273,7 @@ export const SchedulerVisual = () => {
               <div className="text-right flex flex-col items-end">
                 {post.status === 'optimal' ? (
                    <span className={`text-[8px] md:text-[9px] px-2 py-1 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-1`}>
+                     {/* skeleton-guard-allow: status-dot — live 'activity' status indicator dot in marketing mockup */}
                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                      {post.score} Activity
                    </span>

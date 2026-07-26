@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTheme } from '@/hooks/useTheme'
 import { THEME_CONFIGS, Theme, DarkThemeVariant } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Sun, 
   Moon, 
@@ -23,10 +24,7 @@ export function ThemeSelector({ className, variant = 'dropdown' }: ThemeSelector
 
   if (!mounted) {
     return (
-      <div className={cn(
-        "w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse",
-        className
-      )} />
+      <Skeleton variant="rectangle" className={cn("w-12 h-12 rounded-xl", className)} />
     )
   }
 

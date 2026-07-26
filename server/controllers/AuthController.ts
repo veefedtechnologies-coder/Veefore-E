@@ -8,6 +8,7 @@ import { ParsedQs } from 'qs';
 import { storage } from '../mongodb-storage';
 import { emailService } from '../email-service';
 import { getFirebaseAdmin } from '../firebase-admin';
+import { resolveVerifiedUid } from '../lib/verify-auth-token';
 import { getRedisClient } from '../lib/redis';
 
 const LinkFirebaseSchema = z.object({
@@ -61,11 +62,56 @@ export class AuthController extends BaseController {
 
     console.log('[Session] auth_token found, length:', authToken.length);
 
-    // The auth_token cookie already contains the Firebase custom token
-    // Just return it to the frontend
-    this.sendSuccess(res, {
-      customToken: authToken
-    });
+    // SECURITY (P0): resolve the uid ONLY from a cryptographically verified
+    // source — the `__session` cookie, a verified ID token, or a SIGNATURE-
+    // verified custom token. Previously this endpoint base64-decoded the cookie
+    // and trusted `uid`/`user_id`/`sub` without checking the signature, which
+    // would let a forged `auth_token` mint a Firebase custom token for ANY uid
+    // (account takeover). signInWithCustomToken() still needs a custom token, so
+    // we mint a fresh one — but only for a verified uid.
+    try {
+      const admin = getFirebaseAdmin();
+
+      const uid = await resolveVerifiedUid(req);
+
+      if (!uid) {
+        console.warn('[Session] Could not resolve a VERIFIED uid from auth cookies');
+        return res.status(401).json({
+          error: 'invalid_session',
+          message: 'Session token could not be validated'
+        });
+      }
+
+      const { User } = await import('../models/User/User');
+      const user = await User.findById(uid);
+
+      if (!user) {
+        console.warn('[Session] User not found for uid:', uid);
+        return res.status(401).json({
+          error: 'user_not_found',
+          message: 'User not found'
+        });
+      }
+
+      const customToken = await admin.auth().createCustomToken(String(user._id), {
+        email: user.email,
+        emailVerified: user.isEmailVerified,
+        googleId: user.googleId,
+        sessionVersion: user.sessionVersion || 1,
+      });
+
+      console.log('[Session] Minted fresh custom token for verified uid:', uid);
+
+      return this.sendSuccess(res, {
+        customToken
+      });
+    } catch (error) {
+      console.error('[Session] Failed to mint custom token:', error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: 'session_error',
+        message: 'Failed to establish session'
+      });
+    }
   });
 
   /**
@@ -119,6 +165,78 @@ export class AuthController extends BaseController {
       success: true,
       message: 'Session created successfully' 
     });
+  });
+
+  /**
+   * POST /api/auth/session-login
+   * Phase 1 of SSR_INSTANT_LOAD_PLAN: exchange a fresh Firebase ID token for a
+   * long-lived, server-verifiable session cookie (`__session`). This is what
+   * lets the HTML route render the dashboard DATA on the first byte. ADDITIVE —
+   * it does not touch the existing `auth_token` flow.
+   */
+  sessionLogin = this.wrapAsync(async (
+    req: TypedRequest<ParamsDictionary, { idToken?: string }>,
+    res: Response
+  ) => {
+    const idToken = req.body?.idToken;
+    if (!idToken || typeof idToken !== 'string') {
+      return this.sendError(res, new ValidationError('idToken is required'));
+    }
+
+    const admin = getFirebaseAdmin();
+    // Verify the ID token before minting a session cookie.
+    const decoded = await admin.auth().verifyIdToken(idToken);
+
+    // SESSION INVALIDATION: refuse to (re)create the __session cookie when the
+    // token's sessionVersion is stale (a logout bumped the user's version).
+    // Without this, a lingering tab posting a fresh ID token right after logout
+    // would recreate the durable session cookie and log the user back in.
+    try {
+      const { User } = await import('../models/User/User');
+      const user = await User.findById(decoded.uid);
+      const tokenSV = (decoded as any)?.sessionVersion;
+      if (user && tokenSV !== undefined && Number(tokenSV) !== (user.sessionVersion || 1)) {
+        return this.sendError(res, new ValidationError('Session has been invalidated. Please sign in again.'));
+      }
+    } catch {
+      /* fail-open: a lookup failure must not break a legitimate session-login */
+    }
+
+    const expiresIn = 14 * 24 * 60 * 60 * 1000; // 14 days
+    const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
+
+    const isProd = process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false;
+    res.cookie('__session', sessionCookie, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: expiresIn,
+      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+    });
+
+    this.sendSuccess(res, { success: true });
+  });
+
+  /**
+   * POST /api/auth/session-logout
+   * Clears the `__session` cookie so a logged-out user never receives
+   * server-injected dashboard data on the next HTML load.
+   */
+  sessionLogout = this.wrapAsync(async (
+    req: TypedRequest,
+    res: Response
+  ) => {
+    const isProd = process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false;
+    res.cookie('__session', '', {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+    });
+    this.sendSuccess(res, { success: true });
   });
 
   getCurrentUser = this.wrapAsync(async (
@@ -422,18 +540,14 @@ export class AuthController extends BaseController {
     user = await storage.updateUser(user.id, { firebaseUid: uid });
     const workspaces = await storage.getWorkspacesByUserId(user.id);
 
-    let workspaceCreated: any = null;
-    if (!Array.isArray(workspaces) || workspaces.length === 0) {
-      workspaceCreated = await storage.createWorkspace({
-        name: 'My Workspace',
-        userId: user.id,
-        isDefault: true
-      });
-    }
-
+    // BUG FIX: this previously auto-created a bare "My Workspace" (no brand)
+    // whenever a user had zero workspaces at this point. Workspaces must
+    // always represent one connected brand — they're created exclusively via
+    // the Meta OAuth import flow (WorkspaceService.importAuthorizedBrand),
+    // never as an empty placeholder here.
     this.sendSuccess(res, {
       user,
-      workspaceCreated,
+      workspaceCreated: null,
       workspaces
     });
   });

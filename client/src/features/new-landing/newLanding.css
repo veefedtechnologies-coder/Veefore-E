@@ -1,0 +1,329 @@
+/*
+ * New Landing Page — scoped styles (premium / restrained system)
+ *
+ * Aesthetic target: Linear / Framer / Raycast — a near-black canvas, ONE warm
+ * accent used sparingly, huge tight-tracked display type, soft glow halos,
+ * fine grain, glassy thin-bordered surfaces, and slow premium easing.
+ *
+ * SCOPING CONTRACT (Requirement 4.5):
+ *   - Every selector is namespaced under `.veef-landing`.
+ *   - NO global selectors, NO `:root` overrides, NO bare element-tag rules.
+ *   - Only top-level at-rules are the Google Fonts `@import` (first statement)
+ *     and `@keyframes` (all names prefixed `veef`).
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ------------------------------------------------------------------ *
+ * Scoped design tokens
+ * ------------------------------------------------------------------ */
+.veef-landing {
+  /* Canvas — near-black, faintly cool (single page background) */
+  --veef-bg: #07070A;
+  --veef-bg-elevated: #0C0D11;
+
+  /* Glassy surfaces (used with backdrop-blur + thin border) */
+  --veef-surface: rgba(255, 255, 255, 0.024);
+  --veef-surface-strong: rgba(255, 255, 255, 0.04);
+  --veef-border: rgba(255, 255, 255, 0.08);
+  --veef-border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Accent — one cool blue (from the Veefore logo). Lighter blue is a rare secondary. */
+  --veef-accent: #4C82F7;
+  --veef-accent-soft: rgba(76, 130, 247, 0.14);
+  --veef-amber: #7FA8FF;
+
+  /* Text ramp (cool greys) */
+  --veef-text: #F5F6F8;
+  --veef-text-dim: #9BA3B4;
+  --veef-text-muted: #5A6172;
+
+  /* Legacy var aliases (kept so existing inline styles still resolve) */
+  --veef-bg-primary: var(--veef-bg);
+  --veef-bg-secondary: var(--veef-bg-elevated);
+  --veef-bg-tertiary: var(--veef-bg-elevated);
+  --veef-bg-footer: #050507;
+  --veef-coral: var(--veef-accent);
+  --veef-cyan: #5EE6C4;
+  --veef-gold: var(--veef-amber);
+  --veef-mint: #5EE6C4;
+  --veef-rose: var(--veef-accent);
+  --veef-text-primary: var(--veef-text);
+  --veef-text-secondary: var(--veef-text-dim);
+
+  /* Typography stacks */
+  --veef-font-display: 'Syne', sans-serif;
+  --veef-font-body: 'Inter', sans-serif;
+  --veef-font-mono: 'JetBrains Mono', monospace;
+
+  /* Premium easing + timing */
+  --veef-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --veef-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  position: relative;
+  background-color: var(--veef-bg);
+  color: var(--veef-text);
+  font-family: var(--veef-font-body);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Display headings: tight tracking, optical balance.
+ * The Syne display face has unusually tall descenders (g, y, p, j); at large
+ * sizes a line-height below ~1.2 makes the NEXT line's cap-height overlap and
+ * visually clip the previous line's descenders. 1.2 gives them clearance. */
+.veef-landing .veef-display {
+  font-family: var(--veef-font-display);
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  padding-bottom: 0.12em;
+  overflow: visible;
+  text-wrap: balance;
+}
+
+/* Gradient (clipped) text crops the painted glyph to its own line box, so
+ * descenders (g/y/p) on a gradient word get cut even when the surrounding
+ * heading has room. Rendering it inline-block with a little extra leading +
+ * bottom padding (offset by a negative margin so layout doesn't shift) keeps
+ * the descenders fully painted. */
+.veef-landing .veef-gradient-text {
+  display: inline-block;
+  line-height: 1.25;
+  padding-bottom: 0.16em;
+  margin-bottom: -0.16em;
+}
+
+.veef-landing .veef-mono {
+  font-family: var(--veef-font-mono);
+  letter-spacing: 0;
+}
+
+/* Eyebrow / micro-label */
+.veef-landing .veef-eyebrow {
+  font-family: var(--veef-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--veef-text-dim);
+}
+
+/* ------------------------------------------------------------------ *
+ * Page background layer — single fixed canvas behind everything.
+ * Sits at z-index 0; the scroll-path SVG is z-index 2; content z-index 3+.
+ * Sections are transparent so this + the scroll path show through.
+ * ------------------------------------------------------------------ */
+.veef-landing .veef-bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 50% -10%, rgba(76, 130, 247, 0.12), transparent 60%),
+    radial-gradient(50rem 50rem at 85% 12%, rgba(127, 168, 255, 0.06), transparent 55%),
+    radial-gradient(60rem 60rem at 10% 80%, rgba(94, 230, 196, 0.045), transparent 55%),
+    var(--veef-bg);
+  /* Pin to its own cached compositor layer so Safari doesn't repaint the fixed
+   * gradient canvas on every scroll frame. */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Full-page grid overlay — fixed faint lines across the entire landing.
+ * Edges are softly faded with a radial mask so the grid melts into the
+ * canvas rather than ending in a hard rectangle. Sits just above the bg
+ * layer (z-index 0) and below the scroll path + content. */
+.veef-landing .veef-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(130% 110% at 50% 30%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(130% 110% at 50% 30%, #000 55%, transparent 100%);
+  /* Safari repaints fixed elements that use mask-image on every scroll frame,
+   * causing flicker. Promoting to a dedicated, cached compositor layer makes
+   * Safari rasterize it once and reuse the texture while scrolling. */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Fine film grain over the canvas — barely-there, premium texture.
+ * PERF: no mix-blend-mode (blended fixed layers force a full-screen
+ * recomposite every scroll frame). A plain low-opacity overlay reads the
+ * same but is essentially free to scroll over. */
+.veef-landing .veef-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.025;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Hairline section divider (used sparingly between sections) */
+.veef-landing .veef-hairline {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--veef-border), transparent);
+}
+
+/* Glassy card surface */
+.veef-landing .veef-card {
+  background: var(--veef-surface);
+  border: 1px solid var(--veef-border);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.4s var(--veef-ease), border-color 0.4s var(--veef-ease),
+    background-color 0.4s var(--veef-ease);
+}
+
+.veef-landing .veef-card:hover {
+  border-color: var(--veef-border-strong);
+  background: var(--veef-surface-strong);
+}
+
+/* ------------------------------------------------------------------ *
+ * Keyframes (names globally namespaced with `veef`)
+ * ------------------------------------------------------------------ */
+
+@keyframes veefRippleOut {
+  0% { transform: scale(0.4); opacity: 0.5; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes veefFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes veefOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes veefMarquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-33.3333%); }
+}
+
+@keyframes veefPulse {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.25); }
+}
+
+@keyframes veefShimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+@keyframes veefBarGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes veefGaugeFill {
+  from { stroke-dashoffset: var(--veef-gauge-circumference, 214); }
+}
+
+@keyframes veefOrbitCounter {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes veefToastCycle {
+  0% { opacity: 0; transform: translateY(8px); }
+  8%, 38% { opacity: 1; transform: translateY(0); }
+  48%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+
+@keyframes veefParticleDrift {
+  from { transform: translateY(0); opacity: 0; }
+  20% { opacity: 1; }
+  to { transform: translateY(var(--veef-drift, -120px)); opacity: 0; }
+}
+
+@keyframes veefRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ------------------------------------------------------------------ *
+ * Floating platform logos (Hero) — gentle 3D drift + bob. Each chip
+ * translates on Y and rocks slightly on the X/Y tilt axes so it reads
+ * as a 3D object hovering in space. `veefChipGlow` softly breathes the
+ * ambient glow behind each chip.
+ * ------------------------------------------------------------------ */
+@keyframes veefChipDriftA {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, -22px, 0); }
+}
+
+@keyframes veefChipDriftB {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, 18px, 0); }
+}
+
+@keyframes veefChipGlow {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.12); }
+}
+
+/* Blinking typewriter caret for the rotating hero headline. */
+@keyframes veefCaretBlink {
+  0%, 45%  { opacity: 1; }
+  50%, 95% { opacity: 0; }
+
+/* Simple 360° spin for loading spinners. */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+  100%     { opacity: 1; }
+}
+.veef-landing .veef-caret {
+  animation: veefCaretBlink 1s steps(1) infinite;
+}
+
+/* Per-chip hover — lift, scale, and intensify the brand-coloured ring. */
+.veef-landing .veef-logo-chip:hover {
+  transform: translateY(-6px) scale(1.12);
+  border-color: var(--veef-chip-glow, rgba(255,255,255,0.4));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.2) inset,
+    0 36px 70px -24px rgba(0,0,0,0.95),
+    0 0 36px -6px var(--veef-chip-glow, rgba(255,255,255,0.5));
+}
+
+/* ------------------------------------------------------------------ *
+ * Transparency overrides — let the single fixed canvas + scroll path
+ * show through every section. Sections were authored with opaque navy
+ * backgrounds; here we neutralise those so depth comes from glow,
+ * borders, and grain instead of solid fills.
+ * (Scoped class+element specificity beats Tailwind's single-class bg.)
+ * ------------------------------------------------------------------ */
+.veef-landing section,
+.veef-landing header,
+.veef-landing footer {
+  background-color: transparent !important;
+}
+
+/* Section vertical rhythm — generous, Linear-like breathing room. */
+.veef-landing section {
+  position: relative;
+  z-index: 3;
+}

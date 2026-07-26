@@ -17,7 +17,7 @@ import type Redis from 'ioredis';
 
 // In-memory rate limiter (fallback)
 const memoryRateLimiter = new RateLimiterMemory({
-  points: 10, // 10 requests
+  points: 20, // 20 OAuth initiations
   duration: 60, // per 60 seconds (1 minute)
   blockDuration: 60, // Block for 60 seconds if exceeded
 });
@@ -34,8 +34,8 @@ export const initializeOAuthRateLimiting = (redis: Redis | null) => {
     try {
       redisRateLimiter = new RateLimiterRedis({
         storeClient: redis,
-        keyPrefix: 'oauth_rl',
-        points: 10, // 10 requests
+        keyPrefix: 'oauth_init_rl',
+        points: 20, // 20 OAuth initiations
         duration: 60, // per 60 seconds (1 minute)
         blockDuration: 60, // Block for 60 seconds if exceeded
       });
@@ -66,8 +66,18 @@ export const oauthRateLimiter = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Exempt metrics endpoint from rate limiting (monitoring access)
-    if (req.path === '/metrics') {
+    // Only rate-limit genuine OAuth *initiation* (e.g. GET /google/start). The
+    // oauthSecurityMiddleware that wraps this limiter is mounted on the WHOLE
+    // /api/auth OAuth router, so without this guard the 10/min bucket is drained
+    // by the auto-fired session-maintenance endpoints that run on every page load
+    // and during login/logout (/session, /update-token, /refresh, /logout,
+    // /debug-client-log, /google/callback). A single "logout → login" cycle fires
+    // those many times and then wrongly blocks the next /google/start for 60s
+    // (the reported bug). Those endpoints are not brute-force-able OAuth
+    // initiation and have their own protections, so we skip them here and only
+    // throttle the initiation endpoints.
+    const isOAuthInitiation = req.method === 'GET' && /\/start$/.test(req.path);
+    if (!isOAuthInitiation) {
       return next();
     }
     
@@ -83,7 +93,7 @@ export const oauthRateLimiter = async (
       const rateLimiterRes = await rateLimiter.consume(clientIp);
       
       // Set rate limit headers for transparency
-      res.setHeader('X-RateLimit-Limit', '10');
+      res.setHeader('X-RateLimit-Limit', '20');
       res.setHeader('X-RateLimit-Remaining', String(rateLimiterRes.remainingPoints));
       res.setHeader('X-RateLimit-Reset', String(new Date(Date.now() + rateLimiterRes.msBeforeNext).getTime() / 1000));
       
@@ -97,7 +107,7 @@ export const oauthRateLimiter = async (
       });
       
       // Set rate limit headers
-      res.setHeader('X-RateLimit-Limit', '10');
+      res.setHeader('X-RateLimit-Limit', '20');
       res.setHeader('X-RateLimit-Remaining', '0');
       res.setHeader('X-RateLimit-Reset', String(new Date(Date.now() + rateLimiterError.msBeforeNext).getTime() / 1000));
       res.setHeader('Retry-After', String(Math.ceil(rateLimiterError.msBeforeNext / 1000)));

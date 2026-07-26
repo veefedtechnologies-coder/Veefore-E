@@ -5,7 +5,7 @@
  * and API mutations for updating user profile settings.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/hooks/useUser';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ import type {
   AvatarUploadState, 
   ProfileUpdatePayload 
 } from '../types/profile.types';
+import { deriveFormFromUser } from './deriveFormFromUser';
 
 const INITIAL_AVATAR_STATE: AvatarUploadState = {
   file: null,
@@ -28,67 +29,19 @@ export const useProfileSettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Form state
-  const [formData, setFormData] = useState<ProfileFormData>({
-    displayName: '',
-    username: '',
-    phone: '',
-    timezone: 'Asia/Kolkata (IST)',
-    language: 'English (US)',
-    bio: '',
-    businessType: 'solo',
-    primaryPlatform: '',
-    contentNiche: '',
-    creatorAudienceSize: '',
-    postingFrequency: '',
-    startupStage: '',
-    startupTeamSize: '',
-    startupGrowthChannel: '',
-    timeline: '',
-    agencyClientCount: '',
-    agencyServices: '',
-    agencyNiche: '',
-    agencyMonthlyOutput: '',
-    enterpriseIndustry: '',
-    enterpriseDepartment: '',
-    enterpriseSecurity: '',
-    enterpriseBudget: '',
-  });
+  // Local edits the user has made in this session. Anything not edited falls
+  // back to the live user record, so the form always reflects saved data even
+  // if it loads after the component mounts.
+  const [edits, setEdits] = useState<Partial<ProfileFormData>>({});
+
+  // Effective form values = canonical values from the user record, with the
+  // user's in-progress edits layered on top.
+  const formData = useMemo<ProfileFormData>(() => {
+    return { ...deriveFormFromUser(userData), ...edits };
+  }, [userData, edits]);
 
   // Avatar state
   const [avatarState, setAvatarState] = useState<AvatarUploadState>(INITIAL_AVATAR_STATE);
-
-  // Initialize form data from user data
-  useEffect(() => {
-    if (userData) {
-      setFormData(prev => ({
-        ...prev,
-        displayName: userData.displayName || prev.displayName,
-        username: userData.username || prev.username,
-        phone: userData.preferences?.phone || prev.phone,
-        timezone: userData.preferences?.timezone || prev.timezone,
-        language: userData.preferences?.language || prev.language,
-        bio: userData.preferences?.bio || prev.bio,
-        businessType: userData.businessType || prev.businessType,
-        primaryPlatform: userData.preferences?.primaryPlatform || prev.primaryPlatform,
-        contentNiche: userData.preferences?.contentNiche || prev.contentNiche,
-        creatorAudienceSize: userData.preferences?.creatorAudienceSize || prev.creatorAudienceSize,
-        postingFrequency: userData.preferences?.postingFrequency || prev.postingFrequency,
-        startupStage: userData.preferences?.startupStage || prev.startupStage,
-        startupTeamSize: userData.preferences?.startupTeamSize || prev.startupTeamSize,
-        startupGrowthChannel: userData.preferences?.startupGrowthChannel || prev.startupGrowthChannel,
-        timeline: userData.preferences?.timeline || prev.timeline,
-        agencyClientCount: userData.preferences?.agencyClientCount || prev.agencyClientCount,
-        agencyServices: userData.preferences?.agencyServices || prev.agencyServices,
-        agencyNiche: userData.preferences?.agencyNiche || prev.agencyNiche,
-        agencyMonthlyOutput: userData.preferences?.agencyMonthlyOutput || prev.agencyMonthlyOutput,
-        enterpriseIndustry: userData.preferences?.enterpriseIndustry || prev.enterpriseIndustry,
-        enterpriseDepartment: userData.preferences?.enterpriseDepartment || prev.enterpriseDepartment,
-        enterpriseSecurity: userData.preferences?.enterpriseSecurity || prev.enterpriseSecurity,
-        enterpriseBudget: userData.preferences?.enterpriseBudget || prev.enterpriseBudget,
-      }));
-    }
-  }, [userData]);
 
   // Profile update mutation
   const updateProfileMutation = useMutation({
@@ -97,16 +50,17 @@ export const useProfileSettings = () => {
         displayName: data.displayName,
         username: data.username,
         businessType: data.businessType,
-        niche: data.businessType === 'solo' 
-          ? data.contentNiche 
-          : (data.businessType === 'agency' ? data.agencyNiche : undefined),
+        // Derive the centralized niche from the niche selector shown in the
+        // Professional Profile section for the current business type.
+        niche: data.businessType === 'agency' ? data.agencyNiche : data.contentNiche,
         preferences: {
           phone: data.phone,
           timezone: data.timezone,
           language: data.language,
           bio: data.bio,
           primaryPlatform: data.primaryPlatform,
-          contentNiche: data.contentNiche,
+          // Keep contentNiche aligned with the centralized niche value.
+          contentNiche: (data.businessType === 'agency' ? data.agencyNiche : data.contentNiche),
           creatorAudienceSize: data.creatorAudienceSize,
           postingFrequency: data.postingFrequency,
           startupStage: data.startupStage,
@@ -130,6 +84,8 @@ export const useProfileSettings = () => {
       });
     },
     onSuccess: () => {
+      // Clear local edits so the form reflects the freshly-saved server record.
+      setEdits({});
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       toast({
         title: 'Profile Updated',
@@ -201,12 +157,13 @@ export const useProfileSettings = () => {
     },
   });
 
-  // Form field change handler
+  // Form field change handler — records the edit locally; the effective form
+  // value is the user record merged with these edits (see formData useMemo).
   const handleFieldChange = useCallback((
     field: keyof ProfileFormData,
     value: string
   ) => {
-    setFormData(prev => ({
+    setEdits(prev => ({
       ...prev,
       [field]: value,
     }));
@@ -285,7 +242,6 @@ export const useProfileSettings = () => {
   return {
     // Form data
     formData,
-    setFormData,
     handleFieldChange,
     
     // Avatar state

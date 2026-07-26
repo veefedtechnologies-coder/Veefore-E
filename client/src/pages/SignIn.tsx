@@ -285,6 +285,14 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     }
   }
 
+  // Build the OAuth start URL with the sign-in intent so the server knows NOT to
+  // create a new account for a non-existent user (it redirects to the waitlist
+  // instead — account creation requires early access).
+  const buildOAuthStartUrl = () => {
+    const base = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
+    return base + (base.includes('?') ? '&' : '?') + 'mode=signin'
+  }
+
   // Handle OAuth retry
   const handleOAuthRetry = () => {
     clearOAuthError()
@@ -292,7 +300,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
     // Preserve form data before initiating OAuth (Requirement 19.6)
     preserveFormData(formData)
     setIsGoogleLoading(true)
-    window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
+    window.location.href = buildOAuthStartUrl()
   }
 
   // Handle dismissing OAuth error
@@ -483,6 +491,15 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                         {isGoogleLoading ? 'Retrying...' : 'Try Again'}
                       </button>
                     )}
+                    {/* For a non-existent account, the path forward is the waitlist, not retry. */}
+                    {oauthError.code === 'account_not_found' && (
+                      <button
+                        onClick={() => setLocation('/waitlist')}
+                        className="mt-3 px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 transition-colors"
+                      >
+                        Join the waitlist
+                      </button>
+                    )}
                   </div>
                   <button
                     onClick={handleDismissOAuthError}
@@ -622,8 +639,8 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                   preserveFormData(formData)
                   // Show loading state during redirect (Requirement 19.1)
                   setIsGoogleLoading(true)
-                  // Redirect to server-side OAuth start endpoint
-                  window.location.href = import.meta.env.VITE_OAUTH_START_URL || `${import.meta.env.VITE_API_BASE_URL}/api/auth/google/start`
+                  // Redirect to server-side OAuth start endpoint (sign-in intent)
+                  window.location.href = buildOAuthStartUrl()
                 }}
                 disabled={isGoogleLoading || showOAuthSuccess}
                 className="w-full h-11 rounded-md bg-white text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors border border-gray-300 disabled:opacity-70"
@@ -856,6 +873,7 @@ const SignIn = ({ onNavigate }: SignInProps) => {
                       <span className="text-gray-400 text-xs ml-2">VeeFore Dashboard</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-emerald-500/20 px-2 py-0.5 rounded-full">
+                      {/* skeleton-guard-allow: status-dot — live 'Live' status indicator dot, not a loading placeholder */}
                       <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
                       <span className="text-emerald-400 text-[10px] font-medium">Live</span>
                     </div>

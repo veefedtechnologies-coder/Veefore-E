@@ -161,6 +161,7 @@ const EventCard = ({ title, date, time, type, isLive }: {
                     <h4 className="text-base font-semibold text-white">{title}</h4>
                     {isLive && (
                         <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">
+                            {/* skeleton-guard-allow: status-dot — live 'LIVE' status indicator dot, not a loading placeholder */}
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                             LIVE
                         </span>

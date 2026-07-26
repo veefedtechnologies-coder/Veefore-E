@@ -116,9 +116,10 @@ Focus on:
     const promptStr = `System: You are an expert trend intelligence analyst with access to global social media data. Provide actionable recommendations in valid JSON format only.\n\nUser: ${prompt}`;
 
     const { aiServiceManager } = await import('./services/AIServiceManager');
+    const { withAIFeature } = await import('./services/aiUsageTracker');
     let analysisResults: any = {};
     try {
-      analysisResults = await aiServiceManager.generateJSON(promptStr, preferences);
+      analysisResults = await withAIFeature('trend.intelligence', undefined, () => aiServiceManager.generateJSON(promptStr, preferences));
     } catch (e) {
       console.warn('[TREND INTELLIGENCE] Failed to generate JSON using AIServiceManager', e);
       throw new Error('Failed to parse AI response');

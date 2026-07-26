@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -6,73 +6,16 @@ import { v4 as uuidv4 } from 'uuid';
 import { WorkingVideoGenerator } from './services/working-video-generator';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
-import { getFirebaseAdmin } from './firebase-admin';
+import { requireAuth as sharedRequireAuth } from './middleware/require-auth';
 
 const router = express.Router();
 
-// Video-specific authentication middleware that matches main routes
-const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    console.log('[VIDEO AUTH] Authentication attempt:', {
-      hasAuthHeader: !!req.headers.authorization,
-      authHeader: req.headers.authorization?.substring(0, 20) + '...',
-      url: req.url,
-      method: req.method
-    });
-    
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader) {
-      console.log('[VIDEO AUTH] No authorization header', req.headers);
-      try { require('fs').appendFileSync('video-auth-debug.log', new Date().toISOString() + ' MISSING AUTH HEADER. Headers: ' + JSON.stringify(req.headers) + '\n\n'); } catch(e) {}
-      return res.status(401).json({ error: 'Unauthorized', receivedHeaders: req.headers });
-    }
-
-    let token;
-    if (authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    } else {
-      token = authHeader; // Handle case where Bearer prefix is missing
-    }
-    
-    if (!token || token.trim() === '') {
-      return res.status(401).json({ error: 'Access token is required' });
-    }
-
-    // Verify Firebase token
-    console.log('[VIDEO AUTH] Verifying Firebase token...');
-    const adminApp = getFirebaseAdmin();
-    const decodedToken = await adminApp.auth().verifyIdToken(token);
-    const firebaseUid = decodedToken.uid;
-    console.log('[VIDEO AUTH] Firebase token verified for UID:', firebaseUid);
-    
-    // Get storage from app locals
-    const storage = req.app.locals.storage;
-    if (!storage) {
-      console.error('[VIDEO AUTH] Storage not available in app locals');
-      return res.status(500).json({ error: 'Server configuration error' });
-    }
-
-    // Look up user by Firebase UID
-    const user = await storage.getUserByFirebaseUid(firebaseUid);
-    
-    if (!user) {
-      console.error('[VIDEO AUTH] User not found for Firebase UID:', firebaseUid);
-      try { require('fs').appendFileSync('video-auth-debug.log', new Date().toISOString() + ' USER NOT FOUND FOR UID: ' + firebaseUid + '\n\n'); } catch(e) {}
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    console.log(`[VIDEO AUTH] User ${user.email} authenticated successfully`);
-    req.user = user;
-    next();
-  } catch (error: any) {
-    console.error('[VIDEO AUTH] Authentication failed:', error);
-    try {
-      require('fs').appendFileSync('video-auth-debug.log', new Date().toISOString() + ' ERROR: ' + error.message + '\nStack: ' + error.stack + '\nHeaders: ' + JSON.stringify(req.headers) + '\n\n');
-    } catch(e) {}
-    return res.status(401).json({ error: 'Unauthorized', details: error.message, stack: error.stack });
-  }
-};
+// Video routes delegate to the SHARED auth middleware. The shared middleware is
+// strictly more robust than the old local one: it reconstructs malformed JWTs,
+// falls back to email lookup, and auto-creates the user when missing — which
+// fixes spurious "User not found" 401s on uploads (e.g. from the VeeGPT post
+// composer) when getUserByFirebaseUid alone didn't resolve the account.
+const requireAuth = sharedRequireAuth;
 
 // Add download endpoint to serve files securely through /api proxy
 router.get('/download', async (req: Request, res: Response) => {
@@ -145,9 +88,26 @@ const wsConnections = new Map<string, WebSocket>();
 
 // WebSocket server setup function
 export function setupVideoWebSocket(server: Server) {
-  const wss = new WebSocketServer({ 
-    server,
-    path: '/ws/video'
+  // Use noServer + manual upgrade routing so this coexists with the chat
+  // WebSocket and Vite's HMR socket on the same HTTP server. A path-bound
+  // `{ server, path }` WebSocketServer aborts (HTTP 400) any upgrade whose path
+  // doesn't match — which was killing the chat socket's handshake. With
+  // noServer we only claim our exact path and never touch other upgrades.
+  const VIDEO_WS_PATH = '/ws/video';
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (req, socket, head) => {
+    let pathname = '';
+    try {
+      pathname = new URL(req.url || '', `http://${req.headers.host}`).pathname;
+    } catch {
+      pathname = (req.url || '').split('?')[0];
+    }
+    if (pathname === VIDEO_WS_PATH) {
+      wss.handleUpgrade(req, socket as any, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+    }
   });
 
   wss.on('connection', (ws: WebSocket, req) => {

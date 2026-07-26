@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '@/lib/queryClient'
+import { setActiveWorkspaceCookie } from '@/lib/bootstrap'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +21,13 @@ import {
   Crown,
   Check,
   Users,
-  Sparkles
+  Sparkles,
+  Lock,
 } from 'lucide-react'
+import { useUser } from '@/hooks/useUser'
+import { auth } from '@/lib/firebase'
+import { BrandSelectionModal } from '@/features/social-accounts/components/BrandSelectionModal'
+import useSubscription from '@/hooks/useSubscription'
 
 // Workspace switching without loading screen - instant transition
 const AdvancedWorkspaceTransition = ({ workspace: _workspace }: { workspace: Workspace }) => {
@@ -91,12 +98,47 @@ const getSanitizedWorkspaceId = (): string | null => {
 export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceSwitcherProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { userData } = useUser()
+
+  // Plan/limit data comes from the server's entitlement system (single source
+  // of truth in server/config/plan-config.ts) instead of a hardcoded table
+  // here, which previously used different plan names ("Starter"/"Growth"/
+  // "Agency") than the real plan IDs ("creator"/"pro"/"business") and always
+  // fell back to a limit of 1 for any real plan.
+  const { plan: subscriptionPlan, limits, aiCredits, isLoading: subscriptionLoading } = useSubscription()
+  const userPlan: string = subscriptionPlan || (userData as any)?.plan || 'free'
+  const creditBalance = aiCredits?.remaining
+  const creditLabel = creditBalance == null
+    ? (subscriptionLoading ? 'Loading credits…' : 'Credits unavailable')
+    : `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Math.max(0, creditBalance))} credits`
+  // maxWorkspaces of -1 means unlimited (Infinity) per plan-config.ts convention
+  const planLimit = limits?.maxWorkspaces === -1 ? null : (limits?.maxWorkspaces ?? 1)
   // ✅ FIX: Sanitize initial state to prevent 'undefined' string from propagating
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(
     getSanitizedWorkspaceId()
   )
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [targetWorkspace, setTargetWorkspace] = useState<Workspace | null>(null)
+  const [showBrandPickerForNewWs, setShowBrandPickerForNewWs] = useState(false)
+
+  /** Check if inactive brands exist; if so show the brand picker, else navigate to workspace settings */
+  const handleCreateWorkspace = async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken(false).catch(() => '')
+      const hdrs: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await fetch('/api/authorized-brands', { headers: hdrs, credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        const inactive = ((data?.data ?? data ?? []) as any[]).filter((b: any) => b.status === 'INACTIVE')
+        if (inactive.length > 0) {
+          setShowBrandPickerForNewWs(true)
+          return
+        }
+      }
+    } catch { /* ignore */ }
+    // No inactive brands — navigate to workspaces settings for manual creation
+    onNavigateToWorkspaces?.()
+  }
 
   // Fetch user's workspaces
   const { data: workspacesResponse, isLoading } = useQuery({
@@ -136,6 +178,7 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
     // Update workspace immediately
     setCurrentWorkspaceId(workspaceId)
     localStorage.setItem('currentWorkspaceId', workspaceId)
+    setActiveWorkspaceCookie(workspaceId)
 
     // Dispatch custom event to notify useCurrentWorkspace hook
     window.dispatchEvent(new Event('workspace-changed'))
@@ -164,9 +207,9 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
 
   if (isLoading) {
     return (
-      <div className="flex items-center space-x-2 px-3 py-2 bg-gray-100 rounded-lg animate-pulse">
-        <div className="w-8 h-8 bg-gray-300 rounded-lg"></div>
-        <div className="w-24 h-4 bg-gray-300 rounded"></div>
+      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg">
+        <Skeleton variant="rectangle" className="w-8 h-8 rounded-lg" />
+        <Skeleton variant="pill" className="w-24 h-4 rounded" />
       </div>
     )
   }
@@ -207,7 +250,7 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
                   <span>{getPersonalityIcon(currentWorkspace.aiPersonality)}</span>
-                  <span>{currentWorkspace.credits} credits</span>
+                  <span>{creditLabel}</span>
                 </div>
               </div>
               <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
@@ -283,15 +326,59 @@ export default function WorkspaceSwitcher({ onNavigateToWorkspaces }: WorkspaceS
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem
-            onClick={onNavigateToWorkspaces}
-            className="flex items-center space-x-2 p-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="font-medium">Create New Workspace</span>
-          </DropdownMenuItem>
+          {planLimit !== null && safeWorkspaces.length >= planLimit ? (
+            /* At plan limit — show upgrade prompt instead of navigate */
+            <DropdownMenuItem
+              onClick={() => {
+                toast({
+                  title: `${userPlan} plan limit reached`,
+                  description: `Your ${userPlan} plan allows ${planLimit} workspace${planLimit === 1 ? '' : 's'}. Upgrade to create more.`,
+                  variant: 'default',
+                  action: (
+                    <a
+                      href="/settings?tab=billing"
+                      className="inline-flex items-center justify-center rounded-md text-xs font-medium bg-blue-600 text-white px-3 py-1.5 hover:bg-blue-700"
+                    >
+                      Upgrade
+                    </a>
+                  ),
+                })
+              }}
+              className="flex items-center space-x-2 p-3 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer"
+            >
+              <Lock className="w-4 h-4" />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">Create New Workspace</div>
+                <div className="text-xs text-amber-500">{safeWorkspaces.length}/{planLimit} used — upgrade to add more</div>
+              </div>
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onClick={handleCreateWorkspace}
+              className="flex items-center space-x-2 p-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="font-medium">Create New Workspace</span>
+            </DropdownMenuItem>
+          )}
+
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Brand picker modal — shown when creating a new workspace with inactive brands available */}
+      <BrandSelectionModal
+        open={showBrandPickerForNewWs}
+        onOpenChange={setShowBrandPickerForNewWs}
+        workspaceId=""
+        createNewWorkspace={true}
+        title="Choose a brand for your new workspace"
+        description="Select a brand to create a new workspace for. Each workspace manages one brand."
+        onSuccess={(_newWsId) => {
+          setShowBrandPickerForNewWs(false)
+          // Workspace changed — hard reload to pick up new workspace context
+          window.location.href = '/'
+        }}
+      />
     </>
   )
 }
@@ -373,6 +460,7 @@ export function useCurrentWorkspace() {
 
         // Update localStorage
         localStorage.setItem('currentWorkspaceId', validWorkspaceId);
+        setActiveWorkspaceCookie(validWorkspaceId);
         setStoredWorkspaceId(validWorkspaceId);
 
         // ✅ CRITICAL: Invalidate all React Query caches that depend on workspace ID
@@ -388,6 +476,10 @@ export function useCurrentWorkspace() {
         window.dispatchEvent(new Event('workspace-changed'));
       } else if (validWorkspaceId) {
         console.log('[useCurrentWorkspace] ✅ Workspace ID is valid:', validWorkspaceId);
+        // Keep the SSR cookie in sync so the next reload's server shell renders
+        // the CORRECT workspace pill (no placeholder flash), even when no
+        // localStorage correction was needed.
+        setActiveWorkspaceCookie(validWorkspaceId);
       }
 
       setIsValidating(false);
@@ -412,6 +504,7 @@ export function useCurrentWorkspace() {
           // ✅ GUARD: Only set if we got a valid ID back
           if (created && created.id && created.id !== 'undefined') {
             localStorage.setItem('currentWorkspaceId', created.id);
+            setActiveWorkspaceCookie(created.id);
             setStoredWorkspaceId(created.id);
           } else {
             console.warn('[useCurrentWorkspace] ⚠️ Workspace creation returned invalid ID:', created?.id);

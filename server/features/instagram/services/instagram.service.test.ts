@@ -162,4 +162,46 @@ describe('InstagramService', () => {
       expect(elapsedTime).toBeGreaterThanOrEqual(900); // Allow small margin
     });
   });
+
+  describe('getUserProfile error classification', () => {
+    // A Facebook-node token (EAAP...) so the service queries the {accountId} node.
+    const fbToken = 'EAAPxxxxxxxxxxxxxxxxxx';
+    const acctId = '17841474747481653';
+
+    const makeMetaError = (code: number, subcode?: number) => ({
+      response: { data: { error: { message: 'Meta says no', code, error_subcode: subcode } } },
+    });
+
+    it('flags code 100 / subcode 33 (IG unlinked / no permission) as access-revoked', async () => {
+      const svc = new InstagramService();
+      // Both the primary and fallback field attempts fail with the same error.
+      vi.spyOn(svc as any, 'makeApiRequest').mockRejectedValue(makeMetaError(100, 33));
+
+      await expect(svc.getUserProfile(fbToken, acctId)).rejects.toMatchObject({
+        isAccountAccessRevoked: true,
+        metaCode: 100,
+        metaSubcode: 33,
+      });
+    });
+
+    it('flags code 190 (invalid/expired token) as access-revoked', async () => {
+      const svc = new InstagramService();
+      vi.spyOn(svc as any, 'makeApiRequest').mockRejectedValue(makeMetaError(190));
+
+      await expect(svc.getUserProfile(fbToken, acctId)).rejects.toMatchObject({
+        isAccountAccessRevoked: true,
+        metaCode: 190,
+      });
+    });
+
+    it('does NOT flag a generic transient 500 as access-revoked', async () => {
+      const svc = new InstagramService();
+      vi.spyOn(svc as any, 'makeApiRequest').mockRejectedValue(makeMetaError(2)); // code 2 = transient
+
+      await expect(svc.getUserProfile(fbToken, acctId)).rejects.toMatchObject({
+        isAccountAccessRevoked: false,
+      });
+    });
+  });
 });
+

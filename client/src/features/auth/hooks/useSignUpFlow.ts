@@ -26,7 +26,9 @@ export type SignupStep =
   | 'onboarding-profile' 
   | 'onboarding-goals' 
   | 'onboarding-platforms' 
-  | 'onboarding-plan';
+  | 'onboarding-plan'
+  | 'onboarding-connect-meta'     // NEW: "Connect your Meta account" CTA screen
+  | 'onboarding-brand-selection'; // NEW: Shown only when N > 1 authorized pages
 
 export interface SignUpFormData {
   fullName: string;
@@ -623,6 +625,8 @@ export const useSignUpFlow = (
         return onboardingData.platforms.length > 0;
       case 'onboarding-plan':
         return onboardingData.selectedPlan !== '';
+      case 'onboarding-connect-meta': return true;
+      case 'onboarding-brand-selection': return true;
       default:
         return true;
     }
@@ -641,7 +645,7 @@ export const useSignUpFlow = (
         setCurrentStep('onboarding-plan');
         break;
       case 'onboarding-plan':
-        handleCompleteOnboarding();
+        setCurrentStep('onboarding-connect-meta');
         break;
     }
   }, [currentStep]);
@@ -657,6 +661,9 @@ export const useSignUpFlow = (
         break;
       case 'onboarding-plan':
         setCurrentStep('onboarding-platforms');
+        break;
+      case 'onboarding-connect-meta':
+        setCurrentStep('onboarding-plan');
         break;
     }
   }, [currentStep]);
@@ -718,6 +725,8 @@ export const useSignUpFlow = (
       case 'onboarding-goals': return 2;
       case 'onboarding-platforms': return 3;
       case 'onboarding-plan': return 4;
+      case 'onboarding-connect-meta': return 5;
+      case 'onboarding-brand-selection': return 6;
       default: return 0;
     }
   }, [currentStep]);

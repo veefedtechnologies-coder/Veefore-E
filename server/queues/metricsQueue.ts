@@ -1,6 +1,12 @@
 import { Queue, QueueOptions, RepeatOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import { getSharedRedisConnection } from '../lib/redis';
+import { TieredJobScheduler } from '../services/TieredJobScheduler';
+import { UsageStore } from '../services/UsageStore';
+import { rateLimitConfig, type PollingCadence } from '../config/rateLimitConfig';
+import { computeJitterOffset } from '../utils/deterministicJitter';
+import { CURRENT_CONTENT_INSIGHT_EXPANSION } from '../services/insightMetricSelection';
+import { StoryInsightsScheduler } from '../services/StoryInsightsScheduler';
 
 // Redis connection status tracking
 let redisConnection: IORedis | null = null;
@@ -120,9 +126,16 @@ export interface FetchMetricsJobData {
   userId: string;
   instagramAccountId: string;
   token: string;
-  metricsType: 'followers' | 'likes' | 'comments' | 'shares' | 'saves' | 'reach' | 'views' | 'stories' | 'profile_views' | 'all';
+  metricsType: 'followers' | 'likes' | 'comments' | 'shares' | 'saves' | 'reach' | 'views' | 'stories' | 'profile_views' | 'new_posts' | 'all';
   priority?: number;
   forceRefresh?: boolean;
+  /**
+   * Bundled media-insights field-expansion string for post-insight fetches
+   * (smart-polling-system Req 3.1). When present, the worker requests `views`,
+   * `reach`, `saved`, `shares`, and `total_interactions` in a single request
+   * via CURRENT_CONTENT_INSIGHT_EXPANSION rather than separate calls.
+   */
+  insightFields?: string;
 }
 
 export interface WebhookProcessJobData {
@@ -140,12 +153,32 @@ export interface TokenRefreshJobData {
   instagramAccountId: string;
 }
 
+/**
+ * Payload for a connect-init job — runs the post-OAuth connect/reconnect
+ * decision (restore-from-DB vs incremental vs backfill) inside a worker.
+ */
+export interface ConnectInitJobData {
+  workspaceId: string;
+  instagramAccountId: string;
+  token: string;
+  username?: string;
+  mediaCount?: number;
+  followersCount?: number;
+}
+
 // Create queues with specific rate limits (only if Redis is available)
 export const metricsQueue = redisConnection ? new Queue<FetchMetricsJobData>('metrics-fetch', queueOptions) : null;
 
 export const webhookQueue = redisConnection ? new Queue<WebhookProcessJobData>('webhook-process', queueOptions) : null;
 
 export const tokenRefreshQueue = redisConnection ? new Queue<TokenRefreshJobData>('token-refresh', queueOptions) : null;
+
+/**
+ * Queue for post-OAuth connect/reconnect initialization. Decoupled from the
+ * metrics-fetch queue so the connect decision (change-detection, DB restore,
+ * hydration) runs in a worker rather than inline in the OAuth web request.
+ */
+export const connectInitQueue = redisConnection ? new Queue<ConnectInitJobData>('connect-init', queueOptions) : null;
 
 // Export Redis availability status
 export { redisAvailable, redisConnection };
@@ -160,12 +193,153 @@ export const JOB_PRIORITIES = {
   DAILY_SNAPSHOT: 25, // Daily analytics snapshot
 } as const;
 
+/**
+ * Legacy fallback polling interval.
+ * Used ONLY when TieredJobScheduler is unavailable (no Redis).
+ * Actual polling cadence is determined dynamically per account via
+ * TieredJobScheduler.getPollingCadence() and UsageStore ceiling classification.
+ * Requirements 5.1, 5.2, 5.6, 3.4.
+ */
 export const POLLING_INTERVALS = {
-  all: 80, // 80 minutes - Consolidated smart polling for all media & insights
+  all: 80, // 80 minutes - Legacy consolidated interval (fallback only)
 } as const;
 
+/**
+ * Data types that map to specific cadence fields from PollingCadence.
+ * Each type gets its own repeatable BullMQ job at the appropriate interval.
+ * This replaces the single "all" metric type with granular per-type scheduling.
+ */
+export const CADENCE_METRIC_TYPES = {
+  accountInsights: 'all',            // Account-level insights (followers, reach, profile views)
+  postInsightsRecent: 'all',         // Recent post insights (< 7 days)
+  newPostDetection: 'all',           // New post detection polling
+  followerCount: 'all',             // Follower count polling
+} as const;
+
+export type CadenceMetricType = keyof typeof CADENCE_METRIC_TYPES;
+
 // Queue management functions
+let _tieredJobScheduler: TieredJobScheduler | null = null;
+
+/**
+ * Lazily create or return the TieredJobScheduler singleton for polling cadence.
+ * Used by MetricsQueueManager to determine dynamic polling intervals.
+ */
+function getSchedulerInstance(): TieredJobScheduler | null {
+  if (_tieredJobScheduler) return _tieredJobScheduler;
+  if (!redisConnection) return null;
+
+  try {
+    const usageStore = new UsageStore(redisConnection);
+    _tieredJobScheduler = new TieredJobScheduler(usageStore, rateLimitConfig);
+
+    // Wire the re-enqueue hook so resumed deferred jobs actually run again
+    // (smart-polling-system Req 11.2). When reEvaluateDeferredJobs decides an
+    // account is permitted again, it calls this to add a real metrics-fetch job
+    // from the deferred job's stored payload before removing the deferred entry.
+    _tieredJobScheduler.setReEnqueueDeferred(async (data) => {
+      if (!metricsQueue) return;
+      const payload = (data.payload ?? {}) as Partial<FetchMetricsJobData>;
+      const jobData: FetchMetricsJobData = {
+        workspaceId: payload.workspaceId ?? '',
+        userId: payload.userId ?? 'system',
+        instagramAccountId: payload.instagramAccountId ?? data.accountId,
+        token: payload.token ?? '',
+        metricsType: (payload.metricsType ?? 'all') as FetchMetricsJobData['metricsType'],
+        priority: data.priority,
+        forceRefresh: payload.forceRefresh ?? false,
+        ...(payload.insightFields ? { insightFields: payload.insightFields } : {}),
+      };
+      await metricsQueue.add('fetch-metrics' as any, jobData, {
+        priority: data.priority,
+        // Deduplicate resumed jobs within a 10s window so a sweep that overlaps
+        // a repeatable fire doesn't double-enqueue the same account+type.
+        jobId: `resume-${jobData.instagramAccountId}-${jobData.metricsType}-${Math.floor(Date.now() / 10000)}`,
+      });
+    });
+
+    return _tieredJobScheduler;
+  } catch (error) {
+    console.warn('[MetricsQueueManager] Failed to initialize TieredJobScheduler:', (error as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Sweep the durable deferred-jobs queue and re-dispatch any jobs whose account
+ * + app usage now permits them (smart-polling-system Req 11.2). Returns the
+ * number of jobs re-dispatched. Safe no-op when Redis/scheduler is unavailable.
+ */
+export async function reEvaluateAllDeferredJobs(): Promise<number> {
+  const scheduler = getSchedulerInstance();
+  if (!scheduler) return 0;
+  try {
+    return await scheduler.reEvaluateAllDeferredJobs();
+  } catch (error) {
+    console.warn('[MetricsQueueManager] Deferred sweep failed:', (error as Error).message);
+    return 0;
+  }
+}
+
+// Story-insights scheduler singleton — shares the TieredJobScheduler + UsageStore
+// with the smart-polling flow (smart-polling-system Req 5.1).
+let _storyInsightsScheduler: StoryInsightsScheduler | null = null;
+let _storyUsageStore: UsageStore | null = null;
+
+/**
+ * Lazily create or return the StoryInsightsScheduler singleton. Instantiated
+ * with the shared TieredJobScheduler + a UsageStore over the shared Redis
+ * connection so story jobs reuse the same tier policy as the rest of the
+ * smart-polling flow (smart-polling-system Req 5.1). Returns null when Redis /
+ * the scheduler is unavailable (graceful degradation).
+ */
+function getStoryInsightsSchedulerInstance(): StoryInsightsScheduler | null {
+  if (_storyInsightsScheduler) return _storyInsightsScheduler;
+  if (!redisConnection) return null;
+
+  const scheduler = getSchedulerInstance();
+  if (!scheduler) return null;
+
+  try {
+    if (!_storyUsageStore) {
+      _storyUsageStore = new UsageStore(redisConnection);
+    }
+    _storyInsightsScheduler = new StoryInsightsScheduler(scheduler, _storyUsageStore, rateLimitConfig);
+    return _storyInsightsScheduler;
+  } catch (error) {
+    console.warn('[MetricsQueueManager] Failed to initialize StoryInsightsScheduler:', (error as Error).message);
+    return null;
+  }
+}
+
 export class MetricsQueueManager {
+
+  /**
+   * Enqueue a post-OAuth connect/reconnect initialization job.
+   * The worker runs the restore-from-DB vs incremental vs backfill decision,
+   * so no Instagram/account work happens inline in the OAuth web request.
+   *
+   * Returns true if the job was enqueued, false if Redis/queue is unavailable
+   * (caller should fall back to running ConnectInitService inline).
+   */
+  static async enqueueConnectInit(data: ConnectInitJobData): Promise<boolean> {
+    if (!connectInitQueue) {
+      console.log('⚠️ connectInitQueue unavailable, caller must run connect-init inline');
+      return false;
+    }
+    try {
+      await connectInitQueue.add('connect-init', data, {
+        priority: JOB_PRIORITIES.MANUAL_REFRESH,
+        // Deduplicate rapid duplicate OAuth callbacks for the same account within 10s
+        jobId: `connect-init-${data.workspaceId}-${data.instagramAccountId}-${Math.floor(Date.now() / 10000)}`,
+      });
+      console.log(`📥 Enqueued connect-init job for account ${data.instagramAccountId} (workspace ${data.workspaceId})`);
+      return true;
+    } catch (error) {
+      console.error('🚨 Failed to enqueue connect-init job:', (error as Error).message);
+      return false;
+    }
+  }
 
   /**
    * Schedule daily snapshots for all workspaces
@@ -287,7 +461,11 @@ export class MetricsQueueManager {
   }
 
   /**
-   * Schedule metrics fetch job for a workspace
+   * Schedule metrics fetch job for a workspace.
+   * Uses TieredJobScheduler.getPollingCadence() to derive scheduling delay when
+   * no explicit delay is provided. The cadence interval from the account's ceiling
+   * classification is used as the delay for deferred/repeated fetches, ensuring
+   * impression-scaled spacing between requests (Requirement 5.6, 5.7).
    */
   static async scheduleMetricsFetch(
     workspaceId: string,
@@ -306,6 +484,26 @@ export class MetricsQueueManager {
       return;
     }
 
+    // If no explicit delay and not force-refresh, use TieredJobScheduler polling cadence
+    // to determine an appropriate delay based on the account's ceiling classification.
+    // This ensures impression-scaled request spacing (Requirement 5.6).
+    let resolvedDelay = options.delay ?? 0;
+    if (!options.delay && !options.forceRefresh) {
+      const scheduler = getSchedulerInstance();
+      if (scheduler) {
+        try {
+          const cadence = await scheduler.getPollingCadence(instagramAccountId);
+          // Log the cadence for observability; the delay stays 0 for immediate scheduling.
+          // Repeated polling is governed by scheduleSmartPolling using these cadence values.
+          console.log(`[SCHEDULE] 📐 Polling cadence for ${instagramAccountId}: ` +
+            `accountInsights=${Math.round(cadence.accountInsightsMs / 60000)}min, ` +
+            `follower=${Math.round(cadence.followerCountMs / 60000)}min`);
+        } catch (error) {
+          // Non-critical — continue with default behavior
+        }
+      }
+    }
+
     const jobData: FetchMetricsJobData = {
       workspaceId,
       userId,
@@ -318,7 +516,7 @@ export class MetricsQueueManager {
 
     const jobOptions = {
       priority: options.priority || JOB_PRIORITIES.SMART_POLLING_STABLE,
-      delay: options.delay || 0,
+      delay: resolvedDelay,
       // Rate limiting per workspace (Deduplicate rapid clicks within a 10-second window)
       jobId: `${workspaceId}-${instagramAccountId}-${metricsType}-${Math.floor(Date.now() / 10000)}`,
     };
@@ -333,7 +531,21 @@ export class MetricsQueueManager {
   }
 
   /**
-   * Schedule smart polling jobs with adaptive intervals
+   * Schedule smart polling jobs with dynamic, impression-scaled intervals.
+   *
+   * Uses TieredJobScheduler.getPollingCadence() to determine per-data-type intervals
+   * based on the account's ceiling classification (derived from rolling impressions
+   * estimate in UsageStore). Each data type gets its own repeatable BullMQ job:
+   *   - accountInsights: account-level metrics (followers, reach, profile views)
+   *   - postInsightsRecent: recent post metrics (< 7 days)
+   *   - newPostDetection: detect newly published posts
+   *   - followerCount: follower count tracking
+   *
+   * High-ceiling accounts (more impressions) get shorter intervals; low-ceiling
+   * accounts are protected with longer intervals. Falls back to activity-multiplier
+   * based intervals if TieredJobScheduler is unavailable.
+   *
+   * Requirements: 5.1, 5.2, 5.6, 3.4
    */
   static async scheduleSmartPolling(
     workspaceId: string,
@@ -347,97 +559,291 @@ export class MetricsQueueManager {
       return;
     }
 
-    const activityMultiplier = {
-      high: 0.5, // Poll more frequently for active accounts
-      medium: 1,
-      low: 2, // Poll less frequently for inactive accounts
-    };
+    // Try to get dynamic polling cadence from TieredJobScheduler
+    // The cadence is driven by rolling impressions → ceiling classification → config intervals
+    const scheduler = getSchedulerInstance();
+    let cadence: PollingCadence | null = null;
 
-    const multiplier = activityMultiplier[accountActivity];
+    if (scheduler) {
+      try {
+        cadence = await scheduler.getPollingCadence(instagramAccountId);
+        console.log(`[SMART POLLING] 🎯 Dynamic cadence for ${instagramAccountId}: ` +
+          `accountInsights=${Math.round(cadence.accountInsightsMs / 60000)}min, ` +
+          `postInsightsRecent=${Math.round(cadence.postInsightsRecentMs / 60000)}min, ` +
+          `newPostDetection=${Math.round(cadence.newPostDetectionMs / 60000)}min, ` +
+          `followerCount=${Math.round(cadence.followerCountMs / 60000)}min`);
+      } catch (error) {
+        console.warn(`[SMART POLLING] Failed to get tier-aware cadence, falling back to activity multiplier:`, (error as Error).message);
+      }
+    }
+
+    // Drive the recent-post-insight interval from the age-based cadence
+    // (smart-polling-system Req 4.1, 4.6). The interval is selected from the
+    // account's NEWEST post's actual age — not "now" — so an account whose most
+    // recent post is, say, 48 days old correctly lands in the older-post bucket
+    // (weekly) instead of being polled hourly. Per-post boundary-crossing
+    // reschedules are applied where individual posts are scheduled.
+    let postInsightCadenceMs: number | null = null;
+    if (scheduler) {
+      try {
+        // Resolve the newest post's publish time for this account. The cadence
+        // for the account-level repeatable job tracks the freshest real post.
+        let newestPublishedAt: number | null = null;
+        try {
+          const { ContentModel } = await import('../models/Content/Content');
+          const newest = await ContentModel.findOne({
+            workspaceId,
+            accountId: instagramAccountId,
+            publishedAt: { $exists: true, $ne: null },
+          })
+            .sort({ publishedAt: -1 })
+            .select('publishedAt')
+            .lean();
+          if (newest?.publishedAt) {
+            newestPublishedAt = new Date(newest.publishedAt).getTime();
+          }
+        } catch (lookupErr) {
+          // Non-critical — fall back to "now" (freshest bucket) if the lookup fails.
+        }
+
+        postInsightCadenceMs = await scheduler.getPostInsightCadence(
+          instagramAccountId,
+          newestPublishedAt ?? Date.now()
+        );
+      } catch (error) {
+        // Non-critical — fall back to the PollingCadence.postInsightsRecentMs value.
+      }
+    }
+
+    // Drive the new-post detection interval from the ceiling-scaled
+    // `newPostDetectionInterval` (smart-polling-system Req 8.1, 8.2, 8.4):
+    // HIGH-ceiling accounts are detected more frequently (default 2h) and
+    // LOW-ceiling accounts at a wider interval (default 6h). Falls back to the
+    // generic `cadence.newPostDetectionMs` when the smart-polling interval is
+    // unavailable. The detection job fetches the media list via
+    // `InstagramService.getUserMedia`, which routes through `GovernedHttpClient`,
+    // so it counts against the account's usage like any governed call (Req 8.6).
+    let newPostDetectionMs: number | null = null;
+    if (scheduler) {
+      try {
+        newPostDetectionMs = await scheduler.getNewPostDetectionInterval(instagramAccountId);
+      } catch (error) {
+        // Non-critical — fall back to the PollingCadence.newPostDetectionMs value.
+      }
+    }
+
+    // Build per-data-type schedules from cadence (or fallback)
+    const fallbackMs = this.computeFallbackInterval(accountActivity);
+    const newSchedules = cadence
+      ? [
+          {
+            // Account-level insights only (reach, profile views).
+            // metricsType 'reach' → profile + account insights = ~2 API calls (was 4 with 'all').
+            cadenceType: 'accountInsights',
+            metricsType: 'reach' as FetchMetricsJobData['metricsType'],
+            repeatMs: cadence.accountInsightsMs,
+            priority: JOB_PRIORITIES.SMART_POLLING_STABLE,
+          },
+          {
+            // Recent post insights (likes/comments/reach/saves per post).
+            // metricsType 'likes' → profile + media list + batch insights = ~3 API calls (was 4).
+            // Interval driven by age-based post cadence (Req 4.1, 4.6); falls back to
+            // the PollingCadence value when getPostInsightCadence is unavailable.
+            // `saved`/`shares` ride the same bundled media-insights request (Req 3.1, 3.3).
+            cadenceType: 'postInsightsRecent',
+            metricsType: 'likes' as FetchMetricsJobData['metricsType'],
+            repeatMs: postInsightCadenceMs ?? cadence.postInsightsRecentMs,
+            priority: JOB_PRIORITIES.SMART_POLLING_STABLE,
+            insightFields: CURRENT_CONTENT_INSIGHT_EXPANSION,
+          },
+          {
+            // Detect newly published posts — needs ONLY the media list.
+            // metricsType 'new_posts' → profile + media list = ~2 API calls.
+            // It does NOT fetch per-post insights or refresh older posts; that
+            // is the job of `postInsightsRecent`. Newly discovered posts are
+            // persisted with their like/comment counts and (being never-fetched)
+            // are picked up for insights by the next postInsightsRecent run.
+            // Interval driven by the ceiling-scaled new-post detection interval
+            // (Req 8.1, 8.2, 8.4); falls back to the generic PollingCadence value
+            // when getNewPostDetectionInterval is unavailable. The media-list
+            // fetch routes through GovernedHttpClient so it counts against usage
+            // (Req 8.6).
+            cadenceType: 'newPostDetection',
+            metricsType: 'new_posts' as FetchMetricsJobData['metricsType'],
+            repeatMs: newPostDetectionMs ?? cadence.newPostDetectionMs,
+            priority: JOB_PRIORITIES.SMART_POLLING_DYNAMIC,
+          },
+          {
+            // Follower count only — profile call, no insights or media.
+            // metricsType 'followers' → profile only = 1 API call (was 4 with 'all').
+            cadenceType: 'followerCount',
+            metricsType: 'followers' as FetchMetricsJobData['metricsType'],
+            repeatMs: cadence.followerCountMs,
+            priority: JOB_PRIORITIES.SMART_POLLING_STABLE,
+          },
+        ]
+      : [
+          // Fallback: single consolidated job when scheduler is unavailable
+          {
+            cadenceType: 'all',
+            metricsType: 'all' as FetchMetricsJobData['metricsType'],
+            repeatMs: fallbackMs,
+            priority: JOB_PRIORITIES.SMART_POLLING_STABLE,
+          },
+        ];
+
+    // Generate unique jobIds incorporating cadence type + interval for diffing
+    const schedulesWithIds = newSchedules.map((s) => ({
+      ...s,
+      jobId: `smart-poll-${workspaceId}-${instagramAccountId}-${s.cadenceType}-${s.repeatMs}`,
+    }));
 
     try {
-      // Calculate the intended new job IDs based on the current multiplier
-      const newSchedules = Object.entries(POLLING_INTERVALS).map(([metricType, baseIntervalMinutes]) => {
-        const repeatMs = Math.floor(baseIntervalMinutes * multiplier * 60 * 1000);
-        return {
-          metricType,
-          repeatMs,
-          jobId: `smart-poll-${workspaceId}-${instagramAccountId}-${metricType}-${repeatMs}`
-        };
-      });
+      // Phase 5 Optimization (Task 7.1): Cache getRepeatableJobs() with 30-second TTL
+      const now = Date.now();
+      let repeatableJobs;
 
-      try {
-        // Phase 5 Optimization (Task 7.1): Cache getRepeatableJobs() with 30-second TTL
-        const now = Date.now();
-        let repeatableJobs;
-        
-        if (repeatableJobsCache && (now - repeatableJobsCache.timestamp) < CACHE_TTL_MS) {
-          // Use cached data
-          repeatableJobs = repeatableJobsCache.data;
-          console.log('📦 Using cached repeatable jobs data (cache hit)');
-        } else {
-          // Fetch fresh data from Redis
-          repeatableJobs = await metricsQueue.getRepeatableJobs();
-          repeatableJobsCache = { data: repeatableJobs, timestamp: now };
-          console.log('🔄 Fetched fresh repeatable jobs data (cache miss/expired)');
-        }
-        
-        const existingJobs = repeatableJobs.filter(j => 
-          j.key.includes(`smart-poll-${workspaceId}-${instagramAccountId}-`)
-        );
-        
-        // Remove any jobs that don't match our intended new job IDs
-        let cacheInvalidated = false;
-        for (const job of existingJobs) {
-          // BullMQ stores our custom key in the `key` property when using `repeat: { key }`
-          if (!newSchedules.find(s => job.key === s.jobId)) {
-             await metricsQueue.removeRepeatableByKey(job.key);
-             // Invalidate cache when jobs are removed
-             if (!cacheInvalidated) {
-               invalidateRepeatableJobsCache();
-               cacheInvalidated = true;
-             }
-          }
-        }
-
-        // Add the jobs (Only add if they don't already exist to guarantee we don't reset timers)
-        let jobsAdded = false;
-        for (const schedule of newSchedules) {
-          const { metricType, repeatMs, jobId } = schedule;
-          
-          const exists = existingJobs.find(j => j.key === jobId);
-          if (!exists) {
-            await metricsQueue.add(
-              'fetch-metrics' as any,
-              {
-                workspaceId,
-                userId,
-                instagramAccountId,
-                token,
-                metricsType: metricType as FetchMetricsJobData['metricsType'],
-                priority: JOB_PRIORITIES.SMART_POLLING_STABLE,
-              },
-              {
-                repeat: { every: repeatMs, key: jobId } as any,
-                priority: JOB_PRIORITIES.SMART_POLLING_STABLE,
-                jobId: jobId, // The jobId uniquely identifies the repeatable job
-              }
-            );
-            jobsAdded = true;
-          }
-        }
-        
-        // Invalidate cache when new jobs are added
-        if (jobsAdded) {
-          invalidateRepeatableJobsCache();
-        }
-      } catch (e) {
-        console.error(`🚨 Failed to sync existing smart polling schedules:`, e);
+      if (repeatableJobsCache && (now - repeatableJobsCache.timestamp) < CACHE_TTL_MS) {
+        repeatableJobs = repeatableJobsCache.data;
+        console.log('📦 Using cached repeatable jobs data (cache hit)');
+      } else {
+        repeatableJobs = await metricsQueue.getRepeatableJobs();
+        repeatableJobsCache = { data: repeatableJobs, timestamp: now };
+        console.log('🔄 Fetched fresh repeatable jobs data (cache miss/expired)');
       }
 
-      console.log(`🔄 Scheduled granular smart polling for workspace ${workspaceId}, account ${instagramAccountId}, activity: ${accountActivity} (Multiplier: ${multiplier})`);
+      const existingJobs = repeatableJobs.filter((j: any) =>
+        j.key.includes(`smart-poll-${workspaceId}-${instagramAccountId}-`)
+      );
+
+      // Remove stale jobs that don't match the new schedule set
+      let cacheInvalidated = false;
+      for (const job of existingJobs) {
+        if (!schedulesWithIds.find((s) => job.key === s.jobId)) {
+          await metricsQueue.removeRepeatableByKey(job.key);
+          if (!cacheInvalidated) {
+            invalidateRepeatableJobsCache();
+            cacheInvalidated = true;
+          }
+        }
+      }
+
+      // Add jobs that don't already exist (avoid resetting timers)
+      let jobsAdded = false;
+      const jitterSpreadFraction = rateLimitConfig.smartPolling.jitterSpreadFraction;
+      for (const schedule of schedulesWithIds) {
+        const exists = existingJobs.find((j: any) => j.key === schedule.jobId);
+        if (!exists) {
+          // Deterministic first-fire jitter (Req 7.1, 7.5): spread the first
+          // occurrence across [0, spreadFraction × repeatMs] using a stable
+          // hash of (accountId|cadenceType). Applied ONLY here, when the
+          // repeatable job is first created — the deterministic jobId/key keeps
+          // subsequent occurrences firing at the base interval with no
+          // re-applied offset.
+          const firstFireDelay = computeJitterOffset(
+            instagramAccountId,
+            schedule.cadenceType,
+            schedule.repeatMs,
+            jitterSpreadFraction
+          );
+
+          const jobData: FetchMetricsJobData = {
+            workspaceId,
+            userId,
+            instagramAccountId,
+            token,
+            metricsType: schedule.metricsType,
+            priority: schedule.priority,
+          };
+          // Bundle the media-insights field-expansion for post-insight fetches
+          // (Req 3.1) so `views`/`reach`/`saved`/`shares`/`total_interactions`
+          // are requested together in a single call.
+          if ('insightFields' in schedule && schedule.insightFields) {
+            jobData.insightFields = schedule.insightFields;
+          }
+
+          await metricsQueue.add(
+            'fetch-metrics' as any,
+            jobData,
+            {
+              repeat: { every: schedule.repeatMs, key: schedule.jobId } as any,
+              priority: schedule.priority,
+              jobId: schedule.jobId,
+              // First-fire spread offset (Req 7.1). Subsequent repeat
+              // occurrences are governed by `repeat.every` and do not re-apply it.
+              delay: firstFireDelay,
+              // Full-jitter retry backoff (Req 7.4): BullMQ randomizes the
+              // exponential backoff delay using the `jitter` factor. Cast to
+              // `any` for BullMQ versions whose types omit the `jitter` field.
+              backoff: { type: 'exponential', delay: 2000, jitter: 1 } as any,
+            }
+          );
+          jobsAdded = true;
+        }
+      }
+
+      // Invalidate cache when new jobs are added
+      if (jobsAdded) {
+        invalidateRepeatableJobsCache();
+      }
+
+      const intervalSummary = schedulesWithIds
+        .map((s) => `${s.cadenceType}=${Math.round(s.repeatMs / 60000)}min`)
+        .join(', ');
+      console.log(`🔄 Scheduled smart polling for workspace ${workspaceId}, account ${instagramAccountId}: [${intervalSummary}]`);
     } catch (error) {
       console.error(`🚨 Failed to schedule smart polling:`, error);
+    }
+  }
+
+  /**
+   * Compute fallback polling interval when TieredJobScheduler is unavailable.
+   * Uses the original activity-multiplier approach.
+   */
+  private static computeFallbackInterval(accountActivity: 'high' | 'medium' | 'low'): number {
+    const activityMultiplier = {
+      high: 0.5,
+      medium: 1,
+      low: 2,
+    };
+    const multiplier = activityMultiplier[accountActivity];
+    // Use base interval from POLLING_INTERVALS.all (80 minutes)
+    return Math.floor(POLLING_INTERVALS.all * multiplier * 60 * 1000);
+  }
+
+  /**
+   * Schedule story-insights safety-net jobs when a story is detected
+   * (smart-polling-system Req 5.1, 5.2).
+   *
+   * Delegates to {@link StoryInsightsScheduler.onStoryDetected}, which schedules
+   * a recurring Story_Insights_Job at `storyRecurringIntervalMs` plus a single
+   * guaranteed Final_Fetch_Job before the 24h expiry. The scheduler shares the
+   * TieredJobScheduler + UsageStore with the rest of the smart-polling flow.
+   *
+   * Safe no-op (logged) when Redis / the scheduler is unavailable.
+   *
+   * @param instagramAccountId The Instagram account that owns the story.
+   * @param storyId The detected story's media ID.
+   * @param publishTimeMs Story publish time as a Unix epoch in ms. Defaults to
+   *   now when the caller cannot determine it (the worst case still guarantees a
+   *   final fetch within the 24h window).
+   */
+  static async scheduleStoryInsights(
+    instagramAccountId: string,
+    storyId: string,
+    publishTimeMs: number = Date.now()
+  ): Promise<void> {
+    const storyScheduler = getStoryInsightsSchedulerInstance();
+    if (!storyScheduler) {
+      console.log(`⚠️ StoryInsightsScheduler unavailable, skipping story scheduling for account ${instagramAccountId}, story ${storyId}`);
+      return;
+    }
+
+    try {
+      await storyScheduler.onStoryDetected(instagramAccountId, storyId, publishTimeMs);
+      console.log(`📱 Scheduled story-insights recurring + final-fetch jobs for account ${instagramAccountId}, story ${storyId}`);
+    } catch (error) {
+      console.error(`🚨 Failed to schedule story insights for account ${instagramAccountId}, story ${storyId}:`, (error as Error).message);
     }
   }
 

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { storage } from '../mongodb-storage';
 
 import { Workspace } from '../domain/types';
+import { WorkspaceMemberModel } from '../models/Workspace/WorkspaceMemberModel';
 
 // Extend Express Request to include workspace data
 declare global {
@@ -9,20 +10,24 @@ declare global {
     interface Request {
       workspace?: Workspace;
       workspaceId?: string;
+      workspaceRole?: string;
     }
   }
 }
 
 /**
  * CRITICAL SECURITY MIDDLEWARE: Validates workspace access and prevents cross-tenant data leakage
- * 
+ *
+ * Factory version — use createWorkspaceAccessValidator() for route-level usage.
+ * For the WorkspaceMember-lookup plain middleware, use validateWorkspaceAccess directly.
+ *
  * This middleware ensures that:
  * 1. User has authenticated access to the requested workspace
- * 2. Workspace exists and user is authorized (owner/member) 
+ * 2. Workspace exists and user is authorized (owner/member)
  * 3. Prevents cross-tenant data access attacks
  * 4. Provides consistent workspace validation across all routes
  */
-export function validateWorkspaceAccess(options: {
+export function createWorkspaceAccessValidator(options: {
   required?: boolean;
   source?: 'params' | 'query' | 'body' | 'headers' | 'auto';
   paramName?: string;
@@ -210,38 +215,126 @@ export function validateWorkspaceAccess(options: {
 }
 
 /**
- * Helper function for routes that need workspace validation
+ * Plain Express middleware that validates workspace access using WorkspaceMember
+ * lookup (not a factory — use this when you need header/query/body resolution
+ * with role attachment for the workspace-meta-connection spec endpoints).
+ *
+ * Resolution order for workspaceId:
+ *   1. req.headers['x-workspace-id']
+ *   2. req.query.workspaceId
+ *   3. req.body?.workspaceId
+ *
+ * Attaches req.workspaceId and req.workspaceRole on success.
+ */
+export async function validateWorkspaceMembership(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // Resolve workspaceId from header → query → body
+    const workspaceId: string | undefined =
+      (req.headers['x-workspace-id'] as string | undefined) ||
+      (req.query.workspaceId as string | undefined) ||
+      (req.body?.workspaceId as string | undefined);
+
+    if (!workspaceId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'WORKSPACE_ID_REQUIRED',
+          message: 'X-Workspace-ID header is required',
+        },
+      });
+      return;
+    }
+
+    // userId is set by requireAuth middleware
+    const userId: string | undefined = (req as any).userId;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHENTICATED',
+          message: 'Authentication required',
+        },
+      });
+      return;
+    }
+
+    // Verify the user is an active member of the requested workspace
+    const member = await WorkspaceMemberModel.findOne({
+      workspaceId,
+      userId,
+      status: 'ACTIVE',
+    });
+
+    if (!member) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'WORKSPACE_ACCESS_DENIED',
+          message: 'You are not a member of this workspace',
+        },
+      });
+      return;
+    }
+
+    // Attach workspace context to request for downstream handlers
+    (req as any).workspaceId = workspaceId;
+    (req as any).workspaceRole = member.role;
+
+    next();
+  } catch (error) {
+    console.error('🚨 validateWorkspaceAccess Error:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'WORKSPACE_VALIDATION_ERROR',
+        message: 'Workspace validation failed',
+      },
+    });
+  }
+}
+
+/**
+ * Helper function for routes that need workspace validation (factory version)
  * Usage: app.get('/api/route', requireAuth, validateWorkspace(), handler)
  */
-export const validateWorkspace = (options?: Parameters<typeof validateWorkspaceAccess>[0]) =>
-  validateWorkspaceAccess(options);
+export const validateWorkspace = (options?: Parameters<typeof createWorkspaceAccessValidator>[0]) =>
+  createWorkspaceAccessValidator(options);
+
+/**
+ * validateWorkspaceAccess — factory alias maintained for backward compatibility.
+ * All existing routes call this as validateWorkspaceAccess({ source: '...' }).
+ * For the new plain (non-factory) middleware, use validateWorkspaceMembership directly.
+ */
+export const validateWorkspaceAccess = (options?: Parameters<typeof createWorkspaceAccessValidator>[0]) =>
+  createWorkspaceAccessValidator(options);
 
 /**
  * Optional workspace validation for routes that can work with or without workspace context
  * Usage: app.get('/api/route', requireAuth, optionalWorkspace(), handler)
  */
-export const optionalWorkspace = () => validateWorkspaceAccess({ required: false });
+export const optionalWorkspace = () => createWorkspaceAccessValidator({ required: false });
 
 /**
  * Validate workspace from URL params specifically (for RESTful routes)
  * Usage: app.get('/api/workspaces/:workspaceId/data', requireAuth, validateWorkspaceFromParams(), handler)
  */
 export const validateWorkspaceFromParams = (paramName = 'workspaceId') =>
-  validateWorkspaceAccess({ source: 'params', paramName });
+  createWorkspaceAccessValidator({ source: 'params', paramName });
 
 /**
  * Validate workspace from query parameters
  * Usage: app.get('/api/data?workspaceId=xxx', requireAuth, validateWorkspaceFromQuery(), handler)
  */
 export const validateWorkspaceFromQuery = (paramName = 'workspaceId') =>
-  validateWorkspaceAccess({ source: 'query', paramName });
+  createWorkspaceAccessValidator({ source: 'query', paramName });
 
 /**
  * Validate workspace from request body
  * Usage: app.post('/api/data', requireAuth, validateWorkspaceFromBody(), handler)
  */
 export const validateWorkspaceFromBody = (paramName = 'workspaceId') =>
-  validateWorkspaceAccess({ source: 'body', paramName });
+  createWorkspaceAccessValidator({ source: 'body', paramName });
 
 /**
  * Validates that the current user has access to the workspace that owns the given account.
@@ -288,4 +381,4 @@ export function requireWorkspaceMember(idParam: string) {
       return res.status(500).json({ error: 'Resource authorization failed' });
     }
   };
-}
+}

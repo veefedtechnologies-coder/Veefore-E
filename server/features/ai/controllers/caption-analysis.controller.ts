@@ -7,6 +7,7 @@ import { hashtagGeneratorService } from '../../../services/HashtagGeneratorServi
 import { performanceCorrelationService } from '../../../services/PerformanceCorrelationService';
 import { generatedCaptionRepository } from '../../../repositories/GeneratedCaptionRepository';
 import { generateCompetitorAnalysis } from '../../../competitor-analysis-ai';
+import { resolveNiche } from '../../../services/niche.util';
 
 /**
  * Caption Analysis Controller
@@ -33,6 +34,10 @@ export class CaptionAnalysisController {
       const userObj = await storage.getUser(userId);
       if (userObj && userObj.preferences) {
         preferences = { ...userObj.preferences };
+      }
+      if (userObj && !preferences.contentNiche) {
+        const niche = resolveNiche(userObj);
+        if (niche) preferences.contentNiche = niche;
       }
     } catch (e) {
       console.warn('[CaptionAnalysisController] Failed to load user preferences', e);

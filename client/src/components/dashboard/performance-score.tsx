@@ -1,15 +1,16 @@
 import { useLocation } from 'wouter'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { detectInvalidAccounts, getReconnectCopy, startReconnectFlow } from '@/lib/reconnect'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { PerformanceScoreSkeleton } from '@/components/skeletons'
 import { TrendingUp, Users, RefreshCw, Instagram, Facebook, Twitter, Linkedin, Youtube } from 'lucide-react'
 import { usePerformanceData } from '@/hooks/usePerformanceData'
 import { useSocialAccounts } from '@/hooks/useSocialAccounts'
 import { useHistoricalData } from '@/hooks/useHistoricalData'
 import { useFollowerAnalytics } from '@/hooks/useFollowerAnalytics'
+import { usePerformanceOverview } from '@/hooks/usePerformanceOverview'
 import { DataStory } from './DataStory'
 import { MetricsGrid, MetricsGridSkeleton } from './MetricsGrid'
 import { PlatformCard } from './PlatformCard'
@@ -26,60 +27,6 @@ function TikTokIcon({ className = '' }: { className?: string }) {
   )
 }
 
-export function PerformanceScoreSkeleton() {
-  return (
-    <Card data-testid="performance-score-skeleton" className="border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl transition-all duration-300 border-0 rounded-3xl overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
-        <div className="flex items-center space-x-3">
-          <Skeleton className="h-6 w-48" />
-          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-            <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          </div>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-            <Skeleton className="h-8 w-16 rounded-md mx-1" />
-            <Skeleton className="h-8 w-20 rounded-md mx-1" />
-            <Skeleton className="h-8 w-24 rounded-md mx-1" />
-          </div>
-          <Skeleton className="h-9 w-28 rounded-xl" />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 space-y-3">
-              <div className="flex items-center space-x-3">
-                <Skeleton className="w-10 h-10 rounded-lg bg-white/20" />
-                <Skeleton className="h-6 w-32 bg-white/20" />
-              </div>
-              <Skeleton className="h-4 w-full max-w-md bg-white/20" />
-              <Skeleton className="h-4 w-3/4 bg-white/20" />
-              <Skeleton className="h-3 w-2/3 bg-white/20" />
-            </div>
-            <Skeleton className="w-6 h-6 rounded-full bg-white/20" />
-          </div>
-        </div>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <Skeleton className="h-6 w-40" />
-            <div className="flex items-center space-x-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="w-8 h-8 rounded-full" />
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Skeleton className="w-2 h-2 rounded-full" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-        </div>
-        <MetricsGridSkeleton />
-      </CardContent>
-    </Card>
-  )
-}
-
 export function PerformanceScore() {
   const [, setLocation] = useLocation()
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month'>('month')
@@ -89,12 +36,19 @@ export function PerformanceScore() {
   const [storyAnimation, setStoryAnimation] = useState(0)
   const [reconnectVisible, setReconnectVisible] = useState(true)
   const [isClosingReconnect, setIsClosingReconnect] = useState(false)
-  const [dynamicInsight, setDynamicInsight] = useState<string | null>(null)
+  const [aiBanner, setAiBanner] = useState<{ title: string; emoji: string; headline: string; tip: string } | null>(null)
+  const [insightLoading, setInsightLoading] = useState(true)
+  const [insightFailed, setInsightFailed] = useState(false)
+  // Cache AI banners per period + data signature so we only hit the AI API when
+  // the underlying analytics actually change. Switching tabs (or a background
+  // refetch that returns identical data) reuses the cached result.
+  const insightCacheRef = useRef<Map<string, { title: string; emoji: string; headline: string; tip: string }>>(new Map())
 
   const { analytics, isLoading: analyticsLoading } = usePerformanceData(currentWorkspace?.id)
   const { socialAccounts: socialAccountsArray, validAccounts, invalidAccounts, isLoading: socialLoading } = useSocialAccounts(currentWorkspace?.id)
   const { historicalData, isLoading: historicalLoading } = useHistoricalData(currentWorkspace?.id, selectedPeriod)
   const { followerData, isLoading: followerLoading } = useFollowerAnalytics(currentWorkspace?.id)
+  const { overviewData, isLoading: overviewLoading } = usePerformanceOverview(currentWorkspace?.id, selectedPeriod)
 
   useEffect(() => {
     setShowDataStory(true)
@@ -103,20 +57,135 @@ export function PerformanceScore() {
 
   useEffect(() => {
     if (!currentWorkspace?.id || !analytics) return;
-    const fetchInsight = async () => {
-      try {
-        const data = await ApiClient.post(`/api/v1/analytics/workspace/${currentWorkspace.id}/generate-insight`, {
-          metricsData: analytics
-        });
-        if (data.success && data.insight) {
-          setDynamicInsight(data.insight);
+    // Don't call the AI if there's no social account connected — the AI has
+    // nothing real to analyse (0 followers, 0 posts, no insights).
+    // validAccounts is populated by useSocialAccounts above.
+    if (!socialLoading && validAccounts.length === 0) {
+      setInsightLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    // Build a stable signature of the inputs that affect the insight. We strip
+    // volatile fields (like server-generated timestamps) so an unchanged dataset
+    // produces the SAME key across page refreshes — otherwise every reload would
+    // look like "new data" and re-trigger the AI call.
+    const { lastUpdated, updatedAt, fetchedAt, timestamp, ...stableAnalytics } = (analytics as any) || {};
+    const dataSignature = JSON.stringify(stableAnalytics);
+    const cacheKey = `${currentWorkspace.id}:${selectedPeriod}:${dataSignature}`;
+
+    // A banner is only valid if it has a real headline AND tip. This guards
+    // against stale cached entries (from older versions) that had an empty
+    // headline, which would otherwise force the hardcoded template to show.
+    const isValidBanner = (b: any): boolean =>
+      !!b && typeof b.headline === 'string' && b.headline.trim().length > 0
+          && typeof b.tip === 'string' && b.tip.trim().length > 0;
+
+    const cached = insightCacheRef.current.get(cacheKey);
+    if (cached && isValidBanner(cached)) {
+      setAiBanner(cached);
+      setInsightLoading(false);
+      setInsightFailed(false);
+      return;
+    }
+
+    // Survive component remounts (e.g. navigating away and back) within the
+    // session without re-calling the AI for unchanged data.
+    try {
+      const persisted = sessionStorage.getItem(`veefore:insight:${cacheKey}`);
+      if (persisted) {
+        const banner = JSON.parse(persisted);
+        if (isValidBanner(banner)) {
+          insightCacheRef.current.set(cacheKey, banner);
+          setAiBanner(banner);
+          setInsightLoading(false);
+          setInsightFailed(false);
+          return;
         }
+        // Stale/invalid cached banner → drop it and regenerate.
+        sessionStorage.removeItem(`veefore:insight:${cacheKey}`);
+      }
+    } catch {}
+
+    const fetchInsight = async () => {
+      setInsightLoading(true);
+      setInsightFailed(false);
+      // Clear the previous period's banner so we never show, e.g., the monthly
+      // story while the weekly one is still loading.
+      setAiBanner(null);
+
+      const applyBanner = (banner: { title: string; emoji: string; headline: string; tip: string }) => {
+        insightCacheRef.current.set(cacheKey, banner);
+        try {
+          const prefix = `veefore:insight:${currentWorkspace.id}:${selectedPeriod}:`;
+          for (let i = sessionStorage.length - 1; i >= 0; i--) {
+            const k = sessionStorage.key(i);
+            if (k && k.startsWith(prefix)) sessionStorage.removeItem(k);
+          }
+          sessionStorage.setItem(`veefore:insight:${cacheKey}`, JSON.stringify(banner));
+        } catch {}
+        setAiBanner(banner);
+      };
+
+      const parseBanner = (data: any): { title: string; emoji: string; headline: string; tip: string } | null => {
+        // Only accept a structured banner with a real headline + tip. We no
+        // longer build a tip-only banner from the legacy `data.insight` field,
+        // because a missing headline would force the hardcoded template.
+        if (data?.success && isValidBanner(data.banner)) return data.banner;
+        return null;
+      };
+
+      // The backend runs the heavy DB aggregation + AI generation in a BullMQ
+      // worker. The endpoint returns immediately with either a ready result or
+      // status:"pending" — in which case we poll until the worker finishes.
+      const MAX_ATTEMPTS = 14;
+      // Fast early backoff so a finished result surfaces ~2s sooner than a fixed
+      // 2.5s tick, then ease off. Total budget stays ~30s.
+      const POLL_DELAYS = [800, 1000, 1300, 1700, 2200, 2500, 3000];
+      const delayFor = (attempt: number) => POLL_DELAYS[Math.min(attempt, POLL_DELAYS.length - 1)];
+      try {
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+          const data = await ApiClient.post(`/api/v1/analytics/workspace/${currentWorkspace.id}/generate-insight`, {
+            period: selectedPeriod,
+            metricsData: { ...analytics, period: selectedPeriod }
+          });
+          if (cancelled) return;
+
+          const banner = parseBanner(data);
+          if (data?.status === 'ready' && banner) {
+            applyBanner(banner);
+            return;
+          }
+          if (data?.status === 'error') {
+            // Generation failed (e.g. AI quota). Stop polling and show fallback.
+            setInsightFailed(true);
+            return;
+          }
+          if (data?.status !== 'pending' && banner) {
+            // Inline (no-queue) fallback path returns a ready banner without status.
+            applyBanner(banner);
+            return;
+          }
+          if (data?.status !== 'pending' && !banner) {
+            setInsightFailed(true);
+            return;
+          }
+          // pending → wait, then poll again
+          await new Promise((r) => setTimeout(r, delayFor(attempt)));
+        }
+        // Exhausted attempts without a result.
+        if (!cancelled) setInsightFailed(true);
       } catch (err) {
         console.error('Failed to fetch AI insight for banner:', err);
+        if (!cancelled) setInsightFailed(true);
+      } finally {
+        if (!cancelled) setInsightLoading(false);
       }
+
     };
     fetchInsight();
-  }, [currentWorkspace?.id, analytics]);
+    return () => { cancelled = true; };
+  }, [currentWorkspace?.id, analytics, selectedPeriod]);
 
   const generateDataStory = (currentData: any) => {
     const followerCount = currentData?.followers ?? 0;
@@ -162,14 +231,29 @@ export function PerformanceScore() {
     }
     const storyResult = stories[period as 'day' | 'week' | 'month'] || stories.month
     
-    if (dynamicInsight) {
+    // Show the fully AI-generated banner (real or previously-cached AI result).
+    // The backend only ever returns a banner with a real headline + tip, so we
+    // use its values directly (no template substitution).
+    if (aiBanner) {
       return {
         ...storyResult,
-        insight: dynamicInsight
+        title: aiBanner.title || 'Performance Insight',
+        emoji: aiBanner.emoji || '📊',
+        story: aiBanner.headline,
+        insight: aiBanner.tip,
+        isLoading: false
       }
     }
-    
-    return storyResult;
+
+    // Still loading (or analytics not fetched yet) → show the AI-analyzing
+    // skeleton. We NEVER show hardcoded template numbers.
+    if (!insightFailed) {
+      return { ...storyResult, emoji: '✨', isLoading: true };
+    }
+
+    // AI failed and there is no cached AI banner → return null so the caller
+    // hides the banner entirely. We do not show fake/template data.
+    return null;
   }
 
   useEffect(() => {
@@ -218,16 +302,19 @@ export function PerformanceScore() {
     let followerGrowth = 0;
     if (oldFollowers === 0 && currentData.followers > 0) followerGrowth = 100;
     else if (oldFollowers > 0) followerGrowth = ((currentData.followers - oldFollowers) / oldFollowers) * 100;
-    
-    // Reach growth: compare authentic period reach (newest vs oldest snapshot in
-    // the window). Both use the same window-specific field so we never mix a
-    // lifetime total with a windowed value.
+
+    // Reach "vs previous period": compare the latest reach reading against the
+    // oldest record in the window. Both use the period-specific field (reachDay/
+    // reachWeek/reachDays28) so we're comparing apples to apples.
+    // The "previous period" baseline = oldest record's reach snapshot. If it's 0
+    // (not yet populated in the DB), leave growth at 0.0% — no fabrication.
     const currentReachPeriod = newestRecord[reachField] || 0;
     const oldReachPeriod = oldestRecord[reachField] || 0;
 
     let reachGrowth = 0;
-    if (oldReachPeriod > 0) reachGrowth = ((currentReachPeriod - oldReachPeriod) / oldReachPeriod) * 100;
-    // If there's no prior reach baseline, growth stays 0.0% (no fabricated +100%).
+    if (oldReachPeriod > 0 && currentReachPeriod !== oldReachPeriod) {
+      reachGrowth = ((currentReachPeriod - oldReachPeriod) / oldReachPeriod) * 100;
+    }
 
     let likesGrowth = 0;
     if (oldLikes === 0 && currentData.likes > 0) likesGrowth = 100;
@@ -248,14 +335,16 @@ export function PerformanceScore() {
     const currentContentScore = 7.5
     const contentScoreGrowth = ((currentContentScore - oldContentScore) / oldContentScore) * 100
 
+    const cap = (v: number) => Math.max(-999, Math.min(999, v));
+
     return {
-      followers: { value: `${followerGrowth >= 0 ? '+' : ''}${followerGrowth.toFixed(1)}%`, isPositive: followerGrowth >= 0 },
-      likes: { value: `${likesGrowth >= 0 ? '+' : ''}${Math.abs(likesGrowth) > 999 ? '999+' : likesGrowth.toFixed(1)}%`, isPositive: likesGrowth >= 0 },
-      engagement: { value: `${engagementGrowth >= 0 ? '+' : ''}${Math.abs(engagementGrowth) > 999 ? '999+' : engagementGrowth.toFixed(1)}%`, isPositive: engagementGrowth >= 0 },
-      reach: { value: `${reachGrowth >= 0 ? '+' : ''}${Math.abs(reachGrowth) > 999 ? '999+' : reachGrowth.toFixed(1)}%`, isPositive: reachGrowth >= 0 },
-      views: { value: `${viewsGrowth >= 0 ? '+' : ''}${viewsGrowth.toFixed(1)}%`, isPositive: viewsGrowth >= 0 },
-      posts: { value: `${postGrowth >= 0 ? '+' : ''}${postGrowth.toFixed(1)}%`, isPositive: postGrowth >= 0 },
-      contentScore: { value: `${contentScoreGrowth >= 0 ? '+' : ''}${contentScoreGrowth.toFixed(1)}%`, isPositive: contentScoreGrowth >= 0 }
+      followers: { value: `${followerGrowth >= 0 ? '+' : ''}${cap(followerGrowth).toFixed(1)}%`, isPositive: followerGrowth >= 0 },
+      likes: { value: `${likesGrowth >= 0 ? '+' : ''}${cap(likesGrowth).toFixed(1)}%`, isPositive: likesGrowth >= 0 },
+      engagement: { value: `${engagementGrowth >= 0 ? '+' : ''}${cap(engagementGrowth).toFixed(1)}%`, isPositive: engagementGrowth >= 0 },
+      reach: { value: `${reachGrowth >= 0 ? '+' : ''}${cap(reachGrowth).toFixed(1)}%`, isPositive: reachGrowth >= 0 },
+      views: { value: `${viewsGrowth >= 0 ? '+' : ''}${cap(viewsGrowth).toFixed(1)}%`, isPositive: viewsGrowth >= 0 },
+      posts: { value: `${postGrowth >= 0 ? '+' : ''}${cap(postGrowth).toFixed(1)}%`, isPositive: postGrowth >= 0 },
+      contentScore: { value: `${contentScoreGrowth >= 0 ? '+' : ''}${cap(contentScoreGrowth).toFixed(1)}%`, isPositive: contentScoreGrowth >= 0 }
     }
   }
 
@@ -282,7 +371,14 @@ export function PerformanceScore() {
            account.platform === 'twitter' ? 'from-blue-400 to-blue-600' : 
            account.platform === 'linkedin' ? 'from-blue-700 to-blue-900' : 
            account.platform === 'facebook' ? 'from-blue-600 to-blue-700' : 'from-gray-700 to-black',
-    followers: account.followersCount || account.followers || 0,
+    // Prefer the analytics-sourced current followers (AnalyticsDailyMetric) over
+    // SocialAccount.followersCount which only updates on polling sync. This ensures
+    // the card reflects follower gains/losses between syncs. Use the PLATFORM-SPECIFIC
+    // count (instagramFollowers) — not currentFollowers, which is the combined
+    // Instagram + Facebook workspace total and would over-count a single platform card.
+    followers: (followerData?.instagramFollowers != null && account.platform === 'instagram')
+      ? followerData.instagramFollowers
+      : (account.followersCount || account.followers || 0),
     engagement: account.engagementRate ? `${account.engagementRate.toFixed(1)}%` : '0%',
     reach: account.totalReach || 0,
     posts: account.mediaCount || account.posts || 0,
@@ -323,7 +419,6 @@ export function PerformanceScore() {
 
   const calculateTimeBasedData = (period: 'day' | 'week' | 'month') => {
     const totalFollowersBase = totalFollowers || 0
-    const totalReachBase = totalReach || 0
     const totalPostsBase = totalPosts || 0
     const realEngagementRate = analytics?.engagementRate || 0
     const avgEngagementBase = realEngagementRate > 0 ? realEngagementRate : avgEngagement || 0
@@ -405,9 +500,9 @@ export function PerformanceScore() {
       // into a period tab and make Today/Week/Month look identical.
       if (newestRecord) {
         let finalReachGain = 0;
-        if (period === 'day') finalReachGain = newestRecord.reachDay || 0;
-        else if (period === 'week') finalReachGain = newestRecord.reachWeek || 0;
-        else finalReachGain = newestRecord.reachDays28 || 0;
+        if (period === 'day') finalReachGain = newestRecord.reachDay || newestRecord.reach || 0;
+        else if (period === 'week') finalReachGain = newestRecord.reachWeek || newestRecord.reach || 0;
+        else finalReachGain = newestRecord.reachDays28 || newestRecord.reach || 0;
 
         reachGains += finalReachGain;
       }
@@ -419,13 +514,19 @@ export function PerformanceScore() {
       likes: likesGains,
       views: viewsGains,
       followerGains: followerGains,
+      followerGained: 0,
+      followerLost: 0,
+      followerPrevGained: 0,
+      followerPrevLost: 0,
       followerTotal: totalFollowersBase
     }
 
     const growthPercentages = calculateRealGrowthData(historicalData, {
       followers: totalFollowersBase,
       engagement: avgEngagementBase,
-      reach: totalReachBase,
+      // reach growth is computed inside calculateRealGrowthData from the
+      // window-specific account-reach fields (reachDay/reachWeek/reachDays28),
+      // NOT from a lifetime/post-sum total — so no reach baseline is passed here.
       likes: connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.likes, 0),
       views: connectedPlatforms.reduce((sum: number, platform: any) => sum + platform.views, 0),
       posts: totalPostsBase
@@ -436,28 +537,54 @@ export function PerformanceScore() {
 
   const { periodData, growthPercentages } = calculateTimeBasedData(selectedPeriod)
 
-  // Inject true Instagram follower snapshot analytics
+  // Inject true Instagram follower analytics (from AnalyticsDailyMetric via DB)
   if (followerData) {
     periodData.followerTotal = followerData.currentFollowers || periodData.followerTotal;
-    
-    let currentFollowerGrowthPercentage = 0;
-    if (selectedPeriod === 'day') {
-      periodData.followerGains = followerData.dailyGrowth || 0;
-      const yesterdayFollowers = periodData.followerTotal - periodData.followerGains;
-      currentFollowerGrowthPercentage = yesterdayFollowers > 0 ? (periodData.followerGains / yesterdayFollowers) * 100 : 0;
-    } else if (selectedPeriod === 'week') {
-      periodData.followerGains = followerData.weeklyGrowth || 0;
-      const lastWeekFollowers = periodData.followerTotal - periodData.followerGains;
-      currentFollowerGrowthPercentage = lastWeekFollowers > 0 ? (periodData.followerGains / lastWeekFollowers) * 100 : 0;
-    } else if (selectedPeriod === 'month') {
-      periodData.followerGains = followerData.monthlyGrowth || 0;
-      currentFollowerGrowthPercentage = followerData.growthPercentage || 0;
-    }
-    
-    growthPercentages.followers = {
-      value: `${currentFollowerGrowthPercentage >= 0 ? '+' : ''}${currentFollowerGrowthPercentage.toFixed(1)}%`,
-      isPositive: currentFollowerGrowthPercentage >= 0
+
+    // Helper: (current - previous) / |previous| × 100
+    // Returns null when the comparison isn't meaningful (previous = 0)
+    const pctChange = (cur: number, prev: number): number | null => {
+      if (prev === 0 && cur === 0) return null;   // nothing in either period → hide badge
+      if (prev === 0) return null;                // no baseline → can't express as % (show absolute below)
+      const raw = ((cur - prev) / Math.abs(prev)) * 100;
+      return Math.max(-999, Math.min(999, raw));
     };
+
+    // Format: prefer % when comparison is valid; fall back to absolute delta with label
+    const fmtFollower = (cur: number, prev: number): { value: string; isPositive: boolean } => {
+      const pct = pctChange(cur, prev);
+      if (pct !== null) {
+        return { value: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, isPositive: pct >= 0 };
+      }
+      if (prev === 0 && cur !== 0) {
+        // No previous period data — show absolute as context, not misleading %
+        return { value: cur > 0 ? `+${cur} new` : `${cur}`, isPositive: cur >= 0 };
+      }
+      return { value: '—', isPositive: true }; // both zero, hide
+    };
+
+    if (selectedPeriod === 'day') {
+      periodData.followerGains  = followerData.dailyGrowth  || 0;
+      periodData.followerGained = followerData.dailyGained  || 0;
+      periodData.followerLost   = followerData.dailyLost    || 0;
+      periodData.followerPrevGained = followerData.prevDailyGained ?? 0;
+      periodData.followerPrevLost   = followerData.prevDailyLost   ?? 0;
+      growthPercentages.followers = fmtFollower(followerData.dailyGained || 0, followerData.prevDailyGained ?? 0);
+    } else if (selectedPeriod === 'week') {
+      periodData.followerGains  = followerData.weeklyGrowth  || 0;
+      periodData.followerGained = followerData.weeklyGained  || 0;
+      periodData.followerLost   = followerData.weeklyLost    || 0;
+      periodData.followerPrevGained = followerData.prevWeeklyGained ?? 0;
+      periodData.followerPrevLost   = followerData.prevWeeklyLost   ?? 0;
+      growthPercentages.followers = fmtFollower(followerData.weeklyGained || 0, followerData.prevWeeklyGained ?? 0);
+    } else {
+      periodData.followerGains  = followerData.monthlyGrowth  || 0;
+      periodData.followerGained = followerData.monthlyGained  || 0;
+      periodData.followerLost   = followerData.monthlyLost    || 0;
+      periodData.followerPrevGained = followerData.prevMonthlyGained ?? 0;
+      periodData.followerPrevLost   = followerData.prevMonthlyLost   ?? 0;
+      growthPercentages.followers = fmtFollower(followerData.monthlyGained || 0, followerData.prevMonthlyGained ?? 0);
+    }
   }
 
   const formatNumber = (num: number) => {
@@ -503,21 +630,44 @@ export function PerformanceScore() {
               </button>
             ))}
           </div>
-          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-indigo-700 dark:hover:text-indigo-400 rounded-xl px-6 font-semibold">
+          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-indigo-700 dark:hover:text-indigo-400 rounded-xl px-6 font-semibold" onClick={() => setLocation('/analytics')}>
             View Details
           </Button>
         </div>
       </CardHeader>
 
       {showDataStory && (() => {
+        // No social account → don't show the AI banner (no real data to analyse).
+        if (!socialLoading && validAccounts.length === 0) {
+          return (
+            <div className="mx-6 mb-2 rounded-2xl bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600 p-5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <Instagram className="w-5 h-5 text-white/80" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-white font-semibold text-sm">Connect an account to unlock AI insights</p>
+                  <p className="text-white/60 text-xs mt-0.5 truncate">Your AI performance banner analyses follower trends, engagement & reach — it needs real data first.</p>
+                </div>
+              </div>
+              <a
+                href="/settings?tab=social"
+                className="flex-shrink-0 text-xs font-semibold text-white/90 bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Connect now
+              </a>
+            </div>
+          )
+        }
         const { periodData } = calculateTimeBasedData(selectedPeriod)
         const currentStory = generateDataStory({
           followers: periodData.followerTotal,
-          likes: periodData.likes, 
+          likes: periodData.likes,
           reach: periodData.reach,
           views: periodData.views,
           period: selectedPeriod
         })
+        if (!currentStory) return null
         return <DataStory story={currentStory} onClose={() => setShowDataStory(false)} storyAnimation={storyAnimation} />
       })()}
 
@@ -564,6 +714,7 @@ export function PerformanceScore() {
               </div>
             </div>
             <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+              {/* skeleton-guard-allow: status-dot — live "active platforms" status indicator, not a loading placeholder */}
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span>{connectedPlatforms.length} Active</span>
             </div>
@@ -687,34 +838,45 @@ export function PerformanceScore() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
               <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6">Performance Breakdown</h4>
               
-              <div className={`grid gap-4 mb-8 ${
-                connectedPlatforms.length === 1 ? 'grid-cols-1' :
-                connectedPlatforms.length === 2 ? 'grid-cols-2' :
-                connectedPlatforms.length === 3 ? 'grid-cols-3' :
-                connectedPlatforms.length === 4 ? 'grid-cols-2 lg:grid-cols-4' :
-                connectedPlatforms.length === 5 ? 'grid-cols-2 lg:grid-cols-5' :
-                'grid-cols-2 lg:grid-cols-6'
-              }`}>
-                {connectedPlatforms.map((platform: any) => (
-                  <PlatformCard key={platform.id} platform={platform} formatNumber={formatNumber} />
-                ))}
-              </div>
-
-              {connectedPlatforms.length === 0 && (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <p className="text-sm">No connected platforms found. Connect your social accounts to see performance metrics.</p>
+              {connectedPlatforms.length === 0 && !isInitialLoading ? (
+                // No account connected — show a clear empty state instead of 0/0 metrics
+                <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No data yet</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs">
+                    Top Performer, Content Score and Post Frequency appear here once you connect a social account and start posting.
+                  </p>
                 </div>
-              )}
+              ) : (
+                <>
+                  <div className={`grid gap-4 mb-8 ${
+                    connectedPlatforms.length === 1 ? 'grid-cols-1' :
+                    connectedPlatforms.length === 2 ? 'grid-cols-2' :
+                    connectedPlatforms.length === 3 ? 'grid-cols-3' :
+                    connectedPlatforms.length === 4 ? 'grid-cols-2 lg:grid-cols-4' :
+                    connectedPlatforms.length === 5 ? 'grid-cols-2 lg:grid-cols-5' :
+                    'grid-cols-2 lg:grid-cols-6'
+                  }`}>
+                    {connectedPlatforms.map((platform: any) => (
+                      <PlatformCard key={platform.id} platform={platform} formatNumber={formatNumber} />
+                    ))}
+                  </div>
 
-              <PerformanceBreakdown
-                connectedPlatforms={connectedPlatforms}
-                contentScore={contentScore}
-                avgEngagement={avgEngagement}
-                totalPosts={totalPosts}
-                selectedPeriod={selectedPeriod}
-                growthPercentages={growthPercentages}
-                formatNumber={formatNumber}
-              />
+                  <PerformanceBreakdown
+                    connectedPlatforms={connectedPlatforms}
+                    contentScore={contentScore}
+                    avgEngagement={avgEngagement}
+                    totalPosts={totalPosts}
+                    selectedPeriod={selectedPeriod}
+                    growthPercentages={growthPercentages}
+                    formatNumber={formatNumber}
+                    overviewData={overviewData}
+                    overviewLoading={overviewLoading}
+                  />
+                </>
+              )}
             </div>
           </>
         )}

@@ -4,6 +4,7 @@ import { AIAnalysisJobData } from '../queues/socialListeningQueue';
 import { ListeningPostModel } from '../models/SocialListening/ListeningPost';
 import { ListeningHookModel } from '../models/SocialListening/ListeningHook';
 import { AIExtractionService } from '../services/social-listening/ai-extraction.service';
+import { loadSocialListeningPreferences } from '../services/social-listening/ai-preferences';
 
 // Lazy initialization: Worker only starts when first AI job is queued (Task 5.4)
 let socialListeningAIWorker: Worker | null = null;
@@ -36,7 +37,12 @@ export const getSocialListeningAIWorker = (): Worker | null => {
             return;
           }
 
-          const analysisResult = await AIExtractionService.analyzeContent(content, platform);
+          // Use the workspace/user's configured AI model + settings.
+          const aiPreferences = await loadSocialListeningPreferences(
+            undefined,
+            String(post.workspaceId)
+          );
+          const analysisResult = await AIExtractionService.analyzeContent(content, platform, aiPreferences);
 
           if (analysisResult) {
             post.aiMetadata = {

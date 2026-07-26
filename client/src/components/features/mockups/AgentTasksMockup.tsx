@@ -60,6 +60,7 @@ const TasksContent = () => {
                             <span className="text-sm text-white">{item.task}</span>
                             {item.status === 'running' && (
                                 <div className="flex items-center gap-1.5 align-middle">
+                                    {/* skeleton-guard-allow: status-dot — live "Running" task status indicator, not a loading placeholder */}
                                     <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse bg-green-400" />
                                     <span className="text-[10px] text-green-400 font-medium uppercase tracking-wider">Running</span>
                                 </div>

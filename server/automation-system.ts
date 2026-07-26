@@ -67,10 +67,10 @@ export class AutomationSystem {
     };
 
     console.log('[AUTOMATION] Creating rule:', newRule.name);
-    const savedRule = await this.storage.createAutomationRule(newRule);
+    const savedRule = await this.storage.createAutomationRule(newRule as any);
     console.log('[AUTOMATION] Rule created with ID:', savedRule.id);
     
-    return savedRule;
+    return savedRule as unknown as AutomationRule;
   }
 
   /**
@@ -80,7 +80,7 @@ export class AutomationSystem {
     console.log('[AUTOMATION] Getting rules for workspace:', workspaceId);
     const rules = await this.storage.getAutomationRules(workspaceId);
     console.log('[AUTOMATION] Found', rules.length, 'rules');
-    return rules;
+    return rules as unknown as AutomationRule[];
   }
 
   /**
@@ -94,7 +94,7 @@ export class AutomationSystem {
     rule.isActive = !rule.isActive;
     rule.updatedAt = new Date();
     
-    return await this.storage.updateAutomationRule(ruleId, rule);
+    return await this.storage.updateAutomationRule(ruleId, rule) as unknown as AutomationRule;
   }
 
   /**
@@ -327,7 +327,7 @@ export class AutomationSystem {
    * Send Private Reply via Instagram Private Replies API (Official)
    * Based on Instagram documentation: https://developers.facebook.com/docs/messenger-platform/instagram/private-replies
    */
-  public async sendPrivateReply(commentId: string, message: string, accessToken: string, customButtons?: {text: string, url: string, payload?: string}[], recipientType: 'comment_id' | 'id' = 'comment_id'): Promise<boolean> {
+  public async sendPrivateReply(commentId: string, message: string, accessToken: string, customButtons?: {text: string, url?: string, payload?: string, type?: string}[], recipientType: 'comment_id' | 'id' = 'comment_id'): Promise<boolean> {
     console.log('[AUTOMATION] 🎯 Sending Private Reply using official Instagram API...');
     console.log('[AUTOMATION] Comment ID:', commentId);
     console.log('[AUTOMATION] Message:', message);
@@ -396,7 +396,7 @@ export class AutomationSystem {
         // Use Button Template (officially supported format)
         
         // Dynamically build buttons array based on provided config
-        const buttons = [];
+        const buttons: Array<{ type: string; title: string; url?: string; payload?: string }> = [];
         
         if (customButtons && customButtons.length > 0) {
           customButtons.forEach(btn => {
@@ -570,11 +570,12 @@ export class AutomationSystem {
       console.error('[AUTOMATION] ❌ Failed to get Page ID for Private Reply');
       return false;
     } catch (error) {
+      const err = error as Error;
       console.error('[AUTOMATION] 🚨 CRITICAL ERROR in Private Reply:', error);
       console.error('[AUTOMATION] 🚨 Error details:', {
-        name: error?.name,
-        message: error?.message,
-        stack: error?.stack
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack
       });
       return false;
     }
@@ -666,7 +667,7 @@ export class AutomationSystem {
               accessToken: accessToken
             }).toArray();
             
-            const instagramAccount = accounts.find(acc => acc.accessToken === accessToken);
+            const instagramAccount = accounts.find((acc: any) => acc.accessToken === accessToken);
             console.log('[AUTOMATION] Found Instagram account:', {
               username: instagramAccount?.username,
               pageId: instagramAccount?.pageId,

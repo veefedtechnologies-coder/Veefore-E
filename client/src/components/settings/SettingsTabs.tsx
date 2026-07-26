@@ -22,9 +22,54 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { SkeletonWorkspaceCard } from '@/components/ui/skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
+import { FormSkeleton } from '@/components/skeletons'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { useSocialAccounts } from '@/hooks/useSocialAccounts'
+import {
+  NoAccountsEmptyState,
+  AddAccountSection,
+  FacebookReconnectBanner,
+} from '@/features/social-accounts/components'
+import { BrandSelectionModal } from '@/features/social-accounts/components/BrandSelectionModal'
+
+/**
+ * WorkspaceCardSkeleton — placeholder mirroring a single workspace `Card`
+ * (icon tile + name/description, action buttons, and the two-up stats row).
+ * Pure and presentational; composes the `Skeleton` primitive.
+ */
+function WorkspaceCardSkeleton() {
+  return (
+    <Card className="overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start space-x-4">
+            <Skeleton variant="rectangle" className="w-12 h-12 rounded-lg flex-shrink-0" />
+            <div className="space-y-2">
+              <Skeleton variant="text" className="h-5 w-40" />
+              <Skeleton variant="text" className="h-4 w-56" />
+            </div>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Skeleton variant="rectangle" className="h-8 w-8 rounded-md" />
+            <Skeleton variant="rectangle" className="h-8 w-8 rounded-md" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 py-4 border-y border-gray-100 dark:border-gray-800/60">
+          {[0, 1].map((i) => (
+            <div key={i} className="flex items-center space-x-2">
+              <Skeleton variant="circle" className="w-8 h-8 rounded-full flex-shrink-0" />
+              <div className="space-y-2">
+                <Skeleton variant="text" className="h-3 w-20" />
+                <Skeleton variant="text" className="h-4 w-24" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  )
+}
 
 // Placeholder function for generic save
 const handleGenericSave = (e: React.FormEvent) => {
@@ -572,7 +617,7 @@ function WorkspaceSocials({ workspaceId, isActive }: { workspaceId: string, isAc
   }
 
   if (isLoading) {
-    return <div className="animate-pulse h-6 w-24 bg-gray-100 dark:bg-gray-800 rounded-md"></div>;
+    return <Skeleton variant="rectangle" className="h-6 w-24 rounded-md" />;
   }
 
   if (!validAccounts || validAccounts.length === 0) {
@@ -821,8 +866,8 @@ export function WorkspaceSettings() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {isLoading && workspaces.length === 0 ? (
           <>
-            <SkeletonWorkspaceCard />
-            <SkeletonWorkspaceCard />
+            <WorkspaceCardSkeleton />
+            <WorkspaceCardSkeleton />
           </>
         ) : workspaces.map((workspace: Workspace) => {
           const isActive = workspace.id === currentWorkspaceId;
@@ -994,6 +1039,324 @@ export function AppearanceSettings() {
 }
 
 
+// ─── VeeGPT Cross-Chat Memory Panel ─────────────────────────────────────────────
+// Shows what durable facts VeeGPT remembers about the user (per user + workspace),
+// the storage used/remaining with a progress bar, and lets the user delete
+// individual memories or clear everything.
+
+type MemoryItem = { id: string; text: string; createdAt: string; topic?: string }
+
+/** Human labels + emoji for memory topic categories (mirrors server detectTopic). */
+const MEMORY_TOPIC_LABELS: Record<string, { label: string; emoji: string }> = {
+  'posting-schedule': { label: 'Posting schedule', emoji: '🗓️' },
+  'brand-color': { label: 'Brand color', emoji: '🎨' },
+  'niche': { label: 'Niche', emoji: '🎯' },
+  'target-audience': { label: 'Target audience', emoji: '👥' },
+  'primary-goal': { label: 'Primary goal', emoji: '🚀' },
+  'brand-name': { label: 'Brand / business', emoji: '🏷️' },
+  'posting-frequency': { label: 'Posting frequency', emoji: '📈' },
+  'content-tone': { label: 'Content tone', emoji: '🗣️' },
+  'general': { label: 'Other facts', emoji: '🧠' },
+}
+type MemoryUsage = {
+  itemCount: number; maxItems: number; usedChars: number; maxChars: number;
+  usedPercent: number; remainingPercent: number
+}
+type MemoryResponse = {
+  items: MemoryItem[]
+  workspaceContext: WorkspaceContextSnapshot | null
+  workspaceContextUpdatedAt: string | null
+  usage: MemoryUsage
+  updatedAt: string | null
+}
+type WorkspaceContextSnapshot = {
+  generatedAt: string
+  user: Record<string, any>
+  workspace: Record<string, any>
+  socialAccounts: Array<Record<string, any>>
+  recentContent: Array<Record<string, any>>
+  recommendations: Array<Record<string, any>>
+  performanceInsight: any | null
+}
+
+function UserMemoryPanel({ workspaceId, enabled }: { workspaceId?: string; enabled: boolean }) {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const queryKey = ['veegpt-memory', workspaceId]
+
+  const { data, isLoading, isError } = useQuery<MemoryResponse>({
+    queryKey,
+    queryFn: () => apiRequest(`/api/chat/memory?workspaceId=${encodeURIComponent(workspaceId || '')}`),
+    enabled: !!workspaceId,
+  })
+
+  const deleteItem = useMutation({
+    mutationFn: (itemId: string) =>
+      apiRequest(`/api/chat/memory/${itemId}?workspaceId=${encodeURIComponent(workspaceId || '')}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey })
+      toast({ title: 'Memory removed' })
+    },
+    onError: () => toast({ title: 'Failed to remove memory', variant: 'destructive' }),
+  })
+
+  const clearAll = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/chat/memory?workspaceId=${encodeURIComponent(workspaceId || '')}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey })
+      toast({ title: 'All memory cleared' })
+    },
+    onError: () => toast({ title: 'Failed to clear memory', variant: 'destructive' }),
+  })
+
+  const refresh = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/chat/context/refresh`, { method: 'POST', body: JSON.stringify({ workspaceId }) }),
+    onSuccess: () => {
+      setTimeout(() => queryClient.invalidateQueries({ queryKey }), 1500)
+      toast({ title: 'Refreshing VeeGPT memory…' })
+    },
+    onError: () => toast({ title: 'Failed to refresh', variant: 'destructive' }),
+  })
+
+  const usage = data?.usage
+  const items = data?.items ?? []
+  const ctx = data?.workspaceContext ?? null
+  const accounts = ctx?.socialAccounts ?? []
+  const recs = ctx?.recommendations ?? []
+  const content = ctx?.recentContent ?? []
+  const pct = usage?.usedPercent ?? 0
+  const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-blue-600'
+  const fmt = (n: any) => (typeof n === 'number' ? n.toLocaleString() : '—')
+
+  return (
+    <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+            <Brain className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">VeeGPT Memory</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              Everything VeeGPT knows about you in this workspace — your live profile &amp; account stats plus durable facts it learns from your chats.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            onClick={() => refresh.mutate()}
+            disabled={refresh.isPending || !workspaceId}
+            className="text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+          >
+            {refresh.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+            Refresh
+          </Button>
+          {items.length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={() => clearAll.mutate()}
+              disabled={clearAll.isPending}
+              className="text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              {clearAll.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
+              Clear facts
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {!enabled && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2 mb-5">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>Memory is only applied when AI Memory Retention is set to <strong>Long-term</strong>. It’s shown here either way.</span>
+        </div>
+      )}
+
+      {/* Storage bar (counts profile/account context + learned facts) */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="font-medium text-gray-700 dark:text-gray-300">Storage used</span>
+          <span className="text-gray-500 dark:text-gray-400">
+            {usage ? `${pct}% used · ${usage.remainingPercent}% free` : '—'}
+          </span>
+        </div>
+        <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+        </div>
+        {usage && (
+          <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+            <span>{usage.itemCount} / {usage.maxItems} learned facts</span>
+            <span>{usage.usedChars.toLocaleString()} / {usage.maxChars.toLocaleString()} characters</span>
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+        </div>
+      ) : isError ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Couldn’t load memory. Try again later.</p>
+      ) : (
+        <div className="space-y-6">
+          {/* Live profile */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Profile</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                ['Name', ctx?.user?.name],
+                ['Username', ctx?.user?.username ? `@${ctx.user.username}` : undefined],
+                ['Plan', ctx?.user?.plan],
+                ['Niche', ctx?.user?.niche],
+                ['Audience', ctx?.user?.targetAudience],
+                ['Goal', ctx?.user?.primaryObjective],
+              ]
+                .filter(([, v]) => v)
+                .map(([label, value]) => (
+                  <div key={label as string} className="px-3 py-2 bg-gray-50 dark:bg-gray-900/40 rounded-lg">
+                    <div className="text-[11px] text-gray-400 dark:text-gray-500">{label}</div>
+                    <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{value as string}</div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Connected accounts */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">
+              Connected accounts ({accounts.length})
+            </h4>
+            {accounts.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No social accounts connected in this workspace yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {accounts.map((a, i) => (
+                  <div key={i} className="px-4 py-3 bg-gray-50 dark:bg-gray-900/40 rounded-lg border border-gray-100 dark:border-gray-700/50">
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      {a.platform} · @{a.username}{a.isVerified ? ' ✓' : ''}
+                    </span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{fmt(a.followersCount)} followers</span>
+                      <span>{fmt(a.mediaCount)} posts</span>
+                      {a.engagementRate != null && <span>{a.engagementRate}% engagement</span>}
+                      {a.avgLikes != null && <span>avg {fmt(a.avgLikes)} likes</span>}
+                      {a.avgReach != null && <span>avg {fmt(a.avgReach)} reach</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {recs.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Active recommendations</h4>
+              <ul className="space-y-1.5">
+                {recs.slice(0, 5).map((r, i) => (
+                  <li key={i} className="text-sm text-gray-700 dark:text-gray-300 flex gap-2">
+                    <span className="text-blue-500">•</span>
+                    <span>{r.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {ctx?.performanceInsight?.headline && (
+            <div className="px-4 py-3 bg-blue-50/60 dark:bg-blue-900/15 rounded-lg">
+              <div className="text-xs font-semibold uppercase tracking-wide text-blue-500/80 mb-1">Performance insight</div>
+              <p className="text-sm text-gray-700 dark:text-gray-200">{ctx.performanceInsight.headline}</p>
+            </div>
+          )}
+
+          {content.length > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Plus {content.length} recent posts and your latest analytics are stored in VeeGPT’s memory.
+            </p>
+          )}
+
+          {/* Durable facts learned from chats */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">
+              Learned from your chats ({items.length})
+            </h4>
+            {items.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Nothing learned yet. As you chat with VeeGPT, it remembers durable facts about you and your brand here.
+              </p>
+            ) : (
+              (() => {
+                // Group facts by topic category. Single-value topics first
+                // (stable order from the label map), then "Other facts" last.
+                const groups = new Map<string, MemoryItem[]>()
+                for (const item of items) {
+                  const key = item.topic && MEMORY_TOPIC_LABELS[item.topic] ? item.topic : 'general'
+                  if (!groups.has(key)) groups.set(key, [])
+                  groups.get(key)!.push(item)
+                }
+                const order = Object.keys(MEMORY_TOPIC_LABELS)
+                const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+                  if (a === 'general') return 1
+                  if (b === 'general') return -1
+                  return order.indexOf(a) - order.indexOf(b)
+                })
+                const renderItem = (item: MemoryItem) => (
+                  <li
+                    key={item.id}
+                    className="group flex items-start justify-between gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900/40 rounded-lg border border-gray-100 dark:border-gray-700/50"
+                  >
+                    <span className="text-sm text-gray-700 dark:text-gray-200">{item.text}</span>
+                    <button
+                      onClick={() => deleteItem.mutate(item.id)}
+                      disabled={deleteItem.isPending}
+                      className="shrink-0 p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Forget this"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </li>
+                )
+                // If everything is uncategorized, keep the simple flat list.
+                if (sortedKeys.length === 1 && sortedKeys[0] === 'general') {
+                  return <ul className="space-y-2">{items.map(renderItem)}</ul>
+                }
+                return (
+                  <div className="space-y-4">
+                    {sortedKeys.map((key) => {
+                      const meta = MEMORY_TOPIC_LABELS[key] || MEMORY_TOPIC_LABELS.general
+                      const groupItems = groups.get(key) || []
+                      return (
+                        <div key={key}>
+                          <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                            <span className="text-sm">{meta.emoji}</span>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{meta.label}</span>
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500">· {groupItems.length}</span>
+                          </div>
+                          <ul className="space-y-2">{groupItems.map(renderItem)}</ul>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()
+            )}
+          </div>
+
+          {data?.workspaceContextUpdatedAt && (
+            <p className="text-[11px] text-gray-400 dark:text-gray-500">
+              Live data updated {formatDistanceToNow(new Date(data.workspaceContextUpdatedAt), { addSuffix: true })}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 export function AISettings() {
   const { userData } = useUser()
   const { toast } = useToast()
@@ -1146,18 +1509,12 @@ export function AISettings() {
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div>
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">AI Configuration</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-lg max-w-2xl">Loading workspace settings...</p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg max-w-2xl">Enterprise-grade controls for the VeeGPT intelligence engine.</p>
         </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-4">
-            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Loading Configuration</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Please wait while we fetch your workspace settings...</p>
-            </div>
-          </div>
-        </div>
+
+        {/* Structured placeholder mirroring the AI configuration form card so the
+            loading state reserves the same layout as the real form (zero shift). */}
+        <FormSkeleton fields={6} />
       </div>
     )
   }
@@ -1223,6 +1580,8 @@ export function AISettings() {
               {[
                 { id: 'veegpt-hybrid', name: 'VeeGPT Hybrid (Recommended)', desc: 'Advanced reasoning with auto-fallback' },
                 { id: 'openai-gpt4o', name: 'OpenAI GPT-4o', desc: 'Industry leading context understanding' },
+                { id: 'github-gpt-4o-mini', name: 'GitHub Models — GPT-4o mini (Free)', desc: 'Free GitHub AI inference, fast & efficient' },
+                { id: 'github-gpt-4.1-mini', name: 'GitHub Models — GPT-4.1 mini (Free)', desc: 'Free GitHub AI inference, improved reasoning' },
                 { id: 'google-ai-studio', name: 'Google AI Studio API', desc: 'Custom key advanced reasoning' },
                 { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash Exp', desc: 'Highest capability, Google experimental' },
                 { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'Faster response, lower token usage' }
@@ -1475,6 +1834,8 @@ export function AISettings() {
           </Button>
         </div>
       </form>
+
+      <UserMemoryPanel workspaceId={currentWorkspaceId} enabled={formData.aiMemory === 'long-term'} />
     </div>
   )
 }
@@ -1680,20 +2041,13 @@ export function AutomationSettings() {
   )
 }
 
-function AddAccountModal({ currentWorkspace, getPlatformIcon }: any) {
-  const platforms = [
-    { id: 'instagram', name: 'Instagram', description: 'Business & Creator Accounts', color: 'bg-pink-500 hover:bg-pink-600' },
-    { id: 'facebook', name: 'Facebook', description: 'Pages & Groups', color: 'bg-blue-600 hover:bg-blue-700' },
-    { id: 'linkedin', name: 'LinkedIn', description: 'Personal & Company Pages', color: 'bg-blue-700 hover:bg-blue-800' },
-    { id: 'twitter', name: 'X (Twitter)', description: 'Professional Accounts', color: 'bg-slate-900 hover:bg-black dark:hover:bg-slate-800' },
-    { id: 'youtube', name: 'YouTube', description: 'Channels & Shorts', color: 'bg-red-600 hover:bg-red-700' }
-  ];
-
-  const handleConnect = (platformId: string) => {
-    if (!currentWorkspace?.id) return;
-    window.location.href = `/api/social-auth/${platformId}/authorize?workspaceId=${currentWorkspace.id}`;
-  };
-
+/**
+ * AddAccountModal — renders platform connect buttons driven by
+ * `CapabilityGuard.getConnectablePlatforms()` via `<AddAccountSection>`.
+ * The hardcoded platform list has been removed; the registry is the sole
+ * source of truth (Requirements 4.3, 1.5).
+ */
+function AddAccountModal({ currentWorkspace }: { currentWorkspace: any }) {
   return (
     <DialogContent className="sm:max-w-2xl">
       <DialogHeader>
@@ -1702,184 +2056,187 @@ function AddAccountModal({ currentWorkspace, getPlatformIcon }: any) {
         </DialogTitle>
       </DialogHeader>
       <div className="py-6">
-        <p className="text-gray-500 dark:text-gray-400 mb-6">Select a platform below to authenticate. You will be redirected to securely grant permissions to Veefore.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {platforms.map(p => (
-            <button 
-              key={p.id}
-              onClick={() => handleConnect(p.id)}
-              className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 bg-white dark:bg-gray-800 transition-all group text-left"
-            >
-              <div className={`w-12 h-12 flex items-center justify-center rounded-xl text-white shadow-sm transition-transform group-hover:scale-105 ${p.color}`}>
-                {getPlatformIcon(p.id)}
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-900 dark:text-white">{p.name}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{p.description}</p>
-              </div>
-            </button>
-          ))}
-        </div>
+        <AddAccountSection workspaceId={currentWorkspace?.id} />
       </div>
     </DialogContent>
-  );
+  )
 }
 
-function ManageAccountModal({ account, isHealthy, syncMutation, getPlatformIcon }: any) {
-  const tokenHealth = isHealthy ? "Active & Healthy" : account.tokenStatus === "expired" ? "Expired" : "Requires Action";
-  const webhookHealth = isHealthy && account.lastSyncAt ? "Listening" : "Degraded";
-  const connectedDate = account.createdAt ? new Date(account.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown';
-  
-  const profilePic = account.profilePictureUrl || account.profilePicture || account.avatar;
+function ManageAccountModal({ account, fbAccount, igAccount, isHealthy, syncMutation, getPlatformIcon }: any) {
+  const hasFb = !!fbAccount;
+  const hasIg = !!igAccount;
+  const isCombined = hasFb && hasIg;
+  const [activeTab, setActiveTab] = useState<'facebook' | 'instagram'>(hasFb ? 'facebook' : 'instagram');
+
+  const current = activeTab === 'facebook' ? (fbAccount || account) : (igAccount || account);
+  const brandName = fbAccount?.pageName || fbAccount?.username || igAccount?.username || account?.username;
+
+  const tokenHealth = isHealthy ? 'Active & Healthy' : current.tokenStatus === 'expired' ? 'Expired' : 'Requires Action';
+  const webhookHealth = isHealthy && current.lastSyncAt ? 'Listening' : 'Degraded';
+  const connectedDate = current.createdAt ? new Date(current.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown';
+
+  const getPic = (acc: any) => {
+    const id = acc?.accountId;
+    const plat = acc?.platform?.toLowerCase();
+    if (id && (plat === 'facebook' || plat === 'instagram')) {
+      return `/api/image-proxy/social?accountId=${encodeURIComponent(id)}&platform=${encodeURIComponent(plat)}`;
+    }
+    return acc?.profilePictureUrl || '';
+  };
+
+  const brandPic = getPic(fbAccount || account);
 
   return (
-    <DialogContent className="sm:max-w-[750px] p-0 overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-2xl max-h-[95vh]">
-      {/* Premium Header with Gradient */}
+    <DialogContent className="sm:max-w-[780px] p-0 overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-2xl max-h-[95vh]">
+      {/* Header */}
       <div className="relative h-28 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-indigo-900 dark:to-purple-900 overflow-hidden shrink-0">
-        <div className="absolute inset-0 bg-black/10 backdrop-blur-sm"></div>
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+        <div className="absolute inset-0 bg-black/10 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20" />
         <div className="absolute bottom-5 left-6 flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-white shadow-lg flex items-center justify-center relative p-0.5">
-             {profilePic ? (
-                <img src={profilePic} alt={account.username} referrerPolicy="no-referrer" className="w-full h-full object-cover rounded-[14px]" />
-             ) : (
-                <div className="w-full h-full bg-gray-100 rounded-[14px] flex items-center justify-center">
-                  {getPlatformIcon(account.platform)}
-                </div>
-             )}
-             <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm">
-                <div className="scale-75">{getPlatformIcon(account.platform)}</div>
-             </div>
+          <div className="w-16 h-16 rounded-2xl bg-white shadow-lg flex items-center justify-center relative p-0.5 overflow-hidden">
+            <img src={brandPic} alt={brandName}
+              className="w-full h-full object-cover rounded-[14px]"
+              style={{ display: brandPic ? 'block' : 'none' }}
+              onError={(e) => { const t = e.currentTarget as HTMLImageElement; t.style.display = 'none'; const f = t.nextElementSibling as HTMLElement; if (f) f.style.display = 'flex'; }}
+            />
+            <div className="w-full h-full bg-gray-100 rounded-[14px] items-center justify-center" style={{ display: brandPic ? 'none' : 'flex' }}>
+              {getPlatformIcon(account?.platform)}
+            </div>
+            <div className="absolute -bottom-1.5 -right-1.5 flex -space-x-1">
+              {hasFb && <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center shadow ring-1 ring-white"><div className="text-blue-600 scale-[0.7]">{getPlatformIcon('facebook')}</div></div>}
+              {hasIg && <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center shadow ring-1 ring-white"><div className="text-pink-500 scale-[0.7]">{getPlatformIcon('instagram')}</div></div>}
+            </div>
           </div>
           <div>
-            <DialogTitle className="text-2xl font-bold text-white drop-shadow-md leading-tight">@{account.username}</DialogTitle>
-            <p className="text-white/80 text-sm flex items-center gap-1.5 mt-0.5">
-              <span className="capitalize">{account.platform}</span> Business Account
+            <DialogTitle className="text-2xl font-bold text-white drop-shadow-md leading-tight">{brandName}</DialogTitle>
+            <p className="text-white/80 text-sm mt-0.5">
+              {isCombined ? 'Facebook Page + Instagram' : hasFb ? 'Facebook Business Account' : 'Instagram Business Account'}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
-        {/* Core Metrics Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-3.5 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border border-gray-200/50 dark:border-gray-700/50 shadow-sm transition-transform hover:scale-[1.02]">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Followers</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">
-              {account.followersCount ? (account.followersCount > 10000 ? (account.followersCount / 1000).toFixed(1) + 'k' : account.followersCount.toLocaleString()) : 'N/A'}
-            </p>
+      <div className="p-6 flex flex-col gap-5 overflow-y-auto custom-scrollbar">
+        {/* Platform tabs */}
+        {isCombined && (
+          <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
+            {[{ key: 'facebook' as const, label: fbAccount.pageName || fbAccount.username, color: 'text-blue-600 dark:text-blue-400' },
+              { key: 'instagram' as const, label: igAccount.username, color: 'text-pink-600 dark:text-pink-400' }].map(({ key, label, color }) => (
+              <button key={key} onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === key ? 'bg-white dark:bg-gray-700 shadow ' + color : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}>
+                <div className="scale-90">{getPlatformIcon(key)}</div>
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
-          <div className="p-3.5 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border border-gray-200/50 dark:border-gray-700/50 shadow-sm transition-transform hover:scale-[1.02]">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Media</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{account.mediaCount ? account.mediaCount.toLocaleString() : 'N/A'}</p>
+        )}
+
+        {/* Per-account sub-header */}
+        <div className="flex items-center gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+            <img src={getPic(current)} alt={current.username} className="w-full h-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
           </div>
-          <div className="p-3.5 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border border-gray-200/50 dark:border-gray-700/50 shadow-sm transition-transform hover:scale-[1.02]">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Status</p>
-            <div className="flex items-center gap-2 mt-1">
-              <div className={`w-2.5 h-2.5 rounded-full ${isHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-              <p className={`text-sm font-bold ${isHealthy ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} leading-none`}>
-                {isHealthy ? 'Online' : 'Offline'}
-              </p>
-            </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900 dark:text-white">@{current.username}</p>
+            <p className="text-xs text-gray-400 capitalize">{current.platform} Business Account</p>
           </div>
-          <div className="p-3.5 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border border-gray-200/50 dark:border-gray-700/50 shadow-sm transition-transform hover:scale-[1.02]">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Connected</p>
-            <p className="text-sm font-bold text-gray-900 dark:text-white leading-none mt-1">{connectedDate}</p>
+          <div className={`ml-auto flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${isHealthy ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-red-50 text-red-700'}`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+            {isHealthy ? 'Active' : 'Needs Attention'}
           </div>
         </div>
 
-        {/* Integration Details & Scopes */}
+        {/* Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Followers', value: current.followersCount ? (current.followersCount > 10000 ? (current.followersCount / 1000).toFixed(1) + 'k' : current.followersCount.toLocaleString()) : 'N/A' },
+            { label: 'Media', value: current.mediaCount ? current.mediaCount.toLocaleString() : 'N/A' },
+            { label: 'Status', isStatus: true },
+            { label: 'Connected', value: connectedDate },
+          ].map((m) => (
+            <div key={m.label} className="p-3.5 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">{m.label}</p>
+              {m.isStatus ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <div className={`w-2.5 h-2.5 rounded-full ${isHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                  <p className={`text-sm font-bold ${isHealthy ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} leading-none`}>{isHealthy ? 'Online' : 'Offline'}</p>
+                </div>
+              ) : (
+                <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{m.value}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Integration + Scopes */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="flex flex-col gap-3">
-             <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-indigo-500" /> Platform Integration
-             </h4>
-             <div className="flex-1 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden flex flex-col">
-                <div className="p-4 flex-1 flex flex-col justify-center border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                   <div className="flex justify-between items-center mb-1">
-                     <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Access Token</span>
-                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isHealthy ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'}`}>
-                       {tokenHealth}
-                     </span>
-                   </div>
-                   <p className="text-xs text-gray-500 leading-tight">Authenticates secure API requests.</p>
+            <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-indigo-500" /> Platform Integration
+            </h4>
+            <div className="bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 dark:border-gray-700/50">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Access Token</span>
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isHealthy ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-red-100 text-red-700'}`}>{tokenHealth}</span>
                 </div>
-                <div className="p-4 flex-1 flex flex-col justify-center hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                   <div className="flex justify-between items-center mb-1">
-                     <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Data Synchronization</span>
-                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${webhookHealth === 'Listening' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}`}>
-                       {webhookHealth}
-                     </span>
-                   </div>
-                   <p className="text-xs text-gray-500 leading-tight">
-                     Last synchronized: {account.lastSyncAt ? formatDistanceToNow(new Date(account.lastSyncAt), { addSuffix: true }) : 'Never'}
-                   </p>
+                <p className="text-xs text-gray-500">Authenticates secure API requests.</p>
+              </div>
+              <div className="p-4">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Data Synchronization</span>
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${webhookHealth === 'Listening' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-amber-100 text-amber-700'}`}>{webhookHealth}</span>
                 </div>
-             </div>
+                <p className="text-xs text-gray-500">
+                  Last synchronized: {current.lastSyncAt ? formatDistanceToNow(new Date(current.lastSyncAt), { addSuffix: true }) : (current.tokenStatus === 'valid' ? 'Syncing...' : 'Never')}
+                </p>
+              </div>
+            </div>
           </div>
-
           <div className="flex flex-col gap-3">
-             <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Key className="w-4 h-4 text-emerald-500" /> Authorized Scopes
-             </h4>
-             <div className="flex-1 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm flex flex-col justify-center">
-                {isHealthy ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-start gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1.5 rounded-lg transition-colors">
-                      <div className="mt-0.5 bg-emerald-100 dark:bg-emerald-500/20 p-1 rounded-full">
-                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200 leading-tight mb-0.5">Content Management</p>
-                        <p className="text-xs text-gray-500 leading-tight">Publish posts, stories, & reels.</p>
-                      </div>
+            <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+              <Key className="w-4 h-4 text-emerald-500" /> Authorized Scopes
+            </h4>
+            <div className="bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+              {isHealthy ? (
+                <div className="flex flex-col gap-3">
+                  {[['Content Management','Publish posts, stories, & reels.'],['Community Engagement','Read and respond to messages.'],['Insights & Analytics','Access audience demographics.']].map(([t, d]) => (
+                    <div key={t} className="flex items-start gap-2">
+                      <div className="mt-0.5 bg-emerald-100 dark:bg-emerald-500/20 p-1 rounded-full"><Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /></div>
+                      <div><p className="text-xs font-bold text-gray-800 dark:text-gray-200 mb-0.5">{t}</p><p className="text-xs text-gray-500">{d}</p></div>
                     </div>
-                    <div className="flex items-start gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1.5 rounded-lg transition-colors">
-                      <div className="mt-0.5 bg-emerald-100 dark:bg-emerald-500/20 p-1 rounded-full">
-                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200 leading-tight mb-0.5">Community Engagement</p>
-                        <p className="text-xs text-gray-500 leading-tight">Read and respond to messages.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1.5 rounded-lg transition-colors">
-                      <div className="mt-0.5 bg-emerald-100 dark:bg-emerald-500/20 p-1 rounded-full">
-                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200 leading-tight mb-0.5">Insights & Analytics</p>
-                        <p className="text-xs text-gray-500 leading-tight">Access audience demographics.</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-center p-3">
-                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2">
-                      <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                    </div>
-                    <p className="text-xs font-bold text-gray-900 dark:text-white">Permissions Revoked</p>
-                    <p className="text-xs text-gray-500 mt-1">Reconnect this account.</p>
-                  </div>
-                )}
-             </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-3">
+                  <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2"><AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" /></div>
+                  <p className="text-xs font-bold text-gray-900 dark:text-white">Permissions Revoked</p>
+                  <p className="text-xs text-gray-500 mt-1">Reconnect this account.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        
-        {/* Footer Actions */}
+
+        {/* Footer */}
         <div className="pt-4 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/20 -mx-6 -mb-6 p-5 rounded-b-xl shrink-0">
-           <div>
-             <p className="text-sm font-bold text-gray-900 dark:text-white">Data Synchronization</p>
-             <p className="text-xs text-gray-500 mt-0.5">Force a manual fetch of the latest metrics.</p>
-           </div>
-           <Button 
-             onClick={() => syncMutation.mutate(account._id || account.id)} 
-             disabled={!isHealthy || syncMutation.isPending}
-             className="h-9 text-sm gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 shadow-sm transition-all hover:shadow active:scale-95"
-           >
-             <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} /> 
-             {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
-           </Button>
+          <div>
+            <p className="text-sm font-bold text-gray-900 dark:text-white">Data Synchronization</p>
+            <p className="text-xs text-gray-500 mt-0.5">Force a manual fetch of the latest metrics.</p>
+          </div>
+          <Button
+            onClick={() => {
+              if (hasFb) syncMutation.mutate(fbAccount._id || fbAccount.id);
+              if (hasIg) setTimeout(() => syncMutation.mutate(igAccount._id || igAccount.id), 150);
+              if (!hasFb && !hasIg) syncMutation.mutate(account._id || account.id);
+            }}
+            disabled={!isHealthy || syncMutation.isPending}
+            className="h-9 text-sm gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 shadow-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
+          </Button>
         </div>
       </div>
     </DialogContent>
@@ -1892,12 +2249,24 @@ export function SocialAccountsSettings() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  const [showBrandSelection, setShowBrandSelection] = useState(false);
   const [connectedUsername, setConnectedUsername] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Brand selection modal — returned from Meta OAuth via settings context
+    if (params.get('brand_selection') === 'true') {
+      setShowBrandSelection(true);
+      const newUrl = window.location.pathname + '?tab=social';
+      window.history.replaceState({}, '', newUrl);
+      return;
+    }
+
     if (params.get('connected') === 'instagram') {
       const username = params.get('username');
       setConnectedUsername(username);
@@ -1967,6 +2336,22 @@ export function SocialAccountsSettings() {
 
   return (
     <>
+      {/* Brand selection modal — shown after Meta OAuth returns from settings context */}
+      <BrandSelectionModal
+        open={showBrandSelection}
+        onOpenChange={(open) => {
+          setShowBrandSelection(open);
+          if (!open) refetch();
+        }}
+        workspaceId={currentWorkspace?.id ?? ''}
+        title="Choose a brand to connect"
+        description="Select which brand to connect to this workspace. Each workspace manages one brand. Other brands remain available for future workspaces."
+        onSuccess={() => {
+          refetch();
+          queryClient.invalidateQueries({ queryKey: ['/api/social-accounts'] });
+        }}
+      />
+
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -1977,193 +2362,295 @@ export function SocialAccountsSettings() {
           <Button variant="outline" onClick={() => refetch()} className="gap-2">
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh Status
           </Button>
-          <Dialog>
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
               <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
                 <Plus className="w-4 h-4" /> Add Account
               </Button>
             </DialogTrigger>
-            <AddAccountModal currentWorkspace={currentWorkspace} getPlatformIcon={getPlatformIcon} />
+            <AddAccountModal currentWorkspace={currentWorkspace} />
           </Dialog>
         </div>
       </div>
+
+      {/* Reconnect banners — shown for each Facebook account requiring reconnection (Requirements: 2.10, 2.11, 4.5) */}
+      <FacebookReconnectBanner
+        accounts={socialAccounts ?? []}
+        workspaceId={currentWorkspace?.id}
+      />
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         {isLoading ? (
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {[1, 2].map(i => (
-              <div key={i} className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 animate-pulse">
+              <div key={i} className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 rounded-xl"></div>
+                  <Skeleton variant="rectangle" className="w-14 h-14 rounded-xl" />
                   <div className="space-y-2.5">
-                    <div className="h-5 bg-gray-200 dark:bg-gray-800 rounded w-32"></div>
-                    <div className="h-4 bg-gray-100 dark:bg-gray-800/50 rounded w-48"></div>
+                    <Skeleton variant="text" className="h-5 w-32" />
+                    <Skeleton variant="text" className="h-4 w-48" />
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="h-10 bg-gray-200 dark:bg-gray-800 rounded-xl w-32 hidden sm:block"></div>
-                  <div className="h-10 bg-gray-200 dark:bg-gray-800 rounded-xl w-24"></div>
-                  <div className="h-10 bg-gray-200 dark:bg-gray-800 rounded-xl w-10"></div>
+                  <Skeleton variant="button" className="h-10 rounded-xl w-32 hidden sm:block" />
+                  <Skeleton variant="button" className="h-10 rounded-xl w-24" />
+                  <Skeleton variant="button" className="h-10 rounded-xl w-10" />
                 </div>
               </div>
             ))}
           </div>
         ) : !socialAccounts?.length ? (
-          <div className="p-12 text-center flex flex-col items-center">
-            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-              <LinkIcon className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Social Accounts Connected</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md">Connect your brand's social media profiles to enable cross-platform publishing, AI automation, and centralized analytics.</p>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                  <Plus className="w-5 h-5" /> Connect First Account
-                </Button>
-              </DialogTrigger>
-              <AddAccountModal currentWorkspace={currentWorkspace} getPlatformIcon={getPlatformIcon} />
-            </Dialog>
-          </div>
+          <NoAccountsEmptyState
+            onConnectClick={() => setShowAddDialog(true)}
+          />
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {socialAccounts.map((account: any) => {
-              const isHealthy = account.tokenStatus === 'valid' && account.isActive !== false;
-              const hasExpired = account.tokenStatus === 'expired';
-              const validId = account._id || account.id; // Bug fix: Ensure ID is valid
-              return (
-                <div key={validId} className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
-                  
-                  {/* Account Identity */}
-                  <div className="flex items-center gap-5">
-                    <div className="relative">
-                      {account.profilePictureUrl ? (
-                        <img src={account.profilePictureUrl} alt={account.username} className="w-14 h-14 rounded-xl object-cover ring-2 ring-gray-100 dark:ring-gray-800" />
-                      ) : (
-                        <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center ring-2 ring-gray-100 dark:ring-gray-800">
-                           <div className={`${
-                              account.platform.toLowerCase() === 'instagram' ? 'text-pink-500' :
-                              account.platform.toLowerCase() === 'facebook' ? 'text-blue-600' :
-                              account.platform.toLowerCase() === 'linkedin' ? 'text-blue-700' : 'text-gray-500'
-                           }`}>
-                             {getPlatformIcon(account.platform)}
-                           </div>
-                        </div>
-                      )}
-                      <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-white dark:bg-gray-900 rounded-lg flex items-center justify-center shadow-sm">
-                        <div className={`${
-                              account.platform.toLowerCase() === 'instagram' ? 'text-pink-500' :
-                              account.platform.toLowerCase() === 'facebook' ? 'text-blue-600' :
-                              account.platform.toLowerCase() === 'linkedin' ? 'text-blue-700' : 'text-gray-500'
-                           }`}>
-                          {getPlatformIcon(account.platform)}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        {account.username}
-                        {!isHealthy && <AlertCircle className="w-4 h-4 text-red-500" />}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        <span className="capitalize">{account.platform}</span>
-                        <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
-                        <span>{account.followersCount ? account.followersCount.toLocaleString() + ' followers' : 'Unknown audience size'}</span>
-                      </div>
-                    </div>
-                  </div>
+            {(() => {
+              // Group Facebook + Instagram accounts that are linked together into "brand" groups
+              const accounts: any[] = socialAccounts ?? [];
+              const fbAccounts = accounts.filter((a: any) => a.platform?.toLowerCase() === 'facebook');
+              const igAccounts = accounts.filter((a: any) => a.platform?.toLowerCase() === 'instagram');
+              const otherAccounts = accounts.filter((a: any) => a.platform?.toLowerCase() !== 'facebook' && a.platform?.toLowerCase() !== 'instagram');
 
-                  {/* Status & Diagnostics */}
-                  <div className="flex items-center gap-6 lg:justify-end flex-1">
-                    <div className="flex flex-col items-start lg:items-end gap-1">
-                      <div className={`flex items-center gap-1.5 text-sm font-medium px-2.5 py-1 rounded-full ${isHealthy ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                        {isHealthy ? 'Active & Syncing' : hasExpired ? 'Token Expired' : 'Action Required'}
+              // Build brand groups: each FB page paired with its linked IG account
+              const brandGroups: Array<{ fb: any; ig: any | null; id: string }> = [];
+              const usedIgIds = new Set<string>();
+
+              fbAccounts.forEach((fb: any) => {
+                const linkedIgId =
+                  fb.platformMetadata?.linkedInstagramAccountId ||
+                  fb.linkedInstagramAccountId;
+                // Try platformMetadata link first, then fall back to matching by username
+                const linkedIg = linkedIgId
+                  ? igAccounts.find((ig: any) => ig.accountId === linkedIgId)
+                  : igAccounts.find((ig: any) => ig.username && fb.username && ig.username.toLowerCase() === fb.username.toLowerCase());
+                if (linkedIg) usedIgIds.add(linkedIg._id || linkedIg.id);
+                brandGroups.push({ fb, ig: linkedIg || null, id: fb._id || fb.id });
+              });
+
+              // Add standalone IG accounts (not linked to any FB page in this workspace)
+              igAccounts.forEach((ig: any) => {
+                const igId = ig._id || ig.id;
+                if (!usedIgIds.has(igId)) {
+                  brandGroups.push({ fb: null, ig, id: igId });
+                }
+              });
+
+              const allGroups = [...brandGroups, ...otherAccounts.map((a: any) => ({ fb: null, ig: null, other: a, id: a._id || a.id }))];
+
+              // Helper: proxy FB/IG profile pictures through our server's Graph API fetcher.
+              // Facebook CDN URLs are IP-locked — they work only from the original requester's
+              // IP. We use /api/image-proxy/social which calls Graph API fresh from our server.
+              const proxyPic = (url?: string | null, accountId?: string, platform?: string) => {
+                if (!accountId || !platform) return url || '';
+                return `/api/image-proxy/social?accountId=${encodeURIComponent(accountId)}&platform=${encodeURIComponent(platform)}`;
+              };
+
+              // Sub-row for a single platform account inside the brand tree
+              const PlatformRow = ({ account, platform, color }: { account: any; platform: string; color: string }) => {
+                if (!account) return null;
+                const pic = proxyPic(account.profilePictureUrl, account.accountId, platform);
+                const name = account.username || account.pageName || 'Unknown';
+                const followers = account.followersCount;
+                return (
+                  <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/60">
+                    {/* Small platform avatar */}
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={pic}
+                        alt={name}
+                        className="w-8 h-8 rounded-lg object-cover"
+                        style={{ display: pic ? 'block' : 'none' }}
+                        onError={(e) => {
+                          const t = e.currentTarget as HTMLImageElement;
+                          t.style.display = 'none';
+                          const fb = t.nextElementSibling as HTMLElement;
+                          if (fb) fb.style.display = 'flex';
+                        }}
+                      />
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white ${color}`}
+                        style={{ display: pic ? 'none' : 'flex' }}
+                      >
+                        {name.charAt(0).toUpperCase()}
                       </div>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        Last synced: {account.lastSyncAt ? formatDistanceToNow(new Date(account.lastSyncAt), { addSuffix: true }) : 'Never'}
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center shadow-sm`}>
+                        <div className="scale-[0.65]">{getPlatformIcon(platform)}</div>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">@{name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">
+                        {platform} · {followers ? followers.toLocaleString() + ' followers' : 'Syncing…'}
                       </p>
                     </div>
+                  </div>
+                );
+              };
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => syncMutation.mutate(validId)}
-                        disabled={!isHealthy || syncMutation.isPending}
-                        title="Force sync metrics"
-                        className="text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
-                      >
-                        <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                      </Button>
-                      
-                      {!isHealthy ? (
-                        <Button 
-                          onClick={() => handleReconnect(account.platform)}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm h-9"
+              return allGroups.map((group: any) => {
+                const primaryAccount = group.fb || group.ig || group.other;
+                const validId = primaryAccount?._id || primaryAccount?.id;
+                const isHealthy = primaryAccount?.tokenStatus === 'valid' && primaryAccount?.isActive !== false;
+                const hasExpired = primaryAccount?.tokenStatus === 'expired';
+                const brandName = group.fb?.pageName || group.fb?.username || group.ig?.username || group.other?.username;
+                const hasLinkedIG = !!group.ig;
+                // Brand-level avatar: proxied picture of primary account via Graph API
+                const brandPic = proxyPic(
+                  primaryAccount?.profilePictureUrl,
+                  primaryAccount?.accountId,
+                  group.fb ? 'facebook' : group.ig ? 'instagram' : group.other?.platform
+                );
+
+                const handleDeleteBrand = () => {
+                  if (group.fb) deleteMutation.mutate(group.fb._id || group.fb.id);
+                  if (group.ig) setTimeout(() => deleteMutation.mutate(group.ig._id || group.ig.id), 300);
+                  if (group.other) deleteMutation.mutate(group.other._id || group.other.id);
+                };
+
+                return (
+                  <div key={validId} className="p-5 hover:bg-gray-50/60 dark:hover:bg-gray-800/40 transition-colors">
+
+                    {/* ── Brand header row ─────────────────────────────── */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
+                      {/* Left: brand avatar + name */}
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={brandPic}
+                            alt={brandName}
+                            className="w-12 h-12 rounded-xl object-cover ring-2 ring-gray-100 dark:ring-gray-700"
+                            style={{ display: brandPic ? 'block' : 'none' }}
+                            onError={(e) => {
+                              const t = e.currentTarget as HTMLImageElement;
+                              t.style.display = 'none';
+                              const fb = t.nextElementSibling as HTMLElement;
+                              if (fb) fb.style.display = 'flex';
+                            }}
+                          />
+                          <div
+                            className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-lg font-bold ring-2 ring-gray-100 dark:ring-gray-700"
+                            style={{ display: brandPic ? 'none' : 'flex' }}
+                          >
+                            {brandName?.charAt(0)?.toUpperCase() ?? '?'}
+                          </div>
+                          {/* stacked platform badge */}
+                          <div className="absolute -bottom-1.5 -right-1.5 flex -space-x-1">
+                            {group.fb && (
+                              <div className="w-5 h-5 bg-white dark:bg-gray-900 rounded-full flex items-center justify-center shadow ring-1 ring-white dark:ring-gray-900">
+                                <div className="text-blue-600 scale-[0.7]">{getPlatformIcon('facebook')}</div>
+                              </div>
+                            )}
+                            {group.ig && (
+                              <div className="w-5 h-5 bg-white dark:bg-gray-900 rounded-full flex items-center justify-center shadow ring-1 ring-white dark:ring-gray-900">
+                                <div className="text-pink-500 scale-[0.7]">{getPlatformIcon('instagram')}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            {brandName}
+                            {!isHealthy && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
+                          </h3>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                            {[group.fb && 'Facebook Page', group.ig && 'Instagram'].filter(Boolean).join(' + ')}
+                            {group.other && group.other.platform}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: status + actions */}
+                      <div className="flex items-center gap-3 sm:ml-auto">
+                        <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${isHealthy ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                          {isHealthy ? 'Active & Syncing' : hasExpired ? 'Token Expired' : 'Action Required'}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            if (group.fb) syncMutation.mutate(group.fb._id || group.fb.id);
+                            if (group.ig) syncMutation.mutate(group.ig._id || group.ig.id);
+                            if (group.other) syncMutation.mutate(group.other._id || group.other.id);
+                          }}
+                          disabled={!isHealthy || syncMutation.isPending}
+                          title="Sync now"
+                          className="h-8 w-8 text-gray-500 hover:text-indigo-600"
                         >
-                          Reconnect
+                          <RefreshCw className={`w-3.5 h-3.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
                         </Button>
-                      ) : (
+
+                        {!isHealthy ? (
+                          <Button size="sm" onClick={() => handleReconnect(primaryAccount?.platform)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8">
+                            Reconnect
+                          </Button>
+                        ) : (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="text-xs h-8">Manage</Button>
+                            </DialogTrigger>
+                            <ManageAccountModal account={primaryAccount} fbAccount={group.fb} igAccount={group.ig} isHealthy={isHealthy} syncMutation={syncMutation} getPlatformIcon={getPlatformIcon} />
+                          </Dialog>
+                        )}
+
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="outline" className="text-sm h-9">
-                              Manage
+                            <Button variant="outline" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/30">
+                              <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </DialogTrigger>
-                          <ManageAccountModal 
-                            account={account} 
-                            isHealthy={isHealthy} 
-                            syncMutation={syncMutation} 
-                            getPlatformIcon={getPlatformIcon} 
-                          />
-                        </Dialog>
-                      )}
-
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/30">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                          <DialogHeader>
-                            <DialogTitle className="text-red-600 flex items-center gap-2">
-                              <AlertCircle className="w-5 h-5" /> Danger Zone: Disconnect Account
-                            </DialogTitle>
-                          </DialogHeader>
-                          <div className="py-4 space-y-4">
-                            <p className="text-gray-600 dark:text-gray-300">
-                              You are about to disconnect <strong>{account.username}</strong> from Veefore. This will immediately stop all active automations, automated posting, and analytics syncing for this profile.
-                            </p>
-                            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-900/50">
-                              <ul className="list-disc list-inside text-sm text-red-800 dark:text-red-300 space-y-1">
-                                <li>Scheduled posts will fail</li>
-                                <li>AI automations will stop responding</li>
-                                <li>Historical metrics will be retained but frozen</li>
-                              </ul>
+                          <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                              <DialogTitle className="text-red-600 flex items-center gap-2">
+                                <AlertCircle className="w-5 h-5" /> Disconnect Brand
+                              </DialogTitle>
+                            </DialogHeader>
+                            <div className="py-4 space-y-4">
+                              <p className="text-gray-600 dark:text-gray-300">
+                                Disconnect <strong>{brandName}</strong> from this workspace?
+                                {hasLinkedIG && ' This will disconnect both the Facebook Page and linked Instagram account.'}
+                              </p>
+                              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-900/50">
+                                <ul className="list-disc list-inside text-sm text-red-800 dark:text-red-300 space-y-1">
+                                  <li>Scheduled posts will fail</li>
+                                  <li>AI automations will stop responding</li>
+                                  <li>Historical metrics will be retained but frozen</li>
+                                  {hasLinkedIG && <li>Both Facebook and Instagram accounts will be disconnected</li>}
+                                </ul>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex justify-end gap-3">
-                            <DialogTrigger asChild>
-                              <Button variant="outline">Cancel</Button>
-                            </DialogTrigger>
-                            <Button 
-                              variant="destructive" 
-                              onClick={() => deleteMutation.mutate(validId)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? 'Disconnecting...' : 'Yes, disconnect account'}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                            <div className="flex justify-end gap-3">
+                              <DialogTrigger asChild>
+                                <Button variant="outline">Cancel</Button>
+                              </DialogTrigger>
+                              <Button variant="destructive" onClick={handleDeleteBrand} disabled={deleteMutation.isPending}>
+                                {deleteMutation.isPending ? 'Disconnecting…' : `Disconnect${hasLinkedIG ? ' Brand' : ''}`}
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </div>
+
+                    {/* ── Tree: per-platform sub-rows ───────────────────── */}
+                    {(group.fb || group.ig || group.other) && (
+                      <div className="mt-3 ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-2">
+                        {group.fb && <PlatformRow account={group.fb} platform="facebook" color="bg-blue-500" />}
+                        {group.ig && <PlatformRow account={group.ig} platform="instagram" color="bg-gradient-to-br from-purple-500 to-pink-500" />}
+                        {group.other && <PlatformRow account={group.other} platform={group.other.platform} color="bg-gray-400" />}
+                        <p className="text-xs text-gray-400 dark:text-gray-500 pl-1 pt-0.5">
+                          Last synced: {primaryAccount?.lastSyncAt ? formatDistanceToNow(new Date(primaryAccount.lastSyncAt), { addSuffix: true }) : 'Never'}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )
-            })}
+                );
+              });
+            })()}
           </div>
         )}
       </div>
@@ -2192,6 +2679,7 @@ export function SocialAccountsSettings() {
                 <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-900 relative z-10 shadow-sm">
                   <Check className="w-10 h-10 text-emerald-600 dark:text-emerald-400 stroke-[3px]" />
                 </div>
+                {/* skeleton-guard-allow: status-dot — decorative success-confirmation glow, not a loading placeholder */}
                 <div className="absolute inset-0 bg-emerald-400 dark:bg-emerald-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
               </div>
             </div>

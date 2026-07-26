@@ -54,7 +54,34 @@ export function useTokenRefresh(enabled: boolean = true) {
 
     try {
       console.log('[TokenRefresh] Performing background token refresh (silent)...');
-      
+
+      // PRIMARY PATH: refresh the Firebase ID token directly. This is the
+      // authoritative session and works for BOTH email/password and Google OAuth
+      // users. It avoids depending on the server-side Google refresh token, which
+      // doesn't exist for email/password users (and previously caused logouts).
+      if (auth.currentUser) {
+        try {
+          const idToken = await auth.currentUser.getIdToken(true);
+
+          // Keep the server cookie in sync (best-effort, non-fatal).
+          await fetch('/api/auth/update-token', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+          }).catch(() => { /* non-fatal */ });
+
+          console.log('[TokenRefresh] ✅ Firebase ID token refreshed, cookie synced');
+          retryCountRef.current = 0;
+          scheduleNextRefresh();
+          return;
+        } catch (firebaseError) {
+          console.warn('[TokenRefresh] Firebase token refresh failed, trying server refresh:', firebaseError);
+          // Fall through to the server-side refresh below.
+        }
+      }
+
+      // FALLBACK PATH: server-side Google OAuth refresh.
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
         credentials: 'include', // Include HTTP-only cookies
@@ -103,24 +130,15 @@ export function useTokenRefresh(enabled: boolean = true) {
       } else {
         console.warn('[TokenRefresh] Background refresh failed:', response.status, response.statusText);
         
-        // If refresh fails with 401, user needs to re-authenticate
-        // The main app will handle this on the next protected API request
+        // If refresh fails with 401, the server-side Google session is gone.
+        // This is NOT fatal — the Firebase client session (the authoritative one)
+        // may still be valid. We already tried to refresh it via the SDK above.
+        // Do NOT force a redirect/logout here; the next protected request will
+        // re-attempt a Firebase refresh and only redirect if the session is truly gone.
         if (response.status === 401) {
-          // Check if this is a migration error (old token format)
-          try {
-            const errorData = await response.json();
-            if (errorData.error === 'token_format_migration' || errorData.requiresReauth) {
-              console.warn('[TokenRefresh] Old token format detected, redirecting to sign in...');
-              // Redirect to sign in page for re-authentication
-              window.location.href = '/signin?reason=token_migration&message=Please sign in again to update your session';
-              return;
-            }
-          } catch (e) {
-            // Ignore JSON parse errors
-          }
-          
-          console.log('[TokenRefresh] Session expired, user will be prompted to sign in on next action');
-          // Don't schedule next refresh - session is invalid
+          console.log('[TokenRefresh] Server session expired; relying on Firebase session. No logout forced.');
+          // Don't schedule next refresh on the server path; the Firebase-first
+          // path on next activity/visibility will keep the session alive.
         } else if (response.status === 429) {
           // Rate limited - wait longer before retry
           console.log('[TokenRefresh] Rate limited, scheduling retry in 5 minutes...');

@@ -29,6 +29,7 @@ export interface IListeningPost extends Document {
     hooks?: string[];
     painPoints?: string[];
     topics?: string[];
+    hashtags?: string[];
     analyzedAt?: Date;
   };
   rawPayload?: Record<string, any>; // Store original raw data just in case
@@ -65,6 +66,7 @@ export const ListeningPostSchema = new Schema<IListeningPost>({
     hooks: { type: [String], default: [] },
     painPoints: { type: [String], default: [] },
     topics: { type: [String], default: [] },
+    hashtags: { type: [String], default: [] },
     analyzedAt: { type: Date }
   },
   rawPayload: { type: Schema.Types.Mixed, select: false } // exclude by default

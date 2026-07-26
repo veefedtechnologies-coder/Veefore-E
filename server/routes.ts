@@ -7,7 +7,6 @@ import subscriptionRoutes from './routes/subscription';
 import { registerAdminRoutes } from './admin-routes';
 import videoRoutes, { setupVideoWebSocket } from './video-routes';
 import authRoutes from './auth-routes';
-import authCookiesRouter from './routes/auth-cookies';
 import {
   authRateLimiter,
   oauthRateLimiter,
@@ -22,6 +21,17 @@ import { createMediaUpload } from './infrastructure/media-upload';
 import storageRoutes from './features/storage/routes/storage.routes';
 
 import { default as earlyAccessRoutes } from './routes/v1/early-access.routes';
+import { default as publicLandingRoutes } from './routes/v1/public-landing.routes';
+import { default as veegptChatRoutes } from './routes/veegpt-chat.routes';
+
+// ── Subscription billing & entitlement feature routes (v2) ──────────────────
+// subscriptionRouter   → /api/v2/subscription  (user-facing lifecycle + add-ons)
+// adminSubscriptionRouter → /api/admin/subscription  (admin overrides & tooling)
+// webhookRouter        → /api/webhooks          (Razorpay webhook; uses express.raw() per-route)
+import { subscriptionRouter } from './features/subscription/routes/subscription.routes';
+import { adminSubscriptionRouter } from './features/subscription/routes/admin.routes';
+// webhookRouter is imported and mounted directly in server/index.ts, before
+// express.json() — see the NOTE near its mount point below for why.
 
 export { initializeLeaderElection } from './infrastructure/leader-election';
 
@@ -52,12 +62,32 @@ export async function registerRoutes(app: Express, storage: IStorage, httpServer
   // Register early access routes explicitly
   app.use('/api/early-access', earlyAccessRoutes);
 
+  // Public landing caption proxy (unauthenticated, rate-limited) - Requirement 12.8
+  // Resolves to POST /api/public/landing/captions
+  app.use('/api/public/landing', publicLandingRoutes);
+
+  // VeeGPT chat routes — conversation + streaming AI replies driven by the
+  // workspace AI configuration saved in Settings → AI Configuration.
+  app.use('/api/chat', veegptChatRoutes);
+
   mountV1Routes(app, '/api');
   mountV1Routes(app, '/api/v1');
 
   createCopilotRoutes(app, storage);
 
+  // Legacy subscription routes — kept to avoid breaking existing frontend code
   app.use('/api/subscription', subscriptionRoutes);
+
+  // ── New subscription billing & entitlement routes (subscription-billing-entitlement spec) ──
+  // User-facing subscription lifecycle + add-ons (v2 path avoids collision with legacy)
+  app.use('/api/v2/subscription', subscriptionRouter);
+  // Admin subscription management (plan overrides, credit adjustments, refunds, etc.)
+  app.use('/api/admin/subscription', adminSubscriptionRouter);
+  // NOTE: `webhookRouter` (POST /api/webhooks/razorpay) is mounted in
+  // server/index.ts BEFORE express.json(), not here — see the comment there
+  // for why. It must run before the global body parser, and this function
+  // (registerRoutes) is invoked after express.json() has already been
+  // registered.
 
   app.use('/api/video', (req: Request, res: Response, next: NextFunction) => {
     req.app.locals.storage = storage;
@@ -72,8 +102,6 @@ export async function registerRoutes(app: Express, storage: IStorage, httpServer
 
   // OAuth routes with OAuth-specific rate limiter (10 requests/minute per IP) - Requirement 11.7
   app.use('/api/auth', oauthRateLimiter, bruteForceMiddleware, authRoutes);
-
-  app.use('/api/auth-cookies', authRateLimiter, bruteForceMiddleware, authCookiesRouter);
 
   setupVideoWebSocket(httpServer);
   console.log('[WS] Video WebSocket server initialized on /ws/video');

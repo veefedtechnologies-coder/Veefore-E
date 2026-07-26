@@ -266,6 +266,7 @@ const TargetAudienceSection = () => {
                       </AnimatePresence>
                     </div>
                     {activeProfile === 'pro' && (
+                      // skeleton-guard-allow: status-dot — decorative marketing badge pulse, not a loading placeholder
                       <motion.div
                         initial={{ opacity: 0, scale: 0 }}
                         animate={{ opacity: 1, scale: 1 }}

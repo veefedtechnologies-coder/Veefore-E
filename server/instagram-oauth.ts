@@ -78,7 +78,7 @@ export class InstagramOAuthService {
     // Fallback to the classic scope-based Facebook Login
     const scopes = isPhase1Review
       ? 'public_profile,email,instagram_basic,instagram_manage_insights,instagram_content_publish,pages_read_engagement,pages_manage_posts,pages_show_list'
-      : 'public_profile,email,instagram_basic,instagram_manage_insights,instagram_content_publish,instagram_manage_comments,instagram_manage_messages,pages_read_engagement,pages_manage_posts,pages_show_list,pages_messaging';
+      : 'public_profile,email,instagram_basic,instagram_manage_insights,instagram_content_publish,instagram_manage_comments,instagram_manage_messages,pages_read_engagement,pages_manage_posts,pages_show_list,pages_messaging,pages_manage_metadata';
 
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${this.fbAppId}&display=page&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${state}`;
     
@@ -188,7 +188,7 @@ export class InstagramOAuthService {
 
       // 3. Page Discovery: Find the linked Instagram Business account
       log('3. Fetching accounts/pages...');
-      const pagesResponse = await fetch(`https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account{id,username,profile_picture_url,followers_count},name,access_token&access_token=${fbUserAccessToken}`);
+      const pagesResponse = await fetch(`https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account{id,username,profile_picture_url,followers_count,media_count},name,access_token&access_token=${fbUserAccessToken}`);
 
       if (!pagesResponse.ok) {
         log('❌ Failed to fetch pages:', pagesResponse.status);
@@ -209,40 +209,59 @@ export class InstagramOAuthService {
 
       const igAccount = pageWithIg.instagram_business_account;
       const pageId = pageWithIg.id;
+      // The Page Access Token is already returned in step 3 from /me/accounts
+      // (requires pages_show_list only — no pages_manage_metadata needed).
+      // We still attempt to get a long-lived version, but fall back to the
+      // step-3 token if that call fails (403 = missing pages_manage_metadata).
+      const shortLivedPageToken: string = pageWithIg.access_token || fbUserAccessToken;
 
       log(`✅ Found Instagram Business Account: @${igAccount.username} (Page ID: ${pageId})`);
 
-      // 4. CRITICAL: Exchange short-lived Page Access Token for long-lived one
-      log('4. Exchanging for long-lived Page Access Token...');
-      const longLivedPageResponse = await fetch(
-        `https://graph.facebook.com/v21.0/${pageId}?fields=access_token&access_token=${fbUserAccessToken}`
-      );
-
-      if (!longLivedPageResponse.ok) {
-        log('❌ Failed to get long-lived Page Token:', longLivedPageResponse.status);
-        throw new Error(`Failed to get long-lived Page Access Token: ${longLivedPageResponse.status}`);
+      // 4. Try to get the long-lived Page Access Token via /{pageId}?fields=access_token.
+      //    This requires pages_manage_metadata. If the app doesn't have that permission
+      //    (403), fall back to the long-lived USER access token instead — it works
+      //    equally well for IG Business Account queries with instagram_manage_insights.
+      log('4. Getting Page Access Token (with fallback to User token)...');
+      let finalToken = fbUserAccessToken; // safe fallback: long-lived user token
+      try {
+        const longLivedPageResponse = await fetch(
+          `https://graph.facebook.com/v21.0/${pageId}?fields=access_token&access_token=${fbUserAccessToken}`
+        );
+        if (longLivedPageResponse.ok) {
+          const longLivedPageData = await longLivedPageResponse.json();
+          if (longLivedPageData.access_token) {
+            finalToken = longLivedPageData.access_token;
+            log('✅ Got long-lived Page Access Token');
+          } else {
+            log('⚠️ Page token response had no access_token field — using short-lived page token from step 3');
+            finalToken = shortLivedPageToken || fbUserAccessToken;
+          }
+        } else {
+          log(`⚠️ Could not get Page token (HTTP ${longLivedPageResponse.status}) — falling back to long-lived User token. This is fine for IG Business queries.`);
+          // Use the short-lived page token from /me/accounts if available,
+          // otherwise fall back to the long-lived user token.
+          finalToken = shortLivedPageToken || fbUserAccessToken;
+        }
+      } catch (pageTokenErr: any) {
+        log(`⚠️ Page token fetch failed: ${pageTokenErr.message} — using User token`);
+        finalToken = shortLivedPageToken || fbUserAccessToken;
       }
-
-      const longLivedPageData = await longLivedPageResponse.json();
-      const longLivedPageToken = longLivedPageData.access_token;
-
-      log('✅ Got long-lived Page Access Token');
 
       const userProfile = {
         accountId: String(igAccount.id),
         username: igAccount.username,
         accountType: 'BUSINESS', // Demographics flow implies business/professional
-        mediaCount: 0, // Will be filled by sync
+        mediaCount: igAccount.media_count ?? 0, // From IG field expansion (for reconnect change detection)
         followersCount: igAccount.followers_count || 0,
         profilePictureUrl: igAccount.profile_picture_url,
-        accessToken: longLivedPageToken,
+        accessToken: finalToken,
         expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days
         pageId: pageId
       };
 
-      log('Storing user profile...', { username: userProfile.username, accountId: userProfile.accountId });
+      log('Storing user profile...', { username: userProfile.username, accountId: userProfile.accountId, tokenPrefix: finalToken?.slice(0, 12) });
 
-      return this.processAndStoreAccount(workspaceId, userProfile, longLivedPageToken, 60 * 24 * 60 * 60); // Page tokens don't expire but we set a long duration
+      return this.processAndStoreAccount(workspaceId, userProfile, finalToken, 60 * 24 * 60 * 60);
 
     } catch (error) {
       log('❌ ERROR in exchangeFacebookCodeForToken:', {
@@ -288,32 +307,43 @@ export class InstagramOAuthService {
       await this.storeSocialAccount(workspaceId, accountData);
       log('✅ storeSocialAccount returned successfully');
 
-      // Immediately sync real Instagram data (Async/Background)
-      // P1-FIX: We no longer await this to prevent blocking the OAuth response and UI timeouts
+      // Hand the connect/reconnect initialization to a BullMQ worker (Redis-backed)
+      // instead of doing it inline in the OAuth web request. The worker decides:
+      //   restore-from-DB (no changes) | incremental sync | full backfill.
       (async () => {
         try {
-          console.log('[INSTAGRAM OAUTH] 🔄 Triggering immediate sync for newly connected account (Background via Queue)...');
           const { MetricsQueueManager } = await import('./queues/metricsQueue');
-          await MetricsQueueManager.scheduleMetricsFetch(
+          const connectInitPayload = {
             workspaceId,
-            'system',
-            userProfile.accountId,
-            accessToken,
-            'all',
-            { priority: 5, forceRefresh: true }
-          );
-          console.log('[INSTAGRAM OAUTH] ✅ Initial sync queued successfully');
+            instagramAccountId: String(userProfile.accountId),
+            token: accessToken,
+            username: userProfile.username,
+            mediaCount: typeof userProfile.mediaCount === 'number' ? userProfile.mediaCount : undefined,
+            followersCount: typeof userProfile.followersCount === 'number' ? userProfile.followersCount : undefined,
+          };
 
-          // Invalidate performance cache for this workspace so dashboard/accounts refresh immediately
-          try {
-            const { CachingSystem } = await import('./performance/caching-system');
-            await CachingSystem.invalidateWorkspace(workspaceId);
-            console.log('[INSTAGRAM OAUTH] ✅ Workspace cache invalidated for:', workspaceId);
-          } catch (cacheError) {
-            console.log('[INSTAGRAM OAUTH] ⚠️ Cache invalidation failed (non-critical):', cacheError);
+          const enqueued = await MetricsQueueManager.enqueueConnectInit(connectInitPayload);
+          if (enqueued) {
+            console.log('[INSTAGRAM OAUTH] 📥 connect-init queued to BullMQ worker');
+          } else {
+            // Redis/queue unavailable — run inline as a graceful fallback.
+            console.log('[INSTAGRAM OAUTH] ⚠️ Queue unavailable, running connect-init inline (fallback)');
+            const { ConnectInitService } = await import('./services/ConnectInitService');
+            await ConnectInitService.run({
+              workspaceId,
+              instagramAccountId: String(userProfile.accountId),
+              accessToken,
+              username: userProfile.username,
+              mediaCount: connectInitPayload.mediaCount,
+              followersCount: connectInitPayload.followersCount,
+            });
+            try {
+              const { CachingSystem } = await import('./performance/caching-system');
+              await CachingSystem.invalidateWorkspace(workspaceId);
+            } catch { /* non-critical */ }
           }
-        } catch (syncError) {
-          console.error('[INSTAGRAM OAUTH] ⚠️ Initial sync failed (will retry via smart polling):', syncError);
+        } catch (initError) {
+          console.error('[INSTAGRAM OAUTH] ⚠️ Failed to dispatch connect-init (will retry via smart polling):', initError);
         }
       })();
 

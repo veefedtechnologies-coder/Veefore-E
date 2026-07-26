@@ -25,7 +25,8 @@ import {
   Archive,
   Trash2,
   Edit2,
-  ChevronDown
+  ChevronDown,
+  PanelLeft
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '@/lib/queryClient'
@@ -40,6 +41,8 @@ interface ConversationSidebarProps {
   setSidebarCollapsed: (collapsed: boolean) => void
   onSelectConversation: (conversationId: number) => void
   onStartNewChat: () => void
+  /** Open the ChatGPT-style search-chats modal. */
+  onOpenSearch?: () => void
   userData?: {
     displayName?: string
     email?: string
@@ -54,8 +57,8 @@ const ConversationListSkeleton = () => (
   <div className="space-y-1">
     {[1, 2, 3, 4, 5].map((i) => (
       <div key={i} className="flex items-center space-x-3 px-3 py-2.5 rounded-lg">
-        <Skeleton className="w-4 h-4 rounded bg-gray-700" />
-        <Skeleton className="h-4 flex-1 rounded bg-gray-700" />
+        <Skeleton className="w-4 h-4 rounded bg-gray-300 dark:bg-gray-700" />
+        <Skeleton className="h-4 flex-1 rounded bg-gray-300 dark:bg-gray-700" />
       </div>
     ))}
   </div>
@@ -69,6 +72,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   setSidebarCollapsed,
   onSelectConversation,
   onStartNewChat,
+  onOpenSearch,
   userData,
   userLoading,
   refreshKey
@@ -149,43 +153,29 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   }
 
   return (
-    <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-gray-900 dark:bg-gray-900 flex flex-col transition-all duration-500 ease-out`}>
+    <div className={`${sidebarCollapsed ? 'w-16' : 'w-[17.5rem]'} bg-gray-100/80 dark:bg-slate-950/50 dark:backdrop-blur-xl border-r border-gray-200/80 dark:border-white/10 flex flex-col transition-all duration-500 ease-out`}>
       {/* Scrollable Content Area - Everything scrolls except user profile */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll">
         {/* Top Header with Logo */}
         <div className={`p-3 flex items-center transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
           {sidebarCollapsed ? (
-            <div className="relative group w-10 h-10 flex items-center justify-center">
-              {/* VeeFore Logo Button - disappears on hover */}
-              <button 
-                onClick={() => setSidebarCollapsed(false)}
-                className="absolute inset-0 flex items-center justify-center hover:bg-gray-800 rounded transition-all duration-200 opacity-100 group-hover:opacity-0"
-                title="Open sidebar"
-              >
-                <img src="/veefore-logo.png" alt="VeeFore" className="w-8 h-8" />
-              </button>
-              
-              {/* Close Button - appears on hover in same position */}
-              <button 
-                onClick={() => setSidebarCollapsed(false)}
-                className="absolute inset-0 flex items-center justify-center hover:bg-gray-800 rounded transition-all duration-200 opacity-0 group-hover:opacity-100"
-                title="Open sidebar"
-              >
-                <div className="border-2 border-white rounded flex items-center justify-end pr-1.5" style={{width: '17.284608px', height: '15.36px'}}>
-                  <div className="w-0.5 h-full bg-white"></div>
-                </div>
-              </button>
-            </div>
+            <button 
+              onClick={() => setSidebarCollapsed(false)}
+              className="group w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-200/70 dark:hover:bg-white/10 transition-colors"
+              title="Open sidebar"
+            >
+              <img src="/veefore-logo.png" alt="VeeFore" className="w-7 h-7 group-hover:hidden" />
+              <PanelLeft className="w-5 h-5 text-gray-500 dark:text-gray-400 hidden group-hover:block" />
+            </button>
           ) : (
             <>
               <img src="/veefore-logo.png" alt="VeeFore" className="w-8 h-8" />
               <button 
                 onClick={() => setSidebarCollapsed(true)}
-                className="p-1 hover:bg-gray-800 rounded transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-200/70 dark:hover:bg-white/10 transition-colors"
+                title="Close sidebar"
               >
-                <div className="w-5.5 h-5.5 border-2 border-white rounded flex items-center justify-start pl-1.5" style={{width: '17.284608px', height: '15.36px'}}>
-                  <div className="w-0.5 h-full bg-white"></div>
-                </div>
+                <PanelLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
             </>
           )}
@@ -195,50 +185,50 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
         <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} pb-4 transition-all duration-300`}>
           <button
             onClick={onStartNewChat}
-            className="w-full flex items-center px-3 py-2.5 text-sm text-white hover:bg-gray-800 rounded-lg transition-all duration-500 font-medium"
+            className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 hover:border-gray-300 dark:hover:border-white/20 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200"
             title={sidebarCollapsed ? "New chat" : ""}
           >
-            <Edit className={`w-4 h-4 flex-shrink-0 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5]' : ''}`} />
+            <Edit className={`w-4 h-4 flex-shrink-0 text-blue-500 dark:text-blue-400 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5] mx-auto' : ''}`} />
             <span className={`transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-3'}`}>New chat</span>
           </button>
         </div>
 
         {/* Navigation Menu */}
-        <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} pb-6 space-y-1 transition-all duration-300`}>
+        <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} pb-5 space-y-0.5 transition-all duration-300`}>
           <button 
-            onClick={() => setShowSearchInput(!showSearchInput)}
-            className="w-full flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-all duration-500"
+            onClick={() => (onOpenSearch ? onOpenSearch() : setShowSearchInput(!showSearchInput))}
+            className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
             title={sidebarCollapsed ? "Search chats" : ""}
           >
-            <Search className={`w-4 h-4 flex-shrink-0 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5]' : ''}`} />
+            <Search className={`w-[18px] h-[18px] flex-shrink-0 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5] mx-auto' : ''}`} />
             <span className={`transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-3'}`}>Search chats</span>
           </button>
           
           <button 
-            className="w-full flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-all duration-500"
+            className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
             title={sidebarCollapsed ? "Content Studio" : ""}
           >
-            <Edit3 className={`w-4 h-4 flex-shrink-0 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5]' : ''}`} />
+            <Edit3 className={`w-[18px] h-[18px] flex-shrink-0 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5] mx-auto' : ''}`} />
             <span className={`transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-3'}`}>Content Studio</span>
           </button>
           
           {!sidebarCollapsed && (
             <button 
-              className="w-full flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-all duration-500"
+              className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
               title="Auto Pilot"
             >
-              <Rocket className="w-4 h-4 flex-shrink-0 transition-all duration-500" />
+              <Rocket className="w-[18px] h-[18px] flex-shrink-0 text-gray-400 dark:text-gray-500 transition-all duration-500" />
               <span className="transition-all duration-500 opacity-100 w-auto ml-3">Auto Pilot</span>
             </button>
           )}
           
           {!sidebarCollapsed && (
             <button 
-              className="w-full flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-all duration-500"
+              className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
               title="AI Models"
             >
-              <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center transition-all duration-500">
-                <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
+              <div className="w-[18px] h-[18px] flex-shrink-0 flex items-center justify-center transition-all duration-500">
+                <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full shadow-sm shadow-blue-500/40"></div>
               </div>
               <span className="transition-all duration-500 opacity-100 w-auto ml-3">AI Models</span>
             </button>
@@ -253,7 +243,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-gray-100 placeholder-gray-400"
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
               autoFocus
             />
           </div>
@@ -262,7 +252,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
         {/* Conversations Section */}
         {!sidebarCollapsed && (
           <div className="px-3">
-            <div className={`text-sm font-semibold text-gray-400 mb-3 px-2 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
+            <div className={`text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 px-2 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
               Chats
             </div>
             {conversationsLoading ? (
@@ -283,72 +273,78 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                   >
                     <button
                       onClick={() => onSelectConversation(conversation.id)}
-                      className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors group ${
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-200 group relative truncate ${
                         currentConversationId === conversation.id
-                          ? 'bg-gray-800 text-white'
-                          : 'text-gray-300 hover:bg-gray-800'
+                          ? 'bg-white dark:bg-white/10 text-gray-900 dark:text-white font-medium shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-none'
+                          : 'text-gray-900 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
                       }`}
                       title={sidebarCollapsed ? conversation.title : ""}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          {!sidebarCollapsed && (
-                            <div className="truncate text-sm">
-                              {renamingChatId === conversation.id ? (
-                                <input
-                                  type="text"
-                                  value={newChatTitle}
-                                  onChange={(e) => setNewChatTitle(e.target.value)}
-                                  onBlur={() => handleRenameSubmit(conversation.id)}
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleRenameSubmit(conversation.id)
-                                    }
-                                  }}
-                                  className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
-                                  autoFocus
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              ) : (
-                                conversation.title
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {(hoveredChatId === conversation.id || dropdownOpen === conversation.id) && !sidebarCollapsed && renamingChatId !== conversation.id && (
-                          <div className="relative ml-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setDropdownOpen(dropdownOpen === conversation.id ? null : conversation.id)
-                              }}
-                              className="p-1 hover:bg-gray-700 rounded"
-                            >
-                              <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                            </button>
-                            
-                            {dropdownOpen === conversation.id && (
-                              <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setRenamingChatId(conversation.id)
-                                    setNewChatTitle(conversation.title)
-                                    setDropdownOpen(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-3"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                  <span>Rename</span>
-                                </button>
-                                
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    archiveConversationMutation.mutate(conversation.id)
-                                    setDropdownOpen(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-3"
+                      {currentConversationId === conversation.id && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-gradient-to-b from-blue-500 to-blue-600" />
+                      )}
+                      {!sidebarCollapsed && (
+                        renamingChatId === conversation.id ? (
+                          <input
+                            type="text"
+                            value={newChatTitle}
+                            onChange={(e) => setNewChatTitle(e.target.value)}
+                            onBlur={() => handleRenameSubmit(conversation.id)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                handleRenameSubmit(conversation.id)
+                              }
+                            }}
+                            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span className="block truncate whitespace-nowrap pr-1">{conversation.title}</span>
+                        )
+                      )}
+                      {/* Hover menu — overlays the title's end with a fade mask so
+                          the title can use the FULL row width when not hovered. */}
+                      {(hoveredChatId === conversation.id || dropdownOpen === conversation.id) && !sidebarCollapsed && renamingChatId !== conversation.id && (
+                        <div
+                          className={`absolute right-1 top-1/2 -translate-y-1/2 pl-6 ${
+                            currentConversationId === conversation.id
+                              ? 'bg-gradient-to-l from-white via-white dark:from-[#1a2233] dark:via-[#1a2233]'
+                              : 'bg-gradient-to-l from-gray-200/95 via-gray-200/95 dark:from-slate-800 dark:via-slate-800'
+                          } to-transparent`}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDropdownOpen(dropdownOpen === conversation.id ? null : conversation.id)
+                            }}
+                            className="p-1 rounded-md hover:bg-gray-300/70 dark:hover:bg-white/10"
+                          >
+                            <MoreHorizontal className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                          </button>
+
+                          {dropdownOpen === conversation.id && (
+                            <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-lg py-1 z-10 min-w-[150px]">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setRenamingChatId(conversation.id)
+                                  setNewChatTitle(conversation.title)
+                                  setDropdownOpen(null)
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 flex items-center gap-3"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                                <span>Rename</span>
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  archiveConversationMutation.mutate(conversation.id)
+                                  setDropdownOpen(null)
+                                }}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
                                 >
                                   <Archive className="w-4 h-4" />
                                   <span>Archive</span>
@@ -359,7 +355,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                                     e.stopPropagation()
                                     handleDeleteConversation(conversation.id)
                                   }}
-                                  className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 flex items-center space-x-3"
+                                  className="w-full text-left px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                   <span>Delete</span>
@@ -368,7 +364,6 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                             )}
                           </div>
                         )}
-                      </div>
                     </button>
                   </div>
                 ))}
@@ -379,22 +374,22 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
       </div>
 
       {/* Bottom User Section - Fixed */}
-      <div key={refreshKey} className="p-3 border-t border-gray-800">
+      <div key={refreshKey} className="p-2.5 border-t border-gray-200/80 dark:border-white/10">
         {userLoading && !userData ? (
           <div className="flex items-center space-x-3 px-2 py-2">
-            <div className="w-8 h-8 rounded-full bg-gray-700 animate-pulse"></div>
+            <Skeleton variant="avatar" className="w-8 h-8 rounded-full flex-shrink-0" />
             {!sidebarCollapsed && (
               <>
-                <div className="flex-1 min-w-0">
-                  <div className="h-4 bg-gray-700 rounded animate-pulse mb-1"></div>
-                  <div className="h-3 bg-gray-700 rounded animate-pulse w-12"></div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <Skeleton variant="text" className="h-4 w-full" />
+                  <Skeleton variant="text" className="h-3 w-12" />
                 </div>
               </>
             )}
           </div>
         ) : (
-          <div className="flex items-center space-x-3 px-2 py-2 hover:bg-gray-800 rounded-lg transition-colors cursor-pointer">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center space-x-3 px-2 py-2 hover:bg-gray-200/70 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 ring-2 ring-white dark:ring-white/10 shadow-sm">
               {userData?.avatar ? (
                 <img 
                   src={userData.avatar} 
@@ -410,17 +405,17 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
               )}
             </div>
             <div className={`flex-1 min-w-0 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
-              <div className="text-sm font-medium text-white truncate">
+              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                 {userData?.displayName || 
                  userData?.email?.split('@')[0] || 
                  'User'}
                 {userData && ' ✅'}
               </div>
-              <div className="text-xs text-gray-400">
+              <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
                 {userData?.plan || 'Free'}
               </div>
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`} />
+            <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`} />
           </div>
         )}
       </div>

@@ -83,7 +83,7 @@ describe('parseOAuthError', () => {
   });
 
   it('should correctly identify non-retryable errors', () => {
-    const nonRetryable = ['redirect_uri_mismatch', 'invalid_client', 'too_many_requests'];
+    const nonRetryable = ['redirect_uri_mismatch', 'invalid_client'];
     
     nonRetryable.forEach(code => {
       const params = new URLSearchParams(`?error=${code}`);
@@ -353,7 +353,6 @@ describe('Retry Option - Requirement 19.5', () => {
     const nonRetryableErrors = [
       'redirect_uri_mismatch',
       'invalid_client',
-      'too_many_requests',
     ];
 
     nonRetryableErrors.forEach(code => {

@@ -7,12 +7,9 @@ export const useSocialAccounts = (workspaceId?: string) => {
     queryKey: ['/api/social-accounts', workspaceId],
     queryFn: async () => {
       if (!workspaceId) return [];
-      console.log('[useSocialAccounts] Fetching for workspace:', workspaceId);
       const response = await apiRequest(`/api/social-accounts?workspaceId=${workspaceId}`);
-      console.log('[useSocialAccounts] Raw API response:', JSON.stringify(response).slice(0, 500));
       if (Array.isArray(response)) return response;
       if (response && Array.isArray(response.data)) return response.data;
-      console.warn('[useSocialAccounts] Unexpected response shape, returning empty array');
       return [];
     },
     enabled: !!workspaceId,
@@ -20,6 +17,10 @@ export const useSocialAccounts = (workspaceId?: string) => {
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    // Use the cache across page switches (no refetch on navigation). Data is
+    // seeded/fetched accurately and kept fresh by invalidations (connect/
+    // disconnect, webhooks), the 10-min refetchInterval, and refetchOnReconnect —
+    // so navigating back to the dashboard is instant from cache.
     refetchOnMount: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000,
@@ -29,8 +30,11 @@ export const useSocialAccounts = (workspaceId?: string) => {
   const accountsArray = Array.isArray(socialAccounts) ? socialAccounts : (socialAccounts?.data || [])
   
   const validAccounts = accountsArray.filter((a: any) => 
-    (a?.isConnected || a?.tokenStatus) && 
-    (a?.tokenStatus === 'valid' || a?.hasAccessToken || a?.accessToken)
+    // Support both old Instagram accounts (tokenStatus field) and new
+    // multi-platform accounts (connectionStatus field, encrypted token).
+    a?.connectionStatus === 'ACTIVE' ||
+    (a?.tokenStatus === 'valid') ||
+    (a?.isActive && (a?.hasAccessToken || a?.encryptedAccessToken))
   )
   
   const invalidAccounts = accountsArray.filter((a: any) => 

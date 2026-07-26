@@ -1,6 +1,9 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { RequestDeduplicator } from '../../../services/request-deduplicator';
 import { CacheService } from '../../../services/cache-service';
+import { GovernedHttpClient, GovernedHttpClientError, type GovernedRequestOptions } from '../../../services/GovernedHttpClient';
+import { getUsageStoreInstance } from '../../../services/UsageStore';
+import { rateLimitConfig } from '../../../config/rateLimitConfig';
 import * as crypto from 'crypto';
 
 /**
@@ -324,7 +327,8 @@ export class InstagramRepository implements IInstagramRepository {
   }
 
   /**
-   * Make a call to Instagram Graph API with caching and deduplication
+   * Make a call to Instagram Graph API with caching and deduplication.
+   * Routes through GovernedHttpClient for usage header parsing and tier management.
    */
   async callInstagramAPI<T = any>(
     endpoint: string,
@@ -357,34 +361,56 @@ export class InstagramRepository implements IInstagramRepository {
         console.log(`[INSTAGRAM REPOSITORY] ❌ Cache MISS for ${endpoint}`);
       }
 
-      // Build request config
-      const config: AxiosRequestConfig = {
-        method,
-        url,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      };
+      // Extract accountId from the endpoint for usage tracking
+      const accountId = this.extractAccountIdFromEndpoint(endpoint);
 
-      if (method === 'GET') {
-        config.params = {
-          ...data,
-          access_token: accessToken
-        };
+      // Parse the URL to get path and base for GovernedHttpClient
+      let requestPath: string;
+      let requestBaseUrl: string;
+      if (endpoint.startsWith('http')) {
+        const parsed = new URL(url);
+        requestBaseUrl = `${parsed.protocol}//${parsed.host}`;
+        requestPath = parsed.pathname;
       } else {
-        config.data = {
-          ...data,
-          access_token: accessToken
-        };
+        requestBaseUrl = baseUrl;
+        requestPath = `/${endpoint.replace(/^\//, '')}`;
       }
 
-      // Use deduplicator to prevent duplicate requests
-      const requestKey = `${method}_${url}_${JSON.stringify(data)}`;
-      const response = await this.deduplicator.execute<AxiosResponse>(requestKey, async () => {
-        return await axios(config);
-      });
+      // Build GovernedHttpClient and route the request through it
+      const usageStore = getUsageStoreInstance();
+      const client = new GovernedHttpClient(
+        {
+          baseUrl: requestBaseUrl,
+          timeout: rateLimitConfig.httpTimeoutMs,
+          maxRetries: rateLimitConfig.maxRetries,
+          deduplicationWindowMs: rateLimitConfig.deduplicationWindowMs,
+        },
+        usageStore
+      );
 
+      // Build request options for GovernedHttpClient
+      const params: Record<string, string> = {};
+      if (method === 'GET' && data) {
+        for (const [key, value] of Object.entries(data)) {
+          if (value !== undefined && value !== null) {
+            params[key] = String(value);
+          }
+        }
+      }
+
+      const requestOptions: GovernedRequestOptions = {
+        method: method === 'DELETE' ? 'GET' : method, // GovernedHttpClient supports GET/POST; DELETE is rare
+        path: requestPath,
+        token: accessToken,
+        params: method === 'GET' ? (Object.keys(params).length > 0 ? params : undefined) : undefined,
+        body: method === 'POST' ? data : undefined,
+        accountId,
+        priority: 'normal',
+      };
+
+      const response = await client.request<any>(requestOptions);
       const responseData = response.data;
+
       const result: InstagramApiResponse<T> = {
         data: responseData.data || responseData,
         paging: responseData.paging
@@ -402,17 +428,29 @@ export class InstagramRepository implements IInstagramRepository {
       console.error(`[INSTAGRAM REPOSITORY] API call failed: ${method} ${endpoint}`, error.response?.data || error.message);
       
       // Return structured error response
+      const metaErrorCode = error instanceof GovernedHttpClientError ? error.metaErrorCode : error.response?.data?.error?.code;
       return {
         data: null as any,
         error: {
           message: error.response?.data?.error?.message || error.message,
-          type: error.response?.data?.error?.type || 'APIError',
-          code: error.response?.status || 500,
+          type: error.response?.data?.error?.type || error.metaErrorType || 'APIError',
+          code: error instanceof GovernedHttpClientError ? error.statusCode : (error.response?.status || 500),
           error_subcode: error.response?.data?.error?.error_subcode,
           fbtrace_id: error.response?.data?.error?.fbtrace_id
         }
       };
     }
+  }
+
+  /**
+   * Extract Instagram account ID from an endpoint string for usage tracking.
+   */
+  private extractAccountIdFromEndpoint(endpoint: string): string {
+    // Try to extract numeric ID from patterns like "17841400123/media" or "/v22.0/17841400123/insights"
+    const idMatch = endpoint.match(/(\d{10,})/);
+    if (idMatch) return idMatch[1];
+    // Fallback
+    return 'unknown';
   }
 }
 

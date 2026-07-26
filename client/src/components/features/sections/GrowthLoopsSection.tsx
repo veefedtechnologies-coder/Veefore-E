@@ -140,6 +140,7 @@ export const GrowthLoopsSection = React.memo(() => {
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="font-medium text-white">Active Growth Loops</h4>
                                 <div className="flex items-center gap-2">
+                                    {/* skeleton-guard-allow: status-dot — live "running growth loops" status indicator, not a loading placeholder */}
                                     <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                                     <span className="text-xs text-green-400">3 running</span>
                                 </div>

@@ -28,6 +28,9 @@
       ],
       "@assets/*": [
         "./src/assets/*"
+      ],
+      "@platform-registry/*": [
+        "../src/shared/platform-registry/*"
       ]
     }
   },

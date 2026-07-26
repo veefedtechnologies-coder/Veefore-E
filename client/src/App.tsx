@@ -2,7 +2,13 @@ import React, { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useLocation } from 'wouter'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
 import { useTokenRefresh } from './hooks/useTokenRefresh'
+import { useOnboardingStatus } from './hooks/useOnboardingStatus'
 import LoadingSpinner from './components/LoadingSpinner'
+// Eager import: the app-shell skeleton must paint instantly (before the lazy
+// AuthenticatedApp chunk loads), so it ships in the main bundle. It replaces the
+// brand spinner for logged-in users entering the dashboard.
+import { AppShellSkeleton } from './components/skeletons/AppShellSkeleton'
+import { isBootstrapAuthed, isBootstrapOnboarded, isBootstrapCookied, hasAuthHint, isBootstrapExplicitlyLoggedOut } from './lib/bootstrap'
 import { initializeTheme } from './lib/theme'
 import { initializeP6System, P6Provider, ToastContainer } from './lib/p6-integration'
 import { initializeAccessibilityCompliance, useAccessibilityRouteAnnouncements } from './lib/accessibility-compliance'
@@ -12,16 +18,54 @@ import { initializeComponentModernization } from './lib/component-modernization'
 import { WaitlistProvider } from './context/WaitlistContext'
 import { useEarlyAccessCheck } from './hooks/useEarlyAccessCheck'
 // import { WaitlistModal } from './components/waitlist/WaitlistModal'
-import { MainNavigation } from './components/MainNavigation'
-import MainFooter from './components/MainFooter'
 import { RouteErrorBoundary } from './shared/components/ErrorBoundary'
 
-const Landing = React.lazy(() => import('./features/landing/Landing').then(m => ({ default: m.Landing })))
+// Eager import: the landing page is the primary public entry point, so it ships
+// in the main bundle and paints immediately (no Suspense spinner on first load).
+import { NewLandingPage as NewLanding, PublicPageLayout } from './features/new-landing'
+
+// Eager import: auth/waitlist entry pages must paint instantly with NO loading
+// spinner (they're the first thing many visitors see), so they ship in the main
+// bundle instead of behind React.lazy + Suspense.
+import SignUpIntegrated from './pages/SignUpIntegrated'
+import SignIn from './pages/SignIn'
+import WaitlistPage from './pages/WaitlistPage'
 
 const AuthenticatedApp = React.lazy(() => import('./AuthenticatedApp'))
 
-const SignUpIntegrated = React.lazy(() => import('./pages/SignUpIntegrated'))
-const SignIn = React.lazy(() => import('./pages/SignIn'))
+// Reliable first-paint auth signal injected by the server into the HTML document
+// (see server/lib/html-bootstrap.ts). Read once at module load — it reflects the
+// session at the moment this HTML was served.
+const SERVER_AUTHED = isBootstrapAuthed()
+// Auth cookies were present on this load (even if the server couldn't verify):
+// treat as logged-in for the "never show landing on /" decision. The persisted
+// optimistic-auth hint is used ONLY as a tiebreaker when the server's answer is
+// absent/uncertain — never when the server EXPLICITLY says logged-out (so a real
+// logout correctly shows the landing page).
+const SERVER_COOKIED = isBootstrapCookied() || (!isBootstrapExplicitlyLoggedOut() && hasAuthHint())
+// Server injected a verified, ONBOARDED user with seeded data → safe to mount the
+// dashboard immediately, before the client Firebase session finishes restoring.
+const SERVER_ONBOARDED = isBootstrapOnboarded()
+
+// Prefetch the lazy AuthenticatedApp chunk IMMEDIATELY for a server-verified
+// session, in parallel with the main bundle — so by the time React mounts and
+// hits the Suspense boundary the chunk is already loaded and the dashboard
+// renders without an extra shell-fallback frame. (Vite dedupes this with the
+// React.lazy import below, so the chunk downloads once.)
+if (SERVER_AUTHED) {
+  void import('./AuthenticatedApp')
+  // VeeGPT is its own heavy lazy chunk (not part of AuthenticatedApp). On a
+  // direct /veegpt load, prefetch it in parallel so it's ready by the time the
+  // route renders — otherwise the shell overlay dissolves onto VeeGPT's Suspense
+  // fallback / a white content gap (VeeGPT's chat area is white) → a flash.
+  try {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/veegpt')) {
+      void import('./pages/VeeGPT')
+    }
+  } catch { /* ignore */ }
+}
+
+
 const AdminLogin = React.lazy(() => import('./pages/AdminLogin'))
 const Features = React.lazy(() => import('./pages/Features'))
 const Pricing = React.lazy(() => import('./pages/Pricing'))
@@ -40,7 +84,6 @@ const Community = React.lazy(() => import('./pages/Community'))
 const Status = React.lazy(() => import('./pages/Status'))
 const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'))
 const CookieConsentBanner = React.lazy(() => import('./components/CookieConsentBanner'))
-const WaitlistPage = React.lazy(() => import('./pages/WaitlistPage'))
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
 
 const publicRoutes = [
@@ -54,7 +97,7 @@ const protectedRoutes = [
   '/integration', '/plan', '/create', '/analytics', '/inbox', '/video-generator',
   '/workspaces', '/profile', '/automation', '/veegpt', '/admin', '/settings',
   '/security-dashboard', '/integrations', '/test-fixtures', '/encryption-health',
-  '/best-time', '/social-listening'
+  '/best-time', '/social-listening', '/ai-usage'
 ]
 
 function App() {
@@ -67,7 +110,13 @@ function App() {
 
   const { user, loading } = useFirebaseAuth()
   const [location, setLocation] = useLocation()
-  
+
+  // Onboarding gate: a logged-in user who has NOT completed onboarding must never
+  // mount AuthenticatedApp (which would flash the dashboard before bouncing them
+  // out). We resolve onboarding status here, at the top level, and only hand the
+  // user to the authenticated dashboard once onboarding is confirmed complete.
+  const { isResolving: onboardingResolving, isOnboarded } = useOnboardingStatus()
+
   // Debug logging to see auth state in App
   useEffect(() => {
     console.log('[App] Auth state changed:', {
@@ -111,6 +160,13 @@ function App() {
   useAccessibilityRouteAnnouncements(location)
 
   useEffect(() => {
+    // DIAGNOSTIC: set VITE_DISABLE_PERF_OPT=true in client .env to skip all
+    // runtime "optimizers" that mutate the DOM/CSSOM at runtime (Core Web Vitals
+    // style mutations, component modernization, P6). Used to isolate whether these
+    // are the source of the mobile/Safari scroll flicker. Theme/SEO/a11y still run.
+    const disablePerfOpt =
+      (import.meta as any).env?.VITE_DISABLE_PERF_OPT === 'true'
+
     const initAll = () => {
       if (!themeInitialized.current) {
         initializeTheme()
@@ -124,6 +180,12 @@ function App() {
         initializeSEO()
         seoInitialized.current = true
       }
+
+      if (disablePerfOpt) {
+        console.warn('[DIAGNOSTIC] VITE_DISABLE_PERF_OPT=true — skipping CoreWebVitals / ComponentModernization / P6 init')
+        return
+      }
+
       if (!webVitalsInitialized.current) {
         initializeCoreWebVitals()
         webVitalsInitialized.current = true
@@ -150,6 +212,21 @@ function App() {
   }, [])
 
   const effectiveLocation = location || '/'
+
+  // Whether the current navigation is an onboarding resume (/signup?resume=true)
+  // OR a return from Meta OAuth (/signup?authorizedBrandCount=N or ?meta_error=...).
+  // Read from the live URL because wouter's location does not include the query string.
+  const isResumingOnboarding = useMemo(
+    () => {
+      const sp = new URLSearchParams(window.location.search)
+      return (
+        sp.get('resume') === 'true' ||
+        sp.get('authorizedBrandCount') !== null ||
+        sp.get('meta_error') !== null
+      )
+    },
+    [location]
+  )
 
   const isPublicRoute = useMemo(() => publicRoutes.some(route =>
     effectiveLocation === route || effectiveLocation.startsWith(route + '/')
@@ -200,68 +277,115 @@ function App() {
     }
   }, [loading, user, isProtectedRoute, setLocation, hasEarlyAccess, earlyAccessLoading, effectiveLocation])
 
-  // Show loading spinner while Firebase auth is resolving
-  // IMPORTANT: Show loading for ANY auth state transition to prevent flickering
-  if (loading) {
-    // For protected routes or root path, always show loading
-    if (!isPublicRoute || effectiveLocation === '/') {
-      return <LoadingSpinner type="dashboard" />
+  // ONBOARDING GATE REDIRECT
+  // A logged-in user who has NOT completed onboarding belongs in the onboarding
+  // flow — never on the dashboard, the landing page, or a bare signup/signin
+  // form.
+  useEffect(() => {
+    if (loading || !user || onboardingResolving || isOnboarded) return
+
+    // Fast-path: check localStorage before doing the redirect.
+    try {
+      if (localStorage.getItem('isOnboarded') === 'true') return
+    } catch { /* ignore */ }
+
+    // If the server bootstrap says this user is onboarded, trust it — skip the gate.
+    if (SERVER_ONBOARDED || isBootstrapOnboarded()) return
+
+    // Already on the resume flow — nothing to do.
+    const searchParams = new URLSearchParams(window.location.search)
+    const onSignupResume =
+      effectiveLocation === '/signup' &&
+      searchParams.get('resume') === 'true'
+    if (onSignupResume) return
+
+    // Already on the Meta callback return flow — don't redirect away from it.
+    // This covers /signup?authorizedBrandCount=N and /signup?meta_error=...
+    const isMetaCallback =
+      effectiveLocation === '/signup' &&
+      (searchParams.get('authorizedBrandCount') !== null || searchParams.get('meta_error') !== null)
+    if (isMetaCallback) return
+
+    console.log('[App] User not onboarded — navigating to /signup?resume=true to complete onboarding')
+    setLocation('/signup?resume=true')
+  }, [loading, user, onboardingResolving, isOnboarded, effectiveLocation, setLocation])
+
+  // When the server verified an onboarded session and seeded the data, mount the
+  // authenticated dashboard IMMEDIATELY (real frame + seeded data) rather than
+  // waiting for the client Firebase session to finish restoring. Restricted to
+  // authenticated routes / the root entry so public + auth pages are unaffected.
+  // The dashboard mounts inside the provider tree below (not an early return),
+  // so React context is intact.
+  const mountAppEarly =
+    loading && SERVER_AUTHED && SERVER_ONBOARDED &&
+    (!isPublicRoute || effectiveLocation === '/' || effectiveLocation === '/landing')
+
+  // Show the app-shell skeleton while Firebase auth is resolving — but ONLY on
+  // protected (authenticated) routes, OR on the app's root entry when the SERVER
+  // confirmed an authenticated session for this load (so a returning user goes
+  // straight to the dashboard with no landing flash). Logged-out visitors and
+  // anyone on an explicit auth page (signin / signup / waitlist / reset) render
+  // their public page — never the dashboard. Skipped entirely when mounting the
+  // app early (the real dashboard renders instead of the shell).
+  if (loading && !mountAppEarly) {
+    if (!isPublicRoute) {
+      return <AppShellSkeleton pathname={effectiveLocation} />
     }
-    // For public routes (except root), only show loading if we think user might be authenticated
-    // This prevents flickering on public pages during auth initialization
-    if (user !== null) {
-      return <LoadingSpinner type="dashboard" />
+    // A request that carried auth cookies is a logged-in user — show the shell,
+    // never the public landing, on the root entry while Firebase restores.
+    if ((SERVER_AUTHED || SERVER_COOKIED) && (effectiveLocation === '/' || effectiveLocation === '/landing')) {
+      return <AppShellSkeleton pathname={effectiveLocation} />
     }
   }
 
   const renderPublicPage = () => {
     switch (effectiveLocation) {
       case '/':
-        return <RouteErrorBoundary routeName="Home"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Home"><React.Suspense fallback={null}><NewLanding onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
       case '/features':
-        return <RouteErrorBoundary routeName="Features"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Features /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Features"><React.Suspense fallback={null}><Features /></React.Suspense></RouteErrorBoundary>
       case '/pricing':
-        return <RouteErrorBoundary routeName="Pricing"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Pricing /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Pricing"><React.Suspense fallback={null}><Pricing /></React.Suspense></RouteErrorBoundary>
       case '/changelog':
-        return <RouteErrorBoundary routeName="Changelog"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Changelog /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Changelog"><React.Suspense fallback={null}><Changelog /></React.Suspense></RouteErrorBoundary>
       case '/about':
-        return <RouteErrorBoundary routeName="About"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><About /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="About"><React.Suspense fallback={null}><About /></React.Suspense></RouteErrorBoundary>
       case '/blog':
-        return <RouteErrorBoundary routeName="Blog"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Blog /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Blog"><React.Suspense fallback={null}><Blog /></React.Suspense></RouteErrorBoundary>
       case '/careers':
-        return <RouteErrorBoundary routeName="Careers"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Careers /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Careers"><React.Suspense fallback={null}><Careers /></React.Suspense></RouteErrorBoundary>
       case '/contact':
-        return <RouteErrorBoundary routeName="Contact"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Contact /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Contact"><React.Suspense fallback={null}><Contact /></React.Suspense></RouteErrorBoundary>
       case '/security':
-        return <RouteErrorBoundary routeName="Security"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Security /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Security"><React.Suspense fallback={null}><Security /></React.Suspense></RouteErrorBoundary>
       case '/gdpr':
-        return <RouteErrorBoundary routeName="GDPR"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><GDPR /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="GDPR"><React.Suspense fallback={null}><GDPR /></React.Suspense></RouteErrorBoundary>
       case '/privacy-policy':
-        return <RouteErrorBoundary routeName="Privacy Policy"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><PrivacyPolicyPage /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Privacy Policy"><React.Suspense fallback={null}><PrivacyPolicyPage /></React.Suspense></RouteErrorBoundary>
       case '/terms-of-service':
-        return <RouteErrorBoundary routeName="Terms of Service"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><TermsOfServicePage /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Terms of Service"><React.Suspense fallback={null}><TermsOfServicePage /></React.Suspense></RouteErrorBoundary>
       case '/free-trial':
-        return <RouteErrorBoundary routeName="Free Trial"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><FreeTrial /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Free Trial"><React.Suspense fallback={null}><FreeTrial /></React.Suspense></RouteErrorBoundary>
       case '/help':
-        return <RouteErrorBoundary routeName="Help Center"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><HelpCenter /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Help Center"><React.Suspense fallback={null}><HelpCenter /></React.Suspense></RouteErrorBoundary>
       case '/community':
-        return <RouteErrorBoundary routeName="Community"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Community /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Community"><React.Suspense fallback={null}><Community /></React.Suspense></RouteErrorBoundary>
       case '/status':
-        return <RouteErrorBoundary routeName="Status"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Status /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Status"><React.Suspense fallback={null}><Status /></React.Suspense></RouteErrorBoundary>
       case '/cookies':
-        return <RouteErrorBoundary routeName="Cookie Policy"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><CookiePolicy /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Cookie Policy"><React.Suspense fallback={null}><CookiePolicy /></React.Suspense></RouteErrorBoundary>
       case '/signup':
-        return <RouteErrorBoundary routeName="Sign Up"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignUpIntegrated /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Sign Up"><React.Suspense fallback={null}><SignUpIntegrated /></React.Suspense></RouteErrorBoundary>
       case '/signin':
-        return <RouteErrorBoundary routeName="Sign In"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><SignIn onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Sign In"><React.Suspense fallback={null}><SignIn onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
       case '/admin-login':
-        return <RouteErrorBoundary routeName="Admin Login"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><AdminLogin /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Admin Login"><React.Suspense fallback={null}><AdminLogin /></React.Suspense></RouteErrorBoundary>
       case '/landing':
-        return <RouteErrorBoundary routeName="Landing"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><Landing onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="New Landing"><React.Suspense fallback={null}><NewLanding onNavigate={handleNavigate} /></React.Suspense></RouteErrorBoundary>
       case '/waitlist':
-        return <RouteErrorBoundary routeName="Waitlist"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><WaitlistPage /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Waitlist"><React.Suspense fallback={null}><WaitlistPage /></React.Suspense></RouteErrorBoundary>
       case '/auth/reset-password':
-        return <RouteErrorBoundary routeName="Reset Password"><React.Suspense fallback={<LoadingSpinner type="minimal" />}><ResetPassword /></React.Suspense></RouteErrorBoundary>
+        return <RouteErrorBoundary routeName="Reset Password"><React.Suspense fallback={null}><ResetPassword /></React.Suspense></RouteErrorBoundary>
       default:
         return null
     }
@@ -276,43 +400,78 @@ function App() {
             <CookieConsentBanner />
           </React.Suspense>
 
-          {/* CRITICAL: Always show AuthenticatedApp for logged-in users, regardless of route */}
-          {user ? (
+          {/* A logged-in user who still needs to finish onboarding is sent to
+              /signup?resume=true. We must render the SignUpIntegrated onboarding
+              UI here instead of AuthenticatedApp; otherwise AuthenticatedApp has
+              no /signup route, falls through to <Redirect to="/">, and the
+              not-onboarded check immediately re-redirects to /signup?resume=true,
+              producing an infinite loop that renders a blank screen. */}
+          {user && effectiveLocation === '/signup' && isResumingOnboarding ? (
+            <RouteErrorBoundary routeName="Sign Up">
+              <React.Suspense fallback={null}>
+                <SignUpIntegrated />
+              </React.Suspense>
+            </RouteErrorBoundary>
+          ) : user && onboardingResolving && !SERVER_ONBOARDED ? (
+            /* Logged in, but onboarding status not yet resolved. Show the app
+               shell skeleton so we never flash the dashboard before we know
+               whether the user is allowed into it. SKIPPED when the SERVER
+               already verified an onboarded session (SERVER_ONBOARDED): in that
+               case AuthenticatedApp is already mounted via mountAppEarly, and
+               dropping back to this skeleton when Firebase's `loading` flips
+               false would UNMOUNT/remount AuthenticatedApp (and the VeeGPT chunk)
+               — a blank flash on warm loads. Staying on the AuthenticatedApp
+               branch below keeps it mounted continuously. */
+            <AppShellSkeleton pathname={effectiveLocation} />
+          ) : (user && isOnboarded) || mountAppEarly || (user && SERVER_ONBOARDED) ? (
+            /* Onboarded user (or a server-verified onboarded session still
+               restoring on the client): mount the authenticated dashboard. With
+               the server-seeded user/workspace data, the real dashboard frame
+               renders immediately and the per-widget data fills in. */
             <RouteErrorBoundary routeName="App">
-              <React.Suspense fallback={<LoadingSpinner type="dashboard" />}>
+              <React.Suspense fallback={<AppShellSkeleton pathname={effectiveLocation} />}>
                 <AuthenticatedApp />
               </React.Suspense>
             </RouteErrorBoundary>
+          ) : user && !isOnboarded ? (
+            /* Logged in but NOT onboarded and NOT on the resume flow yet. The
+               onboarding gate effect is redirecting to /signup?resume=true. Hold
+               the loader for ALL routes (landing, signin, dashboard, bare signup,
+               etc.) so the user never sees a flash of the wrong page and never
+               sees the misleading "redirecting to your dashboard" message. */
+            <LoadingSpinner type="dashboard" /> /* skeleton-guard-allow: pre-auth-boot-loader */
           ) : isPublicRoute ? (
-            effectiveLocation === '/waitlist' || effectiveLocation === '/signin' || effectiveLocation === '/signup' ? (
-              // Waitlist, SignIn, and SignUp pages render without header/footer
+            effectiveLocation === '/' || effectiveLocation === '/waitlist' || effectiveLocation === '/signin' || effectiveLocation === '/signup' || effectiveLocation === '/landing' ? (
+              // Home (new landing), Waitlist, SignIn, SignUp render without global header/footer
               effectiveLocation === '/waitlist' ? (
                 <RouteErrorBoundary routeName="Waitlist">
-                  <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                  <React.Suspense fallback={null}>
                     <WaitlistPage />
                   </React.Suspense>
                 </RouteErrorBoundary>
               ) : effectiveLocation === '/signin' ? (
                 <RouteErrorBoundary routeName="Sign In">
-                  <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                  <React.Suspense fallback={null}>
                     <SignIn onNavigate={handleNavigate} />
+                  </React.Suspense>
+                </RouteErrorBoundary>
+              ) : effectiveLocation === '/landing' || effectiveLocation === '/' ? (
+                <RouteErrorBoundary routeName="Home">
+                  <React.Suspense fallback={null}>
+                    <NewLanding onNavigate={handleNavigate} />
                   </React.Suspense>
                 </RouteErrorBoundary>
               ) : (
                 <RouteErrorBoundary routeName="Sign Up">
-                  <React.Suspense fallback={<LoadingSpinner type="minimal" />}>
+                  <React.Suspense fallback={null}>
                     <SignUpIntegrated />
                   </React.Suspense>
                 </RouteErrorBoundary>
               )
             ) : (
-              <div className="min-h-screen bg-black text-white">
-                <MainNavigation />
-                <main>
-                  {renderPublicPage()}
-                </main>
-                <MainFooter />
-              </div>
+              <PublicPageLayout onNavigate={handleNavigate}>
+                {renderPublicPage()}
+              </PublicPageLayout>
             )
           ) : (
             <div className="min-h-screen bg-[#030303] flex items-center justify-center p-6">

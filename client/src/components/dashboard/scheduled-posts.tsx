@@ -10,6 +10,7 @@ import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
 import { PostPreviewDialog } from './PostPreviewDialog'
+import useSubscription from '@/hooks/useSubscription'
 
 export const useSocialAccountsMap = (workspaceId: string | undefined) => {
   const { data: accounts } = useQuery({
@@ -20,12 +21,16 @@ export const useSocialAccountsMap = (workspaceId: string | undefined) => {
 
   return React.useMemo(() => {
     const map = new Map<string, any>()
-    if (accounts) {
-      accounts.forEach((acc: any) => {
-        map.set(acc.id, acc)
-        if (acc._id) map.set(acc._id, acc)
-      })
-    }
+    // The endpoint may return a bare array OR a { success, data: [...] } envelope.
+    // Normalize before iterating so a non-array response can't crash the page
+    // (TypeError: forEach is not a function).
+    const list = Array.isArray(accounts)
+      ? accounts
+      : (Array.isArray((accounts as any)?.data) ? (accounts as any).data : [])
+    list.forEach((acc: any) => {
+      map.set(acc.id, acc)
+      if (acc._id) map.set(acc._id, acc)
+    })
     return map
   }, [accounts])
 }
@@ -313,11 +318,14 @@ export function Drafts({ isLoading: externalIsLoading }: DraftsProps = {}) {
   const { currentWorkspace } = useCurrentWorkspace()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { limits } = useSubscription()
+  // Drafts are a Creator+ feature — hide entirely (and skip the fetch) for Free.
+  const canUseDrafts = limits?.features?.draftPosts === true
 
   const { data: drafts, isLoading: isFetching } = useQuery({
     queryKey: ['/api/content/workspace', currentWorkspace?.id, 'drafts'],
     queryFn: () => apiRequest(`/api/content/workspace/${currentWorkspace?.id}/drafts`),
-    enabled: !!currentWorkspace?.id,
+    enabled: !!currentWorkspace?.id && canUseDrafts,
   })
 
   const accountMap = useSocialAccountsMap(currentWorkspace?.id);
@@ -331,10 +339,17 @@ export function Drafts({ isLoading: externalIsLoading }: DraftsProps = {}) {
       await apiRequest(`/api/content/${id}/publish`, { method: 'POST' })
       toast({ title: 'Published successfully' })
       queryClient.invalidateQueries({ queryKey: ['/api/content/workspace', currentWorkspace?.id] })
+      // Refresh the best-time recommendation immediately instead of waiting out its
+      // staleTime. Predicate covers both the analytics hook's key and the calendar's key.
+      queryClient.invalidateQueries({
+        predicate: (q) => typeof q.queryKey[0] === 'string' && (q.queryKey[0] as string).startsWith('/api/v1/analytics/best-time')
+      })
     } catch (error: any) {
       toast({ title: 'Publish failed', description: error.message, variant: 'destructive' })
     }
   }
+
+  if (!canUseDrafts) return null
 
   if (isLoading) {
     return <DraftsSkeleton />

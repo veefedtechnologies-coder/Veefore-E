@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import { MetricsQueueManager } from '../queues/metricsQueue';
+import { WebhookQueueManager } from '../queues/webhookQueue';
 
 const router = express.Router();
 
@@ -88,32 +88,31 @@ router.get('/instagram', (req, res) => {
 
 /**
  * POST /api/webhooks/instagram
- * Handle Instagram webhook events
+ * Handle Instagram webhook events — enqueue-only receiver.
+ * 
+ * This handler is deliberately stateless and performs NO business logic:
+ * - No database lookups
+ * - No outbound API calls
+ * - No in-process webhook evaluation
+ * 
+ * Signature validation is the only check before enqueuing.
+ * All processing is deferred to the webhook worker via BullMQ `webhook-events` queue.
+ * 
+ * Requirements: 7.1 (< 50ms response), 7.2 (no inline logic), 7.7 (stateless/scalable)
  */
 router.post('/instagram', verifyWebhookSignature, async (req, res) => {
-  try {
-    const { object, entry } = req.body;
+  // Return 200 immediately — no processing inline
+  const { object, entry } = req.body;
+  res.status(200).json({ status: 'received' });
 
-    console.log('🔔 Instagram webhook event received');
-    console.log('Object:', object);
-    console.log('Entry count:', entry?.length || 0);
-
-    // Acknowledge receipt immediately
-    res.status(200).json({ status: 'received' });
-
-    // Process webhook events asynchronously
-    if (object === 'instagram' && entry && Array.isArray(entry)) {
-      for (const entryItem of entry) {
-        await processWebhookEntry(entryItem);
-      }
-    } else {
-      console.warn('⚠️ Unknown webhook object type:', object);
+  // Enqueue each entry for async processing (fire-and-forget, don't block response)
+  if (object === 'instagram' && Array.isArray(entry)) {
+    for (const entryItem of entry) {
+      // Enqueue without awaiting confirmation — response is already sent
+      WebhookQueueManager.addWebhookEvent(entryItem).catch((err) => {
+        console.error('[WEBHOOK RECEIVER] Failed to enqueue entry:', err);
+      });
     }
-
-  } catch (error) {
-    console.error('🚨 Error processing webhook:', error);
-    // Still return 200 to avoid Instagram retrying
-    res.status(200).json({ status: 'error', message: 'Processing failed' });
   }
 });
 
@@ -382,6 +381,31 @@ async function handleStoryInsightsWebhook(
 ): Promise<void> {
   console.log(`📱 Processing story insights webhook for account: ${instagramAccountId}`);
 
+  // Smart-polling safety net (smart-polling-system Req 5.1): scheduling the
+  // recurring Story_Insights_Job + guaranteed Final_Fetch_Job here ensures story
+  // insights are captured before the 24h expiry even under rate-limit pressure.
+  // Per Req 5.8 the webhook does NOT replace these jobs — they keep running as
+  // the safety net. publishTimeMs is derived from the webhook timestamp when
+  // present, otherwise defaults to now inside scheduleStoryInsights.
+  try {
+    const storyId = value?.media_id ?? value?.story_id ?? value?.id;
+    if (storyId) {
+      const publishTimeMs = value?.timestamp
+        ? Date.parse(value.timestamp)
+        : (typeof value?.created_time === 'number' ? value.created_time * 1000 : Date.now());
+      const { MetricsQueueManager } = await import('../queues/metricsQueue');
+      await MetricsQueueManager.scheduleStoryInsights(
+        instagramAccountId,
+        String(storyId),
+        Number.isFinite(publishTimeMs) ? publishTimeMs : Date.now()
+      );
+    } else {
+      console.log(`⚠️ Story insights webhook missing story/media id; skipping safety-net scheduling for ${instagramAccountId}`);
+    }
+  } catch (error) {
+    console.error('Failed to schedule story-insights safety-net jobs:', error);
+  }
+
 
 
   // Broadcast to frontend via WebSocket for immediate updates
@@ -554,57 +578,40 @@ router.get('/instagram/test', (req, res) => {
   });
 });
 
-// Test endpoint to simulate a comment webhook
+// Test endpoint to simulate a comment webhook (enqueues via the same queue path)
 router.post('/instagram/test-comment', async (req, res) => {
   try {
-    console.log('🧪 TEST: Simulating comment webhook...');
+    console.log('🧪 TEST: Simulating comment webhook via queue...');
     
-    // Simulate a comment webhook payload
-    const testPayload = {
-      object: 'instagram',
-      entry: [{
-        id: '17841474747481653',
-        time: Math.floor(Date.now() / 1000),
-        changes: [{
-          field: 'comments',
-          value: {
-            id: 'test_comment_' + Date.now(),
-            text: 'Test comment from webhook simulation',
-            from: {
-              id: 'test_user',
-              username: 'test_user'
-            },
-            media_id: '18374233234126113',
-            created_time: Math.floor(Date.now() / 1000)
-          }
-        }]
+    // Simulate a comment webhook entry
+    const testEntry = {
+      id: '17841474747481653',
+      time: Math.floor(Date.now() / 1000),
+      changes: [{
+        field: 'comments',
+        value: {
+          id: 'test_comment_' + Date.now(),
+          text: 'Test comment from webhook simulation',
+          from: {
+            id: 'test_user',
+            username: 'test_user'
+          },
+          media_id: '18374233234126113',
+          created_time: Math.floor(Date.now() / 1000)
+        }
       }]
     };
     
-    // Process the test webhook directly with the correct workspace and account
-    console.log('🧪 TEST WEBHOOK: About to call processWebhookChange...');
-    await processWebhookChange('684402c2fd2cd4eb6521b386', '25418395794416915', {
-      field: 'comments',
-      value: {
-        id: 'test_comment_' + Date.now(),
-        text: 'Test comment from webhook simulation',
-        from: {
-          id: 'test_user',
-          username: 'test_user'
-        },
-        media_id: '18374233234126113',
-        created_time: Math.floor(Date.now() / 1000)
-      }
-    });
-    console.log('🧪 TEST WEBHOOK: processWebhookChange completed');
+    // Enqueue via the same path as real webhooks
+    const queued = await WebhookQueueManager.addWebhookEvent(testEntry);
     
     res.json({
-      status: 'test-webhook-processed',
-      message: 'Test comment webhook processed successfully',
+      status: queued ? 'test-webhook-queued' : 'test-webhook-fallback',
+      message: queued ? 'Test comment webhook enqueued for async processing' : 'Queue unavailable, entry not processed',
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
-    console.error('🧪 TEST: Error processing test webhook:', error);
+  } catch (error: any) {
+    console.error('🧪 TEST: Error enqueuing test webhook:', error);
     res.status(500).json({
       status: 'test-webhook-error',
       error: error.message

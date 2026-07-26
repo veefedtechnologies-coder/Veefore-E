@@ -11,7 +11,11 @@ export const useUser = () => {
     enabled: !!user && !authLoading,
     retry: 2,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: false,
+    // Always refetch the canonical user record when a screen that depends on it
+    // mounts (e.g. Settings). This prevents the profile form from initializing
+    // against a stale/partial cached user where preferences (niche, bio, etc.)
+    // haven't hydrated yet, which made saved values look empty after refresh.
+    refetchOnMount: 'always',
     refetchOnReconnect: true,
     refetchOnWindowFocus: false
   })

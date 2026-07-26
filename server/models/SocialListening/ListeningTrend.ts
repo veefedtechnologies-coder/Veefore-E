@@ -7,7 +7,13 @@ export interface IListeningTrend extends Document {
   velocityScore: number; // 0-100
   opportunityScore: number; // 0-100
   volume: number; // total mentions in current window
-  growthPercentage: number; // growth compared to previous window
+  averageSentiment: number; // -1..1 average sentiment score across mentions
+  growthPercentage: number; // growth vs previous window (momentum)
+  engagement: number; // total engagement (likes + comments + views) across mentions
+  description: string; // short AI summary of what's happening with this topic
+  hashtags: string[]; // suggested hashtags for this topic
+  priority: 'high' | 'medium' | 'low'; // actionability/urgency for the creator
+  sentimentLabel: 'positive' | 'negative' | 'neutral';
   relatedKeywords: string[];
   samplePosts: string[]; // ObjectIds of sample ListeningPosts
   timeframe: '24h' | '7d' | '30d';
@@ -23,7 +29,13 @@ export const ListeningTrendSchema = new Schema<IListeningTrend>({
   velocityScore: { type: Number, default: 0 },
   opportunityScore: { type: Number, default: 0 },
   volume: { type: Number, default: 0 },
+  averageSentiment: { type: Number, default: 0 },
   growthPercentage: { type: Number, default: 0 },
+  engagement: { type: Number, default: 0 },
+  description: { type: String, default: '' },
+  hashtags: { type: [String], default: [] },
+  priority: { type: String, default: 'medium' },
+  sentimentLabel: { type: String, default: 'neutral' },
   relatedKeywords: { type: [String], default: [] },
   samplePosts: { type: [String], default: [] },
   timeframe: { type: String, default: '7d' },

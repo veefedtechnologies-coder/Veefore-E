@@ -23,6 +23,7 @@ import {
   VideoPreview,
   useVideoGeneration,
 } from '@/features/video-generator';
+import { VideoGeneratorSkeleton } from '@/components/skeletons/pages';
 
 /**
  * VideoGeneratorAdvanced Component
@@ -181,6 +182,7 @@ const VideoGeneratorAdvanced: React.FC = () => {
                   >
                     {isGenerating ? (
                       <>
+                        {/* skeleton-guard-allow: action-spinner — "Generate Video" button in-flight spinner, not a content-structure loading placeholder */}
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         Generating Video...
                       </>
@@ -246,14 +248,7 @@ const VideoGeneratorAdvanced: React.FC = () => {
 
   // Show loading state while user data is loading
   if (userLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return <VideoGeneratorSkeleton />;
   }
 
   // Show error state if user is not authenticated

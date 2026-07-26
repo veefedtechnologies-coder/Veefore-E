@@ -4,6 +4,8 @@ import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
 import { auditMiddleware } from '../../middleware/audit-middleware';
 import { AuditActions } from '../../utils/audit-logger';
+import { schedulingGuards, scheduleWithQuotaGuards, bulkSchedulingGuards } from '../../middleware/apply-route-guards';
+import { requireDraftPosts, requireFeature } from '../../middleware/entitlement.middleware';
 import { z } from 'zod';
 
 const router = Router();
@@ -31,6 +33,8 @@ router.get('/debug-counts', contentController.debugCounts);
 
 router.get('/workspace/:workspaceId/drafts',
   requireAuth,
+  // Drafts are a Creator+ feature. Free users cannot list drafts at all.
+  requireFeature('draftPosts'),
   validateRequest({ params: WorkspaceIdParams, query: PaginationQuery }),
   contentController.getDrafts
 );
@@ -49,9 +53,21 @@ router.get('/workspace/:workspaceId',
 
 router.post('/workspace/:workspaceId',
   requireAuth,
+  // Saving a post as a draft (status: 'draft') is a Creator+ feature. Publish /
+  // schedule flows are untouched (they don't send status: 'draft').
+  requireDraftPosts(),
   validateRequest({ params: WorkspaceIdParams }),
   auditMiddleware(AuditActions.CONTENT.CREATE, { resource: 'content' }),
   contentController.createContent
+);
+
+// Bulk scheduling — Creator plan and above. Schedules multiple existing content
+// items in one request. Gated by the bulkScheduling feature + monthly quota.
+router.post('/bulk-schedule',
+  requireAuth,
+  ...bulkSchedulingGuards,
+  auditMiddleware(AuditActions.CONTENT.SCHEDULE, { resource: 'content' }),
+  contentController.bulkScheduleContent
 );
 
 router.get('/top-performing',
@@ -87,6 +103,7 @@ router.put('/:contentId',
 
 router.post('/:contentId/schedule',
   requireAuth,
+  ...scheduleWithQuotaGuards,
   validateRequest({ params: ContentIdParams }),
   auditMiddleware(AuditActions.CONTENT.SCHEDULE, { resource: 'content' }),
   contentController.scheduleContent
@@ -101,6 +118,7 @@ router.post('/:contentId/publish',
 
 router.put('/:contentId/reschedule',
   requireAuth,
+  ...schedulingGuards,
   validateRequest({ params: ContentIdParams }),
   auditMiddleware(AuditActions.CONTENT.RESCHEDULE, { resource: 'content' }),
   contentController.rescheduleContent

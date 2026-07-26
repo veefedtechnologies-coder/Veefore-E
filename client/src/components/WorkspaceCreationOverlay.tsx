@@ -5,6 +5,7 @@ export default function WorkspaceCreationOverlay({ error, onRetry, onSignOut }: 
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 text-center">
         <div className="flex items-center justify-center mb-4">
+          {/* skeleton-guard-allow: action-spinner — in-flight workspace-creation mutation spinner in a modal overlay, not a content-structure loading placeholder */}
           <div className="animate-spin h-8 w-8 rounded-full border-4 border-blue-600 border-t-transparent" />
         </div>
         {!error ? (

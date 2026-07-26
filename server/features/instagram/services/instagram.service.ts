@@ -20,6 +20,9 @@ import axios, { AxiosResponse, AxiosError } from 'axios';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { GovernedHttpClient, GovernedHttpClientError, type GovernedRequestOptions } from '../../../services/GovernedHttpClient';
+import { getUsageStoreInstance } from '../../../services/UsageStore';
+import { rateLimitConfig } from '../../../config/rateLimitConfig';
 
 // Configuration
 const INSTAGRAM_GRAPH_API_BASE = 'https://graph.instagram.com';
@@ -80,6 +83,7 @@ export interface InstagramInsights {
   audience_country?: Record<string, number>;
   audience_gender_age?: Record<string, number>;
   audience_active_time?: Record<string, number>;
+  audience_active_time_weekly?: Record<string, number>;
 }
 
 export interface InstagramMediaInsights {
@@ -247,50 +251,59 @@ export class InstagramService implements IInstagramService {
 
   private async makeApiRequest<T>(url: string, token: string, retryCount: number = 0): Promise<T> {
     try {
-      await this.enforceRateLimit(token);
-
       console.log(`[INSTAGRAM API] Making request: ${url}`);
 
-      const response: AxiosResponse<T> = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'User-Agent': 'VeeFore/1.0',
-        },
-        timeout: 10000,
+      // Parse the URL to extract base, path, and params for GovernedHttpClient
+      const parsed = new URL(url);
+      const baseUrl = `${parsed.protocol}//${parsed.host}`;
+      const requestPath = parsed.pathname;
+      const params: Record<string, string> = {};
+      parsed.searchParams.forEach((value, key) => {
+        if (key !== 'access_token') {
+          params[key] = value;
+        }
       });
 
+      // Extract account ID from URL for usage tracking
+      const accountIdMatch = url.match(/\/(\d{10,})\//);
+      const accountId = accountIdMatch ? accountIdMatch[1] : 'unknown';
+
+      // Route through GovernedHttpClient for usage header parsing + tier management
+      const usageStore = getUsageStoreInstance();
+      const client = new GovernedHttpClient(
+        {
+          baseUrl,
+          timeout: rateLimitConfig.httpTimeoutMs,
+          maxRetries: rateLimitConfig.maxRetries,
+          deduplicationWindowMs: rateLimitConfig.deduplicationWindowMs,
+        },
+        usageStore
+      );
+
+      const requestOptions: GovernedRequestOptions = {
+        method: 'GET',
+        path: requestPath,
+        token,
+        params: Object.keys(params).length > 0 ? params : undefined,
+        accountId,
+        priority: 'normal',
+      };
+
+      const response = await client.request<T>(requestOptions);
       return response.data;
     } catch (error) {
-      const axiosError = error as AxiosError;
-
-      // Handle rate limiting (429 errors)
-      if (axiosError.response?.status === 429) {
-        const retryAfter = parseInt(axiosError.response.headers['retry-after'] || '60');
-
-        if (retryCount < MAX_RETRIES) {
-          console.log(`🚦 Rate limited. Retrying after ${retryAfter} seconds. Attempt ${retryCount + 1}/${MAX_RETRIES}`);
-          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-          return this.makeApiRequest(url, token, retryCount + 1);
-        }
-
+      // Map GovernedHttpClientError to InstagramApiError for backward compatibility
+      if (error instanceof GovernedHttpClientError) {
         throw {
-          code: 429,
-          message: 'Rate limit exceeded',
-          type: 'OAuthException',
-          is_rate_limit: true,
-          retry_after: retryAfter,
+          code: error.metaErrorCode || error.statusCode,
+          message: error.message,
+          type: error.metaErrorType || 'APIError',
+          is_rate_limit: error.statusCode === 429 || error.metaErrorCode === 80002,
+          retry_after: error.retryAfter || 60,
         } as InstagramApiError;
       }
 
-      // Handle server errors with exponential backoff
-      if (axiosError.response?.status && axiosError.response.status >= 500 && retryCount < MAX_RETRIES) {
-        const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount);
-        console.log(`🔄 Server error. Retrying in ${delay}ms. Attempt ${retryCount + 1}/${MAX_RETRIES}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return this.makeApiRequest(url, token, retryCount + 1);
-      }
-
-      // Handle Instagram API errors
+      const axiosError = error as AxiosError;
       if (axiosError.response?.data) {
         const apiError = axiosError.response.data as any;
         throw {
@@ -475,6 +488,15 @@ export class InstagramService implements IInstagramService {
       const useFacebookNode = !!accountId && !isBasicToken;
       const accountTypeField = useFacebookNode ? '' : ',account_type';
 
+      // Log which path we're taking so the debug file shows the routing decision.
+      try {
+        const { logMetaApiNote } = await import('../../../utils/instagram-api-debug-logger');
+        logMetaApiNote('getUserProfile', `token type=${isBasicToken ? 'IGAA(basic)' : 'EAAP(page/user)'} useFacebookNode=${useFacebookNode}`, {
+          accountId,
+          tokenPrefix: accessToken.slice(0, 12),
+        });
+      } catch { /* non-fatal */ }
+
       // Try comprehensive fields first, then fallback if needed
       let fields = `id,username${accountTypeField},media_count,followers_count,name,biography,profile_picture_url,website`;
       let response;
@@ -491,6 +513,16 @@ export class InstagramService implements IInstagramService {
       }
 
       console.log(`[INSTAGRAM API] User profile:`, response);
+
+      // Log success to the debug file for comparison with error entries.
+      try {
+        const { logMetaApiSuccess } = await import('../../../utils/instagram-api-debug-logger');
+        logMetaApiSuccess('getUserProfile', {
+          username: response.username,
+          accountId: response.id,
+          followersCount: response.followers_count,
+        });
+      } catch { /* non-fatal */ }
 
       // Ensure we have all required properties. Accounts reached via the Facebook
       // Graph node are Business/Creator accounts by definition (the field isn't
@@ -514,9 +546,42 @@ export class InstagramService implements IInstagramService {
 
       return profile;
     } catch (error: any) {
-      const underlying = error?.response?.data?.error?.message || error.message || error;
+      const metaError = error?.response?.data?.error || error?.error || {};
+      const code = Number(metaError.code ?? error?.code ?? 0);
+      // error_subcode is now propagated through GovernedHttpClientError → InstagramApiError
+      // Treat null (no subcode in Meta response) as 0 rather than NaN.
+      const rawSubcode =
+        metaError.error_subcode ??
+        error?.error_subcode ??
+        error?.subcode;
+      const subcode = rawSubcode != null ? Number(rawSubcode) : 0;
+      const underlying = metaError.message || error.message || error;
       console.error(`[INSTAGRAM API] Profile error:`, underlying);
-      throw new Error(`Failed to fetch Instagram Business profile: ${underlying}`);
+
+      // Classify "account is no longer accessible by this token" failures so the
+      // caller can mark the connection invalid and STOP retrying instead of
+      // hammering Meta forever. This is NOT a transient error and NOT a rate
+      // limit — the token can't read this IG object at all:
+      //   • code 190                         → invalid/expired OAuth token
+      //   • code 100 + subcode 33            → object missing / no permission
+      //     (IG account unlinked from the Page, or permission revoked)
+      //   • code 10 / 200 / 803              → permission / object-access errors
+      const isAccessRevoked =
+        code === 190 ||
+        (code === 100 && subcode === 33) ||
+        // subcode=33 sometimes comes through as 0 (extraction issue). Check the message too.
+        (code === 100 && underlying.includes('does not exist, cannot be loaded due to missing permissions')) ||
+        code === 10 ||
+        code === 200 ||
+        code === 803;
+
+      const wrapped: any = new Error(`Failed to fetch Instagram Business profile: ${underlying}`);
+      // Mark the error so the worker recognizes it as a reconnect-required
+      // condition (handled like token expiry: mark invalid, do not retry).
+      wrapped.isAccountAccessRevoked = isAccessRevoked;
+      wrapped.metaCode = code;
+      wrapped.metaSubcode = subcode;
+      throw wrapped;
     }
   }
 
@@ -705,17 +770,68 @@ export class InstagramService implements IInstagramService {
           }
         }
 
-        // Fetch online_followers (Active Time)
+        // Fetch online_followers (Active Time) — Business/Creator only.
+        // Without since/until the API defaults to today's unfinished period → returns {}.
+        // Fetch last 30 days (excluding today) and average per-hour across days
+        // that actually had data — the same approach Hootsuite uses.
         try {
-          const url = `${apiBase}/${INSTAGRAM_GRAPH_API_VERSION}/${accountId}/insights?metric=online_followers&period=lifetime&access_token=${accessToken}`;
+          const DAY_S = 86400;
+          const nowSec = Math.floor(Date.now() / 1000);
+          const since = nowSec - 30 * DAY_S;   // 30 days ago
+          const until = nowSec - DAY_S;         // yesterday (today is unfinished → returns {})
+          const url = `${apiBase}/${INSTAGRAM_GRAPH_API_VERSION}/${accountId}/insights?metric=online_followers&period=lifetime&since=${since}&until=${until}&access_token=${accessToken}`;
           const response = await this.makeApiRequest<any>(url, accessToken);
 
           if (response.data && response.data.length > 0) {
             const metricData = response.data.find((m: any) => m.name === 'online_followers');
             if (metricData && metricData.values && metricData.values.length > 0) {
-              const validValue = [...metricData.values].reverse().find((v: any) => v.value && Object.keys(v.value).length > 0);
-              if (validValue) {
-                insights.audience_active_time = this.sanitizeDemographics(validValue.value);
+              // Average each hour's count across all non-empty days (24h bar chart).
+              const hourSums: Record<string, number> = {};
+              const hourCounts: Record<string, number> = {};
+              // Weekly grid: key = "DOW_HOUR" (0=Sun … 6=Sat, hour 0–23)
+              const weekSums: Record<string, number> = {};
+              const weekCounts: Record<string, number> = {};
+
+              for (const val of metricData.values) {
+                if (val.value && typeof val.value === 'object' && Object.keys(val.value).length > 0) {
+                  // Extract day-of-week from end_time (e.g. "2026-07-01T07:00:00+0000")
+                  const dow = val.end_time ? new Date(val.end_time).getDay() : -1; // 0=Sun … 6=Sat
+
+                  for (const [hour, count] of Object.entries(val.value)) {
+                    if (typeof count === 'number') {
+                      // 24h aggregation
+                      hourSums[hour] = (hourSums[hour] ?? 0) + count;
+                      hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+                      // Weekly grid aggregation
+                      if (dow >= 0) {
+                        const wKey = `${dow}_${hour}`;
+                        weekSums[wKey] = (weekSums[wKey] ?? 0) + count;
+                        weekCounts[wKey] = (weekCounts[wKey] ?? 0) + 1;
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (Object.keys(hourSums).length > 0) {
+                // 24h averaged heatmap
+                const averaged: Record<string, number> = {};
+                for (const [hour, sum] of Object.entries(hourSums)) {
+                  averaged[hour] = Math.round(sum / (hourCounts[hour] ?? 1));
+                }
+                insights.audience_active_time = this.sanitizeDemographics(averaged);
+
+                // 7×24 weekly heatmap
+                const weeklyAveraged: Record<string, number> = {};
+                for (const [wKey, sum] of Object.entries(weekSums)) {
+                  weeklyAveraged[wKey] = Math.round(sum / (weekCounts[wKey] ?? 1));
+                }
+                insights.audience_active_time_weekly = this.sanitizeDemographics(weeklyAveraged);
+
+                const daysWithData = Object.values(hourCounts)[0] ?? 0;
+                console.log(`✅ [instagram.service] Active Time: ${daysWithData} days, 24h slots: ${Object.keys(averaged).length}, weekly cells: ${Object.keys(weeklyAveraged).length}`);
+              } else {
+                console.log(`ℹ️  [instagram.service] online_followers: all ${metricData.values.length} day(s) returned empty values`);
               }
             }
           }

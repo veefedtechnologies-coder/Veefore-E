@@ -438,6 +438,7 @@ export const Loading: React.FC<LoadingProps> = ({ show, message, overlay = false
 
   const content = (
     <div className="flex items-center justify-center space-x-2">
+      {/* skeleton-guard-allow: action-spinner — generic <Loading> utility spinner shown for transient in-flight actions/overlays, not a primary content-structure loader */}
       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
       {message && <span className="text-sm text-gray-600">{message}</span>}
     </div>

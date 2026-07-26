@@ -83,14 +83,28 @@ export class FirebaseTokenService {
    * @requirement 3.5 - Handle token creation failures
    */
   async createFirebaseToken(
-    googleUserInfo: GoogleUserInfo
+    googleUserInfo: GoogleUserInfo,
+    options?: { allowCreate?: boolean }
   ): Promise<FirebaseTokenResult> {
     const startTime = Date.now();
-    
+    // Whether a brand-new account may be created in this flow. Sign-in flows pass
+    // allowCreate=false so a non-existent user is NOT silently created (early
+    // access is required to create an account — those users must join the
+    // waitlist). Defaults to true to preserve existing signup/OAuth behaviour.
+    const allowCreate = options?.allowCreate !== false;
+
     try {
       // Requirement 3.1: Find existing user by email
       let user: IUser | null = await User.findOne({ email: googleUserInfo.email });
       let isNewUser = false;
+
+      if (!user && !allowCreate) {
+        // Sign-in flow for an account that does not exist. Do NOT create it.
+        // Signal the caller so it can redirect the user to the waitlist instead.
+        const notFound = new Error('ACCOUNT_NOT_FOUND') as Error & { code?: string };
+        notFound.code = 'ACCOUNT_NOT_FOUND';
+        throw notFound;
+      }
 
       if (!user) {
         // Requirement 3.2: Create new user for Google OAuth
@@ -111,6 +125,10 @@ export class FirebaseTokenService {
           createdAt: new Date(),
           lastLoginAt: new Date(),
         });
+
+        // Immediately set firebaseUid = MongoDB _id (the custom token uses _id as UID).
+        // Without this, getUserByFirebaseUid won't find the user on the next request.
+        await User.updateOne({ _id: user._id }, { firebaseUid: String(user._id) });
 
         // Requirement 18.2: Log user creation during OAuth flow
         logger.info('New user created via Google OAuth', {
@@ -134,6 +152,13 @@ export class FirebaseTokenService {
         }
         if (!user.displayName && googleUserInfo.name) {
           user.displayName = googleUserInfo.name;
+        }
+
+        // Always sync firebaseUid with the MongoDB _id (the custom token uses _id as UID).
+        // This prevents stale firebaseUid values from breaking getUserByFirebaseUid lookups.
+        const expectedFirebaseUid = String(user._id);
+        if (user.firebaseUid !== expectedFirebaseUid) {
+          user.firebaseUid = expectedFirebaseUid;
         }
 
         await user.save();
@@ -184,6 +209,13 @@ export class FirebaseTokenService {
         isNewUser,
       };
     } catch (error) {
+      // Sign-in for a non-existent account: propagate as-is so the caller can
+      // redirect to the waitlist. This is an expected control-flow signal, not a
+      // token-creation failure, so don't log it as an error.
+      if ((error as any)?.code === 'ACCOUNT_NOT_FOUND') {
+        throw error;
+      }
+
       // Requirement 3.5: Handle Firebase token creation failures
       // Requirement 18.4: Log Firebase token creation failure with ERROR level
       logger.error('Failed to create Firebase token', error, {

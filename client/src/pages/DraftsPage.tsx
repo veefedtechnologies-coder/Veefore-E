@@ -1,15 +1,17 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Skeleton, SkeletonPageLoader } from '@/components/ui/skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
+import { DraftsSkeleton } from '@/components/skeletons/pages'
 import { Calendar, ArrowLeft, Eye, Video, Image as ImageIcon, Sparkles, PenBox, Trash2 } from 'lucide-react'
 import { useLocation } from 'wouter'
 import { useQuery } from '@tanstack/react-query'
-import { apiRequest } from '@/lib/queryClient'
+import { apiRequest, queryClient } from '@/lib/queryClient'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { useSocialAccountsMap } from '@/components/dashboard/scheduled-posts'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
+import useSubscription from '@/hooks/useSubscription'
 
 const isVideoUrl = (url: string) => {
   if (!url) return false
@@ -69,13 +71,24 @@ const MediaPreview = ({ url }: { url: string }) => {
 export default function DraftsPage() {
   const [, setLocation] = useLocation()
   const { currentWorkspace } = useCurrentWorkspace()
+  const { limits, isLoading: subLoading } = useSubscription()
   const [page, setPage] = useState(1)
   const limit = 12
+
+  // Drafts are a Creator+ feature. Once the entitlement resolves, redirect Free
+  // users away instead of letting them view (or fetch) drafts.
+  const canUseDrafts = limits?.features?.draftPosts === true
+  React.useEffect(() => {
+    if (!subLoading && limits && !canUseDrafts) {
+      setLocation('/plan')
+    }
+  }, [subLoading, limits, canUseDrafts, setLocation])
 
   const { data: drafts, isLoading, refetch } = useQuery({
     queryKey: ['/api/content/workspace', currentWorkspace?.id, 'drafts', page],
     queryFn: () => apiRequest(`/api/content/workspace/${currentWorkspace?.id}/drafts?page=${page}&limit=${limit}`),
-    enabled: !!currentWorkspace?.id,
+    // Never fetch drafts for plans that don't include the feature.
+    enabled: !!currentWorkspace?.id && canUseDrafts,
   })
 
   const { toast } = useToast()
@@ -88,6 +101,11 @@ export default function DraftsPage() {
         description: 'Your draft has been published.',
       })
       refetch()
+      // Refresh the best-time recommendation immediately instead of waiting out its
+      // staleTime. Predicate covers both the analytics hook's key and the calendar's key.
+      queryClient.invalidateQueries({
+        predicate: (q) => typeof q.queryKey[0] === 'string' && (q.queryKey[0] as string).startsWith('/api/v1/analytics/best-time')
+      })
     } catch (error: any) {
       toast({
         title: 'Publish failed',
@@ -148,7 +166,7 @@ export default function DraftsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {isLoading ? (
-          <SkeletonPageLoader type="drafts-page" />
+          <DraftsSkeleton />
         ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 px-4 text-center">
             <div className="w-24 h-24 mb-6 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center ring-8 ring-white dark:ring-gray-900 shadow-xl">

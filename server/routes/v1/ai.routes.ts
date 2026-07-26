@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import OpenAI from 'openai';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { aiRateLimiter } from '../../middleware/rate-limiting-working';
@@ -7,6 +8,16 @@ import { storage } from '../../mongodb-storage';
 import { performanceCorrelationService } from '../../services/PerformanceCorrelationService';
 import { generatedCaptionRepository } from '../../repositories/GeneratedCaptionRepository';
 import { AuthenticatedRequest } from '../../types/express';
+import { aiFeatureMiddleware } from '../../services/aiUsageTracker';
+import { AICreditService } from '../../services/AICreditService';
+import { multiPlatformCaptionService } from '../../services/MultiPlatformCaptionService';
+import type { PlatformId } from '../../../../src/shared/platform-registry/types';
+import {
+  captionGenerationGuards,
+  hashtagGenerationGuards,
+  imageGenerationGuards,
+  aiRewriteGuards,
+} from '../../middleware/ai-route-guards';
 
 // Import slim controllers
 import {
@@ -99,6 +110,45 @@ const GenerateHashtagsSchema = z.object({
   platform: z.string().max(50).optional(),
 });
 
+function inferMediaTypeFromUrl(url: unknown): 'image' | 'video' | undefined {
+  if (typeof url !== 'string' || !url) return undefined;
+  const normalizedUrl = url.toLowerCase();
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico', '.heic', '.heif'];
+  if (imageExtensions.some((extension) => normalizedUrl.includes(extension))) return 'image';
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'];
+  if (videoExtensions.some((extension) => normalizedUrl.includes(extension))) return 'video';
+  return undefined;
+}
+
+const GenerateContentSchema = z.preprocess(
+  (input: unknown) => {
+    if (!input || typeof input !== 'object') return input;
+    const normalized = { ...(input as Record<string, unknown>) };
+    if (normalized.mediaType == null) {
+      normalized.mediaType = inferMediaTypeFromUrl(normalized.mediaUrl);
+    }
+    return normalized;
+  },
+  z.object({
+    mediaUrl: z.string().optional().refine(
+      (value) => !value || value.trim() === '' || z.string().url().safeParse(value).success,
+      { message: 'Must be a valid URL if provided' },
+    ),
+    mediaType: z.enum(['image', 'video']).nullish(),
+    postType: z.enum(['post', 'story', 'reel']).optional(),
+    platform: z.string().max(50).optional(),
+    existingCaption: z.string().max(5000).optional(),
+    workspaceId: z.string().optional(),
+  }).transform((data) => ({
+    mediaUrl: data.mediaUrl?.trim() || undefined,
+    mediaType: data.mediaType || undefined,
+    postType: data.postType,
+    platform: data.platform,
+    existingCaption: data.existingCaption || undefined,
+    workspaceId: data.workspaceId,
+  })),
+);
+
 const GenerateImageSchema = z.object({
   prompt: z.string().min(1).max(1000),
   platform: z.string().max(50).optional(),
@@ -156,6 +206,7 @@ const RecordPerformanceSchema = z.object({
 router.post('/creative-brief',
   requireAuth,
   aiRateLimiter,
+  aiFeatureMiddleware('content.brief'),
   validateRequest({ body: CreativeBriefSchema }),
   ContentGenerationController.generateCreativeBrief
 );
@@ -164,6 +215,7 @@ router.post('/creative-brief',
 router.post('/content-repurpose',
   requireAuth,
   aiRateLimiter,
+  aiFeatureMiddleware('content.repurpose'),
   validateRequest({ body: ContentRepurposeSchema }),
   ContentGenerationController.repurposeContent
 );
@@ -171,6 +223,7 @@ router.post('/content-repurpose',
 router.post('/content-repurpose/bulk',
   requireAuth,
   aiRateLimiter,
+  aiFeatureMiddleware('content.repurpose'),
   validateRequest({ body: BulkRepurposeSchema }),
   ContentGenerationController.bulkRepurposeContent
 );
@@ -179,6 +232,7 @@ router.post('/content-repurpose/bulk',
 router.post('/competitor-analysis',
   requireAuth,
   aiRateLimiter,
+  aiFeatureMiddleware('competitor.analysis'),
   validateRequest({ body: CompetitorAnalysisSchema }),
   AnalysisController.analyzeCompetitor
 );
@@ -187,6 +241,8 @@ router.post('/competitor-analysis',
 router.post('/generate-caption',
   requireAuth,
   aiRateLimiter,
+  ...captionGenerationGuards,
+  aiFeatureMiddleware('caption.generation'),
   validateRequest({ body: GenerateCaptionSchema }),
   CaptionGenerationController.generateCaption
 );
@@ -195,6 +251,8 @@ router.post('/generate-caption',
 router.post('/regenerate-captions',
   requireAuth,
   aiRateLimiter,
+  ...captionGenerationGuards,
+  aiFeatureMiddleware('caption.regenerate'),
   validateRequest({ body: RegenerateCaptionsSchema }),
   CaptionGenerationController.regenerateCaptions
 );
@@ -203,14 +261,18 @@ router.post('/regenerate-captions',
 router.post('/generate-hashtags',
   requireAuth,
   aiRateLimiter,
+  ...hashtagGenerationGuards,
+  aiFeatureMiddleware('hashtag.generation'),
   validateRequest({ body: GenerateHashtagsSchema }),
   AnalysisController.generateHashtags
 );
 
-// Image generation - delegated to ImageGenerationController
+// Create Post AI image generation (separate from Performance Overview banner)
 router.post('/generate-image',
   requireAuth,
   aiRateLimiter,
+  ...imageGenerationGuards,
+  aiFeatureMiddleware('image.generation'),
   validateRequest({ body: GenerateImageSchema }),
   ImageGenerationController.generateImage
 );
@@ -219,837 +281,16 @@ router.post('/generate-image',
 router.post('/generate-script',
   requireAuth,
   aiRateLimiter,
+  aiFeatureMiddleware('video.script'),
   validateRequest({ body: GenerateScriptSchema }),
   ContentGenerationController.generateScript
-);
-
-router.post('/generate-caption',
-  requireAuth,
-  aiRateLimiter,
-  validateRequest({ body: GenerateCaptionSchema }),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { title, type, platform, mediaUrl, workspaceId, existingCaption } = req.body;
-      const userId = req.user.id;
-      
-      if (!title && !mediaUrl) {
-        return res.status(400).json({ error: 'Title or media URL is required' });
-      }
-
-      const creditCost = AICreditService.calculateCost('content_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        return res.status(402).json({ 
-          error: 'Insufficient credits',
-          required: creditCost,
-          current: creditCheck.currentCredits
-        });
-      }
-
-      // Get workspace ID from multiple sources
-      const finalWorkspaceId = workspaceId || req.headers['workspace-id'] as string;
-      
-      // Validate workspace access if provided
-      if (finalWorkspaceId) {
-        const workspace = await storage.getWorkspace(finalWorkspaceId);
-        if (!workspace) {
-          return res.status(404).json({ error: 'Workspace not found' });
-        }
-        
-        const user = await storage.getUser(userId);
-        const workspaceUserId = workspace.userId?.toString();
-        const requestUserId = userId.toString();
-        const firebaseUid = user?.firebaseUid;
-        
-        const userOwnsWorkspace = workspaceUserId === requestUserId || 
-                                 workspaceUserId === firebaseUid ||
-                                 workspace.userId === userId ||
-                                 workspace.userId === firebaseUid;
-        
-        if (!userOwnsWorkspace) {
-          return res.status(403).json({ error: 'Access denied to workspace' });
-        }
-      }
-
-      console.log('[AI CAPTION] Generating Instagram caption variations for user:', userId, {
-        workspaceId: finalWorkspaceId,
-        platform,
-        type,
-        hasExistingCaption: !!existingCaption
-      });
-
-      // Get AI preferences for the user and workspace
-      const preferences = await getAIPreferences(userId, req);
-
-      // Use AIServiceManager to generate caption variations with authenticity scoring
-      const aiServiceManager = AIServiceManager.getInstance();
-      const variations = await aiServiceManager.generateInstagramCaptions({
-        userId,
-        workspaceId: finalWorkspaceId || userId, // Use userId as fallback
-        topic: title || 'Content based on uploaded media',
-        mediaAnalysis: mediaUrl ? `Media URL: ${mediaUrl}` : undefined,
-        existingCaption,
-        postType: (type === 'story' || type === 'reel') ? type : 'post',
-        platform: platform || 'Instagram',
-        preferences
-      });
-
-      // Generate hashtags for each variation
-      const variationsWithHashtags = await Promise.all(
-        variations.map(async (variation) => {
-          try {
-            const hashtagResult = await hashtagGeneratorService.generateStrategicHashtags({
-              caption: variation.caption,
-              mediaAnalysis: mediaUrl ? `Media URL: ${mediaUrl}` : undefined,
-              niche: preferences.contentNiche || 'general',
-              postType: (type === 'story' || type === 'reel') ? type as 'post' | 'story' | 'reel' : 'post',
-              platform: platform || 'Instagram',
-              userId,
-              workspaceId: finalWorkspaceId
-            });
-
-            return {
-              caption: variation.caption,
-              hashtags: hashtagResult.hashtags,
-              style: variation.style,
-              styleDescription: variation.styleDescription,
-              authenticityScore: variation.authenticityScore?.overallScore || 0,
-              authenticityDetails: variation.authenticityScore ? {
-                criteriaScores: variation.authenticityScore.criteriaScores,
-                aiTellsDetected: variation.authenticityScore.aiTellsDetected,
-                recommendations: variation.authenticityScore.recommendations,
-                passesThreshold: variation.authenticityScore.passesThreshold
-              } : undefined,
-              engagementPrediction: variation.engagementPrediction ? {
-                predictedLikeRate: variation.engagementPrediction.predictedLikeRate,
-                predictedCommentRate: variation.engagementPrediction.predictedCommentRate,
-                predictedSaveRate: variation.engagementPrediction.predictedSaveRate,
-                predictedShareRate: variation.engagementPrediction.predictedShareRate,
-                confidence: variation.engagementPrediction.confidence,
-                factors: variation.engagementPrediction.factors,
-                vsUserAverage: variation.engagementPrediction.vsUserAverage
-              } : undefined,
-              // Extract used patterns and hooks from variation metadata
-              // These will be populated in future tasks (13.1, 13.2)
-              usedPatterns: [], // Placeholder for Task 13.1
-              usedHooks: [] // Placeholder for Task 13.1
-            };
-          } catch (error) {
-            console.error('[AI CAPTION] Failed to generate hashtags for variation:', error);
-            // Return variation without hashtags if hashtag generation fails
-            return {
-              caption: variation.caption,
-              hashtags: [],
-              style: variation.style,
-              styleDescription: variation.styleDescription,
-              authenticityScore: variation.authenticityScore?.overallScore || 0,
-              authenticityDetails: variation.authenticityScore ? {
-                criteriaScores: variation.authenticityScore.criteriaScores,
-                aiTellsDetected: variation.authenticityScore.aiTellsDetected,
-                recommendations: variation.authenticityScore.recommendations,
-                passesThreshold: variation.authenticityScore.passesThreshold
-              } : undefined,
-              engagementPrediction: variation.engagementPrediction ? {
-                predictedLikeRate: variation.engagementPrediction.predictedLikeRate,
-                predictedCommentRate: variation.engagementPrediction.predictedCommentRate,
-                predictedSaveRate: variation.engagementPrediction.predictedSaveRate,
-                predictedShareRate: variation.engagementPrediction.predictedShareRate,
-                confidence: variation.engagementPrediction.confidence,
-                factors: variation.engagementPrediction.factors,
-                vsUserAverage: variation.engagementPrediction.vsUserAverage
-              } : undefined,
-              usedPatterns: [],
-              usedHooks: []
-            };
-          }
-        })
-      );
-
-      // Deduct credits
-      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
-        creditsToDeduct: creditCost,
-        workspaceId: finalWorkspaceId,
-        endpoint: '/api/v1/ai/generate-caption'
-      });
-
-      if (!deductResult.success) {
-        console.error('[AI CAPTION] Credit deduction failed:', deductResult.error);
-        return res.status(402).json({ error: deductResult.error || 'Failed to deduct credits' });
-      }
-
-      console.log('[AI CAPTION] Successfully generated caption variations with authenticity scoring', {
-        variationCount: variationsWithHashtags.length,
-        avgAuthenticityScore: variationsWithHashtags.reduce((sum, v) => sum + v.authenticityScore, 0) / variationsWithHashtags.length,
-        creditsUsed: deductResult.creditsDeducted
-      });
-
-      // Return variations with all metadata
-      res.json({ 
-        variations: variationsWithHashtags,
-        creditsUsed: deductResult.creditsDeducted,
-        remainingCredits: deductResult.creditsAfter,
-        // Backward compatibility: also return first variation as default caption
-        caption: variationsWithHashtags[0]?.caption || '',
-        hashtags: variationsWithHashtags[0]?.hashtags || []
-      });
-
-    } catch (error: any) {
-      console.error('[AI CAPTION] Generation failed:', error);
-      res.status(500).json({ error: 'Failed to generate caption', details: error.message });
-    }
-  }
-);
-
-router.post('/regenerate-captions',
-  requireAuth,
-  aiRateLimiter,
-  validateRequest({ body: RegenerateCaptionsSchema }),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { workspaceId, postDetails, variationIndex, adjustments } = req.body;
-      const userId = req.user.id;
-      
-      console.log('[AI REGENERATE CAPTIONS] Request received:', {
-        userId,
-        workspaceId,
-        variationIndex,
-        hasAdjustments: !!adjustments,
-        adjustments: adjustments || {}
-      });
-
-      // Check credits
-      const creditCost = AICreditService.calculateCost('content_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        return res.status(402).json({ 
-          error: 'Insufficient credits',
-          required: creditCost,
-          current: creditCheck.currentCredits
-        });
-      }
-
-      // Validate workspace access
-      const workspace = await storage.getWorkspace(workspaceId);
-      if (!workspace) {
-        return res.status(404).json({ error: 'Workspace not found' });
-      }
-      
-      const user = await storage.getUser(userId);
-      const workspaceUserId = workspace.userId?.toString();
-      const requestUserId = userId.toString();
-      const firebaseUid = user?.firebaseUid;
-      
-      const userOwnsWorkspace = workspaceUserId === requestUserId || 
-                               workspaceUserId === firebaseUid ||
-                               workspace.userId === userId ||
-                               workspace.userId === firebaseUid;
-      
-      if (!userOwnsWorkspace) {
-        return res.status(403).json({ error: 'Access denied to workspace' });
-      }
-
-      // Get AI preferences
-      const preferences = await getAIPreferences(userId, req);
-      
-      // Apply adjustments to preferences if provided
-      const adjustedPreferences = { ...preferences };
-      if (adjustments) {
-        if (adjustments.tone) {
-          adjustedPreferences.captionStyle = adjustments.tone;
-        }
-        if (adjustments.hashtagStrategy) {
-          // Store hashtag strategy preference
-          adjustedPreferences.hashtagStrategy = adjustments.hashtagStrategy;
-        }
-        if (adjustments.emphasize) {
-          // Store emphasis directive
-          adjustedPreferences.emphasize = adjustments.emphasize;
-        }
-      }
-
-      console.log('[AI REGENERATE CAPTIONS] Generating new variation with adjustments', {
-        originalVariationIndex: variationIndex,
-        adjustedPreferences: {
-          tone: adjustedPreferences.captionStyle,
-          hashtagStrategy: adjustedPreferences.hashtagStrategy,
-          emphasize: adjustedPreferences.emphasize
-        }
-      });
-
-      // Generate a single new variation using AIServiceManager
-      const aiServiceManager = AIServiceManager.getInstance();
-      
-      // Build context for regeneration
-      let regenerationContext = postDetails.existingCaption 
-        ? `Previous caption (variation ${variationIndex}): ${postDetails.existingCaption}\n\n`
-        : '';
-      
-      if (adjustments?.emphasize) {
-        regenerationContext += `IMPORTANT: Emphasize the following in the new caption: ${adjustments.emphasize}\n\n`;
-      }
-      
-      if (adjustments?.tone) {
-        regenerationContext += `Use a ${adjustments.tone} tone for this caption.\n\n`;
-      }
-
-      // Generate new caption variations
-      const variations = await aiServiceManager.generateInstagramCaptions({
-        userId,
-        workspaceId,
-        topic: postDetails.title || 'Content based on uploaded media',
-        mediaAnalysis: postDetails.mediaUrl 
-          ? `${regenerationContext}Media URL: ${postDetails.mediaUrl}` 
-          : regenerationContext || undefined,
-        existingCaption: postDetails.existingCaption,
-        postType: (postDetails.type === 'story' || postDetails.type === 'reel') 
-          ? postDetails.type as 'post' | 'story' | 'reel'
-          : 'post',
-        platform: postDetails.platform || 'Instagram',
-        preferences: adjustedPreferences
-      });
-
-      // Filter variations that pass authenticity threshold (80+)
-      const validVariations = variations.filter(v => 
-        v.authenticityScore && v.authenticityScore.passesThreshold
-      );
-
-      if (validVariations.length === 0) {
-        console.warn('[AI REGENERATE CAPTIONS] No variations passed authenticity threshold');
-        return res.status(500).json({ 
-          error: 'Failed to generate captions meeting authenticity standards',
-          details: 'All generated variations scored below the 80 authenticity threshold. Please try again.' 
-        });
-      }
-
-      // Generate hashtags for the new variation
-      const hashtagGeneratorService = HashtagGeneratorService.getInstance();
-      
-      const newVariation = validVariations[0]; // Use the first valid variation
-      
-      let hashtags: string[] = [];
-      try {
-        const hashtagResult = await hashtagGeneratorService.generateStrategicHashtags({
-          caption: newVariation.caption,
-          mediaAnalysis: postDetails.mediaUrl ? `Media URL: ${postDetails.mediaUrl}` : undefined,
-          niche: adjustedPreferences.contentNiche || 'general',
-          postType: (postDetails.type === 'story' || postDetails.type === 'reel') 
-            ? postDetails.type as 'post' | 'story' | 'reel'
-            : 'post',
-          platform: postDetails.platform || 'Instagram',
-          userId,
-          workspaceId,
-          strategy: adjustments?.hashtagStrategy
-        });
-        hashtags = hashtagResult.hashtags;
-      } catch (error) {
-        console.error('[AI REGENERATE CAPTIONS] Failed to generate hashtags:', error);
-        // Continue without hashtags if generation fails
-      }
-
-      // Deduct credits
-      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
-        creditsToDeduct: creditCost,
-        workspaceId,
-        endpoint: '/api/v1/ai/regenerate-captions'
-      });
-
-      if (!deductResult.success) {
-        console.error('[AI REGENERATE CAPTIONS] Credit deduction failed:', deductResult.error);
-        return res.status(402).json({ error: deductResult.error || 'Failed to deduct credits' });
-      }
-
-      console.log('[AI REGENERATE CAPTIONS] Successfully regenerated caption', {
-        authenticityScore: newVariation.authenticityScore?.overallScore,
-        hashtagCount: hashtags.length,
-        creditsUsed: deductResult.creditsDeducted
-      });
-
-      // Save regenerated caption to database with metadata
-      const { aiContentGenerator } = await import('../../ai-content-generator');
-      try {
-        await aiContentGenerator.saveGeneratedCaption({
-          userId,
-          workspaceId,
-          variations: [{
-            caption: newVariation.caption,
-            hashtags,
-            authenticityScore: newVariation.authenticityScore?.overallScore,
-            engagementPrediction: newVariation.engagementPrediction ? {
-              likeRate: newVariation.engagementPrediction.predictedLikeRate,
-              commentRate: newVariation.engagementPrediction.predictedCommentRate,
-              saveRate: newVariation.engagementPrediction.predictedSaveRate,
-              shareRate: newVariation.engagementPrediction.predictedShareRate,
-              confidence: newVariation.engagementPrediction.confidence
-            } : undefined,
-            usedPatterns: [],
-            usedHooks: []
-          }],
-          postType: (postDetails.type === 'story' || postDetails.type === 'reel') 
-            ? postDetails.type as 'post' | 'story' | 'reel'
-            : 'post',
-          platform: postDetails.platform || 'Instagram',
-          niche: adjustedPreferences.contentNiche || 'general'
-        });
-        console.log('[AI REGENERATE CAPTIONS] Caption saved to database');
-      } catch (saveError) {
-        console.error('[AI REGENERATE CAPTIONS] Failed to save caption to database:', saveError);
-        // Continue despite save failure - don't block the response
-      }
-
-      // Return the new variation with metadata
-      res.json({ 
-        variation: {
-          caption: newVariation.caption,
-          hashtags,
-          style: newVariation.style,
-          styleDescription: newVariation.styleDescription,
-          authenticityScore: newVariation.authenticityScore?.overallScore || 0,
-          authenticityDetails: newVariation.authenticityScore ? {
-            criteriaScores: newVariation.authenticityScore.criteriaScores,
-            aiTellsDetected: newVariation.authenticityScore.aiTellsDetected,
-            recommendations: newVariation.authenticityScore.recommendations,
-            passesThreshold: newVariation.authenticityScore.passesThreshold
-          } : undefined,
-          engagementPrediction: newVariation.engagementPrediction ? {
-            predictedLikeRate: newVariation.engagementPrediction.predictedLikeRate,
-            predictedCommentRate: newVariation.engagementPrediction.predictedCommentRate,
-            predictedSaveRate: newVariation.engagementPrediction.predictedSaveRate,
-            predictedShareRate: newVariation.engagementPrediction.predictedShareRate,
-            confidence: newVariation.engagementPrediction.confidence,
-            factors: newVariation.engagementPrediction.factors,
-            vsUserAverage: newVariation.engagementPrediction.vsUserAverage
-          } : undefined,
-          regenerationMetadata: {
-            originalVariationIndex: variationIndex,
-            adjustmentsApplied: adjustments || {},
-            regeneratedAt: new Date().toISOString()
-          }
-        },
-        creditsUsed: deductResult.creditsDeducted,
-        remainingCredits: deductResult.creditsAfter
-      });
-
-    } catch (error: any) {
-      console.error('[AI REGENERATE CAPTIONS] Regeneration failed:', error);
-      res.status(500).json({ 
-        error: 'Failed to regenerate caption', 
-        details: error.message 
-      });
-    }
-  }
-);
-
-router.post('/generate-hashtags',
-  requireAuth,
-  aiRateLimiter,
-  validateRequest({ body: GenerateHashtagsSchema }),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { title, description, type, platform } = req.body;
-      const userId = req.user.id;
-      
-      if (!title && !description) {
-        return res.status(400).json({ error: 'Title or description is required' });
-      }
-
-      const creditCost = AICreditService.calculateCost('content_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        return res.status(402).json({ 
-          error: 'Insufficient credits',
-          required: creditCost,
-          current: creditCheck.currentCredits
-        });
-      }
-
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(500).json({ error: 'OpenAI API key not configured' });
-      }
-
-      const prompt = `Generate relevant hashtags for this ${platform || 'social media'} ${type || 'post'}:
-        Title: ${title || ''}
-        Description: ${description || ''}
-        
-        Generate 8-12 relevant hashtags that are:
-        - Popular but not oversaturated
-        - Relevant to the content
-        - Mix of broad and niche tags
-        - Appropriate for ${platform || 'social media'}
-        
-        Return only the hashtags with # symbols, separated by spaces.`;
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 150,
-          temperature: 0.6
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('[AI HASHTAGS] OpenAI API error:', error);
-        return res.status(500).json({ error: 'Failed to generate hashtags' });
-      }
-
-      const data = await response.json() as any;
-      const hashtagText = data.choices[0].message.content?.trim() || '';
-      const hashtags = hashtagText.split(/\s+/).filter((tag: string) => tag.startsWith('#'));
-
-      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
-        creditsToDeduct: creditCost,
-        endpoint: '/api/v1/ai/generate-hashtags'
-      });
-
-      res.json({ 
-        hashtags,
-        creditsUsed: deductResult.creditsDeducted,
-        remainingCredits: deductResult.creditsAfter
-      });
-
-    } catch (error: any) {
-      console.error('[AI HASHTAGS] Generation failed:', error);
-      res.status(500).json({ error: 'Failed to generate hashtags' });
-    }
-  }
-);
-
-router.post('/generate-image',
-  requireAuth,
-  aiRateLimiter,
-  validateRequest({ body: GenerateImageSchema }),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const user = req.user;
-      const userId = user.id;
-      const { prompt, platform, contentType, style, workspaceId, dimensions } = req.body;
-
-      console.log('[AI IMAGE] Request:', { userId, platform, contentType, style });
-
-      const creditCost = AICreditService.calculateCost('image_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        return res.status(402).json({ 
-          error: `Insufficient credits. Image generation requires ${creditCost} credits.`,
-          required: creditCost,
-          current: creditCheck.currentCredits,
-          upgradeModal: true 
-        });
-      }
-
-      const openaiApiKey = process.env.OPENAI_API_KEY;
-      if (!openaiApiKey) {
-        return res.status(500).json({ 
-          error: 'OpenAI API key not configured. Please contact support to enable AI image generation.',
-          requiresSetup: true 
-        });
-      }
-
-      try {
-        const openai = new OpenAI({ apiKey: openaiApiKey });
-
-        const imageResponse = await openai.images.generate({
-          model: "dall-e-3",
-          prompt: prompt,
-          n: 1,
-          size: platform === 'instagram' ? "1024x1024" : "1792x1024",
-          quality: "hd",
-          style: style === 'realistic' ? 'natural' : 'vivid'
-        });
-
-        const imageUrl = imageResponse.data?.[0]?.url;
-        if (!imageUrl) {
-          throw new Error('No image URL returned from DALL-E');
-        }
-
-        const captionResponse = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: `You are a professional social media content creator. Generate engaging, authentic captions for ${platform} ${contentType || 'posts'}. 
-              
-              Guidelines:
-              - Create captivating, authentic captions that drive engagement
-              - Include relevant emojis naturally within the text
-              - Ask engaging questions to encourage comments
-              - Write in a conversational, relatable tone
-              - Keep it concise but compelling
-              - Do NOT include hashtags (they will be generated separately)
-              - Focus on storytelling and value for the audience`
-            },
-            {
-              role: "user",
-              content: `Generate an engaging caption for this ${platform} ${contentType || 'post'} about: ${prompt}
-              
-              Style: ${style || 'professional'}
-              Platform: ${platform || 'instagram'}
-              
-              Make it authentic and engaging without using hashtags.`
-            }
-          ],
-          max_tokens: 200,
-          temperature: 0.7
-        });
-
-        const caption = captionResponse.choices[0]?.message?.content?.trim() || 'Amazing content created with AI! What do you think? 💭';
-
-        const hashtagResponse = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: `Generate relevant, trending hashtags for ${platform} posts. Return 8-12 hashtags that are:
-              - Popular but not oversaturated
-              - Relevant to the content
-              - Mix of broad and niche tags
-              - Include # symbol
-              - Separate with spaces`
-            },
-            {
-              role: "user",
-              content: `Generate hashtags for: ${prompt}\nPlatform: ${platform}\nStyle: ${style}`
-            }
-          ],
-          max_tokens: 100,
-          temperature: 0.6
-        });
-
-        const hashtagText = hashtagResponse.choices[0]?.message?.content?.trim() || '';
-        const hashtags = hashtagText.split(/\s+/).filter(tag => tag.startsWith('#')).slice(0, 12);
-
-        const deductResult = await AICreditService.deductCredits(userId, 'image_generation', {
-          creditsToDeduct: creditCost,
-          workspaceId,
-          endpoint: '/api/v1/ai/generate-image'
-        });
-
-        if (!deductResult.success) {
-          console.error('[AI IMAGE] Credit deduction failed:', deductResult.error);
-          return res.status(402).json({ error: deductResult.error || 'Failed to deduct credits' });
-        }
-
-        if (workspaceId) {
-          await storage.createContent({
-            title: `AI Generated Image: ${prompt.substring(0, 50)}...`,
-            description: caption,
-            type: 'image',
-            platform: platform || null,
-            status: 'ready',
-            workspaceId: workspaceId,
-            creditsUsed: creditCost,
-            contentData: {
-              imageUrl,
-              caption,
-              hashtags,
-              prompt,
-              style,
-              dimensions: dimensions || { width: 1024, height: 1024 }
-            }
-          });
-        }
-
-        console.log('[AI IMAGE] Successfully generated image and caption');
-
-        res.json({
-          success: true,
-          imageUrl,
-          caption,
-          hashtags,
-          creditsUsed: deductResult.creditsDeducted,
-          remainingCredits: deductResult.creditsAfter
-        });
-
-      } catch (aiError: any) {
-        console.error('[AI IMAGE] OpenAI API error:', aiError);
-        return res.status(500).json({ 
-          error: 'AI generation failed. Please try again.',
-          details: aiError.message 
-        });
-      }
-
-    } catch (error: any) {
-      console.error('[AI IMAGE] Generation failed:', error);
-      res.status(500).json({ error: 'Failed to generate image' });
-    }
-  }
-);
-
-router.post('/generate-script',
-  requireAuth,
-  aiRateLimiter,
-  validateRequest({ body: GenerateScriptSchema }),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const user = req.user;
-      const userId = user.id;
-      const { prompt, platform, contentType, style, duration, workspaceId, dimensions } = req.body;
-
-      console.log('[AI SCRIPT] Request:', { userId, platform, contentType, style, duration });
-
-      const creditCost = AICreditService.calculateCost('content_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        return res.status(402).json({ 
-          error: `Insufficient credits. Script generation requires ${creditCost} credits.`,
-          required: creditCost,
-          current: creditCheck.currentCredits,
-          upgradeModal: true 
-        });
-      }
-
-      const openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      });
-
-      const systemPrompt = `You are an expert content creator and scriptwriter. Generate professional scripts optimized for ${platform} ${contentType}.
-
-Platform specs:
-- ${platform} ${contentType}: ${dimensions ? `${dimensions.width}x${dimensions.height} (${dimensions.ratio})` : 'Standard dimensions'}
-- Duration: ${duration} seconds
-- Style: ${style}
-
-Create engaging, platform-optimized content that drives engagement and views.`;
-
-      const userPrompt = `Create a ${duration}-second ${style} script for ${platform} ${contentType} about: "${prompt}"
-
-Include:
-1. Hook (first 3 seconds)
-2. Main content structure
-3. Call-to-action
-4. Engaging caption with emojis
-5. 10-15 trending hashtags for ${platform}
-
-Format as JSON with: script, caption, hashtags`;
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 1500,
-        temperature: 0.7
-      });
-
-      let result: any;
-      try {
-        const aiContent = response.choices[0].message.content || '{}';
-        const aiResult = safeParseAIResponse(aiContent);
-        if (!aiResult.success) {
-          console.error('[AI SECURITY] Invalid AI response format:', aiResult.error);
-          result = { error: 'AI response parsing failed', fallback: true };
-        } else {
-          result = aiResult.data;
-        }
-      } catch (parseError) {
-        console.error('[AI SCRIPT] JSON parse failed:', parseError);
-        result = {
-          script: response.choices[0].message.content || "Generated script content",
-          caption: "🎬 AI-generated content",
-          hashtags: ['#ai', '#content', '#viral']
-        };
-      }
-
-      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
-        creditsToDeduct: creditCost,
-        workspaceId,
-        endpoint: '/api/v1/ai/generate-script'
-      });
-
-      const scriptResponse = {
-        script: result.script || `Professional ${contentType} script for ${platform}:\n\nHook: Start with an attention-grabbing opening\nMain Content: Deliver your key message with engaging visuals\nCall to Action: End with a clear next step for viewers\n\nThis script is optimized for ${platform} ${contentType} format.`,
-        caption: result.caption || "🎬 AI-generated content for your audience",
-        hashtags: result.hashtags || ['#ai', '#content', '#viral'],
-        creditsUsed: deductResult.creditsDeducted,
-        remainingCredits: deductResult.creditsAfter,
-        platform,
-        contentType,
-        dimensions
-      };
-
-      res.json(scriptResponse);
-
-    } catch (error: any) {
-      console.error('[AI SCRIPT] Error:', error);
-      res.status(500).json({ error: error.message || 'Failed to generate script' });
-    }
-  }
-);
-
-/**
- * Helper function to infer media type from URL extension
- * @param url - The media URL to analyze
- * @returns 'image' | 'video' | undefined
- */
-function inferMediaTypeFromUrl(url: string | undefined | null): 'image' | 'video' | undefined {
-  if (!url || typeof url !== 'string') return undefined;
-  
-  const urlLower = url.toLowerCase();
-  
-  // Image extensions
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico', '.heic', '.heif'];
-  if (imageExtensions.some(ext => urlLower.includes(ext))) {
-    return 'image';
-  }
-  
-  // Video extensions
-  const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'];
-  if (videoExtensions.some(ext => urlLower.includes(ext))) {
-    return 'video';
-  }
-  
-  return undefined;
-}
-
-const GenerateContentSchema = z.preprocess(
-  (data: any) => {
-    // Normalize data before validation
-    const normalized = { ...data };
-    
-    // If mediaType is missing, null, or undefined, try to infer from mediaUrl
-    if (normalized.mediaType == null && normalized.mediaUrl) {
-      const inferredType = inferMediaTypeFromUrl(normalized.mediaUrl);
-      if (inferredType) {
-        normalized.mediaType = inferredType;
-      }
-    }
-    
-    return normalized;
-  },
-  z.object({
-    mediaUrl: z.string().optional().refine(
-      (val) => !val || val.trim() === '' || z.string().url().safeParse(val).success,
-      { message: 'Must be a valid URL if provided' }
-    ),
-    mediaType: z.enum(['image', 'video']).nullish(),
-    postType: z.enum(['post', 'story', 'reel']).optional(),
-    platform: z.string().optional(),
-    existingCaption: z.string().max(5000).optional(),
-    workspaceId: z.string().optional(),
-  }).transform((data) => {
-    // Clean up empty strings and return only valid values
-    return {
-      mediaUrl: data.mediaUrl && data.mediaUrl.trim() ? data.mediaUrl : undefined,
-      mediaType: data.mediaType || undefined,
-      postType: data.postType || undefined,
-      platform: data.platform || undefined,
-      existingCaption: data.existingCaption || undefined,
-      workspaceId: data.workspaceId || undefined,
-    };
-  })
 );
 
 router.post('/generate-content',
   requireAuth,
   aiRateLimiter,
+  ...captionGenerationGuards,
+  aiFeatureMiddleware('caption.generation'),
   (req, res, next) => {
     // Debug logging to see actual request body
     console.log('[AI GENERATE-CONTENT DEBUG] Raw request body:', JSON.stringify(req.body, null, 2));
@@ -1836,9 +1077,12 @@ const AdaptCaptionSchema = z.object({
   workspaceId: z.string().optional(),
 });
 
+// AI Rewrite feature: adapts/rewrites a caption for a different platform.
+// Requires Creator plan or higher + 2 AI credits (aiRewrite cost).
 router.post('/adapt-caption',
   requireAuth,
   aiRateLimiter,
+  ...aiRewriteGuards,
   validateRequest({ body: AdaptCaptionSchema }),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -2139,6 +1383,125 @@ router.get('/safety-feedback/:workspaceId',
       });
     }
   }
+);
+
+// ---------------------------------------------------------------------------
+// Multi-Platform Caption Generation (Task 11.2)
+// POST /api/v1/ai/generate-multi-platform-captions
+//
+// Enforces platform-specific caption constraints BEFORE calling AIServiceManager:
+//   - Facebook / Both (Facebook slot): max 500 chars, max 3 hashtags,
+//     conversational tone directive
+//   - Instagram: max 2200 chars, hashtag-discovery tone directive
+//
+// When targetPlatforms includes both Instagram and Facebook a shared creative
+// brief (topic, angle, CTA) is generated first and returned in the response so
+// the user can see it.  The two distinct caption variants are then generated in
+// parallel.  Partial-success semantics: if one platform's generation fails the
+// other platform's caption is still returned with `error` on the failed entry.
+//
+// Requirements: 11.2, 11.3, 11.4, 11.5
+// ---------------------------------------------------------------------------
+
+const GenerateMultiPlatformCaptionsSchema = z.object({
+  targetPlatforms: z
+    .array(z.enum(['instagram', 'facebook']))
+    .min(1, 'At least one platform must be specified')
+    .max(2),
+  topic: z.string().min(1).max(1000),
+  workspaceId: z.string().optional(),
+  preferences: z
+    .object({
+      aiModel: z.string().optional(),
+      creativityLevel: z.number().min(0).max(1).optional(),
+      optimizationGoals: z.string().optional(),
+      aiPersona: z.string().optional(),
+      captionStyle: z.string().optional(),
+      responseLength: z.string().optional(),
+      multilingual: z.string().optional(),
+      contentSafety: z.string().optional(),
+      contentNiche: z.string().optional(),
+    })
+    .optional(),
+});
+
+router.post(
+  '/generate-multi-platform-captions',
+  requireAuth,
+  aiRateLimiter,
+  aiFeatureMiddleware('caption.generation'),
+  validateRequest({ body: GenerateMultiPlatformCaptionsSchema }),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const { targetPlatforms, topic, workspaceId, preferences = {} } = req.body;
+
+      const finalWorkspaceId =
+        workspaceId || (req.headers['workspace-id'] as string) || userId;
+
+      console.log('[AI MULTI-PLATFORM CAPTION] Request:', {
+        userId,
+        targetPlatforms,
+        topic: topic.substring(0, 80),
+        workspaceId: finalWorkspaceId,
+      });
+
+      // Validate workspace access when an explicit workspaceId is supplied
+      if (workspaceId) {
+        const workspace = await storage.getWorkspace(workspaceId);
+        if (!workspace) {
+          return res.status(404).json({ error: 'Workspace not found' });
+        }
+
+        const user = await storage.getUser(userId);
+        const workspaceUserId = workspace.userId?.toString();
+        const requestUserId = userId.toString();
+        const firebaseUid = user?.firebaseUid;
+
+        const userOwnsWorkspace =
+          workspaceUserId === requestUserId ||
+          workspaceUserId === firebaseUid ||
+          workspace.userId === userId ||
+          workspace.userId === firebaseUid;
+
+        if (!userOwnsWorkspace) {
+          return res.status(403).json({ error: 'Access denied to workspace' });
+        }
+      }
+
+      // Delegate to the MultiPlatformCaptionService — constraint enforcement
+      // and parallel AI calls happen inside the service.
+      const result = await multiPlatformCaptionService.generateCaptions({
+        targetPlatforms: targetPlatforms as PlatformId[],
+        topic,
+        userId,
+        workspaceId: finalWorkspaceId,
+        preferences,
+      });
+
+      console.log('[AI MULTI-PLATFORM CAPTION] Generation complete:', {
+        userId,
+        hasBrief: !!result.sharedBrief,
+        platforms: result.captions.map((c) => ({
+          platform: c.platform,
+          chars: c.characterCount,
+          hashtags: c.hashtagCount,
+          hasError: !!c.error,
+        })),
+      });
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error('[AI MULTI-PLATFORM CAPTION] Failed:', error);
+      return res.status(500).json({
+        error: 'Failed to generate multi-platform captions',
+        details: error.message,
+      });
+    }
+  },
 );
 
 export default router;
