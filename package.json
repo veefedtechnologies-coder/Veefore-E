@@ -13,7 +13,7 @@
     "dev:local": "npm run redis:start && npm run dev",
     "dev": "cross-env NODE_ENV=development tsx watch --ignore \"client/**\" --ignore \"uploads/**\" --ignore \"logs/**\" --ignore \"**/vite.config.ts.timestamp-*\" server/index.ts",
     "client:dev": "vite --config vite.client.config.ts --port 5173 --host",
-    "client:install": "cd client && npm install",
+    "client:install": "cd client && npm install --legacy-peer-deps",
     "skeleton:guard": "node scripts/skeleton-guard.mjs",
     "backfill:onboarded": "node scripts/backfill-onboarded.mjs",
     "backfill:onboarded:dry": "node scripts/backfill-onboarded.mjs --dry-run",
