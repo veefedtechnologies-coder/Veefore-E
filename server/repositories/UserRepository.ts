@@ -1,7 +1,6 @@
 import mongoose, { FilterQuery } from 'mongoose';
 import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { User, IUser } from '../models/User';
-import { WorkspaceModel } from '../models/Workspace/Workspace';
 import { generateReferralCode } from '../storage/converters';
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
@@ -429,10 +428,26 @@ export class UserRepository extends BaseRepository<IUser> {
     }
   }
 
+  /**
+   * Creates a new user record. Named `createWithDefaultWorkspace` for
+   * backward compatibility with existing call sites, but NO LONGER creates a
+   * bare/brandless workspace.
+   *
+   * BUG FIX: this previously always created a placeholder workspace named
+   * "My VeeFore Workspace" (or "{displayName}'s Workspace") for every new
+   * signup, with no brand and no social account attached. Per the
+   * workspace-meta-connection spec (Requirement 4.1 — "Onboarding_Flow SHALL
+   * NOT include a manual Create Workspace step" — and Requirement 1: "A
+   * workspace represents one brand"), a workspace should only ever be created
+   * as part of importing an authorized Meta brand (see
+   * WorkspaceService.importAuthorizedBrand / createWorkspace). Auto-creating
+   * an empty one here produced orphaned workspaces with no brand, which also
+   * corrupted the single-default-workspace invariant once a real workspace
+   * was created later (see server/services/WorkspaceService.ts import flow
+   * fix for the related isDefault bug).
+   */
   async createWithDefaultWorkspace(userData: InsertUser): Promise<IUser> {
     const startTime = Date.now();
-    const session = await mongoose.startSession();
-    session.startTransaction();
     try {
       const referralCode = generateReferralCode();
       const user = new this.model({
@@ -442,31 +457,12 @@ export class UserRepository extends BaseRepository<IUser> {
         createdAt: new Date(),
         updatedAt: new Date()
       });
-      const savedUser = await user.save({ session });
-      const userId = savedUser._id.toString();
-      const existingWorkspaces = await WorkspaceModel.find({ userId }).session(session);
-      if (existingWorkspaces.length === 0) {
-        const name = userData.displayName ? `${userData.displayName}'s Workspace` : 'My VeeFore Workspace';
-        const defaultWorkspace = new WorkspaceModel({
-          name,
-          description: 'Default workspace for social media management',
-          userId,
-          theme: 'space',
-          isDefault: true,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-        await defaultWorkspace.save({ session });
-      }
-      await session.commitTransaction();
-      session.endSession();
-      logger.db.query('createWithDefaultWorkspace', this.entityName, Date.now() - startTime, { userId });
+      const savedUser = await user.save();
+      logger.db.query('createWithDefaultWorkspace', this.entityName, Date.now() - startTime, { userId: savedUser._id.toString() });
       return savedUser;
     } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
       logger.db.error('createWithDefaultWorkspace', error, { entityName: this.entityName });
-      throw new DatabaseError('Workspace creation failed during signup', error as Error);
+      throw new DatabaseError('User creation failed during signup', error as Error);
     }
   }
 }

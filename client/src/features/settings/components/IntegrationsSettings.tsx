@@ -13,6 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher';
 import { useSocialAccounts } from '@/hooks/useSocialAccounts';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  NoAccountsEmptyState,
+  AddAccountSection,
+} from '@/features/social-accounts/components'
 
 /**
  * IntegrationsSettings Component
@@ -36,6 +41,7 @@ export function IntegrationsSettings() {
   });
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [connectedUsername, setConnectedUsername] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(5);
 
@@ -160,13 +166,13 @@ export function IntegrationsSettings() {
             <Button variant="outline" onClick={() => refetch()} className="gap-2">
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
-            <Dialog>
+            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
               <DialogTrigger asChild>
                 <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
                   <Plus className="w-4 h-4" /> Add Account
                 </Button>
               </DialogTrigger>
-              <AddAccountModal currentWorkspace={currentWorkspace} getPlatformIcon={getPlatformIcon} />
+              <AddAccountModal currentWorkspace={currentWorkspace} />
             </Dialog>
           </div>
         </div>
@@ -174,38 +180,20 @@ export function IntegrationsSettings() {
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2].map(i => (
-              <div key={i} className="p-4 flex items-center justify-between animate-pulse rounded-xl border border-gray-200 dark:border-gray-700">
+              <div key={i} className="p-4 flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+                  <Skeleton variant="rectangle" className="w-12 h-12 rounded-xl" />
                   <div className="space-y-2">
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
-                    <div className="h-3 bg-gray-100 dark:bg-gray-700/50 rounded w-48"></div>
+                    <Skeleton variant="text" className="h-4 w-32" />
+                    <Skeleton variant="text" className="h-3 w-48" />
                   </div>
                 </div>
-                <div className="h-9 bg-gray-200 dark:bg-gray-700 rounded-xl w-24"></div>
+                <Skeleton variant="button" className="h-9 rounded-xl w-24" />
               </div>
             ))}
           </div>
         ) : !socialAccounts?.length ? (
-          <div className="p-8 text-center flex flex-col items-center rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-            <div className="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-              <LinkIcon className="w-7 h-7 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              No Social Accounts Connected
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md">
-              Connect your social media profiles to enable cross-platform publishing and automation
-            </p>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                  <Plus className="w-5 h-5" /> Connect First Account
-                </Button>
-              </DialogTrigger>
-              <AddAccountModal currentWorkspace={currentWorkspace} getPlatformIcon={getPlatformIcon} />
-            </Dialog>
-          </div>
+          <NoAccountsEmptyState onConnectClick={() => setShowAddDialog(true)} />
         ) : (
           <div className="space-y-3">
             {socialAccounts.map((account: any) => {
@@ -399,21 +387,8 @@ export function IntegrationsSettings() {
   );
 }
 
-// Add Account Modal Component
-function AddAccountModal({ currentWorkspace, getPlatformIcon }: any) {
-  const platforms = [
-    { id: 'instagram', name: 'Instagram', description: 'Business & Creator Accounts', color: 'bg-pink-500 hover:bg-pink-600' },
-    { id: 'facebook', name: 'Facebook', description: 'Pages & Groups', color: 'bg-blue-600 hover:bg-blue-700' },
-    { id: 'twitter', name: 'X (Twitter)', description: 'Professional Accounts', color: 'bg-slate-900 hover:bg-black dark:hover:bg-slate-800' },
-    { id: 'youtube', name: 'YouTube', description: 'Channels & Shorts', color: 'bg-red-600 hover:bg-red-700' },
-    { id: 'linkedin', name: 'LinkedIn', description: 'Personal & Company Pages', color: 'bg-blue-700 hover:bg-blue-800' }
-  ];
-
-  const handleConnect = (platformId: string) => {
-    if (!currentWorkspace?.id) return;
-    window.location.href = `/api/social-auth/${platformId}/authorize?workspaceId=${currentWorkspace.id}`;
-  };
-
+// Add Account Modal Component — uses AddAccountSection (registry-driven, no hardcoded list)
+function AddAccountModal({ currentWorkspace }: { currentWorkspace: any }) {
   return (
     <DialogContent className="sm:max-w-2xl">
       <DialogHeader>
@@ -422,29 +397,10 @@ function AddAccountModal({ currentWorkspace, getPlatformIcon }: any) {
         </DialogTitle>
       </DialogHeader>
       <div className="py-6">
-        <p className="text-gray-500 dark:text-gray-400 mb-6">
-          Select a platform below to authenticate. You will be redirected to securely grant permissions.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {platforms.map(p => (
-            <button 
-              key={p.id}
-              onClick={() => handleConnect(p.id)}
-              className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 bg-white dark:bg-gray-800 transition-all group text-left"
-            >
-              <div className={`w-12 h-12 flex items-center justify-center rounded-xl text-white shadow-sm transition-transform group-hover:scale-105 ${p.color}`}>
-                {getPlatformIcon(p.id)}
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-900 dark:text-white">{p.name}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{p.description}</p>
-              </div>
-            </button>
-          ))}
-        </div>
+        <AddAccountSection workspaceId={currentWorkspace?.id} />
       </div>
     </DialogContent>
-  );
+  )
 }
 
 // Manage Account Modal Component
@@ -504,6 +460,7 @@ function ManageAccountModal({ account, isHealthy, syncMutation, getPlatformIcon 
           <div className="p-3.5 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Status</p>
             <div className="flex items-center gap-2 mt-1">
+              {/* skeleton-guard-allow: status-dot — live account health "Online/Offline" status indicator, not a loading placeholder */}
               <div className={`w-2.5 h-2.5 rounded-full ${isHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
               <p className={`text-sm font-bold ${isHealthy ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} leading-none`}>
                 {isHealthy ? 'Online' : 'Offline'}
@@ -548,7 +505,7 @@ function ManageAccountModal({ account, isHealthy, syncMutation, getPlatformIcon 
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 leading-tight">
-                  Last synchronized: {account.lastSyncAt ? formatDistanceToNow(new Date(account.lastSyncAt), { addSuffix: true }) : 'Never'}
+                  Last synchronized: {account.lastSyncAt ? formatDistanceToNow(new Date(account.lastSyncAt), { addSuffix: true }) : (account.tokenStatus === 'valid' ? 'Syncing...' : 'Never')}
                 </p>
               </div>
             </div>

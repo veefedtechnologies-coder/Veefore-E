@@ -132,8 +132,8 @@ const ERROR_MAPPINGS: Record<string, Omit<OAuthError, 'code'>> = {
   // Rate limiting
   too_many_requests: {
     message: 'Too many authentication attempts',
-    userMessage: 'Too many sign-in attempts. Please wait a few minutes before trying again.',
-    canRetry: false,
+    userMessage: 'Too many sign-in attempts in a short time. Please wait a minute, then try again.',
+    canRetry: true,
     severity: 'warning',
   },
   
@@ -143,6 +143,16 @@ const ERROR_MAPPINGS: Record<string, Omit<OAuthError, 'code'>> = {
     userMessage: 'An unexpected error occurred during sign-in. Please try again.',
     canRetry: true,
     severity: 'error',
+  },
+
+  // Sign-in attempted with a Google account that has no VeeFore account yet.
+  // Account creation requires early access, so we point them to the waitlist
+  // rather than silently creating an account.
+  account_not_found: {
+    message: 'No account found for this Google account',
+    userMessage: "We couldn't find a VeeFore account for that Google account. Join the waitlist to request early access.",
+    canRetry: false,
+    severity: 'warning',
   },
 };
 

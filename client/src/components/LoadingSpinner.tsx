@@ -1,21 +1,3 @@
-import { cn } from "@/lib/utils"
-
-interface SkeletonProps {
-  className?: string
-}
-
-const Skeleton = ({ className }: SkeletonProps) => (
-  <div
-    className={cn(
-      "rounded-md bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 bg-[length:200%_100%]",
-      className
-    )}
-    style={{
-      animation: 'shimmer 1.5s ease-in-out infinite'
-    }}
-  />
-)
-
 const LoadingSpinner = ({ type = 'default' }: { type?: 'automation' | 'integration' | 'workspaces' | 'profile' | 'dashboard' | 'veegpt' | 'video' | 'settings' | 'security' | 'admin' | 'default' | 'minimal' }) => {
   return (
     <div className="min-h-screen bg-[#030303] flex items-center justify-center">
@@ -77,5 +59,4 @@ const LoadingSpinner = ({ type = 'default' }: { type?: 'automation' | 'integrati
   )
 }
 
-export { Skeleton }
 export default LoadingSpinner

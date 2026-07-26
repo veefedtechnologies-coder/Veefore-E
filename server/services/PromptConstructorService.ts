@@ -18,6 +18,8 @@ import { nicheContextService } from './NicheContextService';
 import { exampleCaptionService } from './ExampleCaptionService';
 import type { ViralPattern, ViralHook, NicheContext, ExampleCaption } from '../domain/types';
 import type { UserAIPreferences } from './AIServiceManager';
+import { CapabilityGuard } from '../../src/shared/platform-registry';
+import type { PlatformId } from '../../src/shared/platform-registry/types';
 
 export interface PromptConstructionParams {
   userId: string;
@@ -31,6 +33,22 @@ export interface PromptConstructionParams {
     brandValues?: string[];
     prohibitedTopics?: string[];
   };
+  /**
+   * Active platform context for AI insight generation.
+   * - `'instagram'`: generate Instagram-specific recommendations only
+   * - `'facebook'`: generate Facebook-specific recommendations only
+   * - `'all'`: generate per-platform blocks + cross-platform recommendations
+   * When omitted the prompt has no platform restriction (backward-compatible).
+   * Requirements: 8.1, 8.2, 8.3, 8.4
+   */
+  platformContext?: 'instagram' | 'facebook' | 'all';
+  /**
+   * List of capability keys (metric IDs or feature names) that are available
+   * in the current context.  The AI Engine omits any recommendation that
+   * references a capability not present in this list.
+   * Requirements: 8.5
+   */
+  availableCapabilities?: string[];
 }
 
 export interface PromptQualityScore {
@@ -157,6 +175,195 @@ ${layer6}
       console.error('[PromptConstructorService] Error building prompt:', error);
       throw new Error(`Failed to build generation prompt: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  // ============================================================================
+  // INSIGHT PROMPT BUILDER (Platform-Aware AI Insights — Requirements 8.1–8.4)
+  // ============================================================================
+
+  /**
+   * Build a platform-aware system prompt prefix for AI insight generation.
+   *
+   * Consults `CapabilityGuard` to determine which capabilities are available
+   * on the active platform(s) before constructing the prefix — no raw platform
+   * string comparisons are used in conditional logic.
+   *
+   * Behaviour by `platformContext`:
+   *   - `'instagram'`: restricts recommendations to Instagram content formats;
+   *     explicitly excludes capabilities that have `MetricSupportLevel = 'NONE'`
+   *     on Instagram (e.g. `facebook_reactions`, `facebook_page_views`).
+   *   - `'facebook'`: restricts recommendations to Facebook content formats;
+   *     explicitly excludes capabilities that have `MetricSupportLevel = 'NONE'`
+   *     on Facebook (e.g. `saves`, carousel posts).
+   *   - `'all'`: structures the response as three sections — (1) Instagram-specific
+   *     insight block, (2) Facebook-specific insight block, (3) cross-platform
+   *     strategic recommendations.
+   *   - `undefined` / not provided: returns an empty string so the prompt is
+   *     unaffected (backward-compatible with existing caption-generation calls).
+   *
+   * The `availableCapabilities` list is used as an additional allow-list so the
+   * AI never recommends a capability the caller has not explicitly passed.
+   *
+   * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
+   *
+   * @param params - Prompt construction parameters (uses `platformContext` and
+   *                 `availableCapabilities`)
+   * @returns Platform-specific system prompt prefix string, or `''` when
+   *          `platformContext` is not set.
+   */
+  public buildInsightPrompt(params: PromptConstructionParams): string {
+    const { platformContext, availableCapabilities } = params;
+
+    // Backward-compatible: no platformContext means no restriction prefix.
+    if (!platformContext) {
+      return '';
+    }
+
+    // Collect unsupported metric keys for a platform by consulting CapabilityGuard.
+    // This is the only place we reference platform-specific capabilities — never
+    // a raw `if (platform === 'facebook')` branch.
+    const buildUnsupportedList = (platform: PlatformId): string[] => {
+      // All known metric keys across both platforms that we want to guard against.
+      const allTrackedMetrics = [
+        'followers_total', 'reach_total', 'impressions_total',
+        'total_engagements', 'likes', 'comments', 'shares',
+        'saves', 'video_views', 'profile_visits', 'website_clicks',
+        'published_posts', 'facebook_reactions', 'facebook_page_views',
+      ];
+      return allTrackedMetrics.filter(
+        (key) => CapabilityGuard.getMetricSupport(platform, key) === 'NONE',
+      );
+    };
+
+    // Collect unsupported publishing formats for a platform.
+    const buildUnsupportedFormats = (platform: PlatformId): string[] => {
+      const allFormats: Array<{ key: keyof import('../../src/shared/platform-registry/types').PublishingCapabilities; label: string }> = [
+        { key: 'textPosts',   label: 'text-only posts'  },
+        { key: 'imagePosts',  label: 'image posts'       },
+        { key: 'videoPosts',  label: 'video posts'       },
+        { key: 'carouselPosts', label: 'carousel posts'  },
+        { key: 'reels',       label: 'Reels'             },
+        { key: 'stories',     label: 'Stories'           },
+        { key: 'linkPosts',   label: 'link posts'        },
+      ];
+      return allFormats
+        .filter((f) => !CapabilityGuard.supportsPublishing(platform, f.key))
+        .map((f) => f.label);
+    };
+
+    // Build an allow-list clause only when the caller supplied capabilities.
+    const capabilityAllowClause =
+      availableCapabilities && availableCapabilities.length > 0
+        ? `\nOnly reference capabilities and metrics from this available set: ${availableCapabilities.join(', ')}. Do NOT mention any capability outside this list.`
+        : '';
+
+    // -------------------------------------------------------------------------
+    // Single-platform: instagram
+    // -------------------------------------------------------------------------
+    if (platformContext === 'instagram') {
+      const unsupportedMetrics  = buildUnsupportedList('instagram');
+      const unsupportedFormats  = buildUnsupportedFormats('instagram');
+
+      return `
+═══════════════════════════════════════════════════════════════════
+PLATFORM CONTEXT: Instagram-Only Insight Mode
+═══════════════════════════════════════════════════════════════════
+
+You are generating AI insights EXCLUSIVELY for Instagram.
+
+SCOPE:
+- Use ONLY Instagram metrics and Instagram-specific performance data.
+- Every recommendation must reference Instagram content formats and audience behaviour.
+- Structure: produce a single, unified Instagram insight block.
+
+CONTENT FORMAT RESTRICTIONS:
+- Recommend only Instagram-supported formats: image posts, video posts, carousels, Reels, Stories.
+${unsupportedFormats.length > 0 ? `- DO NOT recommend: ${unsupportedFormats.join(', ')} — these are NOT supported on Instagram.` : ''}
+
+METRIC RESTRICTIONS:
+${unsupportedMetrics.length > 0 ? `- DO NOT reference the following metrics — they are unavailable on Instagram:\n  ${unsupportedMetrics.join(', ')}.` : '- All standard metrics are available on Instagram.'}
+- Never fabricate or estimate metric values that are not present in the provided data.
+${capabilityAllowClause}
+
+OMISSION RULE:
+If a recommendation would reference a capability, content format, or metric that is NOT supported on Instagram, omit that recommendation entirely. Do not include it with a caveat or asterisk.
+`.trim();
+    }
+
+    // -------------------------------------------------------------------------
+    // Single-platform: facebook
+    // -------------------------------------------------------------------------
+    if (platformContext === 'facebook') {
+      const unsupportedMetrics  = buildUnsupportedList('facebook');
+      const unsupportedFormats  = buildUnsupportedFormats('facebook');
+
+      return `
+═══════════════════════════════════════════════════════════════════
+PLATFORM CONTEXT: Facebook-Only Insight Mode
+═══════════════════════════════════════════════════════════════════
+
+You are generating AI insights EXCLUSIVELY for Facebook Pages.
+
+SCOPE:
+- Use ONLY Facebook Page metrics and Facebook-specific performance data.
+- Every recommendation must reference Facebook content formats, Page audience behaviour, and Facebook-native engagement patterns (reactions, shares, link posts).
+- Structure: produce a single, unified Facebook insight block.
+
+CONTENT FORMAT RESTRICTIONS:
+- Recommend only Facebook-supported formats: text posts, image posts, video posts, Reels, link posts.
+${unsupportedFormats.length > 0 ? `- DO NOT recommend: ${unsupportedFormats.join(', ')} — these are NOT supported on Facebook Pages.` : ''}
+
+METRIC RESTRICTIONS:
+${unsupportedMetrics.length > 0 ? `- DO NOT reference the following metrics — they are unavailable on Facebook:\n  ${unsupportedMetrics.join(', ')}.` : '- All standard metrics are available on Facebook.'}
+- Never fabricate or estimate metric values that are not present in the provided data.
+${capabilityAllowClause}
+
+OMISSION RULE:
+If a recommendation would reference a capability, content format, or metric that is NOT supported on Facebook Pages, omit that recommendation entirely. Do not include it with a caveat or asterisk.
+`.trim();
+    }
+
+    // -------------------------------------------------------------------------
+    // Cross-platform: all
+    // -------------------------------------------------------------------------
+    // platformContext === 'all'
+    const igUnsupportedMetrics = buildUnsupportedList('instagram');
+    const fbUnsupportedMetrics = buildUnsupportedList('facebook');
+
+    return `
+═══════════════════════════════════════════════════════════════════
+PLATFORM CONTEXT: Cross-Platform Insight Mode (Instagram + Facebook)
+═══════════════════════════════════════════════════════════════════
+
+You are generating AI insights for BOTH Instagram and Facebook simultaneously.
+
+REQUIRED RESPONSE STRUCTURE — you MUST produce all three sections in this order:
+
+  (1) INSTAGRAM INSIGHTS
+      - Analyse Instagram-specific metrics and performance data.
+      - Recommend only Instagram-supported content formats (image posts, video posts, carousels, Reels, Stories).
+${igUnsupportedMetrics.length > 0 ? `      - DO NOT reference these Instagram-unavailable metrics: ${igUnsupportedMetrics.join(', ')}.` : ''}
+
+  (2) FACEBOOK INSIGHTS
+      - Analyse Facebook Page-specific metrics and performance data.
+      - Recommend only Facebook-supported content formats (text posts, image posts, video posts, Reels, link posts).
+${fbUnsupportedMetrics.length > 0 ? `      - DO NOT reference these Facebook-unavailable metrics: ${fbUnsupportedMetrics.join(', ')}.` : ''}
+
+  (3) CROSS-PLATFORM STRATEGIC RECOMMENDATIONS
+      - Identify patterns, synergies, and strategic actions that explicitly name BOTH Instagram and Facebook.
+      - For each cross-platform recommendation, state whether it applies to one or both platforms and why.
+      - Only suggest cross-platform tactics that both platforms support (e.g. do not recommend Instagram Stories as a cross-platform tactic because Facebook Pages do not support Stories).
+
+GENERAL RULES:
+- Section (1) and section (2) must be completely independent: no metric or recommendation should appear in both.
+- If data for one platform is unavailable, include that platform's section header and note "Data unavailable" — do NOT omit the section or merge it with the other.
+- Never fabricate or estimate metric values that are not present in the provided data.
+- Every recommendation must explicitly identify which platform(s) it targets.
+${capabilityAllowClause}
+
+OMISSION RULE:
+If a recommendation would reference a capability, content format, or metric that is NOT supported on its target platform, omit that recommendation entirely. Do not include it with a caveat or asterisk.
+`.trim();
   }
 
   // ============================================================================

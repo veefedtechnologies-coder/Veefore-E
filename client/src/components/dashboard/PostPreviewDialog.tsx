@@ -44,6 +44,7 @@ export function PostPreviewDialog({ post, account, isOpen, onClose }: PostPrevie
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-50 flex items-center justify-between px-2 shadow-inner">
             <div className="w-2.5 h-2.5 bg-[#111] rounded-full ring-1 ring-white/10"></div>
             <div className="w-2.5 h-2.5 bg-green-500/20 rounded-full flex items-center justify-center">
+              {/* skeleton-guard-allow: status-dot — decorative device "live" status indicator in phone mockup, not a loading placeholder */}
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
             </div>
           </div>

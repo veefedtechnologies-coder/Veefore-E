@@ -275,6 +275,7 @@ export const VideoPromptStep: React.FC<VideoPromptStepProps> = ({
                   >
                     {isGenerating ? (
                       <>
+                        {/* skeleton-guard-allow: action-spinner — "Generate Video" button in-flight spinner, not a content-structure loading placeholder */}
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         <span>Generating...</span>
                       </>
@@ -293,6 +294,7 @@ export const VideoPromptStep: React.FC<VideoPromptStepProps> = ({
           // Loading state
           <div className="flex flex-col items-center justify-center py-16">
             <div className="relative">
+              {/* skeleton-guard-allow: action-spinner — live AI script-generation progress spinner (in-flight generation, not a content-structure loading placeholder) */}
               <div className="w-16 h-16 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <Sparkles className="w-6 h-6 text-blue-400 animate-pulse" />

@@ -40,6 +40,16 @@ const ScheduleContentSchema = z.object({
 
 type ScheduleContentBody = z.infer<typeof ScheduleContentSchema>;
 
+const BulkScheduleSchema = z.object({
+  items: z.array(
+    z.object({
+      contentId: z.string().min(1),
+      scheduledAt: z.coerce.date(),
+      platform: z.string().max(50).optional(),
+    })
+  ).min(1).max(50),
+});
+
 const RescheduleContentSchema = z.object({
   scheduledAt: z.coerce.date(),
 });
@@ -205,6 +215,44 @@ export class ContentController extends BaseController {
       platform: input.platform,
     });
     this.sendSuccess(res, content, 200, 'Content scheduled successfully');
+  });
+
+  /**
+   * Bulk-schedule multiple existing content items in one request (Creator+).
+   * Gated by bulkSchedulingGuards. Schedules each item independently and returns
+   * a per-item result so a partial failure doesn't abort the whole batch.
+   */
+  bulkScheduleContent = this.wrapAsync(async (
+    req: TypedRequest<Record<string, never>, z.infer<typeof BulkScheduleSchema>>,
+    res: Response
+  ) => {
+    const { items } = BulkScheduleSchema.parse(req.body);
+
+    const results = await Promise.all(
+      items.map(async (item) => {
+        try {
+          const content = await contentService.scheduleContent(item.contentId, {
+            scheduledAt: item.scheduledAt,
+            platform: item.platform,
+          });
+          return { contentId: item.contentId, success: true, content };
+        } catch (err) {
+          return {
+            contentId: item.contentId,
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      })
+    );
+
+    const scheduled = results.filter((r) => r.success).length;
+    this.sendSuccess(
+      res,
+      { scheduled, failed: results.length - scheduled, results },
+      200,
+      `Scheduled ${scheduled} of ${results.length} posts`
+    );
   });
 
   publishNow = this.wrapAsync(async (

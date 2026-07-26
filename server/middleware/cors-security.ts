@@ -190,6 +190,20 @@ export function corsSecurityMiddleware(options: CorsSecurityOptions = {}) {
   return (req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin;
 
+    // Razorpay's Checkout.js `redirect: true` flow performs a genuine
+    // cross-origin top-level browser POST from checkout.razorpay.com back to
+    // this callback endpoint (see subscription.controller.ts#checkoutCallback).
+    // That is not an XHR/fetch subject to CORS in the browser — CORS never
+    // applies to top-level navigations — but this middleware's explicit
+    // Origin allowlist check would otherwise 403 it since razorpay's domain
+    // is intentionally not on our allowlist. The handler itself verifies
+    // Razorpay's HMAC payment signature before trusting the request, so
+    // skipping the origin check here does not weaken security.
+    if (req.path === '/api/v2/subscription/checkout-callback') {
+      next();
+      return;
+    }
+
     // DEBUG: Log CORS request details
     console.log(`🔍 CORS DEBUG: ${req.method} ${req.path} | Origin: ${origin || 'none'} | Allowed: ${JSON.stringify(allowedOrigins)}`);
 
@@ -284,6 +298,16 @@ export function strictCorsMiddleware(req: Request, res: Response, next: NextFunc
  * P1-5: CORS security for API endpoints
  */
 export function apiCorsMiddleware(req: Request, res: Response, next: NextFunction) {
+  // Razorpay's redirect-based Checkout callback (see corsSecurityMiddleware
+  // for the full explanation) is a genuine cross-origin POST from
+  // checkout.razorpay.com with no matching Referer/Origin pair for this app
+  // — exempt it here too so the referer/origin mismatch check below doesn't
+  // 403 it. The handler verifies Razorpay's HMAC signature independently.
+  if (req.path === '/api/v2/subscription/checkout-callback') {
+    next();
+    return;
+  }
+
   const allowedOrigins = getAllowedOrigins();
   const origin = req.headers.origin;
 

@@ -5,9 +5,8 @@ import { logger } from '../config/logger';
 import { ValidationError } from '../errors';
 import { socialAccountService } from '../services';
 import { CachingSystem } from '../performance/caching-system';
+import { invalidateBootstrapCache } from '../lib/html-bootstrap';
 import { MetricsQueueManager } from '../queues/metricsQueue';
-import * as fs from 'fs';
-import * as path from 'path';
 
 const traceLog = (msg: string, data?: any) => {
   if (data) {
@@ -84,8 +83,36 @@ export class SocialAccountController extends BaseController {
     res: Response
   ) => {
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
+    // Req 3.5 / 4.1: Return accounts for ALL platforms by default.
+    // Callers may filter server-side via `?platform=<platformId>`.
+    const platformFilter = req.query.platform as string | undefined;
+
     const accounts = await socialAccountService.getActiveAccountsByWorkspace(workspaceId);
-    this.sendSuccess(res, accounts);
+
+    // Apply optional platform filter — no default applied server-side.
+    const filtered = platformFilter
+      ? accounts.filter(a => a.platform === platformFilter)
+      : accounts;
+
+    // Explicitly include the multi-platform fields in the response so downstream
+    // consumers (PlatformFilterContext, FacebookAccountCard, etc.) can rely on them.
+    const shaped = filtered.map(account => {
+      const raw = typeof (account as any).toJSON === 'function'
+        ? (account as any).toJSON()
+        : { ...(account as any).toObject?.() ?? account };
+
+      return {
+        ...raw,
+        // Ensure these fields are always present in the response shape even when
+        // the document was created before the multi-platform migration ran.
+        platform: raw.platform ?? 'instagram',
+        connectionStatus: raw.connectionStatus ?? 'ACTIVE',
+        tokenExpiresAt: raw.tokenExpiresAt ?? null,
+        platformMetadata: raw.platformMetadata ?? {},
+      };
+    });
+
+    this.sendSuccess(res, shaped);
   });
 
   connectAccount = this.wrapAsync(async (
@@ -110,6 +137,9 @@ export class SocialAccountController extends BaseController {
     if ('url' in result) {
       this.sendSuccess(res, result);
     } else {
+      // The seeded bootstrap includes this workspace's accounts — invalidate the
+      // per-user bootstrap cache so the next HTML load reflects the new account.
+      void invalidateBootstrapCache((req as any).user?.id);
       this.sendCreated(res, result, 'Account connected successfully');
     }
   });
@@ -122,6 +152,7 @@ export class SocialAccountController extends BaseController {
     logger.info('Disconnecting account requested', { component: 'SocialAccountController', accountId });
     await socialAccountService.disconnectAccount(accountId);
     logger.info('Disconnect account successful', { component: 'SocialAccountController', accountId });
+    void invalidateBootstrapCache((req as any).user?.id);
     this.sendNoContent(res);
   });
 

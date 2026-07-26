@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../../../types/express';
 import { AIServiceManager } from '../../../services/AIServiceManager';
 import { AICreditService } from '../../../services/AICreditService';
 import { storage } from '../../../mongodb-storage';
+import { resolveNiche } from '../../../services/niche.util';
 
 /**
  * Text Generation Controller
@@ -29,6 +30,10 @@ export class TextGenerationController {
       const userObj = await storage.getUser(userId);
       if (userObj && userObj.preferences) {
         preferences = { ...userObj.preferences };
+      }
+      if (userObj && !preferences.contentNiche) {
+        const niche = resolveNiche(userObj);
+        if (niche) preferences.contentNiche = niche;
       }
     } catch (e) {
       console.warn('[TextGenerationController] Failed to load user preferences', e);

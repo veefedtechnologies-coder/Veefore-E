@@ -1,6 +1,15 @@
-import { User, IUser } from '../models/User/User';
-import { AIUsageLogModel, IAIUsageLog } from '../models/AI/AIUsageLog';
+import { AIUsageLogModel } from '../models/AI/AIUsageLog';
 import { logUserAction, AuditActions, AuditResources } from '../utils/audit-logger';
+import { getRedisClient } from '../lib/redis';
+import SubscriptionRepository from '../features/subscription/db/repositories/SubscriptionRepository';
+import { AICreditsRepository } from '../features/subscription/db/repositories/AICreditsRepository';
+import { getEntitlementService } from '../features/subscription/services/EntitlementService';
+import { PLAN_CONFIG } from '../config/plan-config';
+
+function canonicalCredits() {
+  const redis = getRedisClient();
+  return getEntitlementService(redis, new SubscriptionRepository());
+}
 
 export type AIOperationType = 
   | 'content_generation' 
@@ -41,9 +50,8 @@ const CREDIT_COSTS: Record<AIOperationType, CreditCost> = {
     description: 'AI analysis (sentiment, engagement prediction)'
   },
   chat: {
-    baseCredits: 1,
-    perTokenCredits: 0.001,
-    description: 'AI chat/copilot interactions'
+    baseCredits: 0,
+    description: 'Plain VeeGPT chat is free; caption/hashtag tools meter separately'
   },
   trend_analysis: {
     baseCredits: 5,
@@ -61,14 +69,6 @@ const CREDIT_COSTS: Record<AIOperationType, CreditCost> = {
     baseCredits: 2,
     description: 'Other AI operations'
   }
-};
-
-const PLAN_MONTHLY_CREDITS: Record<string, number> = {
-  'Free': 100,
-  'Starter': 500,
-  'Pro': 2000,
-  'Business': 10000,
-  'Enterprise': 50000
 };
 
 export class AICreditService {
@@ -95,7 +95,8 @@ export class AICreditService {
       totalCredits = Math.ceil(costConfig.baseCredits * (options.videoDuration / 10));
     }
 
-    return Math.max(1, Math.ceil(totalCredits));
+    if (operationType === 'chat') return 0;
+    return Math.max(0.01, Math.ceil(totalCredits * 100) / 100);
   }
 
   static async checkCredits(userId: string, requiredCredits: number): Promise<{
@@ -104,20 +105,8 @@ export class AICreditService {
     requiredCredits: number;
     shortfall: number;
   }> {
-    const user = await User.findById(userId).select('credits').lean();
-    
-    if (!user) {
-      return {
-        hasCredits: false,
-        currentCredits: 0,
-        requiredCredits,
-        shortfall: requiredCredits
-      };
-    }
-
-    const currentCredits = user.credits || 0;
-    const hasCredits = currentCredits >= requiredCredits;
-
+    const currentCredits = await canonicalCredits().remainingCredits(userId);
+    const hasCredits = currentCredits === Infinity || currentCredits >= requiredCredits;
     return {
       hasCredits,
       currentCredits,
@@ -146,62 +135,27 @@ export class AICreditService {
     creditsDeducted: number;
     error?: string;
   }> {
-    const creditsToDeduct = options?.creditsToDeduct || 
-      this.calculateCost(operationType, options);
+    const creditsToDeduct = options?.creditsToDeduct ?? this.calculateCost(operationType, options);
+    const service = canonicalCredits();
+    const creditsBefore = await service.remainingCredits(userId);
 
-    const userCheck = await User.findById(userId).select('credits').lean();
-    
-    if (!userCheck) {
-      return {
-        success: false,
-        creditsBefore: 0,
-        creditsAfter: 0,
-        creditsDeducted: 0,
-        error: 'User not found'
-      };
-    }
-
-    const creditsBefore = userCheck.credits || 0;
-
-    const updatedUser = await User.findOneAndUpdate(
-      { 
-        _id: userId, 
-        credits: { $gte: creditsToDeduct } 
-      },
-      { 
-        $inc: { credits: -creditsToDeduct } 
-      },
-      { 
-        new: true,
-        select: 'credits'
-      }
-    );
-
-    if (!updatedUser) {
-      await this.logUsage({
-        userId,
-        workspaceId: options?.workspaceId,
-        operationType,
-        aiProvider: options?.aiProvider || 'openai',
-        aiModel: options?.model,
-        creditsUsed: 0,
-        creditsBefore,
-        creditsAfter: creditsBefore,
-        success: false,
-        errorMessage: 'Insufficient credits',
-        requestMetadata: { endpoint: options?.endpoint }
-      });
-
+    if (!Number.isFinite(creditsToDeduct) || creditsToDeduct < 0) {
       return {
         success: false,
         creditsBefore,
         creditsAfter: creditsBefore,
         creditsDeducted: 0,
-        error: `Insufficient credits. Required: ${creditsToDeduct}, Available: ${creditsBefore}`
+        error: 'Credit deduction amount must be a non-negative finite number'
       };
     }
 
-    const creditsAfter = updatedUser.credits;
+    // Compatibility for old chat routes: plain VeeGPT chat is free.
+    if (creditsToDeduct === 0 || creditsBefore === Infinity) {
+      return { success: true, creditsBefore, creditsAfter: creditsBefore, creditsDeducted: 0 };
+    }
+
+    const result = await service.deductCredits(userId, creditsToDeduct);
+    const creditsAfter = result.remaining;
 
     await this.logUsage({
       userId,
@@ -209,30 +163,51 @@ export class AICreditService {
       operationType,
       aiProvider: options?.aiProvider || 'openai',
       aiModel: options?.model,
-      creditsUsed: creditsToDeduct,
+      creditsUsed: result.success ? creditsToDeduct : 0,
       creditsBefore,
       creditsAfter,
-      success: true,
+      success: result.success,
+      errorMessage: result.success ? undefined : 'Insufficient credits',
       requestMetadata: { endpoint: options?.endpoint }
     });
 
-    await logUserAction(userId, AuditActions.AI.GENERATE_CONTENT, {
-      operationType,
-      creditsDeducted: creditsToDeduct,
-      creditsBefore,
-      creditsAfter,
-      provider: options?.aiProvider
-    }, {
-      workspaceId: options?.workspaceId,
-      resource: AuditResources.AI_CREDITS
-    });
+    if (!result.success) {
+      return {
+        success: false,
+        creditsBefore,
+        creditsAfter,
+        creditsDeducted: 0,
+        error: `Insufficient credits. Required: ${creditsToDeduct}, Available: ${creditsBefore}`
+      };
+    }
 
-    return {
-      success: true,
-      creditsBefore,
-      creditsAfter,
-      creditsDeducted: creditsToDeduct
-    };
+    try {
+      await Promise.all([
+        service.invalidateCache(userId),
+        getRedisClient().del(`sub:me:${userId}`),
+      ]);
+    } catch (cacheError) {
+      console.error('Failed to invalidate credit cache after deduction:', cacheError);
+    }
+
+    try {
+      await logUserAction(userId, AuditActions.AI.GENERATE_CONTENT, {
+        operationType,
+        creditsDeducted: creditsToDeduct,
+        creditsBefore,
+        creditsAfter,
+        provider: options?.aiProvider
+      }, {
+        workspaceId: options?.workspaceId,
+        resource: AuditResources.AI_CREDITS
+      });
+    } catch (auditError) {
+      // The canonical balance mutation already committed. Audit availability
+      // must never convert a successful debit into an HTTP failure.
+      console.error('Failed to audit AI credit deduction:', auditError);
+    }
+
+    return { success: true, creditsBefore, creditsAfter, creditsDeducted: creditsToDeduct };
   }
 
   static async addCredits(
@@ -247,40 +222,45 @@ export class AICreditService {
     creditsAdded: number;
     error?: string;
   }> {
-    const user = await User.findById(userId).select('credits');
-    
-    if (!user) {
+    const service = canonicalCredits();
+    await service.ensureCreditAccount(userId);
+    const creditsBefore = await service.remainingCredits(userId);
+    if (!Number.isFinite(creditsToAdd) || creditsToAdd <= 0) {
       return {
         success: false,
-        creditsBefore: 0,
-        creditsAfter: 0,
+        creditsBefore,
+        creditsAfter: creditsBefore,
         creditsAdded: 0,
-        error: 'User not found'
+        error: 'Credit addition amount must be a positive finite number'
       };
     }
+    const updated = await new AICreditsRepository().addPurchasedCredits(userId, creditsToAdd);
+    if (!updated) {
+      return { success: false, creditsBefore, creditsAfter: creditsBefore, creditsAdded: 0, error: 'Credit account unavailable' };
+    }
+    const creditsAfter = updated.remainingCredits;
+    try {
+      await Promise.all([
+        service.invalidateCache(userId),
+        getRedisClient().del(`sub:me:${userId}`),
+      ]);
+    } catch (cacheError) {
+      console.error('Failed to invalidate credit cache after addition:', cacheError);
+    }
 
-    const creditsBefore = user.credits || 0;
-    user.credits = creditsBefore + creditsToAdd;
-    await user.save();
+    try {
+      await logUserAction(userId, AuditActions.BILLING.CREDIT_PURCHASE, {
+        reason,
+        creditsAdded: creditsToAdd,
+        creditsBefore,
+        creditsAfter,
+        ...metadata
+      }, { resource: AuditResources.AI_CREDITS });
+    } catch (auditError) {
+      console.error('Failed to audit AI credit addition:', auditError);
+    }
 
-    const creditsAfter = user.credits;
-
-    await logUserAction(userId, AuditActions.BILLING.CREDIT_PURCHASE, {
-      reason,
-      creditsAdded: creditsToAdd,
-      creditsBefore,
-      creditsAfter,
-      ...metadata
-    }, {
-      resource: AuditResources.AI_CREDITS
-    });
-
-    return {
-      success: true,
-      creditsBefore,
-      creditsAfter,
-      creditsAdded: creditsToAdd
-    };
+    return { success: true, creditsBefore, creditsAfter, creditsAdded: creditsToAdd };
   }
 
   static async getUsageStats(
@@ -335,23 +315,13 @@ export class AICreditService {
     plan: string;
     monthlyAllowance: number;
   }> {
-    const user = await User.findById(userId).select('credits plan').lean();
-    
-    if (!user) {
-      return {
-        credits: 0,
-        plan: 'Free',
-        monthlyAllowance: PLAN_MONTHLY_CREDITS['Free']
-      };
-    }
-
-    const plan = user.plan || 'Free';
-    const monthlyAllowance = PLAN_MONTHLY_CREDITS[plan] || PLAN_MONTHLY_CREDITS['Free'];
-
+    const service = canonicalCredits();
+    const plan = await service.getPlan(userId);
+    const credits = await service.remainingCredits(userId);
     return {
-      credits: user.credits || 0,
+      credits,
       plan,
-      monthlyAllowance
+      monthlyAllowance: PLAN_CONFIG[plan].limits.aiCreditsPerMonth
     };
   }
 
@@ -359,29 +329,33 @@ export class AICreditService {
     success: boolean;
     newCredits: number;
   }> {
-    const user = await User.findById(userId).select('credits plan');
-    
-    if (!user) {
-      return { success: false, newCredits: 0 };
+    const service = canonicalCredits();
+    const plan = await service.getPlan(userId);
+    if (plan === 'enterprise') return { success: true, newCredits: Infinity };
+    const allocation = PLAN_CONFIG[plan].limits.aiCreditsPerMonth;
+    const nextResetAt = new Date();
+    nextResetAt.setUTCMonth(nextResetAt.getUTCMonth() + 1);
+    const updated = await new AICreditsRepository().resetMonthly(userId, allocation, nextResetAt)
+      ?? await new AICreditsRepository().ensureForUser(userId, allocation, nextResetAt);
+    try {
+      await Promise.all([
+        service.invalidateCache(userId),
+        getRedisClient().del(`sub:me:${userId}`),
+      ]);
+    } catch (cacheError) {
+      console.error('Failed to invalidate credit cache after monthly reset:', cacheError);
     }
 
-    const plan = user.plan || 'Free';
-    const monthlyCredits = PLAN_MONTHLY_CREDITS[plan] || PLAN_MONTHLY_CREDITS['Free'];
-    
-    user.credits = monthlyCredits;
-    await user.save();
+    try {
+      await logUserAction(userId, 'credits.monthly_reset', {
+        plan,
+        newCredits: updated.remainingCredits
+      }, { resource: AuditResources.AI_CREDITS });
+    } catch (auditError) {
+      console.error('Failed to audit monthly AI credit reset:', auditError);
+    }
 
-    await logUserAction(userId, 'credits.monthly_reset', {
-      plan,
-      newCredits: monthlyCredits
-    }, {
-      resource: AuditResources.AI_CREDITS
-    });
-
-    return {
-      success: true,
-      newCredits: monthlyCredits
-    };
+    return { success: true, newCredits: updated.remainingCredits };
   }
 
   private static async logUsage(data: {
@@ -420,7 +394,9 @@ export class AICreditService {
   }
 
   static getPlanCredits(): Record<string, number> {
-    return { ...PLAN_MONTHLY_CREDITS };
+    return Object.fromEntries(
+      Object.values(PLAN_CONFIG).map((plan) => [plan.name, plan.limits.aiCreditsPerMonth])
+    );
   }
 }
 

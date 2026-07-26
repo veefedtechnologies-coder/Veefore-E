@@ -3,7 +3,26 @@ import { Button } from '@/components/ui/button'
 import { SEO, seoConfig, generateStructuredData } from '@/lib/seo-optimization'
 import { TrendingUp, Users, Eye, Heart, Share, ArrowUpRight } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { SkeletonDashboardStats, SkeletonAnalyticsChart, SkeletonMetricCard } from '@/components/ui/skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
+import { AnalyticsSkeleton } from '@/components/skeletons/pages'
+
+/** Placeholder mirroring a single overview metric card (`Card > CardContent p-6`). */
+function OverviewMetricCardSkeleton() {
+  return (
+    <Card className="border-gray-200 dark:border-gray-700">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton variant="text" className="h-4 w-28" />
+            <Skeleton variant="text" className="h-8 w-20" />
+            <Skeleton variant="text" className="h-4 w-16" />
+          </div>
+          <Skeleton variant="rectangle" className="w-12 h-12 rounded-lg flex-shrink-0" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 const performanceData = [
   { date: 'Sep 24', score: 50 },
@@ -35,11 +54,7 @@ export function AnalyticsDashboard({ isLoading = false, isFetching = false }: An
           structuredData={generateStructuredData.softwareApplication()}
         />
         <div className="space-y-6">
-          <SkeletonDashboardStats />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SkeletonAnalyticsChart />
-            <SkeletonAnalyticsChart />
-          </div>
+          <AnalyticsSkeleton />
         </div>
       </>
     )
@@ -56,10 +71,10 @@ export function AnalyticsDashboard({ isLoading = false, isFetching = false }: An
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {isFetching ? (
           <>
-            <SkeletonMetricCard />
-            <SkeletonMetricCard />
-            <SkeletonMetricCard />
-            <SkeletonMetricCard />
+            <OverviewMetricCardSkeleton />
+            <OverviewMetricCardSkeleton />
+            <OverviewMetricCardSkeleton />
+            <OverviewMetricCardSkeleton />
           </>
         ) : (
           <>

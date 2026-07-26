@@ -102,7 +102,8 @@ Also provide:
 Focus on actionable insights that can be immediately implemented to gain competitive advantage.
 `;
     const { aiServiceManager } = await import('./services/AIServiceManager');
-    const analysisResults = await aiServiceManager.generateJSON(prompt, request.preferences);
+    const { withAIFeature } = await import('./services/aiUsageTracker');
+    const analysisResults = await withAIFeature('competitor.analysis', undefined, () => aiServiceManager.generateJSON(prompt, request.preferences));
     
     // Generate top performing posts analysis
     const topPerformingPosts = generateTopPerformingPosts(mockCompetitorData);

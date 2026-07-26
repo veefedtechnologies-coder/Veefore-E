@@ -2,9 +2,14 @@ import { Response } from 'express';
 import OpenAI from 'openai';
 import { AuthenticatedRequest } from '../../../types/express';
 import { storage } from '../../../mongodb-storage';
-import { AICreditService } from '../../../services/AICreditService';
+import {
+  aiCreditMeteringService,
+  InsufficientAICreditsError,
+} from '../../subscription/services/AICreditMeteringService';
+import { fromOpenAIUsage, recordAIUsage } from '../../../services/aiUsageTracker';
 import { generateCompetitorAnalysis } from '../../../competitor-analysis-ai';
 import { HashtagGeneratorService } from '../../../services/HashtagGeneratorService';
+import { AICreditService } from '../../../services/AICreditService';
 
 /**
  * Analysis Controller
@@ -108,17 +113,6 @@ export class AnalysisController {
         return;
       }
 
-      const creditCost = AICreditService.calculateCost('content_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        res.status(402).json({ 
-          error: 'Insufficient credits',
-          required: creditCost,
-          current: creditCheck.currentCredits
-        });
-        return;
-      }
-
       if (!process.env.OPENAI_API_KEY) {
         res.status(500).json({ error: 'OpenAI API key not configured' });
         return;
@@ -136,45 +130,59 @@ export class AnalysisController {
         
         Return only the hashtags with # symbols, separated by spaces.`;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
+      const { result: hashtags, settlement } = await aiCreditMeteringService.runMetered(
+        'hashtagGeneration',
+        'hashtag.generation',
+        { userId, workspaceId: req.body.workspaceId },
+        async () => {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [{ role: 'user', content: prompt }],
+              max_tokens: 150,
+              temperature: 0.6
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            console.error('[AI HASHTAGS] OpenAI API error:', error);
+            throw new Error('Failed to generate hashtags');
+          }
+
+          const data = await response.json() as any;
+          const hashtagText = data.choices[0].message.content?.trim() || '';
+          recordAIUsage({
+            provider: 'openai',
+            model: 'gpt-4o',
+            callType: 'text',
+            usage: fromOpenAIUsage(data.usage),
+            promptText: prompt,
+            completionText: hashtagText,
+          });
+          const hashtags = hashtagText.split(/\s+/).filter((tag: string) => tag.startsWith('#'));
+          if (hashtags.length < 3) {
+            throw new Error('AI returned too few usable hashtags');
+          }
+          return hashtags;
         },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 150,
-          temperature: 0.6
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('[AI HASHTAGS] OpenAI API error:', error);
-        res.status(500).json({ error: 'Failed to generate hashtags' });
-        return;
-      }
-
-      const data = await response.json() as any;
-      const hashtagText = data.choices[0].message.content?.trim() || '';
-      const hashtags = hashtagText.split(/\s+/).filter((tag: string) => tag.startsWith('#'));
-
-      const deductResult = await AICreditService.deductCredits(userId, 'content_generation', {
-        creditsToDeduct: creditCost,
-        endpoint: '/api/v1/ai/generate-hashtags'
-      });
+      );
 
       res.json({ 
         hashtags,
-        creditsUsed: deductResult.creditsDeducted,
-        remainingCredits: deductResult.creditsAfter
+        creditsUsed: settlement.charged,
+        remainingCredits: settlement.remaining
       });
 
     } catch (error: any) {
       console.error('[AI HASHTAGS] Generation failed:', error);
-      res.status(500).json({ error: 'Failed to generate hashtags' });
+      const status = error instanceof InsufficientAICreditsError ? 402 : 500;
+      res.status(status).json({ error: error.message || 'Failed to generate hashtags' });
     }
   }
 }

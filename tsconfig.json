@@ -1,5 +1,5 @@
 {
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
+  "include": ["client/src/**/*", "shared/**/*", "server/**/*", "src/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "**/archive/**"],
   "compilerOptions": {
     "incremental": true,
@@ -19,7 +19,9 @@
     "downlevelIteration": true,
     "paths": {
       "@/*": ["./client/src/*"],
-      "@shared/*": ["./shared/*"]
+      "@shared/*": ["./shared/*"],
+      "@platform-registry": ["./src/shared/platform-registry/index.ts"],
+      "@platform-registry/*": ["./src/shared/platform-registry/*"]
     }
   }
 }

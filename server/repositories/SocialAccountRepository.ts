@@ -129,7 +129,10 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
   }
 
   async findByInstagramAccountId(instagramAccountId: string): Promise<ISocialAccount | null> {
-    return this.findOne({ accountId: instagramAccountId, platform: 'instagram' });
+    // Search by accountId only — not restricted to instagram platform so that
+    // Facebook Pages (whose pageId is stored in the accountId field) are also
+    // found when the BullMQ worker resolves an external account ID.
+    return this.findOne({ accountId: instagramAccountId });
   }
 
   async findActiveByWorkspace(workspaceId: string): Promise<ISocialAccount[]> {
@@ -201,12 +204,16 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
       totalLikes?: number;
       totalComments?: number;
       totalReach?: number;
+      accountReach?: number;
+      totalViews?: number;
       totalSaves?: number;
       totalShares?: number;
       audienceCity?: Map<string, number> | Record<string, number>;
       audienceCountry?: Map<string, number> | Record<string, number>;
       audienceGenderAge?: Map<string, number> | Record<string, number>;
       audienceActiveTime?: Map<string, number> | Record<string, number>;
+      audienceActiveTimeWeekly?: Map<string, number> | Record<string, number>;
+      demographicsLastFetched?: Date;
     }
   ): Promise<ISocialAccount | null> {
     return this.updateById(accountId, {
@@ -372,6 +379,80 @@ export class SocialAccountRepository extends BaseRepository<ISocialAccount> {
     } catch (error) {
       logger.db.error('findByPageIdOrAccountId', error, { entityName: this.entityName, pageId });
       throw new DatabaseError('Failed to find account by page ID or account ID', error as Error);
+    }
+  }
+
+  /**
+   * Set the `connectionStatus` field on a SocialAccount by its document `_id`.
+   *
+   * Used by error-handling paths (e.g. `FacebookRollupReadStore`) to mark an
+   * account as `REQUIRES_RECONNECT` immediately when a TOKEN_EXPIRED error is
+   * received from the Facebook Graph API, and to restore it to `ACTIVE` after a
+   * successful reconnection.
+   *
+   * The method also marks `isActive: false` when the new status is
+   * `REQUIRES_RECONNECT` or `DISCONNECTED` so the account is excluded from
+   * future `findActiveByWorkspace` queries until it is reconnected.
+   *
+   * Requirements: 12.2
+   */
+  async setConnectionStatus(
+    accountId: string,
+    status: 'ACTIVE' | 'DISCONNECTED' | 'REQUIRES_RECONNECT' | 'SYNCING'
+  ): Promise<ISocialAccount | null> {
+    const startTime = Date.now();
+    try {
+      const isActive = status === 'ACTIVE' || status === 'SYNCING';
+      const result = await this.updateById(accountId, {
+        connectionStatus: status,
+        isActive,
+        updatedAt: new Date(),
+      });
+
+      logger.db.query('setConnectionStatus', this.entityName, Date.now() - startTime, {
+        accountId,
+        status,
+      });
+      return result;
+    } catch (error) {
+      logger.db.error('setConnectionStatus', error, { entityName: this.entityName, accountId, status });
+      throw new DatabaseError('Failed to set connection status', error as Error);
+    }
+  }
+
+  /**
+   * Find Facebook SocialAccounts whose `tokenExpiresAt` is within the next
+   * `daysAhead` days. Used by the token-refresh job to proactively refresh
+   * tokens before they expire.
+   *
+   * Only returns ACTIVE accounts — REQUIRES_RECONNECT / DISCONNECTED accounts
+   * are excluded because the user must manually reconnect them.
+   *
+   * Requirements: 2.10, 2.11
+   */
+  async findExpiringFacebook(daysAhead: number): Promise<ISocialAccount[]> {
+    const startTime = Date.now();
+    try {
+      const now = new Date();
+      const cutoff = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+
+      const accounts = await this.model.find({
+        platform: 'facebook',
+        connectionStatus: 'ACTIVE',
+        tokenExpiresAt: {
+          $gt: now,       // not already expired
+          $lte: cutoff,   // expires within daysAhead days
+        },
+      }).exec();
+
+      logger.db.query('findExpiringFacebook', this.entityName, Date.now() - startTime, {
+        daysAhead,
+        count: accounts.length,
+      });
+      return accounts;
+    } catch (error) {
+      logger.db.error('findExpiringFacebook', error, { entityName: this.entityName, daysAhead });
+      throw new DatabaseError('Failed to find expiring Facebook accounts', error as Error);
     }
   }
 

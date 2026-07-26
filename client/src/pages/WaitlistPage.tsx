@@ -1151,6 +1151,7 @@ export default function WaitlistPage() {
                                         animate={{ x: 0, opacity: 1 }}
                                         transition={{ delay: 1, type: "spring" }}
                                     >
+                                        {/* skeleton-guard-allow: status-dot — live 'Profile Active' status indicator in marketing illustration */}
                                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                                         <span className="text-xs font-bold text-gray-700">Profile Active</span>
                                     </motion.div>
@@ -1190,6 +1191,7 @@ export default function WaitlistPage() {
                                                 <div className="text-xs text-gray-600 font-medium">Select Niche</div>
                                             </div>
                                             <div className="flex items-center gap-2">
+                                                {/* skeleton-guard-allow: decorative — pending "Add Bio" step dot in the marketing onboarding illustration, not a loading placeholder */}
                                                 <div className="w-4 h-4 bg-gray-200 rounded-full animate-pulse"></div>
                                                 <div className="text-xs text-gray-400">Add Bio</div>
                                             </div>
@@ -1465,6 +1467,7 @@ export default function WaitlistPage() {
                                                 transition={{ delay: 0.5 }}
                                                 className="absolute right-4 top-4 bg-black/80 backdrop-blur text-white px-3 py-1.5 rounded-full text-[10px] font-medium flex items-center gap-1.5 shadow-xl z-20"
                                             >
+                                                {/* skeleton-guard-allow: status-dot — live 'Systems Operational' status indicator, not a loading placeholder */}
                                                 <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
                                                 Systems Operational
                                             </motion.div>
@@ -1599,6 +1602,7 @@ export default function WaitlistPage() {
                                                 className="absolute left-8 top-12 bg-white/90 backdrop-blur-md px-4 py-2 rounded-lg shadow-lg border-l-4 border-emerald-500"
                                             >
                                                 <div className="flex items-center gap-2">
+                                                    {/* skeleton-guard-allow: status-dot — decorative 'SOC2 Compliant' badge accent dot, not a loading placeholder */}
                                                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                                                     <span className="text-xs font-bold text-gray-800">SOC2 Compliant</span>
                                                 </div>

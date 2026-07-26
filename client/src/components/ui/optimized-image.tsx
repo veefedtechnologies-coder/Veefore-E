@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, forwardRef, ImgHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type PlaceholderType = 'blur' | 'empty' | 'skeleton';
 
@@ -162,18 +163,13 @@ const ImageSkeleton: React.FC<{ className?: string; aspectRatio?: string }> = ({
   className, 
   aspectRatio 
 }) => (
-  <div
-    className={cn(
-      'animate-pulse bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200',
-      'dark:from-gray-700 dark:via-gray-600 dark:to-gray-700',
-      'bg-[length:200%_100%] rounded-lg',
-      className
-    )}
-    style={{
-      aspectRatio,
-      animation: 'shimmer 1.5s ease-in-out infinite'
-    }}
-    aria-hidden="true"
+  // skeleton-guard-allow: image-placeholder — generic reusable image-fill placeholder
+  // with no specific content structure; uses the shared Skeleton primitive so it
+  // inherits the global shimmer, theme colors, and reduced-motion handling.
+  <Skeleton
+    variant="rectangle"
+    className={cn('rounded-lg', className)}
+    style={{ aspectRatio }}
   />
 );
 

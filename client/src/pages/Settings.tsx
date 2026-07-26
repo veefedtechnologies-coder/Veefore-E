@@ -1,4 +1,7 @@
 import { SEO, seoConfig, generateStructuredData } from '@/lib/seo-optimization'
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { 
   User, 
   Globe,
@@ -44,6 +47,43 @@ import type { SettingsCategory } from '@/features/settings/types'
  * Requirements: 11.5, 2.6
  */
 export default function Settings() {
+  const queryClient = useQueryClient()
+  const { currentWorkspaceId } = useCurrentWorkspace()
+
+  // When redirected back from a successful Facebook OAuth connect, force-refresh
+  // the social accounts cache so the UI immediately shows the new accounts
+  // (React Query's stale cache would otherwise keep showing 0 active accounts).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('connected') === 'facebook') {
+      // Immediate refetch to show the newly connected accounts
+      queryClient.refetchQueries({ queryKey: ['/api/social-accounts'] })
+      if (currentWorkspaceId) {
+        queryClient.refetchQueries({ queryKey: ['/api/social-accounts', currentWorkspaceId] })
+      }
+      // Also refetch after a short delay to pick up BullMQ-synced metrics
+      // (followers, mediaCount, engagementRate are written ~5-30s after connect)
+      const timers = [
+        setTimeout(() => {
+          queryClient.refetchQueries({ queryKey: ['/api/social-accounts'] })
+          if (currentWorkspaceId) {
+            queryClient.refetchQueries({ queryKey: ['/api/social-accounts', currentWorkspaceId] })
+          }
+        }, 5000),
+        setTimeout(() => {
+          queryClient.refetchQueries({ queryKey: ['/api/social-accounts'] })
+          if (currentWorkspaceId) {
+            queryClient.refetchQueries({ queryKey: ['/api/social-accounts', currentWorkspaceId] })
+          }
+        }, 15000),
+      ]
+      // Remove the query param so it doesn't re-fire on navigation
+      const newUrl = window.location.pathname + '?tab=social'
+      window.history.replaceState({}, '', newUrl)
+      return () => timers.forEach(clearTimeout)
+    }
+  }, [queryClient, currentWorkspaceId])
+
   // Define settings categories with refactored and legacy components
   const settingsCategories: SettingsCategory[] = createSettingsCategories([
     {

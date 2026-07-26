@@ -157,10 +157,16 @@ export class BrowserCompatibility {
     document.head.appendChild(style);
 
     // Safari-specific JavaScript fixes
-    if ('serviceWorker' in navigator) {
+    // NOTE: Do NOT register a service worker in development — a stale SW caches
+    // old client assets and serves them in normal (non-incognito) windows, which
+    // breaks fixes until the SW is manually cleared. Only register in production,
+    // and only if the sw.js asset actually exists.
+    if ('serviceWorker' in navigator && !(import.meta as any).env?.DEV) {
       // Delayed service worker registration for Safari
       setTimeout(() => {
-        navigator.serviceWorker.register('/sw.js');
+        navigator.serviceWorker.register('/sw.js').catch(() => {
+          /* sw.js not present — ignore */
+        });
       }, 1000);
     }
   }

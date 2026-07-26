@@ -268,11 +268,17 @@ export function SignUpForm({ onSuccess, initialEmail = '' }: SignUpFormProps) {
   return (
     <div className="space-y-4 py-4">
       <div className="mb-2">
-        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-3 py-1.5 mb-4">
-          <span className="text-teal-400 text-xs font-medium">✨ Free Trial • No Credit Card</span>
+        <div
+          className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5"
+          style={{
+            background: 'rgba(76,130,247,0.10)',
+            border: '1px solid rgba(76,130,247,0.22)',
+          }}
+        >
+          <span className="text-xs font-medium" style={{ color: '#7FA8FF' }}>✨ Free Trial · No Credit Card</span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Get Started Free</h2>
-        <p className="text-white/50 text-sm">Create your account in 30 seconds</p>
+        <h2 className="mb-2 text-2xl font-bold text-white sm:text-3xl">Get Started Free</h2>
+        <p className="text-sm" style={{ color: '#5A6172' }}>Create your account in 30 seconds</p>
       </div>
 
       {/* OAuth Success Message */}
@@ -369,7 +375,13 @@ export function SignUpForm({ onSuccess, initialEmail = '' }: SignUpFormProps) {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full h-11 rounded-md bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-semibold text-sm flex items-center justify-center gap-2 hover:from-teal-600 hover:to-emerald-700 transition-all disabled:opacity-70 mt-2"
+          className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-70"
+          style={{
+            background: isLoading ? 'rgba(76,130,247,0.7)' : '#4C82F7',
+            boxShadow: isLoading ? 'none' : '0 0 24px rgba(76,130,247,0.35)',
+          }}
+          onMouseEnter={e => { if (!isLoading) e.currentTarget.style.background = '#3A6FE6' }}
+          onMouseLeave={e => { if (!isLoading) e.currentTarget.style.background = '#4C82F7' }}
         >
           {isLoading ? (
             <><Loader2 className="w-5 h-5 animate-spin" /> {isCheckingEmail ? 'Checking...' : 'Sending code...'}</>
@@ -441,8 +453,8 @@ export function SignUpForm({ onSuccess, initialEmail = '' }: SignUpFormProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center">
-              <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-teal-500/30">
-                <Mail className="w-8 h-8 text-teal-400" />
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border" style={{ background: 'rgba(76,130,247,0.12)', borderColor: 'rgba(76,130,247,0.28)' }}>
+                <Mail className="h-8 w-8" style={{ color: '#4C82F7' }} />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Welcome Back!</h3>
               <p className="text-white/60 text-sm mb-4">
@@ -454,7 +466,10 @@ export function SignUpForm({ onSuccess, initialEmail = '' }: SignUpFormProps) {
               <div className="space-y-3">
                 <button
                   onClick={handleRedirectToSignIn}
-                  className="w-full h-11 rounded-md bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-semibold text-sm flex items-center justify-center gap-2 hover:from-teal-600 hover:to-emerald-700 transition-all"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white transition-all"
+                  style={{ background: '#4C82F7' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#3A6FE6' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#4C82F7' }}
                 >
                   <ArrowRight className="w-4 h-4" />
                   Go to Sign In

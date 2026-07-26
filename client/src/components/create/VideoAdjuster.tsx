@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Cropper from 'react-easy-crop';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX } from 'lucide-react';
 import type { Point, Area } from 'react-easy-crop';
@@ -309,9 +310,7 @@ export function VideoAdjuster({ videoFile, onComplete, onCancel, postType = 'pos
                 frames={frames}
               />
             ) : (
-              <div className="h-16 w-full rounded-md bg-white/5 animate-pulse flex items-center justify-center">
-                <span className="text-xs text-white/50">Loading timeline...</span>
-              </div>
+              <Skeleton variant="rectangle" className="h-16 w-full rounded-md" />
             )}
           </div>
 
@@ -353,6 +352,7 @@ export function VideoAdjuster({ videoFile, onComplete, onCancel, postType = 'pos
             >
               {isProcessing ? (
                 <>
+                  {/* skeleton-guard-allow: action-spinner — "Apply Crop & Trim" button in-flight spinner while the video is being processed, not a content-structure loading placeholder */}
                   <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                   Processing Video...
                 </>

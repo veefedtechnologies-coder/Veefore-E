@@ -2,6 +2,7 @@ import React from 'react'
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface ThemeToggleProps {
   className?: string
@@ -13,10 +14,7 @@ export function ThemeToggle({ className, variant = 'default' }: ThemeToggleProps
 
   if (!mounted) {
     return (
-      <div className={cn(
-        "w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse",
-        className
-      )} />
+      <Skeleton variant="rectangle" className={cn("w-12 h-12 rounded-xl", className)} />
     )
   }
 

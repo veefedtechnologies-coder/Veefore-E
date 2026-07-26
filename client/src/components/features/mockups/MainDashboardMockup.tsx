@@ -183,6 +183,7 @@ const DashboardContent = () => {
                                 ]).map((auto, i) => (
                                     <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02]">
                                         <div className="flex items-center gap-2">
+                                            {/* skeleton-guard-allow: status-dot — live "active automation" status indicator, not a loading placeholder */}
                                             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                                             <span className="text-xs text-white">{auto.name}</span>
                                         </div>

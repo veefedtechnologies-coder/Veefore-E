@@ -105,24 +105,55 @@ export class AnalyticsService extends BaseService {
 
       let baselinePosts = analytics.posts;
 
+      // Prior record (most recent before today) — reused for both the posts
+      // baseline and reach carry-forward.
+      const startOfDayForPrior = new Date(date);
+      startOfDayForPrior.setUTCHours(0, 0, 0, 0);
+      const priorRecord = await analyticsRepository.findOneBeforeDate(
+        input.workspaceId,
+        startOfDayForPrior,
+        input.platform,
+        input.accountId
+      );
+
       if (analytics.posts === 0) {
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const priorRecord = await analyticsRepository.findOneBeforeDate(
-          input.workspaceId,
-          startOfDay,
-          input.platform,
-          input.accountId
-        );
         const MAX_GAP_MS = 2 * 24 * 60 * 60 * 1000;
-        const isRecent = priorRecord && (startOfDay.getTime() - new Date(priorRecord.date).getTime() <= MAX_GAP_MS);
-        
-        if (isRecent && priorRecord.posts > 0) {
-          baselinePosts = priorRecord.posts;
+        const isRecent = priorRecord && (startOfDayForPrior.getTime() - new Date(priorRecord.date).getTime() <= MAX_GAP_MS);
+
+        if (isRecent && priorRecord!.posts > 0) {
+          baselinePosts = priorRecord!.posts;
         } else {
           baselinePosts = input.posts || 0;
         }
       }
+
+      // Reach resolution (defence-in-depth with getOrCreateForDate inheritance).
+      // Account-level reach (reach / reachDay / reachWeek / reachDays28) is a
+      // rolling de-duplicated window value Meta returns per sync — NOT a per-day
+      // counter. Two layers keep it stable:
+      //   1. getOrCreateForDate INHERITS prior reach when a new-day record is
+      //      created, so the day never starts at a spurious 0.
+      //   2. This carry-forward guards the WRITE path: if a sync omits reach
+      //      (undefined — e.g. a non-insights job, or a transient fetch failure)
+      //      and the current record has no value yet, fall back to the prior
+      //      record's last-known-good value instead of leaving/writing 0.
+      // A genuine Meta 0 is still written because then the input is `0` (defined),
+      // not `undefined`. Only the account-insights job supplies fresh reach.
+      const carry = (
+        inputVal: number | undefined,
+        currentVal: number | undefined,
+        priorVal: number | undefined
+      ): number | undefined => {
+        if (inputVal !== undefined) return inputVal;        // fresh value (incl. explicit 0)
+        if (currentVal && currentVal > 0) return currentVal; // already set on this record
+        if (priorVal && priorVal > 0) return priorVal;       // carry last known good
+        return currentVal;                                   // nothing better available
+      };
+
+      const reachResolved = carry(input.reach, analytics.reach, priorRecord?.reach);
+      const reachDayResolved = carry(input.reachDay, analytics.reachDay, priorRecord?.reachDay);
+      const reachWeekResolved = carry(input.reachWeek, analytics.reachWeek, priorRecord?.reachWeek);
+      const reachDays28Resolved = carry(input.reachDays28, analytics.reachDays28, priorRecord?.reachDays28);
 
       const updated = await analyticsRepository.updateMetrics((analytics._id as any).toString(), {
         // Always update engagement metrics — these are live/cumulative values
@@ -130,10 +161,10 @@ export class AnalyticsService extends BaseService {
         likes: input.likes !== undefined ? input.likes : analytics.likes,
         comments: input.comments !== undefined ? input.comments : analytics.comments,
         shares: input.shares !== undefined ? input.shares : analytics.shares,
-        reach: input.reach !== undefined ? input.reach : analytics.reach,
-        reachDay: input.reachDay !== undefined ? input.reachDay : analytics.reachDay,
-        reachWeek: input.reachWeek !== undefined ? input.reachWeek : analytics.reachWeek,
-        reachDays28: input.reachDays28 !== undefined ? input.reachDays28 : analytics.reachDays28,
+        reach: reachResolved !== undefined ? reachResolved : analytics.reach,
+        reachDay: reachDayResolved !== undefined ? reachDayResolved : analytics.reachDay,
+        reachWeek: reachWeekResolved !== undefined ? reachWeekResolved : analytics.reachWeek,
+        reachDays28: reachDays28Resolved !== undefined ? reachDays28Resolved : analytics.reachDays28,
         viewsDay: input.customMetrics?.viewsDay !== undefined ? input.customMetrics.viewsDay : analytics.viewsDay,
         viewsWeek: input.customMetrics?.viewsWeek !== undefined ? input.customMetrics.viewsWeek : analytics.viewsWeek,
         viewsDays28: input.customMetrics?.viewsDays28 !== undefined ? input.customMetrics.viewsDays28 : analytics.viewsDays28,
@@ -413,7 +444,8 @@ export class AnalyticsService extends BaseService {
       country?: Record<string, number>;
       genderAge?: Record<string, number>;
       activeTime?: Record<string, number>;
-      aiBestActiveTime?: any;
+      /** Unified best-time recommendation (audience-online + engagement + reach). */
+      smartBestTime?: any;
     };
   }> {
     return this.withErrorHandling('getPerformanceSummary', async () => {
@@ -487,12 +519,14 @@ export class AnalyticsService extends BaseService {
           }
         }
 
-        // Always try to attach AI Best Active Time from the Instagram account
-        // This ensures V4 insights appear even if "classic" demographics are missing
-        const instagramAccount = accounts.find((a: any) => a.platform === 'instagram');
-        if (instagramAccount?.aiBestActiveTime) {
+        // Attach the unified best-time recommendation (audience-online + engagement +
+        // reach, all read from the DB — server/services/bestTimeEngine.ts) so
+        // insights appear even if "classic" demographics are missing.
+        const { getSmartBestTime } = await import('./bestTimeService');
+        const smart = await getSmartBestTime(workspaceId);
+        if (smart?.bestSlot) {
           if (!audience) audience = {};
-          audience.aiBestActiveTime = instagramAccount.aiBestActiveTime;
+          audience.smartBestTime = smart;
         }
       } catch (error) {
         this.logError('getPerformanceSummary', error as Error, { workspaceId });
@@ -611,94 +645,225 @@ export class AnalyticsService extends BaseService {
 
   async getFollowerAnalytics(workspaceId: string): Promise<{
     currentFollowers: number;
+    instagramFollowers: number;
+    facebookFollowers: number;
     dailyGrowth: number;
+    dailyGained: number;
+    dailyLost: number;
+    prevDailyGrowth: number;
+    prevDailyGained: number;
+    prevDailyLost: number;
     weeklyGrowth: number;
+    weeklyGained: number;
+    weeklyLost: number;
+    prevWeeklyGrowth: number;
+    prevWeeklyGained: number;
+    prevWeeklyLost: number;
     monthlyGrowth: number;
+    monthlyGained: number;
+    monthlyLost: number;
+    prevMonthlyGrowth: number;
+    prevMonthlyGained: number;
+    prevMonthlyLost: number;
     growthPercentage: number;
     trend: 'up' | 'down' | 'flat';
   }> {
     return this.withErrorHandling('getFollowerAnalytics', async () => {
       const accounts = await socialAccountRepository.findActiveByWorkspace(workspaceId);
       const igAccounts = accounts.filter(a => a.platform === 'instagram');
-      
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
+      const fbAccounts = accounts.filter(a => a.platform === 'facebook');
 
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setUTCHours(0, 0, 0, 0);
 
-      const lastWeek = new Date(today);
-      lastWeek.setDate(lastWeek.getDate() - 7);
+      const instagramIds = igAccounts
+        .filter(a => a.accountId)
+        .map(a => a.accountId as string);
 
-      const lastMonth = new Date(today);
-      lastMonth.setDate(lastMonth.getDate() - 30);
+      const facebookIds = fbAccounts
+        .filter(a => a.accountId)
+        .map(a => a.accountId as string);
 
-      let currentFollowers = 0;
-      let yesterdayFollowers = 0;
-      let lastWeekFollowers = 0;
-      let lastMonthFollowers = 0;
-
-      for (const account of igAccounts) {
-        if (!account.accountId && !account.username) continue;
-        
-        const current = account.followersCount || 0;
-        currentFollowers += current;
-
-        // Daily baseline: oldest snapshot in the last 1.5 days
-        const snapshotYesterday = await InstagramFollowerSnapshotModel.findOne({ 
-          accountId: account._id, 
-          snapshotDate: { $gte: new Date(today.getTime() - 1.5 * 24 * 60 * 60 * 1000) }
-        }).sort({ snapshotDate: 1 }).lean();
-        
-        // Weekly baseline: oldest snapshot in the last 7 days
-        const snapshotLastWeek = await InstagramFollowerSnapshotModel.findOne({ 
-          accountId: account._id, 
-          snapshotDate: { $gte: lastWeek }
-        }).sort({ snapshotDate: 1 }).lean();
-
-        // Monthly baseline: oldest snapshot in the last 30 days
-        const snapshotLastMonth = await InstagramFollowerSnapshotModel.findOne({ 
-          accountId: account._id, 
-          snapshotDate: { $gte: lastMonth }
-        }).sort({ snapshotDate: 1 }).lean();
-
-        // If no snapshot exists at all, try fallback from Metrics collection
-        let metricsBaseline: number | null = null;
-        if (!snapshotYesterday && !snapshotLastWeek && !snapshotLastMonth) {
-          const MetricsModel = (await import('../models/Metrics')).default;
-          const oldMetric = await MetricsModel.findOne({
-            instagramAccountId: account.accountId,
-            followers: { $exists: true, $gt: 0 }
-          }).sort({ startDate: 1 }).lean(); // get oldest available metric
-          if (oldMetric && (oldMetric as any).followers) {
-            metricsBaseline = (oldMetric as any).followers;
+      // Use InstagramFollowerSnapshot for IG currentFollowers — same source as analytics page.
+      let igCurrentFollowers = igAccounts.reduce((sum, a) => sum + (a.followersCount || 0), 0);
+      try {
+        const { InstagramFollowerSnapshotModel } = await import('../models/Analytics');
+        if (instagramIds.length > 0) {
+          const snaps = await InstagramFollowerSnapshotModel.aggregate([
+            { $match: { instagramUserId: { $in: instagramIds }, followerCount: { $gt: 0 } } },
+            { $sort: { snapshotDate: -1 } },
+            { $group: { _id: '$instagramUserId', followerCount: { $first: '$followerCount' } } },
+          ]);
+          if (snaps.length > 0) {
+            igCurrentFollowers = snaps.reduce((sum: number, s: any) => sum + (s.followerCount || 0), 0);
           }
         }
+      } catch { /* non-fatal */ }
 
-        yesterdayFollowers += snapshotYesterday ? snapshotYesterday.followerCount : (metricsBaseline ?? current);
-        lastWeekFollowers += snapshotLastWeek ? snapshotLastWeek.followerCount : (metricsBaseline ?? current);
-        lastMonthFollowers += snapshotLastMonth ? snapshotLastMonth.followerCount : (metricsBaseline ?? current);
-      }
+      // Facebook current followers from SocialAccount.followersCount (updated by syncFacebookAccount).
+      const fbCurrentFollowers = fbAccounts.reduce((sum, a) => sum + (a.followersCount || 0), 0);
+      const currentFollowers = igCurrentFollowers + fbCurrentFollowers;
 
-      const dailyGrowth = currentFollowers - yesterdayFollowers;
-      const weeklyGrowth = currentFollowers - lastWeekFollowers;
-      const monthlyGrowth = currentFollowers - lastMonthFollowers;
+      const zero = {
+        currentFollowers,
+        instagramFollowers: igCurrentFollowers,
+        facebookFollowers: fbCurrentFollowers,
+        dailyGrowth: 0, dailyGained: 0, dailyLost: 0, prevDailyGrowth: 0, prevDailyGained: 0, prevDailyLost: 0,
+        weeklyGrowth: 0, weeklyGained: 0, weeklyLost: 0, prevWeeklyGrowth: 0, prevWeeklyGained: 0, prevWeeklyLost: 0,
+        monthlyGrowth: 0, monthlyGained: 0, monthlyLost: 0, prevMonthlyGrowth: 0, prevMonthlyGained: 0, prevMonthlyLost: 0,
+        growthPercentage: 0, trend: 'flat' as const,
+      };
 
-      const growthPercentage = lastMonthFollowers > 0 
-        ? Number(((monthlyGrowth / lastMonthFollowers) * 100).toFixed(2)) 
-        : 0;
+      const hasInstagram = instagramIds.length > 0;
+      const hasFacebook = facebookIds.length > 0;
+      if (!hasInstagram && !hasFacebook) return zero;
 
-      let trend: 'up' | 'down' | 'flat' = 'flat';
-      if (growthPercentage > 0) trend = 'up';
-      else if (growthPercentage < 0) trend = 'down';
+      const AnalyticsDailyMetricModel = (await import('../models/Analytics/AnalyticsDailyMetric')).default;
+      const { AnalyticsModel } = await import('../models/Analytics/Analytics');
+      const METRIC_GROUP = 'follows_and_unfollows';
+      const toYmd = (d: Date) => d.toISOString().slice(0, 10);
+      const nowYmd = toYmd(now);
+
+      // Sum Instagram gained & lost from AnalyticsDailyMetricModel (follows_and_unfollows group).
+      const sumIgFlow = async (fromYmd: string, toYmdStr: string) => {
+        if (!hasInstagram) return { gained: 0, lost: 0 };
+        const rows = await AnalyticsDailyMetricModel.find({
+          accountId: { $in: instagramIds },
+          metricGroup: METRIC_GROUP,
+          date: { $gte: fromYmd, $lte: toYmdStr },
+        }).select('values').lean();
+        let gained = 0, lost = 0;
+        for (const r of rows) {
+          const v = (r as any).values ?? {};
+          gained += typeof v.gained === 'number' ? v.gained : 0;
+          lost   += typeof v.lost   === 'number' ? v.lost   : 0;
+        }
+        return { gained, lost };
+      };
+
+      // Sum Facebook gained & lost from Analytics collection (page_daily_follows stored by syncFacebookAccount).
+      // The Analytics collection stores daily records with `followers` (snapshot) and the raw
+      // facebook customMetrics. New followers come from the difference between consecutive daily snapshots.
+      const sumFbFlow = async (fromYmd: string, toYmdStr: string) => {
+        if (!hasFacebook) return { gained: 0, lost: 0 };
+        try {
+          // Look at AnalyticsDailyMetricModel for facebook_insights records
+          const fbInsightsRows = await AnalyticsDailyMetricModel.find({
+            accountId: { $in: facebookIds },
+            metricGroup: 'facebook_insights',
+            date: { $gte: fromYmd, $lte: toYmdStr },
+          }).select('values').lean();
+
+          if (fbInsightsRows.length > 0) {
+            // Use page_daily_follows / page_daily_unfollows_unique stored in the durable history
+            let gained = 0, lost = 0;
+            for (const r of fbInsightsRows) {
+              const v = (r as any).values ?? {};
+              gained += typeof v.page_daily_follows === 'number' ? v.page_daily_follows : 0;
+              lost   += typeof v.page_daily_unfollows_unique === 'number' ? v.page_daily_unfollows_unique : 0;
+            }
+            return { gained, lost };
+          }
+
+          // Fallback: use Analytics collection daily snapshots (derive from consecutive follower counts)
+          const fbAnalytics = await AnalyticsModel.find({
+            workspaceId,
+            platform: 'facebook',
+            accountId: { $in: facebookIds },
+            date: { $gte: new Date(fromYmd), $lte: new Date(toYmdStr + 'T23:59:59Z') },
+          }).sort({ date: 1 }).lean();
+
+          if (fbAnalytics.length >= 2) {
+            let gained = 0, lost = 0;
+            for (let i = 1; i < fbAnalytics.length; i++) {
+              const diff = (fbAnalytics[i].followers || 0) - (fbAnalytics[i - 1].followers || 0);
+              if (diff > 0) gained += diff;
+              else if (diff < 0) lost += Math.abs(diff);
+            }
+            return { gained, lost };
+          }
+        } catch { /* non-fatal */ }
+        return { gained: 0, lost: 0 };
+      };
+
+      // Current period windows
+      const dayFrom   = toYmd(new Date(todayStart.getTime() -  1 * 24 * 60 * 60 * 1000));
+      const weekFrom  = toYmd(new Date(todayStart.getTime() -  7 * 24 * 60 * 60 * 1000));
+      const monthFrom = toYmd(new Date(todayStart.getTime() - 28 * 24 * 60 * 60 * 1000));
+
+      // Previous period windows
+      const prevDayFrom   = toYmd(new Date(todayStart.getTime() -  2 * 24 * 60 * 60 * 1000));
+      const prevDayTo     = toYmd(new Date(todayStart.getTime() -  1 * 24 * 60 * 60 * 1000));
+      const prevWeekFrom  = toYmd(new Date(todayStart.getTime() - 14 * 24 * 60 * 60 * 1000));
+      const prevWeekTo    = toYmd(new Date(todayStart.getTime() -  7 * 24 * 60 * 60 * 1000));
+      const prevMonthFrom = toYmd(new Date(todayStart.getTime() - 56 * 24 * 60 * 60 * 1000));
+      const prevMonthTo   = toYmd(new Date(todayStart.getTime() - 28 * 24 * 60 * 60 * 1000));
+
+      // Fetch IG + FB flows in parallel
+      const [
+        igDay, igWeek, igMonth, igPrevDay, igPrevWeek, igPrevMonth,
+        fbDay, fbWeek, fbMonth, fbPrevDay, fbPrevWeek, fbPrevMonth,
+      ] = await Promise.all([
+        sumIgFlow(dayFrom, nowYmd),   sumIgFlow(weekFrom, nowYmd),   sumIgFlow(monthFrom, nowYmd),
+        sumIgFlow(prevDayFrom, prevDayTo), sumIgFlow(prevWeekFrom, prevWeekTo), sumIgFlow(prevMonthFrom, prevMonthTo),
+        sumFbFlow(dayFrom, nowYmd),   sumFbFlow(weekFrom, nowYmd),   sumFbFlow(monthFrom, nowYmd),
+        sumFbFlow(prevDayFrom, prevDayTo), sumFbFlow(prevWeekFrom, prevWeekTo), sumFbFlow(prevMonthFrom, prevMonthTo),
+      ]);
+
+      // Combine IG + FB
+      const combine = (ig: { gained: number; lost: number }, fb: { gained: number; lost: number }) => ({
+        gained: ig.gained + fb.gained,
+        lost: ig.lost + fb.lost,
+      });
+
+      const dayFlow   = combine(igDay, fbDay);
+      const weekFlow  = combine(igWeek, fbWeek);
+      const monthFlow = combine(igMonth, fbMonth);
+      const prevDayFlow   = combine(igPrevDay, fbPrevDay);
+      const prevWeekFlow  = combine(igPrevWeek, fbPrevWeek);
+      const prevMonthFlow = combine(igPrevMonth, fbPrevMonth);
+
+      const dailyGrowth    = dayFlow.gained   - dayFlow.lost;
+      const weeklyGrowth   = weekFlow.gained  - weekFlow.lost;
+      const monthlyGrowth  = monthFlow.gained - monthFlow.lost;
+      const prevDailyGrowth   = prevDayFlow.gained   - prevDayFlow.lost;
+      const prevWeeklyGrowth  = prevWeekFlow.gained  - prevWeekFlow.lost;
+      const prevMonthlyGrowth = prevMonthFlow.gained - prevMonthFlow.lost;
+
+      const pctChange = (cur: number, prev: number): number => {
+        if (prev === 0) return cur > 0 ? 100 : cur < 0 ? -100 : 0;
+        return ((cur - prev) / Math.abs(prev)) * 100;
+      };
+
+      const growthPercentage = Number(pctChange(monthlyGrowth, prevMonthlyGrowth).toFixed(2));
+      const trend: 'up' | 'down' | 'flat' =
+        growthPercentage > 0 ? 'up' : growthPercentage < 0 ? 'down' : 'flat';
 
       return {
         currentFollowers,
+        instagramFollowers: igCurrentFollowers,
+        facebookFollowers: fbCurrentFollowers,
         dailyGrowth,
+        dailyGained:  dayFlow.gained,
+        dailyLost:    dayFlow.lost,
+        prevDailyGrowth,
+        prevDailyGained:   prevDayFlow.gained,
+        prevDailyLost:     prevDayFlow.lost,
         weeklyGrowth,
+        weeklyGained:  weekFlow.gained,
+        weeklyLost:    weekFlow.lost,
+        prevWeeklyGrowth,
+        prevWeeklyGained:  prevWeekFlow.gained,
+        prevWeeklyLost:    prevWeekFlow.lost,
         monthlyGrowth,
+        monthlyGained:  monthFlow.gained,
+        monthlyLost:    monthFlow.lost,
+        prevMonthlyGrowth,
+        prevMonthlyGained: prevMonthFlow.gained,
+        prevMonthlyLost:   prevMonthFlow.lost,
         growthPercentage,
-        trend
+        trend,
       };
     });
   }

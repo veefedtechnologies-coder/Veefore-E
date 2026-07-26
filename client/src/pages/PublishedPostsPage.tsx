@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Skeleton, SkeletonPageLoader } from '@/components/ui/skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
+import { PublishedPostsSkeleton } from '@/components/skeletons/pages'
 import { Eye, ArrowLeft, Video, Image as ImageIcon, Sparkles, CheckCircle2 } from 'lucide-react'
 import { useLocation } from 'wouter'
 import { useQuery } from '@tanstack/react-query'
@@ -152,7 +153,7 @@ export default function PublishedPostsPage() {
         </div>
 
         {isLoading ? (
-          <SkeletonPageLoader type="published-page" />
+          <PublishedPostsSkeleton />
         ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 px-4 text-center">
             <div className="w-24 h-24 mb-6 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center ring-8 ring-white dark:ring-gray-900 shadow-xl">

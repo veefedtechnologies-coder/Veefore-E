@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { BaseController, TypedRequest } from './BaseController';
 import { userService } from '../services';
 import { storage } from '../mongodb-storage';
+import { syncNicheUpdate, resolveNiche } from '../services/niche.util';
+import { invalidateBootstrapCache } from '../lib/html-bootstrap';
 
 const UpdateProfileSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
@@ -73,40 +75,20 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-async function createDefaultWorkspaceIfNeeded(userId: string, userPlan: string = 'free'): Promise<void> {
-  try {
-    const existingWorkspaces = await storage.getWorkspacesByUserId(userId);
-
-    if (existingWorkspaces.length === 0) {
-      console.log(`[DEFAULT WORKSPACE] Creating default workspace for user ${userId} with plan ${userPlan}`);
-
-      const defaultWorkspace = await storage.createWorkspace({
-        userId: userId,
-        name: 'My Workspace',
-        description: 'Your default workspace for managing social media content',
-        isDefault: true,
-        plan: userPlan,
-        credits: userPlan === 'free' ? 10 : 100,
-        members: [{
-          userId: userId,
-          role: 'owner',
-          joinedAt: new Date()
-        }],
-        settings: {
-          autoSync: true,
-          notifications: true,
-          timezone: 'UTC'
-        },
-        addons: []
-      });
-
-      console.log(`[DEFAULT WORKSPACE] ✅ Created default workspace ${defaultWorkspace.id} for user ${userId}`);
-    } else {
-      console.log(`[DEFAULT WORKSPACE] User ${userId} already has ${existingWorkspaces.length} workspace(s) - skipping creation`);
-    }
-  } catch (error) {
-    console.error(`[DEFAULT WORKSPACE] Error creating default workspace for user ${userId}:`, error);
-  }
+/**
+ * BUG FIX: this previously auto-created a bare "My Workspace" (no brand, no
+ * social account) whenever a user reached onboarding completion with zero
+ * workspaces. Per the workspace-meta-connection spec, a workspace must
+ * always represent one connected brand — it should only be created via the
+ * Meta OAuth import flow (WorkspaceService.importAuthorizedBrand /
+ * createWorkspace), never as an empty placeholder. This function is now a
+ * no-op kept only so existing call sites don't need to change; onboarding
+ * completion no longer forces workspace creation, and the frontend's
+ * "Connect Meta" / brand-selection onboarding steps are what create the
+ * user's first real (brand-backed) workspace.
+ */
+async function createDefaultWorkspaceIfNeeded(_userId: string, _userPlan: string = 'free'): Promise<void> {
+  // Intentionally does nothing — see doc comment above.
 }
 
 export class UserController extends BaseController {
@@ -169,6 +151,16 @@ export class UserController extends BaseController {
       updateData.businessType = profile.businessType;
       updateData.experienceLevel = profile.experienceLevel;
       updateData.primaryObjective = profile.primaryObjective;
+
+      // Keep niche and preferences.contentNiche in sync so all AI features
+      // (recommendations, banner, captions, insights) and social listening
+      // read the same niche the user picked during onboarding.
+      if (profile.niche) {
+        const existing = await storage.getUser(userId).catch(() => null);
+        const synced = syncNicheUpdate({ niche: profile.niche }, (existing as any)?.preferences || {});
+        updateData.niche = synced.niche;
+        updateData.preferences = synced.preferences;
+      }
     }
 
     if (onboardingData.planSelected) {
@@ -193,6 +185,7 @@ export class UserController extends BaseController {
     const userId = req.user!.id;
     const input = CompleteOnboardingSchema.parse(req.body);
     const user = await userService.completeOnboarding(userId, input);
+    void invalidateBootstrapCache(userId);
     this.sendSuccess(res, user, 200, 'Onboarding completed successfully');
   });
 
@@ -237,11 +230,20 @@ export class UserController extends BaseController {
 
       // Step 2: Update user with onboarding data (longer timeout - 15s)
       console.log(`[ONBOARDING] Updating user ${dbUser.id} with isOnboarded=true`);
-      const updateData = {
+      // Mirror the niche the user selected during onboarding into BOTH the
+      // top-level `niche` field (social listening) and `preferences.contentNiche`
+      // (all AI features) so the whole app is aligned from day one.
+      const incomingPrefs = (preferences || {}) as Record<string, any>;
+      const synced = syncNicheUpdate(
+        { preferences: incomingPrefs },
+        (dbUser as any)?.preferences || {}
+      );
+      const updateData: any = {
         isOnboarded: true,
         onboardingCompletedAt: new Date(),
-        preferences: preferences || {}
+        preferences: synced.preferences || incomingPrefs
       };
+      if (synced.niche) updateData.niche = synced.niche;
 
       const updatedUser = await withTimeout(storage.updateUser(dbUser.id, updateData), 15000);
       console.log(`[ONBOARDING] ✅ User updated successfully, isOnboarded: ${updatedUser.isOnboarded}`);
@@ -257,6 +259,10 @@ export class UserController extends BaseController {
       }
 
       console.log(`[ONBOARDING] ✅ Completed onboarding for user ${updatedUser.id}`);
+      // Onboarding + default workspace changed what the bootstrap seeds — drop the
+      // cached bootstrap so the next HTML load reflects the onboarded state.
+      void invalidateBootstrapCache(updatedUser.id);
+      void invalidateBootstrapCache(currentUserId);
       this.sendSuccess(res, { success: true, message: 'Onboarding completed successfully', user: updatedUser });
     } catch (error: any) {
       console.error(`[ONBOARDING] ❌ Critical error during onboarding completion:`, error);

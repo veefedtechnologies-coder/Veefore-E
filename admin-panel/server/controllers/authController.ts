@@ -59,54 +59,6 @@ function parseUserAgent(userAgent: string) {
   };
 }
 
-/**
- * Parse User-Agent string to extract device information
- */
-function parseUserAgent(userAgent: string) {
-  const ua = userAgent.toLowerCase();
-  
-  let deviceType: 'desktop' | 'mobile' | 'tablet' = 'desktop';
-  if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)) {
-    deviceType = 'mobile';
-  } else if (/tablet|ipad/i.test(ua)) {
-    deviceType = 'tablet';
-  }
-
-  let os = 'unknown';
-  if (/windows/i.test(ua)) os = 'Windows';
-  else if (/mac os x/i.test(ua)) os = 'macOS';
-  else if (/linux/i.test(ua)) os = 'Linux';
-  else if (/android/i.test(ua)) os = 'Android';
-  else if (/ios|iphone|ipad/i.test(ua)) os = 'iOS';
-
-  let browser = 'unknown';
-  let version = 'unknown';
-  if (/chrome/i.test(ua) && !/edge|edg/i.test(ua)) {
-    browser = 'Chrome';
-    const match = ua.match(/chrome\/(\d+)/);
-    if (match) version = match[1];
-  } else if (/firefox/i.test(ua)) {
-    browser = 'Firefox';
-    const match = ua.match(/firefox\/(\d+)/);
-    if (match) version = match[1];
-  } else if (/safari/i.test(ua) && !/chrome/i.test(ua)) {
-    browser = 'Safari';
-    const match = ua.match(/version\/(\d+)/);
-    if (match) version = match[1];
-  } else if (/edge|edg/i.test(ua)) {
-    browser = 'Edge';
-    const match = ua.match(/edg\/(\d+)/);
-    if (match) version = match[1];
-  }
-
-  return {
-    type: deviceType,
-    os,
-    browser,
-    version
-  };
-}
-
 export class AuthController {
   // Login
   static async login(req: Request, res: Response) {
@@ -252,32 +204,6 @@ export class AuthController {
 
       // Reset login attempts
       await admin.resetLoginAttempts();
-
-      // Generate username if missing
-      if (!admin.username) {
-        const emailPrefix = admin.email.split('@')[0];
-        const baseUsername = emailPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        
-        // Ensure username is unique
-        let username = baseUsername;
-        let counter = 1;
-        
-        while (await Admin.findOne({ username })) {
-          username = `${baseUsername}${counter}`;
-          counter++;
-        }
-        
-        admin.username = username;
-      }
-
-      // Update last login
-      admin.lastLogin = new Date();
-      if (deviceFingerprint) {
-        if (!admin.deviceFingerprints.includes(deviceFingerprint)) {
-          admin.deviceFingerprints.push(deviceFingerprint);
-        }
-      }
-      await admin.save();
 
       // Generate username if missing
       if (!admin.username) {

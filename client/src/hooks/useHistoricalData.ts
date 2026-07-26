@@ -23,10 +23,10 @@ export const useHistoricalData = (workspaceId?: string, period: Period = 'month'
     enabled: !!workspaceId,
     refetchInterval: 10 * 60 * 1000,
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchOnMount: 'always',
-    staleTime: 0,
+    refetchOnMount: false,
+    staleTime: 5 * 60 * 1000, // serve cached data instantly; revalidate after 5 min
     gcTime: 30 * 60 * 1000,
     placeholderData: undefined,
   })

@@ -2,7 +2,6 @@ import { useRef, useState, memo, useEffect } from 'react';
 import { motion, useScroll, useSpring, useMotionValueEvent, useTransform, useReducedMotion } from 'framer-motion';
 import { MessageSquare, DollarSign, Search, CheckCircle, Calendar, Clock } from 'lucide-react';
 import { ScrollHint } from './ui/ScrollHint';
-import { GPU_ACCELERATED_STYLES, MOBILE_OPTIMIZED_LAYER } from '../lib/animation-performance';
 import { useIsMobile } from '../hooks/use-is-mobile';
 
 // Lightning fast spring config - low solver overhead
@@ -305,6 +304,7 @@ const ScreenContent = memo(({ feature, isMobile = false }: { feature: Feature, i
                             </div>
                             {feature.screen.schedule.peak && (
                                 <div className="flex items-center space-x-1.5 text-[8px] md:text-[9px] text-green-400 bg-green-500/10 p-1.5 md:p-2 rounded-md border border-green-500/20">
+                                    {/* skeleton-guard-allow: status-dot — live 'peak audience activity' status indicator in marketing mockup */}
                                     <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-green-500 animate-pulse" />
                                     <span>3x Peak Audience Activity</span>
                                 </div>
@@ -420,9 +420,6 @@ const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
     return (
         <div
             className="w-full h-full flex flex-col items-center justify-center pointer-events-none"
-            style={{
-                ...GPU_ACCELERATED_STYLES,
-            }}
         >
             <div className="scale-[0.6] sm:scale-[0.7] md:scale-[0.8] origin-center sm:-mt-0">
                 <IphoneMockup className="shadow-2xl">
@@ -435,7 +432,7 @@ const IPhoneScreen = memo(({ feature }: { feature: Feature }) => {
 
 const LaptopScreen = memo(({ feature }: { feature: Feature }) => {
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center" style={GPU_ACCELERATED_STYLES}>
+        <div className="w-full h-full flex flex-col items-center justify-center">
             <div className="w-full aspect-[16/10] bg-black rounded-t-2xl border-[6px] border-zinc-800 overflow-hidden relative shadow-2xl">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-zinc-900 rounded-b-xl z-20" />
                 <ScreenContent feature={feature} />
@@ -493,13 +490,11 @@ const TextSlide = memo(({ feature, opacity, y }: TextSlideProps) => {
                 type: "spring",
                 ...springCfg
             }}
-            style={{ 
-                // Keep these - needed for proper 3D layering
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
-                // OPTIMIZATION: Isolate rendering to prevent cascade repaints
-                contain: 'layout paint style'
-            }}
+            // NOTE: removed backfaceVisibility + `contain: layout paint style`.
+            // Safari's compositing-border view showed these creating a deep STACK
+            // of nested GPU layers in the mockup, which WebKit re-rasterizes on
+            // scroll-back (the flicker). Framer Motion promotes this element to a
+            // layer automatically only while it animates, which is sufficient.
             className="w-full max-w-lg"
         >
             <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 ${colors.border} text-[10px] md:text-xs font-bold ${colors.text} uppercase tracking-widest mb-4 md:mb-6 md:backdrop-blur-md`}>
@@ -537,12 +532,6 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
     if (isStatic) {
         return (
             <div
-                style={{
-                    ...GPU_ACCELERATED_STYLES,
-                    opacity: 1,
-                    // OPTIMIZATION: Isolate rendering
-                    contain: 'layout paint style'
-                }}
                 className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
             >
                 <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
@@ -556,10 +545,8 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
         return (
             <div
                 style={{
-                    ...GPU_ACCELERATED_STYLES,
                     opacity: isVisible ? 1 : 0,
                     display: isVisible ? 'flex' : 'none',
-                    contain: 'layout paint style'
                 }}
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
             >
@@ -581,13 +568,9 @@ const MockupSlide = memo(({ feature, y, scale, isVisible, isStatic = false, opac
                 type: "spring",
                 ...springCfg
             }}
-            style={{
-                // Keep these - needed for proper 3D layering
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
-                // OPTIMIZATION: Isolate rendering to prevent cascade repaints
-                contain: 'layout paint style'
-            }}
+            // NOTE: removed backfaceVisibility + `contain: layout paint style`.
+            // These were creating nested GPU layers that WebKit re-rasterized on
+            // scroll-back. Framer Motion adds the necessary layer only during animation.
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
             <div className="hidden md:block w-full h-full"><LaptopScreen feature={feature} /></div>
@@ -660,8 +643,6 @@ const MotionAmbientGlow = ({ color, index, progress }: { color: any; index: numb
             // GPU-accelerated property: opacity only
             style={{ 
                 opacity,
-                ...MOBILE_OPTIMIZED_LAYER,
-                contain: 'layout paint style'
             }}
             className={`absolute right-0 top-1/2 -translate-y-1/2 w-[200px] h-[200px] md:w-[600px] md:h-[600px] ${color.bg} blur-[80px] md:blur-[120px] rounded-full`}
         />
@@ -723,7 +704,10 @@ export default function StickyScrollFeaturesV2() {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.7),rgba(0,0,0,1))]" />
 
             <div
-                className="sticky top-0 h-[100dvh] flex flex-col md:flex-row items-center w-full z-[60]"
+                // h-[100svh]: stable small-viewport height. `dvh` changes as the iOS
+                // address bar shows/hides during scroll-up, resizing this pinned
+                // element every frame (reflow + repaint = flicker). `svh` is constant.
+                className="sticky top-0 h-[100svh] flex flex-col md:flex-row items-center w-full z-[60]"
                 style={{
                     position: 'sticky',
                     WebkitOverflowScrolling: 'touch'
@@ -758,7 +742,7 @@ export default function StickyScrollFeaturesV2() {
 
                     <div className="flex w-full md:w-[55%] h-[55vh] sm:h-[60vh] md:h-full items-center justify-center relative z-[70]">
                         <motion.div
-                            style={{ opacity: sectionOpacity, ...MOBILE_OPTIMIZED_LAYER }}
+                            style={{ opacity: sectionOpacity }}
                             className="absolute -inset-2 md:-inset-8 overflow-visible pointer-events-none"
                         >
                             <div className="absolute inset-0 rounded-3xl transition-all duration-500" style={{ background: activeColors.panelGradient }} />
@@ -771,7 +755,12 @@ export default function StickyScrollFeaturesV2() {
                                     background: `radial-gradient(circle, ${activeColors.orbPrimary} 0%, transparent 60%)`, 
                                     filter: 'blur(60px)'
                                 }}
-                                animate={prefersReducedMotion ? { scale: 1 } : { scale: [1, 1.15, 1] }}
+                                // WebKit flicker fix: pulse via OPACITY, not scale.
+                                // Animating `scale` on a `filter: blur()` element forces WebKit to
+                                // re-rasterize the large blur buffer every frame; during scroll this
+                                // collides with scroll compositing and causes the flicker. Opacity
+                                // reuses the cached blur buffer, so the glow still breathes cheaply.
+                                animate={prefersReducedMotion ? { opacity: 1 } : { opacity: [0.7, 1, 0.7] }}
                                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                             />
                             <motion.div
@@ -780,19 +769,14 @@ export default function StickyScrollFeaturesV2() {
                                     background: `radial-gradient(circle, ${activeColors.orbSecondary} 0%, transparent 60%)`, 
                                     filter: 'blur(50px)'
                                 }}
-                                animate={prefersReducedMotion ? { scale: 1 } : { scale: [1, 1.2, 1] }}
+                                // WebKit flicker fix: pulse via OPACITY, not scale (see note above).
+                                animate={prefersReducedMotion ? { opacity: 1 } : { opacity: [0.65, 1, 0.65] }}
                                 transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                             />
                         </motion.div>
 
                         <div
                             className="relative w-full h-[90%] md:h-[80%] max-w-[700px] z-[100]"
-                            style={{
-                                WebkitTransform: 'translate3d(0,0,0)',
-                                transform: 'translate3d(0,0,0)',
-                                WebkitBackfaceVisibility: 'hidden',
-                                backfaceVisibility: 'hidden',
-                            }}
                         >
                             {features.map((feature, i) => (
                                 <MotionMockupSlide key={i} feature={feature} index={i} activeFeature={activeFeature} />

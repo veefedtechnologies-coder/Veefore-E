@@ -96,7 +96,11 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
       })
 
       newSocket.on('connect_error', (error) => {
-        console.error('[Realtime] Connection error:', error.message)
+        // Only log the first error to avoid flooding the console on the
+        // reconnect backoff loop (the metrics socket retries indefinitely).
+        if (reconnectDelayRef.current === INITIAL_RECONNECT_DELAY) {
+          console.warn('[Realtime] Connection error:', error.message)
+        }
         setConnectionStatus('disconnected')
         scheduleReconnect()
       })
@@ -206,14 +210,14 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
     }
   }, [connectSocket])
 
-  const value: RealtimeContextValue = {
+  const value: RealtimeContextValue = React.useMemo(() => ({
     socket,
     connectionStatus,
     isConnected: connectionStatus === 'connected',
     emit,
     subscribe,
     reconnect,
-  }
+  }), [socket, connectionStatus, emit, subscribe, reconnect])
 
   return (
     <RealtimeContext.Provider value={value}>

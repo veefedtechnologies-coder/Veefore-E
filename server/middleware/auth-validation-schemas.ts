@@ -13,14 +13,6 @@ export const verifyEmailSchema = z.object({
     .regex(/^\d{6}$/, 'Verification code must contain only numbers')
 });
 
-// Firebase token exchange validation
-export const tokenExchangeSchema = z.object({
-  token: z.string()
-    .min(1, 'Firebase ID token is required')
-    .max(4096, 'Token too long'), // Firebase ID tokens are typically ~2KB
-  csrfToken: z.string().optional()
-});
-
 // CSRF token validation
 export const csrfValidationSchema = z.object({
   csrfToken: z.string()

@@ -98,6 +98,7 @@ export const InstagramPreview: React.FC<InstagramPreviewProps> = ({
               <p className="text-sm opacity-90">Instagram direct message interface</p>
             </div>
             <div className="ml-auto">
+              {/* skeleton-guard-allow: status-dot — live preview status indicator dot, not a loading placeholder */}
               <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
             </div>
           </div>
@@ -172,6 +173,7 @@ export const InstagramPreview: React.FC<InstagramPreviewProps> = ({
                 <p className="text-sm opacity-90">Instagram direct message interface</p>
               </div>
               <div className="ml-auto">
+                {/* skeleton-guard-allow: status-dot — live preview status indicator dot, not a loading placeholder */}
                 <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
               </div>
             </div>

@@ -110,6 +110,39 @@ export async function initializeLeaderElection(storage: IStorage): Promise<void>
 }
 
 let isPollingExecuting = false;
+let deferredSweepTimer: NodeJS.Timeout | null = null;
+
+/** How often the leader sweeps the deferred-jobs queue for resumable work. */
+const DEFERRED_SWEEP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Start (once) a periodic sweep that re-dispatches deferred jobs whose account
+ * usage has dropped back below the restricted threshold (smart-polling-system
+ * Req 11.2). Idempotent — repeated calls do not stack timers. Only the leader
+ * instance calls this (via startFallbackSmartPolling).
+ */
+function startDeferredJobSweep(): void {
+  if (deferredSweepTimer) return; // already running
+
+  deferredSweepTimer = setInterval(async () => {
+    try {
+      const { reEvaluateAllDeferredJobs } = await import('../queues/metricsQueue');
+      const count = await reEvaluateAllDeferredJobs();
+      if (count > 0) {
+        console.log(`[SMART POLLING] ♻️ Deferred sweep re-dispatched ${count} job(s)`);
+      }
+    } catch (err) {
+      console.error('[SMART POLLING] Deferred sweep error:', (err as Error).message);
+    }
+  }, DEFERRED_SWEEP_INTERVAL_MS);
+
+  // Don't let the timer keep the event loop alive on shutdown.
+  if (typeof deferredSweepTimer.unref === 'function') {
+    deferredSweepTimer.unref();
+  }
+
+  console.log(`[SMART POLLING] ♻️ Deferred-job recovery sweep started (every ${DEFERRED_SWEEP_INTERVAL_MS / 60000}m)`);
+}
 
 export async function startFallbackSmartPolling() {
   console.log('[SMART POLLING] Initializing BullMQ Smart Polling system...');
@@ -121,6 +154,13 @@ export async function startFallbackSmartPolling() {
 
     const activeAccounts = await SocialAccountModel.find({
       platform: 'instagram',
+      $or: [{ accessToken: { $exists: true, $ne: '' } }, { encryptedAccessToken: { $exists: true, $ne: '' } }]
+    });
+
+    // Also collect active Facebook accounts for polling
+    const activeFacebookAccounts = await SocialAccountModel.find({
+      platform: 'facebook',
+      connectionStatus: 'ACTIVE',
       $or: [{ accessToken: { $exists: true, $ne: '' } }, { encryptedAccessToken: { $exists: true, $ne: '' } }]
     });
 
@@ -157,6 +197,75 @@ export async function startFallbackSmartPolling() {
         console.error(`[SMART POLLING] Failed to schedule BullMQ job for ${acc.username}:`, err.message);
       }
     }
+
+    // ── Facebook Page polling (repeatable, every 2 hours) ─────────────────
+    // Facebook analytics are fetched live on dashboard load, but we also
+    // schedule a background repeatable job so data stays fresh without
+    // requiring a user to open the dashboard. Every 2 hours is appropriate
+    // since Facebook Page Insights have a ~1-hour granularity.
+    for (const fbAcc of activeFacebookAccounts) {
+      try {
+        const fbAccountId = String((fbAcc as any).accountId || (fbAcc as any)._id);
+        const fbToken = (fbAcc as any).accessToken || '';
+        if (!fbToken || !fbAccountId) continue;
+
+        // Enqueue a one-shot refresh now + schedule repeatable every 2 hours.
+        // metricsQueue handles Facebook via the same 'all' type — the worker
+        // routes to SocialAccountService.syncFacebookAccount() when platform='facebook'.
+        await MetricsQueueManager.scheduleMetricsFetch(
+          fbAcc.workspaceId.toString(),
+          'system',
+          fbAccountId,
+          fbToken,
+          'all',
+          { priority: 15 }
+        );
+
+        // Schedule repeatable Facebook polling (every 2 hours = 120 minutes)
+        const { metricsQueue: fbQueue } = await import('../queues/metricsQueue');
+        if (fbQueue) {
+          const fbJobId = `fb-poll-${fbAcc.workspaceId}-${fbAccountId}`;
+          await fbQueue.add(
+            'fetch-metrics' as any,
+            {
+              workspaceId: fbAcc.workspaceId.toString(),
+              userId: 'system',
+              instagramAccountId: fbAccountId,  // field name is legacy; used as accountId
+              token: fbToken,
+              metricsType: 'all',
+              priority: 15,
+              forceRefresh: false,
+            },
+            {
+              repeat: { every: 2 * 60 * 60 * 1000 }, // every 2 hours
+              jobId: fbJobId,
+              priority: 15,
+            }
+          );
+          console.log(`[SMART POLLING] 🔵 Scheduled Facebook polling for page ${fbAccountId} (every 2h)`);
+        }
+
+        // ── Trigger 24-month history backfill for existing FB accounts ──────
+        // For accounts connected before the durable store was built, enqueue
+        // the prewarm on startup so their history gets populated. The worker
+        // skips immutable days already stored, so this is idempotent — running
+        // on every restart just means each run only fetches the latest missing day.
+        try {
+          const { prewarmFacebookInsightsForWorkspace } = await import('../features/facebook/analytics/facebookInsightsHistory');
+          prewarmFacebookInsightsForWorkspace(fbAcc.workspaceId.toString())
+            .catch((e: Error) => console.warn('[SMART POLLING] FB prewarm failed:', e.message));
+        } catch {
+          // non-fatal
+        }
+      } catch (err: any) {
+        console.error(`[SMART POLLING] Failed to schedule Facebook polling for ${(fbAcc as any).username}:`, err.message);
+      }
+    }
+
+    // Start the periodic deferred-job recovery sweep (leader only). Recovers any
+    // jobs that were deferred while an account was throttled, once its usage
+    // drops back below the restricted threshold (smart-polling-system Req 11.2).
+    startDeferredJobSweep();
   } catch (err) {
     console.error('[SMART POLLING] Initialization error:', err);
   }

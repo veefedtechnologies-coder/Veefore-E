@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { Home, Calendar, BarChart3, MessageSquare, Settings, Globe, LogOut, Users, Link, Plus, Zap, Video, Shield, Activity } from 'lucide-react'
+import { Home, Calendar, BarChart3, MessageSquare, Settings, Globe, LogOut, Users, Link, Plus, Zap, Video, Shield, Activity, CreditCard, Coins } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CreateDropdown } from './create-dropdown'
 import { logout } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
 import { useLocation } from 'wouter'
 import { useUser } from '@/hooks/useUser'
+import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
+import { ActiveWorkspaceProvider } from '@/contexts/ActiveWorkspaceContext'
 
 // Grouped sidebar items for better organization
 const sidebarGroups = [
@@ -34,6 +36,7 @@ const sidebarGroups = [
   {
     title: "Management",
     items: [
+      { icon: Coins, label: 'Credits', key: 'credits', url: '/credits' },
       { icon: Shield, label: 'Security Health', key: 'encryption-health', url: '/encryption-health' },
       { icon: Settings, label: 'Test Fixtures', key: 'test-fixtures', url: '/test-fixtures' },
     ]
@@ -64,7 +67,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
     if (loc === '/video-generator') return 'video-generator'
     if (loc === '/veegpt') return 'veegpt'
     if (loc === '/inbox') return 'inbox'
-    if (loc === '/analytics') return 'analytics'
+    if (loc === '/analytics' || loc.startsWith('/analytics/')) return 'analytics'
     if (loc === '/automation') return 'automation'
     if (loc === '/social-listening') return 'social-listening'
     if (loc === '/settings') return 'settings'
@@ -72,6 +75,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
     if (loc === '/landing') return 'landing'
     if (loc === '/test-fixtures') return 'test-fixtures'
     if (loc === '/encryption-health') return 'encryption-health'
+    if (loc === '/credits') return 'credits'
     return 'home'
   }
 
@@ -177,6 +181,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
           activeView === item.key ? "scale-110" : "group-hover:scale-105"
         )} />
         {item.isCreateButton && dropdownOpen && (
+          // skeleton-guard-allow: status-dot — decorative create-button notification accent dot, not a loading placeholder
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-orange-500 to-red-600 rounded-full animate-pulse"></div>
         )}
       </div>
@@ -196,7 +201,11 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
   )
 
   return (
+    <ActiveWorkspaceProvider>
     <div className={cn("w-24 bg-white dark:bg-slate-800 flex flex-col h-full min-h-full overflow-y-auto [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-500 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 relative transition-colors duration-300", className)}>
+      {/* WorkspaceSwitcher — only visible when user has more than one workspace */}
+      <WorkspaceSwitcher />
+
       {/* VeeGPT Logo Section */}
       <div className="flex flex-col items-center py-6 bg-white dark:bg-slate-800">
         <div 
@@ -276,8 +285,40 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
         </nav>
       </div>
 
-      {/* Bottom Section - Settings and Logout */}
+      {/* Bottom Section - Settings, Billing and Logout */}
       <div className="flex flex-col space-y-4 py-6 bg-white dark:bg-slate-800">
+        {/* Billing */}
+        <div 
+          className={cn(
+            "flex flex-col items-center cursor-pointer transition-all duration-300 relative group py-2",
+            location === '/settings/billing'
+              ? 'text-blue-600 dark:text-blue-400' 
+              : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+          )}
+          onClick={() => setLocation('/settings/billing')}
+        >
+          <div className={cn(
+            "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 mb-1",
+            location === '/settings/billing'
+              ? "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 shadow-lg border border-blue-200/50 dark:border-blue-600/50"
+              : "hover:bg-gradient-to-br hover:from-blue-50 hover:to-purple-50 dark:hover:from-blue-900/20 dark:hover:to-purple-900/20 hover:shadow-md"
+          )}>
+            <CreditCard className={cn(
+              "w-5 h-5 transition-all duration-300",
+              location === '/settings/billing' ? "scale-110" : "group-hover:scale-105"
+            )} />
+          </div>
+          <span className={cn(
+            "text-xs font-medium transition-all duration-300",
+            location === '/settings/billing'
+              ? "text-blue-600 dark:text-blue-400 font-semibold" 
+              : "text-gray-600 dark:text-gray-300"
+          )}>Billing</span>
+          {location === '/settings/billing' && (
+            <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
+          )}
+        </div>
+
         {/* Settings */}
         <div 
           className={cn(
@@ -331,5 +372,6 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
         onOptionSelect={handleCreateOptionSelect}
       />
     </div>
+    </ActiveWorkspaceProvider>
   )
 }

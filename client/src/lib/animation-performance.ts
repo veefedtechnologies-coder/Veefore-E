@@ -1,22 +1,22 @@
-export const GPU_ACCELERATED_STYLES = {
-  transform: 'translate3d(0, 0, 0)',
-  // REMOVED: backfaceVisibility causes flickering on mobile with animations
-  // backfaceVisibility: 'hidden' as const,
-  // WebkitBackfaceVisibility: 'hidden' as const,
-  perspective: '1000px',
-  WebkitFontSmoothing: 'subpixel-antialiased' as const,
-} as const;
+/**
+ * Layer-promotion constants.
+ *
+ * HISTORY: these used to force permanent GPU layers (`perspective`, `will-change`,
+ * `translateZ`, `contain`) on many static/background elements. Safari's 3D Layers
+ * inspector revealed this built a deep nested compositing-layer stack that WebKit
+ * re-rasterizes on scroll — the whole-page flicker on iPhone AND desktop Safari.
+ *
+ * They are now intentionally EMPTY. Framer Motion promotes elements to their own
+ * layer automatically while they animate and releases them afterward, which is the
+ * correct, flicker-free behavior. Nothing visual changes. Kept as exported objects
+ * so the many `style={{ ...MOBILE_OPTIMIZED_LAYER }}` spreads across the app keep
+ * working without edits.
+ */
+export const GPU_ACCELERATED_STYLES = {} as const;
 
-export const MOBILE_OPTIMIZED_LAYER = {
-  ...GPU_ACCELERATED_STYLES,
-  willChange: 'transform, opacity',
-  contain: 'paint layout', // Isolates layout/paint to this element
-} as const;
+export const MOBILE_OPTIMIZED_LAYER = {} as const;
 
-export const GPU_ACCELERATED_CONTAINER = {
-  ...GPU_ACCELERATED_STYLES,
-  contain: 'layout style paint',
-} as const;
+export const GPU_ACCELERATED_CONTAINER = {} as const;
 
 export const GPU_STABLE_CLASS = 'gpu-stable';
 

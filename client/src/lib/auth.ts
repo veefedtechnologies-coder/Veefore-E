@@ -1,5 +1,6 @@
 import { signOut } from 'firebase/auth'
 import { auth } from './firebase'
+import { clearClientSessionState } from './session-cleanup'
 
 export const logout = async () => {
   try {
@@ -26,10 +27,16 @@ export const logout = async () => {
     
     // Sign out from Firebase
     await signOut(auth)
-    
-    // Clear any stored user data
-    localStorage.removeItem('user')
-    sessionStorage.removeItem('user')
+
+    // Wipe ALL per-user client state (localStorage + sessionStorage + React Query
+    // cache) so a different account on this browser can't see the previous user's
+    // data. Keeps only device-level settings (theme, cookie consent, email prefill).
+    clearClientSessionState()
+
+    // CROSS-TAB LOGOUT: broadcast to other open tabs. Set AFTER the wipe so the
+    // signal survives. Other tabs listen (see useFirebaseAuth) and hard reload to
+    // a signed-out state.
+    try { localStorage.setItem('veefore_logout', String(Date.now())) } catch { /* ignore */ }
     
     // Force redirect to landing page
     window.location.href = '/'

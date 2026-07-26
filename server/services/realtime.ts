@@ -89,8 +89,15 @@ export class RealtimeService {
         }
 
         const { storage } = await import('../mongodb-storage');
-        const user = await storage.getUserByFirebaseUid(firebaseUid);
-        
+        let user = await storage.getUserByFirebaseUid(firebaseUid);
+
+        if (!user) {
+          // Custom-token users have uid === Mongo _id, so fall back to a by-id
+          // lookup (mirrors the HTTP auth / onboarding resolution). Without this
+          // the metrics socket rejects every connection → endless reconnect loop.
+          try { user = await storage.getUser(firebaseUid as any); } catch { /* ignore */ }
+        }
+
         if (!user) {
            throw new Error('User not found');
         }
@@ -117,17 +124,25 @@ export class RealtimeService {
    */
   private static handleConnection(socket: SocketWithWorkspace): void {
     const { userId, workspaceId } = socket;
-    
-    if (!userId || !workspaceId) {
-      console.error('🚨 WebSocket connection missing user or workspace info');
+
+    // Only a userId is required to ESTABLISH the connection. The workspace room
+    // is joined afterwards via the `join-workspace` event (the client emits it
+    // once it knows its active workspace). Previously we required workspaceId
+    // here and disconnected immediately when it was absent — which it always was,
+    // since the auth middleware never sets it — causing an endless connect/
+    // disconnect/reconnect loop.
+    if (!userId) {
+      console.error('🚨 WebSocket connection missing user info');
       socket.disconnect();
       return;
     }
 
-    console.log(`🔗 New WebSocket connection: user=${userId}, workspace=${workspaceId}, socket=${socket.id}`);
+    console.log(`🔗 New WebSocket connection: user=${userId}, workspace=${workspaceId || '(pending join)'}, socket=${socket.id}`);
 
-    // Join workspace room
-    this.joinWorkspaceRoom(socket, workspaceId);
+    // Join workspace room if the workspace is already known.
+    if (workspaceId) {
+      this.joinWorkspaceRoom(socket, workspaceId);
+    }
 
     // Track user socket
     this.userSockets.set(userId, socket.id);
@@ -135,7 +150,7 @@ export class RealtimeService {
     // Send initial connection confirmation
     socket.emit('connected', {
       message: 'Connected to real-time metrics',
-      workspaceId,
+      workspaceId: workspaceId || null,
       timestamp: new Date()
     });
 

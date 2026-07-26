@@ -8,6 +8,7 @@
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ProfileFormData } from '../types/profile.types';
+import { nicheOptionsWith } from '../constants/niches';
 
 interface ProfessionalProfileFieldsProps {
   formData: ProfileFormData;
@@ -83,10 +84,9 @@ export function ProfessionalProfileFields({
                     <SelectValue placeholder="Select Niche..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="tech">Tech & AI</SelectItem>
-                    <SelectItem value="lifestyle">Lifestyle</SelectItem>
-                    <SelectItem value="education">Education</SelectItem>
-                    <SelectItem value="entertainment">Entertainment</SelectItem>
+                    {nicheOptionsWith(formData.contentNiche).map((n) => (
+                      <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -269,10 +269,9 @@ export function ProfessionalProfileFields({
                     <SelectValue placeholder="Select Niche..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ecom">E-Commerce</SelectItem>
-                    <SelectItem value="b2b">B2B Tech</SelectItem>
-                    <SelectItem value="local">Local</SelectItem>
-                    <SelectItem value="mixed">Mixed</SelectItem>
+                    {nicheOptionsWith(formData.agencyNiche).map((n) => (
+                      <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

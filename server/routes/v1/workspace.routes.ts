@@ -1,11 +1,37 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { workspaceController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
+import { validateWorkspaceAccess } from '../../middleware/workspace-validation';
 import { apiRateLimiter } from '../../middleware/rate-limiting-working';
 import { validateRequest } from '../../middleware/validation';
 import { auditMiddleware } from '../../middleware/audit-middleware';
 import { AuditActions } from '../../utils/audit-logger';
+import { teamInviteGuards } from '../../middleware/ai-route-guards';
 import { z } from 'zod';
+
+// ─── Error handler helper ─────────────────────────────────────────────────────
+/**
+ * Maps WorkspaceError codes to appropriate HTTP status codes and sends a
+ * consistent `{ success, error: { code, message } }` response shape.
+ * Requirements: 10.2, 10.3, 10.4
+ */
+function handleWorkspaceError(err: any, res: Response): Response {
+  const code: string = err?.code ?? 'INTERNAL_ERROR';
+  const message: string = err?.message ?? 'An unexpected error occurred.';
+  const statusMap: Record<string, number> = {
+    WORKSPACE_LIMIT_REACHED: 403,
+    WORKSPACE_NAME_CONFLICT: 409,
+    SOCIAL_ACCOUNT_ALREADY_IMPORTED: 409,
+    TOKEN_EXPIRED: 422,
+    BRAND_NOT_FOUND: 404,
+    NOT_FOUND_OR_UNAUTHORIZED: 403,
+    CANNOT_DELETE_LAST_WORKSPACE: 422,
+    USER_NOT_FOUND: 400,
+    WORKSPACE_ACCESS_DENIED: 403,
+  };
+  const status = statusMap[code] ?? 500;
+  return res.status(status).json({ success: false, error: { code, message } });
+}
 
 const router = Router();
 
@@ -104,9 +130,53 @@ router.get('/:workspaceId/stats',
 
 router.post('/enforce-default', workspaceController.enforceDefault);
 
-router.get('/:workspaceId/members', 
-  validateRequest({ params: WorkspaceIdParams }), 
-  workspaceController.getMembers
+// ─── Members sub-routes ───────────────────────────────────────────────────────
+
+// GET /api/workspaces/:workspaceId/members — OWNER or ADMIN only
+// Requirements: 10.2, 10.3
+router.get('/:workspaceId/members',
+  requireAuth,
+  validateWorkspaceAccess({ source: 'params', paramName: 'workspaceId' }),
+  async (req: any, res) => {
+    try {
+      const workspaceRole = req.workspaceRole;
+      if (!workspaceRole || !['OWNER', 'ADMIN'].includes(workspaceRole)) {
+        return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_ROLE', message: 'Only OWNER or ADMIN can view workspace members.' } });
+      }
+      const { WorkspaceMemberModel } = await import('../../models/Workspace/WorkspaceMemberModel');
+      const members = await WorkspaceMemberModel.find({ workspaceId: req.params.workspaceId }).lean();
+      return res.json({ success: true, data: members });
+    } catch (err) {
+      return handleWorkspaceError(err, res);
+    }
+  }
+);
+
+// POST /api/workspaces/:workspaceId/members — 501 stub (team feature not yet active)
+// Requirements: 10.3
+router.post('/:workspaceId/members',
+  requireAuth,
+  validateWorkspaceAccess({ source: 'params', paramName: 'workspaceId' }),
+  (req: Request, res: Response) => {
+    const body = req.body;
+    if (!body || typeof body !== 'object') {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_INPUT', message: 'Request body must be a JSON object.' } });
+    }
+    return res.status(501).json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Team member management is not yet active.' } });
+  }
+);
+
+// DELETE /api/workspaces/:workspaceId/members/:memberId — 501 stub (team feature not yet active)
+// Requirements: 10.4
+router.delete('/:workspaceId/members/:memberId',
+  requireAuth,
+  validateWorkspaceAccess({ source: 'params', paramName: 'workspaceId' }),
+  (req: Request, res: Response) => {
+    if (!req.params.memberId) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_INPUT', message: 'memberId is required.' } });
+    }
+    return res.status(501).json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Team member management is not yet active.' } });
+  }
 );
 
 router.get('/:workspaceId/invitations', 
@@ -116,6 +186,7 @@ router.get('/:workspaceId/invitations',
 
 router.post('/:workspaceId/invite', 
   validateRequest({ params: WorkspaceIdParams, body: InviteMemberSchema }), 
+  ...teamInviteGuards,
   auditMiddleware(AuditActions.WORKSPACE.INVITE_MEMBER, { resource: 'workspace' }),
   workspaceController.inviteMember
 );

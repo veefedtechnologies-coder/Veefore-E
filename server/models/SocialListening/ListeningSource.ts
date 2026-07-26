@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IListeningSource extends Document {
   workspaceId: mongoose.Types.ObjectId | string;
-  platform: 'reddit' | 'youtube' | 'web' | 'instagram' | 'tiktok' | 'twitter' | 'linkedin';
+  platform: 'reddit' | 'youtube' | 'web' | 'instagram' | 'tiktok' | 'twitter' | 'linkedin' | 'hackernews' | 'news';
   type: 'keyword' | 'competitor' | 'topic' | 'hashtag';
   value: string; // The keyword or URL
   status: 'active' | 'paused' | 'error';

@@ -44,22 +44,22 @@ export function defaultWorkspaceEnforcer(storage: IStorage) {
       // If we could not read workspaces quickly, do not block the request
       if (workspaces === null) return next()
 
-      let user: any
-      try { user = await withTimeout(storage.getUser(userId), 2000) } catch { }
-      const name = user?.displayName ? `${user.displayName}'s Workspace` : 'My Workspace'
-
-      try {
-        const ws = await withTimeout(storage.createWorkspace({ name, userId, isDefault: true, theme: 'space' }), 3000)
-        req.workspaceId = ws.id
-        return next()
-      } catch (err: any) {
-        return res.status(409).json({
-          error: 'DEFAULT_WORKSPACE_REQUIRED',
-          message: 'Workspace creation failed. Please retry.',
-          hint: 'Click Retry Workspace Creation or sign out and back in.',
-          details: err?.message || 'unknown'
-        })
-      }
+      // BUG FIX: this previously auto-created a bare "My Workspace" (no
+      // brand, no social account) for any user with zero workspaces on
+      // ANY API request. That's the root cause of orphaned placeholder
+      // workspaces like "My VeeFore Workspace" — created here, then later
+      // colliding with the user's REAL brand-backed workspace (created via
+      // the Meta OAuth import flow) over the isDefault flag, which is what
+      // caused the "redirected back to an old workspace" bug.
+      //
+      // A workspace must always represent one connected brand (see the
+      // workspace-meta-connection spec). Zero workspaces is a valid,
+      // expected state for a user who hasn't connected a brand yet — do NOT
+      // fabricate one here. Just proceed without a workspaceId; route
+      // handlers that require an active workspace already validate that
+      // via validateWorkspaceAccess and will correctly report "no workspace"
+      // rather than silently operating on a fake one.
+      return next()
     } catch (error) {
       return res.status(500).json({ error: 'Workspace enforcement failed' })
     }

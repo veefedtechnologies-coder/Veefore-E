@@ -225,9 +225,12 @@ export default defineConfig({
     dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', '@tanstack/react-query', 'wouter', 'framer-motion', 'three'],
     alias: {
       'three-mesh-bvh': path.resolve(__dirname, 'client/src/stubs/three-mesh-bvh.ts'),
+      // agentation is installed as a real package — no stub alias needed.
       "@": path.resolve(__dirname, "client/src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
+      // Isomorphic platform capability registry (importable in both server + client)
+      "@platform-registry": path.resolve(__dirname, "src/shared/platform-registry"),
     },
   },
   build: {

@@ -15,9 +15,28 @@ export default defineConfig({
       'client/**/*.spec.tsx'
     ],
     testTimeout: 30000,
+    server: {
+      deps: {
+        // Inline so the react/react-dom aliases below also apply inside
+        // @testing-library/react (otherwise it pulls a second React copy and
+        // hooks fail with a null dispatcher).
+        inline: [/@testing-library\//],
+      },
+    },
   },
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
+      react: path.resolve(__dirname, '../node_modules/react'),
+      'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
+      'react/jsx-runtime': path.resolve(
+        __dirname,
+        '../node_modules/react/jsx-runtime.js',
+      ),
+      'react/jsx-dev-runtime': path.resolve(
+        __dirname,
+        '../node_modules/react/jsx-dev-runtime.js',
+      ),
       '@': path.resolve(__dirname, './client/src'),
     },
   },

@@ -31,15 +31,10 @@ body {
 }
 
 /* Prevent flickering during animations */
-/* REMOVED: backfaceVisibility - causes issues on mobile */
-.animate-fade-rise,
-.animate-fade-rise-delay,
-.animate-fade-rise-delay-2,
-[class*="motion-"],
-[class*="animate-"] {
-  transform: translateZ(0);
-  will-change: transform, opacity;
-}
+/* REMOVED ENTIRELY: blanket `[class*="motion-"], [class*="animate-"]` layer promotion.
+ * Framer Motion handles its own layer/will-change during animation. The keyframe
+ * entrance helpers below animate transform/opacity which the browser composites
+ * on demand without a permanent forced layer. */
 
 /* Remove will-change after animations complete to free GPU memory */
 .animation-complete {
@@ -47,12 +42,12 @@ body {
 }
 
 /* Optimize marquee and continuous animations */
-.marquee,
-.gradient-orb,
-[class*="motion-"] {
+/* `.marquee` genuinely needs a stable layer for its infinite scroll transform. */
+.marquee {
   will-change: transform;
   transform: translateZ(0);
 }
+/* REMOVED: blanket `.gradient-orb, [class*="motion-"]` promotion (layer-stack cause). */
 
 /* Mobile-specific optimizations */
 /* REMOVED: The * selector was breaking all animations! */
@@ -347,6 +342,23 @@ body {
     box-shadow: none !important;
   }
 
+  /* contentEditable inputs (e.g. VeeGPT chat box) — no focus ring/outline */
+  [contenteditable]:focus,
+  [contenteditable]:focus-visible,
+  [contenteditable]:focus-within {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+  }
+
+  /* Kill the mobile/desktop tap highlight + any focus-within ring on wrappers */
+  *:focus-within {
+    outline: none !important;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* Override for elements that shouldn't transition */
   .no-transition,
   .no-transition * {
@@ -426,6 +438,92 @@ body {
     background-position: 200% 0;
   }
 }
+
+/* ChatGPT-style shimmering "thinking" text. A bright band sweeps across a
+   muted base color, looping seamlessly. */
+@keyframes text-shimmer {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -150% 0;
+  }
+}
+
+.shimmer-text {
+  display: inline-block;
+  background: linear-gradient(
+    100deg,
+    rgba(107, 114, 128, 0.55) 30%,
+    rgba(17, 24, 39, 0.95) 50%,
+    rgba(107, 114, 128, 0.55) 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: text-shimmer 1.8s linear infinite;
+}
+
+.dark .shimmer-text {
+  background: linear-gradient(
+    100deg,
+    rgba(148, 163, 184, 0.45) 30%,
+    rgba(241, 245, 249, 0.95) 50%,
+    rgba(148, 163, 184, 0.45) 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ChatGPT-style auto-hiding scrollbar — now provided by the OS's NATIVE OVERLAY
+   scrollbar (see the global note above): hidden until hover/scroll, drawn over
+   the content, reserves no width. We deliberately don't style ::-webkit-scrollbar
+   here, since doing so would force a classic reserved scrollbar and reintroduce
+   the skeleton-vs-live layout shift. Kept as a marker class (used by the sidebars
+   + a few scroll areas) in case we need to scope behavior later. */
+.sidebar-scroll {
+  scrollbar-width: thin; /* Firefox: thin overlay-ish; Chrome/Safari use native overlay */
+}
+
+/* "Search chats" match highlight: paints only the matched term(s) inside the
+   opened message. Applied via <mark> in the markdown renderer; cleared when the
+   highlight state resets (~10s). */
+mark.veegpt-mark {
+  background-color: rgba(250, 204, 21, 0.55);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.dark mark.veegpt-mark {
+  background-color: rgba(250, 204, 21, 0.4);
+  color: inherit;
+}
+
+/* VeeGPT floating chat composer — visible, elevated pill in both themes. */.veegpt-composer {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), 0 1px 3px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.veegpt-composer:focus-within {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 28px rgba(59, 130, 246, 0.14), 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.dark .veegpt-composer {
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+.dark .veegpt-composer:focus-within {
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow: 0 10px 34px rgba(59, 130, 246, 0.18);
+}
+
 
 @keyframes shimmer-slide {
 
@@ -523,36 +621,16 @@ body {
   margin-bottom: 0.5rem;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
+/* Scrollbars: use the OS's NATIVE OVERLAY scrollbars (macOS) instead of a custom
+   styled one. Defining any ::-webkit-scrollbar rule forces Chrome into CLASSIC
+   scrollbars that RESERVE layout width (and stay visible whenever content
+   overflows). Overlay scrollbars are drawn OVER the content, stay hidden until
+   the user hovers/scrolls, and reserve NO width — so there's no layout shift
+   between the SSR skeleton and the live app (the skeleton needs no scrollbar at
+   all). We intentionally do NOT style ::-webkit-scrollbar globally for this
+   reason. Components that explicitly want a thin visible scrollbar can opt in
+   with `.custom-scrollbar`. */
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
-
-/* Dark mode scrollbar */
-html.dark ::-webkit-scrollbar-track {
-  background: #374151;
-}
-
-html.dark ::-webkit-scrollbar-thumb {
-  background: #6b7280;
-}
-
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
 
 /* Focus styles */
 button:focus-visible,
@@ -901,10 +979,9 @@ html {
 }
 
 /* Optimize framer-motion animations */
-/* REMOVED: backfaceVisibility causes flickering */
-[style*="will-change"] {
-  transform: translateZ(0);
-}
+/* REMOVED ENTIRELY: `[style*="will-change"] { transform: translateZ(0) }`.
+ * Matched every element Framer Motion tags with will-change and forced a permanent
+ * layer on each — part of the WebKit layer-stack flicker. */
 
 /* =================================================
    CRITICAL FIX: PREVENT LAYOUT THRASHING & BLINKING
@@ -922,15 +999,20 @@ html {
   contain: layout style paint;  /* Keep containment for performance */
 }
 
-/* RULE #3: GPU Compositing for animated elements - SCALED FOR MOBILE STABILITY */
-/* REMOVED: backfaceVisibility causes flickering on mobile */
-[data-framer-motion],
-[style*="transform"],
-[style*="opacity"] {
-  transform: translateZ(0);
-  /* Ensure we don't create layers for every single child */
-  isolation: isolate;
-}
+/* RULE #3 REMOVED ENTIRELY (was the core flicker cause on ALL WebKit, not just mobile).
+ *
+ * Safari's 3D Layers inspector showed a deep stack of nested compositing layers
+ * across the animated sections. The cause was blanket attribute-selector promotion:
+ * Framer Motion writes inline `transform`/`opacity` onto every animated node, so
+ * `[style*="transform"], [style*="opacity"], [data-framer-motion]` matched dozens of
+ * elements and forced a separate GPU layer on each (plus `isolation: isolate`).
+ * WebKit re-rasterizes that layer stack on scroll-back → the flicker.
+ *
+ * Framer Motion already promotes elements to layers ONLY while they actively animate
+ * and releases them afterward, which is the correct behavior. We no longer force
+ * permanent layers globally. Opt-in helpers (.gpu-stable, .transform-gpu) remain for
+ * the rare element that genuinely needs a stable layer.
+ */
 /* RULE #4: Fast, smooth animation timing - 0.3s with snappy ease-out */
 .fade-in-section,
 .scroll-reveal,
@@ -975,9 +1057,8 @@ html {
 
 /* Mobile-specific scroll stability */
 @media (max-width: 768px) {
-  section {
-    contain-intrinsic-size: 1px 800px;
-  }
+  /* REMOVED: `section { contain-intrinsic-size: 1px 800px }` — only meaningful with
+   * content-visibility (also removed) and adds layout instability on scroll-back. */
 
   /* Scoped will-change reset - only for motion elements, allow GPU compositing for essential transforms */
   [class*="motion"],
@@ -1005,60 +1086,56 @@ html {
 /* Now handled by RULE #3 above */
 
 /* Force GPU layers for gradient orbs and background elements */
-/* REMOVED: backfaceVisibility causes flickering */
-.gradient-orb,
-.fallback-orb,
-[class*="blur-"] {
-  transform: translateZ(0);
-  isolation: isolate;
-}
+/* REMOVED ENTIRELY: blanket `[class*="blur-"]` promotion. Every blurred orb across
+ * the page became its own isolated layer; combined with RULE #3 this built the
+ * nested layer stack WebKit re-rasterizes on scroll. Blurs render fine without it. */
 
 /* Ensure sticky elements don't cause reflow */
-.sticky {
-  transform: translateZ(0);
-  contain: layout style;
-}
+/* REMOVED: global `.sticky { transform: translateZ(0); contain: layout style }`.
+ * Tailwind applies `.sticky` to many elements; forcing a layer + containment on
+ * all of them is a key WebKit scroll-repaint trigger. Sticky works natively
+ * without these hints. */
 
 /* GPU accelerate AnimatePresence height transitions */
-[data-framer-exit],
-[data-framer-enter] {
-  transform: translateZ(0);
-  contain: layout;
-}
+/* REMOVED: global `[data-framer-exit]/[data-framer-enter]` layer + contain hints —
+ * same WebKit repaint concern; Framer handles enter/exit compositing itself. */
 
 /* Prevent layout shifts on sections with lazy loading */
-section {
-  contain: layout style;
-}
+/* REMOVED: `section { contain: layout style }` applied containment to EVERY section
+ * on the page. In WebKit/Safari, broad `contain` on scrolled sections forces
+ * per-section compositing that is repainted on scroll-back — a primary cause of
+ * the whole-page flicker (WebKit-only; Chrome/Firefox handle it fine). Layout
+ * containment here provided negligible benefit and is not worth the flicker. */
 
-/* OPTIMIZATION: Only apply will-change on desktop to prevent GPU layer explosion on mobile */
-@media (min-width: 769px) {
-  [data-framer-motion][style*="opacity"],
-  [data-framer-motion][style*="transform"] {
-    will-change: opacity, transform;
-    contain: layout paint;
-  }
-}
+/* OPTIMIZATION REMOVED: blanket `[data-framer-motion][style*=...] { will-change; contain }`.
+ * Same root cause — forced permanent layers + paint containment on every motion
+ * element. Framer Motion manages will-change itself during animation. */
 /* Ensure smooth scrolling on mobile */
-@supports (overflow: overlay) {
-  :root {
-    overflow: overlay;
-  }
-}
+/* REMOVED: `@supports (overflow: overlay) { :root { overflow: overlay } }`
+ * `overflow: overlay` is a non-standard, deprecated value. On iOS it changes the
+ * root scroll container's compositing and contributes to whole-page scroll
+ * flicker. Standard `overflow-y: scroll` (set elsewhere for .dark) is sufficient. */
 
 /* ========================================
    ANIMATION STABILITY - PREVENT RESET
    ======================================== */
 
-/* Ensure animations preserve their final state */
-[data-framer-motion] {
-  animation-fill-mode: both !important;
-}
+/* REMOVED: `[data-framer-motion] { animation-fill-mode: both !important }`.
+ * This forced fill-mode onto every Framer Motion element globally and interferes
+ * with Framer's own transform/opacity management, contributing to repaint churn
+ * in WebKit during scroll. Framer Motion manages its own final states correctly. */
 
 /* Prevent scroll-based layout recalculations from affecting animations */
+/* REMOVED: `-webkit-overflow-scrolling: touch` on the ROOT html element.
+ * This is the dominant mobile whole-page flicker cause: on iOS, applying
+ * `-webkit-overflow-scrolling: touch` to the root scroller forces the entire page
+ * into a separate momentum-scroll compositing layer. It is deprecated since iOS 13
+ * (momentum scrolling is now the default) and on the root element it produces
+ * blink/flicker on scroll — worst on scroll-back, mobile-only, independent of
+ * animations or device performance. Removing it lets iOS use its native, stable
+ * root scroll path. `scroll-behavior: smooth` is kept. */
 html {
   scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* Stabilize touch interactions */
@@ -1090,4 +1167,106 @@ a,
 }
 .tab-content-container[data-state="active"] {
   display: block !important;
+}
+
+
+/* ========================================
+   SLIM CUSTOM SCROLLBAR (used in chat & scrollable panels)
+   ======================================== */
+.custom-scrollbar {
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.7);
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.45);
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.75);
+}
+
+/* ========================================
+   SKELETON LOADING SYSTEM
+   Global shimmer keyframes, per-theme placeholder/shimmer color
+   variables, and the `.vf-skeleton` base class consumed by the
+   Skeleton primitive (@/components/ui/skeleton).
+   See spec: pixel-perfect-skeleton-loading (R6, R7).
+   ======================================== */
+
+/* Per-theme placeholder/shimmer colors as RGB triplets (consumed via rgb()).
+   Unknown/unsupported themes fall back to the :root (light) values because no
+   theme class matches them (R7.6). */
+:root {
+  --vf-skeleton-base: 226 232 240;       /* slate-200 */
+  --vf-skeleton-highlight: 241 245 249;  /* slate-100 */
+}
+
+.dark,
+html.dark {
+  --vf-skeleton-base: 51 65 85;          /* slate-700 */
+  --vf-skeleton-highlight: 71 85 105;    /* slate-600 */
+}
+
+.dark-blue,
+html.dark-blue {
+  --vf-skeleton-base: 45 55 72;
+  --vf-skeleton-highlight: 58 70 92;
+}
+
+.dark-black,
+html.dark-black {
+  --vf-skeleton-base: 51 51 51;
+  --vf-skeleton-highlight: 68 68 68;
+}
+
+.dark-gray,
+html.dark-gray {
+  --vf-skeleton-base: 64 64 64;
+  --vf-skeleton-highlight: 82 82 82;
+}
+
+/* Shimmer sweep animates only background-position (GPU-compositable, no layout). */
+@keyframes vf-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.vf-skeleton {
+  background-color: rgb(var(--vf-skeleton-base));
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--vf-skeleton-base)) 0%,
+    rgb(var(--vf-skeleton-highlight)) 50%,
+    rgb(var(--vf-skeleton-base)) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: vf-shimmer 1.6s linear infinite; /* within 1.2-2.0s (R6.4) */
+  will-change: background-position;            /* GPU compositing hint */
+}
+
+/* Reduced motion: static base fill, no positional/opacity change (R6.3). */
+@media (prefers-reduced-motion: reduce) {
+  .vf-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: rgb(var(--vf-skeleton-base));
+  }
 }

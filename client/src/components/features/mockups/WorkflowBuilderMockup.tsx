@@ -34,6 +34,7 @@ const WorkflowContent = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* skeleton-guard-allow: status-dot — live "active workflows" status indicator, not a loading placeholder */}
                     <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                     <span className="text-xs text-green-400">3 Active Workflows</span>
                 </div>

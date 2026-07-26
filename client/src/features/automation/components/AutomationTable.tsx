@@ -172,6 +172,7 @@ const AutomationCard: React.FC<AutomationCardProps> = ({
     <div className="group relative bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
       {/* Status Indicator */}
       <div className="absolute top-4 right-4">
+        {/* skeleton-guard-allow: status-dot — live "active automation" status indicator, not a loading placeholder */}
         <div className={`w-3 h-3 rounded-full ${
           rule.isActive 
             ? 'bg-green-500 animate-pulse' 

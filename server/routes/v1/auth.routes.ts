@@ -44,6 +44,17 @@ router.post('/signin',
   authController.signIn
 );
 
+// Session cookie endpoints (SSR instant-load — Phase 1). Additive; do not affect
+// the existing auth_token flow.
+// NOTE: No authRateLimiter here — session-login requires a valid Firebase ID token
+// (not brute-forceable) and fires on every page load. The authRateLimiter's 10/15min
+// limit would block legitimate users after a few refreshes.
+router.post('/session-login',
+  validateRequest({ body: z.object({ idToken: z.string().min(1) }) }),
+  authController.sessionLogin
+);
+router.post('/session-logout', authController.sessionLogout);
+
 router.post('/link-firebase',
   authRateLimiter,
   validateRequest({ body: LinkFirebaseSchema }),

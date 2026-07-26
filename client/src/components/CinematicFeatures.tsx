@@ -117,6 +117,7 @@ const Card = memo(({ feature, index, activeFeature }: { feature: Feature, index:
             className="flex flex-col justify-center order-2 lg:order-1 z-10 mt-2 sm:mt-4 md:mt-0"
           >
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-black/80 md:bg-white/5 border border-white/10 w-fit mb-2 sm:mb-4 md:mb-6 md:backdrop-blur-md">
+              {/* skeleton-guard-allow: status-dot — decorative feature-badge accent dot in marketing mockup */}
               <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
               <span className="text-[10px] md:text-xs font-bold tracking-widest text-white/60 uppercase">Feature 0{index + 1}</span>
             </div>

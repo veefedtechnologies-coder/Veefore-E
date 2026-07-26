@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { schedulerController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { scheduleWithQuotaGuards } from '../../middleware/apply-route-guards';
 import { z } from 'zod';
 
 const router = Router();
@@ -28,6 +29,7 @@ const ListScheduledQuery = z.object({
 
 router.post('/create',
   requireAuth,
+  ...scheduleWithQuotaGuards,
   validateRequest({ body: CreateScheduledContentSchema }),
   schedulerController.createScheduledContent
 );

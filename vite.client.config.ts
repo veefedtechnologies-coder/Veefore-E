@@ -14,7 +14,6 @@ export default defineConfig({
     preserveSymlinks: false,
     dedupe: ["react", "react-dom"],
     alias: {
-      agentation: path.resolve(__dirname, "client/src/stubs/agentation.ts"),
       react: path.resolve(__dirname, "client/node_modules/react"),
       "react-dom": path.resolve(__dirname, "client/node_modules/react-dom"),
       "three-mesh-bvh": path.resolve(__dirname, "client/src/stubs/three-mesh-bvh.ts"),
@@ -45,6 +44,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     force: true,
-    include: ["react", "react-dom", "@tanstack/react-query", "wouter"],
+    include: ["react", "react-dom", "@tanstack/react-query", "wouter", "agentation"],
   },
 })

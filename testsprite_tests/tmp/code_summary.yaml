@@ -1,0 +1,189 @@
+version: "2"
+type: backend
+tech_stack:
+  - TypeScript
+  - Node.js
+  - Express 4
+  - MongoDB (Mongoose)
+  - Redis (BullMQ, caching)
+  - Firebase Admin (auth)
+  - Socket.IO (realtime)
+  - Vite (client build)
+features:
+  - name: Health & Operational
+    description: Unauthenticated liveness/readiness and health metrics endpoints for load balancers and monitoring.
+    files:
+      - server/index.ts
+      - server/routes/health.ts
+    endpoints:
+      - method: GET
+        path: /api/health
+        description: Simple health check returning service status.
+        auth_required: false
+        response_schema:
+          "200": "{ status: string, timestamp: string }"
+      - method: GET
+        path: /health
+        description: Enterprise health check (root + /health mount).
+        auth_required: false
+        response_schema:
+          "200": "{ status: string }"
+      - method: GET
+        path: /health/detailed
+        description: Detailed health including dependency checks.
+        auth_required: false
+        response_schema:
+          "200": "{ status: string, checks: object }"
+      - method: GET
+        path: /health/ready
+        description: Readiness probe.
+        auth_required: false
+        response_schema:
+          "200": "{ ready: boolean }"
+      - method: GET
+        path: /health/live
+        description: Liveness probe.
+        auth_required: false
+        response_schema:
+          "200": "{ alive: boolean }"
+    known_limitations: []
+  - name: Authentication
+    description: Firebase ID token (Bearer) verification middleware plus OAuth/session auth routes. Tokens are short-lived (~1h).
+    files:
+      - server/middleware/require-auth.ts
+      - server/routes/auth.ts
+    endpoints:
+      - method: POST
+        path: /api/auth/refresh
+        description: Refresh an OAuth/session token.
+        auth_required: false
+        response_schema:
+          "200": "{ token: string }"
+          "401": Unauthorized
+      - method: GET
+        path: /api/auth/session
+        description: Return the current session info.
+        auth_required: false
+        response_schema:
+          "200": "{ user: object }"
+      - method: POST
+        path: /api/auth/logout
+        description: Clear the current session.
+        auth_required: false
+        response_schema:
+          "200": "{ success: boolean }"
+    depends_on: []
+  - name: Instagram Polling Status
+    description: Returns the active smart-polling cadence (per-data-type timers) for the workspace's connected Instagram account.
+    files:
+      - server/index.ts
+      - server/services/TieredJobScheduler.ts
+      - server/queues/metricsQueue.ts
+    endpoints:
+      - method: GET
+        path: /api/instagram/polling-status
+        description: Active polling cadence and timers for the connected account.
+        auth_required: true
+        request_schema:
+          query:
+            workspaceId: string
+        response_schema:
+          "200": "{ timers: object, metricsInterval: number }"
+          "401": Unauthorized
+      - method: GET
+        path: /api/instagram/rate-limit-usage
+        description: Current rate-limit usage tier/percentage for the account.
+        auth_required: true
+        request_schema:
+          query:
+            workspaceId: string
+        response_schema:
+          "200": "{ tier: string, percentage: number }"
+          "401": Unauthorized
+      - method: POST
+        path: /api/instagram/start-polling
+        description: Schedule smart polling for the account.
+        auth_required: true
+        request_schema:
+          body:
+            workspaceId: string
+        response_schema:
+          "200": "{ success: boolean }"
+          "401": Unauthorized
+    depends_on:
+      - Authentication
+  - name: Dashboard Analytics
+    description: Aggregated workspace analytics (followers, posts, engagement, reach).
+    files:
+      - server/index.ts
+      - server/routes/metrics.ts
+    endpoints:
+      - method: GET
+        path: /api/dashboard/analytics
+        description: Aggregated analytics for the workspace.
+        auth_required: true
+        request_schema:
+          query:
+            workspaceId: string
+        response_schema:
+          "200": "{ followers: number, posts: number, engagement: number }"
+          "401": Unauthorized
+      - method: GET
+        path: /api/workspaces/:workspaceId/metrics
+        description: Workspace metrics snapshot.
+        auth_required: true
+        response_schema:
+          "200": "{ metrics: object }"
+          "401": Unauthorized
+      - method: GET
+        path: /api/workspaces/:workspaceId/metrics/followers
+        description: Follower metrics for the workspace.
+        auth_required: true
+        response_schema:
+          "200": "{ followers: number }"
+          "401": Unauthorized
+      - method: POST
+        path: /api/workspaces/:workspaceId/metrics/refresh
+        description: Trigger a metrics refresh for the workspace.
+        auth_required: true
+        response_schema:
+          "200": "{ success: boolean }"
+          "401": Unauthorized
+    depends_on:
+      - Authentication
+  - name: Instagram Account Management
+    description: Connect/disconnect/reconnect and force-sync of Instagram accounts.
+    files:
+      - server/index.ts
+      - server/services/SocialAccountService.ts
+    endpoints:
+      - method: POST
+        path: /api/instagram/disconnect
+        description: Disconnect an Instagram account from a workspace.
+        auth_required: false
+        request_schema:
+          body:
+            accountId: string
+            workspaceId: string
+        response_schema:
+          "200": "{ success: boolean }"
+      - method: POST
+        path: /api/instagram/force-sync
+        description: Force a full sync of an account.
+        auth_required: false
+        response_schema:
+          "200": "{ success: boolean }"
+      - method: GET
+        path: /api/instagram/token-status/:accountId
+        description: Return token validity status for an account.
+        auth_required: false
+        response_schema:
+          "200": "{ status: string }"
+    depends_on: []
+known_limitations:
+  - issue: Authenticated endpoints require a short-lived Firebase ID token (~1h expiry); a static token will eventually return 401.
+    location: server/middleware/require-auth.ts
+    impact: Authenticated tests may fail after the supplied token expires.
+  - issue: Several Instagram management endpoints rely on live Meta API + valid workspace state.
+    location: server/index.ts
+    impact: Endpoints may return errors without a real connected account.

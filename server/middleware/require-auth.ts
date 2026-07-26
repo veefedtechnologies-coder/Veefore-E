@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { storage } from '../mongodb-storage';
 import { getFirebaseAdmin } from '../firebase-admin';
-import { safeParseJWTPayload } from './unsafe-json-replacements';
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -18,11 +17,50 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/**
+ * SSR instant-load fallback: resolve the authenticated user from the verified
+ * Firebase `__session` cookie (set by /api/auth/session-login). Used only when a
+ * request carries no Authorization header — i.e. the client Firebase session is
+ * still restoring. Returns null on anything unexpected (caller then 401s).
+ */
+async function resolveSessionCookieUser(req: Request): Promise<any | null> {
+  try {
+    const session = (req as any).cookies?.__session;
+    if (!session || typeof session !== 'string') return null;
+
+    const adminApp = getFirebaseAdmin();
+    if (!adminApp) return null;
+
+    const decoded: any = await withTimeout(adminApp.auth().verifySessionCookie(session, false), 4000);
+    const uid = decoded?.uid;
+    if (!uid) return null;
+
+    // For our users the Firebase uid equals the Mongo _id (sign-in mints custom
+    // tokens with uid = String(user._id)); fall back to firebaseUid lookup.
+    let user = await withTimeout(storage.getUser(uid), 6000).catch(() => null);
+    if (!user) {
+      user = await withTimeout(storage.getUserByFirebaseUid(uid), 6000).catch(() => null);
+    }
+    return user || null;
+  } catch {
+    return null;
+  }
+}
+
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
+      // SSR instant-load: when there's no Bearer token yet (the client Firebase
+      // session is still restoring), fall back to the verified `__session`
+      // cookie so the dashboard's first data fetches succeed immediately.
+      // Additive — Bearer requests are unaffected.
+      const sessionUser = await resolveSessionCookieUser(req);
+      if (sessionUser) {
+        req.user = sessionUser;
+        return next();
+      }
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -56,42 +94,35 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     }
 
     const adminApp = getFirebaseAdmin();
-    if (adminApp) {
-      try {
-        const decoded = await withTimeout(adminApp.auth().verifyIdToken(cleanToken), 4000);
-        firebaseUid = decoded?.uid;
-      } catch (e: any) {
-        console.warn('[AUTH] Admin verification skipped:', e?.message);
-      }
+    if (!adminApp) {
+      // Fail CLOSED: never authenticate when we can't verify tokens.
+      console.error('[AUTH] Firebase Admin unavailable — refusing to authenticate');
+      return res.status(503).json({ error: 'Authentication temporarily unavailable' });
     }
 
+    // SECURITY (P0): authenticate ONLY from a cryptographically VERIFIED ID token.
+    // Previously, if verifyIdToken threw we fell back to decoding the JWT payload
+    // WITHOUT verifying its signature and trusted `user_id`/`sub` — which let a
+    // forged/unsigned Bearer token authenticate as ANY uid. That unverified
+    // fallback is removed: verification failure → 401, and the client refreshes
+    // its token and retries via its existing 401 handler.
+    let decoded: any;
+    try {
+      decoded = await withTimeout(adminApp.auth().verifyIdToken(cleanToken), 4000);
+    } catch (e: any) {
+      console.warn('[AUTH] ID token verification failed:', e?.message);
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    firebaseUid = decoded?.uid;
     if (!firebaseUid) {
-      try {
-        const finalParts = cleanToken.split('.');
-        const payloadResult = safeParseJWTPayload(finalParts[1]);
-        if (!payloadResult.success) {
-          console.error('[JWT SECURITY] Invalid token payload:', payloadResult.error);
-          return res.status(401).json({ error: 'Invalid token format' });
-        }
-        const payload = payloadResult.data;
-        firebaseUid = payload.user_id || payload.sub;
-        if (!firebaseUid) {
-          console.error('[AUTH] No Firebase UID in token payload:', Object.keys(payload));
-          return res.status(401).json({ error: 'Invalid token payload' });
-        }
-      } catch (error: any) {
-        console.error('[AUTH] Token parsing error:', error.message);
-        console.error('[AUTH] Problematic token length:', token.length);
-        console.error('[AUTH] Token preview:', token.substring(0, 50) + '...');
-        return res.status(401).json({ error: 'Invalid token format' });
-      }
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     let user: any;
-    const parts = cleanToken.split('.');
-    const payloadResult = parts.length === 3 ? safeParseJWTPayload(parts[1]) : ({ success: false } as any);
-    const payload: any = payloadResult.success ? payloadResult.data : {};
-    const userEmail = payload.email;
+    // Identity claims come ONLY from the verified token — never an unverified decode.
+    const payload: any = decoded;
+    const userEmail = decoded.email;
 
     const uidPromise = withTimeout(storage.getUserByFirebaseUid(firebaseUid), 8000);
     const emailPromise = userEmail ? withTimeout(storage.getUserByEmail(userEmail), 8000) : Promise.reject(new Error('noemail'));
@@ -152,10 +183,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     }
 
     try {
-      const parts = cleanToken.split('.');
-      const payloadResult = parts.length === 3 ? safeParseJWTPayload(parts[1]) : { success: false } as any;
-      const payload: any = payloadResult.success ? payloadResult.data : {};
-      const email = payload.email || user?.email;
+      const email = (decoded?.email as string | undefined) || user?.email;
       if (email) {
         const emailUser = await withTimeout(storage.getUserByEmail(email), 6000).catch(() => undefined as any);
         if (emailUser && emailUser.id !== user.id) {

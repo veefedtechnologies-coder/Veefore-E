@@ -2,6 +2,11 @@ import './env';
 import dotenv from 'dotenv';
 import path from 'path';
 
+// Stable per-process startup timestamp — included in /api/dashboard/analytics
+// so the client's sessionStorage cache key changes on every server restart,
+// preventing stale AI banners from persisting across deploys/restarts.
+export const SERVER_STARTUP_TS = Date.now().toString(36);
+
 import { validateEnv, isProduction as isProd, isDevelopment as isDev } from './config/env';
 const validatedEnv = validateEnv();
 
@@ -53,8 +58,13 @@ import testingRoutes from "./routes/testing";
 import cicdRoutes from "./routes/cicd";
 import productionRoutes from "./routes/production";
 import auditRoutes from "./routes/audit";
+import { webhookRouter } from "./features/subscription/routes/webhook.routes";
 import socialListeningRoutes from "./routes/social-listening";
 import adminMonitoringRoutes from "./routes/admin-monitoring";
+import facebookRoutes from "./routes/facebook.routes";
+import workspaceRoutesV2 from './routes/workspace.routes';
+import authorizedBrandsRoutes from './routes/authorized-brands.routes';
+import imageProxyRoutes from './routes/image-proxy.routes';
 import multer from "multer";
 import {
   initializeRateLimiting,
@@ -390,6 +400,21 @@ setInterval(() => {
   cleanupTempFiles(24 * 60 * 60 * 1000); // Clean files older than 24 hours
 }, 60 * 60 * 1000); // Run every hour
 
+// WEBHOOK BODY PARSING — must be registered BEFORE express.json() so that
+// POST /api/webhooks/razorpay receives a raw Buffer for HMAC verification.
+// express.json() would parse the body into an object and destroy the raw bytes.
+//
+// IMPORTANT: this MUST be a synchronous (static) import, not a dynamic
+// `import(...).then(...)`. Dynamic imports always resolve as a microtask, so
+// a route registered inside `.then()` ends up added to Express's middleware
+// stack AFTER any synchronous `app.use(...)` calls that follow it in source
+// order — including the global `express.json()` below. That reordering was
+// the actual root cause of every Razorpay webhook signature check failing:
+// express.json() (mounted with no path filter) ran first, consumed/parsed
+// the request body, and destroyed the raw bytes Razorpay's HMAC was computed
+// over, well before the raw-body route ever saw the request.
+app.use('/api/webhooks', webhookRouter);
+
 app.use(express.json({ 
   limit: '50mb',
   verify: (req: any, res, buf) => {
@@ -430,6 +455,30 @@ const upload = multer({
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
+
+// KILL-SWITCH SERVICE WORKER: a previous build registered a service worker at
+// /sw.js that aggressively cached client assets. Stuck browsers keep serving the
+// old bundle (which breaks auth/login fixes) and a 404 on /sw.js does NOT remove
+// an already-installed worker. Serving this self-destroying worker makes any
+// browser that still has the old SW unregister it and wipe its caches on the next
+// update check, then reload with fresh assets — no manual DevTools steps needed.
+// Safe to keep: browsers with no SW simply never fetch this.
+app.get('/sw.js', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.send(`
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', async () => {
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch (e) {}
+  await self.registration.unregister();
+  const clients = await self.clients.matchAll({ type: 'window' });
+  clients.forEach((client) => client.navigate(client.url));
+});
+`);
+});
 
 // Fix body parsing middleware for content creation
 app.use((req, res, next) => {
@@ -620,10 +669,26 @@ app.use((req, res, next) => {
   await storage.connect();
 
   // P2 SECURITY: Register OAuth 2.0 authentication routes BEFORE other routes
-  // This ensures OAuth endpoints take precedence over v1 routes at the same path
+  // This ensures OAuth endpoints take precedence over v1 routes at the same path.
+  // NOTE: do NOT add the rate-limiting-working `oauthRateLimiter` here. This
+  // router already applies OAuth rate limiting via `oauthSecurityMiddleware`
+  // (server/middleware/oauthSecurity.ts), and BOTH limiters bucket under the same
+  // Redis key (`oauth_rl:<ip>`), so stacking them double-counted every
+  // /google/start and tripped the limit after only a few logins.
   app.use('/api/auth', authRoutes);
 
   await registerRoutes(app, storage as any, httpServer, upload);
+
+  // VeeGPT Auto Pilot feature registration (Requirements: 1).
+  // Currently a no-op scaffold — routes and queues/workers are wired in by
+  // later tasks. Wrapped in try/catch so a future failure here can never break
+  // the boot sequence. Safe to call once during startup.
+  try {
+    const { registerAutoPilot } = await import('./features/autopilot/index');
+    registerAutoPilot(app);
+  } catch (e) {
+    console.warn('[INFRA] Auto Pilot registration failed:', (e as Error).message);
+  }
 
   // Initialize leader election for Instagram polling AFTER routes are registered
   // Use setTimeout to ensure the event loop has processed all pending connections
@@ -667,6 +732,16 @@ app.use((req, res, next) => {
   // Register metrics and webhook routes
   app.use('/api', metricsRoutes);
   app.use('/api/webhooks', webhooksRoutes);
+
+  // Facebook OAuth and Page Connection routes
+  app.use('/api/facebook', facebookRoutes);
+
+  // Workspace lifecycle and authorized-brand routes (workspace-meta-connection spec)
+  // Uses /api/workspaces-v2 to avoid conflicting with the legacy /api/workspaces route
+  // registered by registerRoutes(). Requirements: 2.6, 3.4, 6.7
+  app.use('/api/workspaces-v2', workspaceRoutesV2);
+  app.use('/api/authorized-brands', authorizedBrandsRoutes);
+  app.use('/api/image-proxy', imageProxyRoutes);
 
   // P8 SECURITY: Register advanced security and threat intelligence routes
   app.use('/api/security', securityRoutes);
@@ -722,8 +797,11 @@ app.use((req, res, next) => {
   // P5 PERFORMANCE: Create performance monitoring endpoints
   createPerformanceEndpoints(app);
 
-  // P5 PERFORMANCE: Apply cached routes optimization
-  applyCachedRoutes(app);
+  // P5 PERFORMANCE: cached-route short-circuits were applied here, but they ran
+  // BEFORE requireAuth and would serve workspace data without auth once
+  // populated. Caching is now done INSIDE the authenticated handlers instead
+  // (post-auth, safe). See /api/dashboard/analytics below.
+  // applyCachedRoutes(app);  // intentionally disabled — auth-bypass risk
 
   // P5 PERFORMANCE: Run startup optimizations
   await performStartupOptimizations();
@@ -760,6 +838,17 @@ app.use((req, res, next) => {
     MessageWorker.start(storage);
     PostWorker.start(storage);
     VerifyWorker.start(storage);
+
+    // Subscription cron jobs (Requirements: 10.1–10.4, 10.6)
+    try {
+      const { initializeSubscriptionCronJobs } = await import('./features/subscription/index');
+      const { getSubscriptionCronWorker } = await import('./workers/subscriptionCronWorker');
+      await initializeSubscriptionCronJobs();
+      getSubscriptionCronWorker(); // lazy-init the worker so it is ready to process
+      console.log('[INFRA] Subscription cron jobs registered and worker initialized');
+    } catch (e) {
+      console.warn('[INFRA] Subscription cron init failed (Redis may be unavailable):', (e as Error).message);
+    }
     
     // REMOVED: Eager worker starts (Task 5.6: Redis Optimization)
     // startSocialListeningWorker();      // Now lazy: getSocialListeningWorker() called on first job
@@ -769,6 +858,27 @@ app.use((req, res, next) => {
     // startNotificationWorker();         // Now lazy: getNotificationWorker() called on first job
     
     initializeRateLimiting(rateLimitRedis); // Connect rate limiter to fail-fast client
+
+    // Social Listening: periodic background refresh that keeps each workspace's
+    // intelligence warm using the OpenAI Batch API (50% discount) + analysis
+    // cache, so a user's "Sync Live Data" click is mostly cache hits. Enabled
+    // by default; opt out with SOCIAL_LISTENING_BG_REFRESH=false.
+    try {
+      const { BackgroundRefreshService } = await import('./services/social-listening/background-refresh.service');
+      BackgroundRefreshService.start();
+    } catch (e) {
+      console.warn('[STARTUP] Social Listening background refresh not started:', (e as Error).message);
+    }
+
+    // Social Listening batch recovery: checks every 30 min for completed OpenAI
+    // Batch API jobs and finalizes the trend-computation pipeline. Handles
+    // server restarts gracefully — pending batches are stored in MongoDB.
+    try {
+      const { BatchRecoveryService } = await import('./services/social-listening/batch-recovery.service');
+      BatchRecoveryService.start();
+    } catch (e) {
+      console.warn('[STARTUP] Social Listening batch recovery not started:', (e as Error).message);
+    }
 
     // P2 SECURITY: Initialize OAuth rate limiting with Redis
     const { initializeOAuthRateLimiting } = await import('./middleware/oauthSecurity');
@@ -1105,16 +1215,42 @@ app.use((req, res, next) => {
       const workspaceId = req.workspaceId!;
 
       const { SocialAccountModel } = await import('./models/Social');
-      
-      // 1. Fetch real BullMQ repeatable jobs to get EXACT timer truths
+
+      // 1. Fetch real BullMQ repeatable jobs to get EXACT timer truths.
+      //    Smart polling now schedules FOUR distinct cadence-type jobs per account
+      //    (accountInsights, postInsightsRecent, newPostDetection, followerCount),
+      //    keyed `smart-poll-{workspaceId}-{accountId}-{cadenceType}-{repeatMs}`,
+      //    plus a dedicated recurring story-insights job on its own queue.
       let repeatableJobs: any[] = [];
+      let storyRepeatableJobs: any[] = [];
       try {
          const { metricsQueue } = await import('./queues/metricsQueue');
          if (metricsQueue) {
              repeatableJobs = await metricsQueue.getRepeatableJobs();
          }
+         const { StoryInsightsScheduler } = await import('./services/StoryInsightsScheduler');
+         const storyQueue = StoryInsightsScheduler.getQueue();
+         if (storyQueue) {
+             storyRepeatableJobs = await storyQueue.getRepeatableJobs();
+         }
       } catch (err) {
          console.error('Failed to get repeatable jobs for status UI', err);
+      }
+
+      // Resolve the account's tier-based polling cadence so the fallback timers
+      // (used before a repeatable job has been injected into Redis) reflect the
+      // real impression-scaled intervals instead of a static legacy value.
+      let scheduler: any = null;
+      try {
+        const { isRedisAvailable, redisConnection } = await import('./queues/metricsQueue');
+        if (isRedisAvailable && isRedisAvailable() && redisConnection) {
+          const { TieredJobScheduler } = await import('./services/TieredJobScheduler');
+          const { UsageStore } = await import('./services/UsageStore');
+          const { rateLimitConfig } = await import('./config/rateLimitConfig');
+          scheduler = new TieredJobScheduler(new UsageStore(redisConnection), rateLimitConfig);
+        }
+      } catch (err) {
+        console.error('Failed to init scheduler for polling-status fallback', err);
       }
 
       // SECURITY: Only query accounts for the validated workspace
@@ -1124,57 +1260,144 @@ app.use((req, res, next) => {
       }).lean();
 
       // Build polling status response - only expose non-sensitive data
-      const accountStatuses = accounts.map((acc: any) => {
+      const accountStatuses = await Promise.all(accounts.map(async (acc: any) => {
         const hasValidToken = !!(acc.accessToken || acc.encryptedAccessToken);
         const lastSync = acc.lastSyncAt || acc.updatedAt;
         const accId = acc._id?.toString() || acc.id;
-        
-        const getExactNextPollIn = (metricType: string, fallbackIntervalMins: number) => {
+        const metaAccountId = acc.instagramAccountId || acc.accountId;
+        const mongoId = acc._id?.toString() || acc.id;
+
+        // Resolve the real per-cadence-type intervals from the account's ceiling
+        // classification (fallback values when a Redis job isn't found yet).
+        let cadence: any = null;
+        if (hasValidToken && scheduler) {
+          try {
+            cadence = await scheduler.getPollingCadence(metaAccountId);
+          } catch {
+            try { cadence = await scheduler.getPollingCadence(mongoId); } catch { /* noop */ }
+          }
+        }
+
+        // Age-based post-insight interval — selected from the account's NEWEST
+        // post's actual age (matching how scheduleSmartPolling schedules the
+        // postInsightsRecent job), so the displayed cadence reflects reality
+        // (e.g. weekly for an account whose newest post is 48 days old) rather
+        // than the static recent-post config value.
+        let postInsightIntervalMs: number | null = null;
+        if (hasValidToken && scheduler) {
+          try {
+            let newestPublishedAt: number | null = null;
+            try {
+              const { ContentModel } = await import('./models/Content/Content');
+              const newest = await ContentModel.findOne({
+                workspaceId,
+                accountId: metaAccountId,
+                publishedAt: { $exists: true, $ne: null },
+              })
+                .sort({ publishedAt: -1 })
+                .select('publishedAt')
+                .lean();
+              if (newest?.publishedAt) {
+                newestPublishedAt = new Date(newest.publishedAt).getTime();
+              }
+            } catch { /* noop — fall back to now */ }
+
+            postInsightIntervalMs = await scheduler.getPostInsightCadence(
+              metaAccountId,
+              newestPublishedAt ?? Date.now()
+            );
+          } catch { /* noop — fall back to cadence.postInsightsRecentMs below */ }
+        }
+
+        /**
+         * Find the next-fire time (ms from now) for a given smart-poll cadence
+         * type, falling back to the account's tier-based interval phase-aligned
+         * to lastSync when the repeatable job isn't in Redis yet.
+         */
+        const getCadenceNextPollIn = (cadenceType: string, fallbackIntervalMs: number, jobs: any[] = repeatableJobs) => {
              if (!hasValidToken) return 0;
-             
-             // Look for the absolute truth timer inside the BullMQ engine
-             // Due to historical inconsistencies, jobs might be scheduled with EITHER the Meta ID or the MongoDB _id.
-             const metaAccountId = acc.instagramAccountId || acc.accountId;
-             const mongoId = acc._id?.toString() || acc.id;
-             const expectedKeyMeta = `smart-poll-${workspaceId}-${metaAccountId}-${metricType}`;
-             const expectedKeyMongo = `smart-poll-${workspaceId}-${mongoId}-${metricType}`;
-             const job = repeatableJobs.find((j: any) => 
-               (j.key && (j.key.includes(expectedKeyMeta) || j.key.includes(expectedKeyMongo))) || 
-               j.name === expectedKeyMeta || j.name === expectedKeyMongo
+
+             const keyMeta = `smart-poll-${workspaceId}-${metaAccountId}-${cadenceType}-`;
+             const keyMongo = `smart-poll-${workspaceId}-${mongoId}-${cadenceType}-`;
+             const job = jobs.find((j: any) =>
+               (j.key && (j.key.includes(keyMeta) || j.key.includes(keyMongo))) ||
+               (j.name && (j.name.includes(keyMeta) || j.name.includes(keyMongo)))
              );
-             
+
              if (job && job.next) {
-                 // Return the exact millisecond difference from right now!
                  return Math.max(0, job.next - Date.now());
              }
-             
-             // Mathematical fallback if the job hasn't been injected into Redis yet
-             if (!lastSync) return fallbackIntervalMins * 60 * 1000;
-             const intervalMs = fallbackIntervalMins * 60 * 1000;
+
+             // Mathematical fallback if the job hasn't been injected into Redis yet.
+             if (!fallbackIntervalMs || fallbackIntervalMs <= 0) return 0;
+             if (!lastSync) return fallbackIntervalMs;
              const timeSinceSync = Date.now() - new Date(lastSync).getTime();
-             return Math.max(0, intervalMs - (timeSinceSync % intervalMs));
+             return Math.max(0, fallbackIntervalMs - (timeSinceSync % fallbackIntervalMs));
         };
 
-        const nextPollAll = getExactNextPollIn('all', 80);
+        const accountInsightsIn = getCadenceNextPollIn('accountInsights', cadence?.accountInsightsMs ?? 0);
+        const postInsightsIn = getCadenceNextPollIn('postInsightsRecent', postInsightIntervalMs ?? cadence?.postInsightsRecentMs ?? 0);
+        const newPostIn = getCadenceNextPollIn('newPostDetection', cadence?.newPostDetectionMs ?? 0);
+        const followerIn = getCadenceNextPollIn('followerCount', cadence?.followerCountMs ?? 0);
+
+        // Stories ride their own dedicated recurring job (per detected story).
+        // Report the soonest upcoming story poll for this account, if any.
+        let storiesIn: number | undefined;
+        if (hasValidToken) {
+          const storyJobs = storyRepeatableJobs.filter((j: any) => {
+            const k = j.key || j.name || '';
+            return k.includes(`story-insights-recurring-${metaAccountId}-`) ||
+                   k.includes(`story-insights-recurring-${mongoId}-`);
+          });
+          const nexts = storyJobs.map((j: any) => j.next).filter((n: any) => typeof n === 'number');
+          if (nexts.length > 0) {
+            storiesIn = Math.max(0, Math.min(...nexts) - Date.now());
+          }
+        }
+
+        // The CADENCE (how often each metric polls) — distinct from the
+        // countdown above. This is what the dashboard displays as "every X".
+        const { rateLimitConfig: rlConfig } = await import('./config/rateLimitConfig');
+        const storyIntervalMs = rlConfig.smartPolling.storyRecurringIntervalMs;
+        const metricsInterval = hasValidToken && cadence ? {
+          likes: postInsightIntervalMs ?? cadence.postInsightsRecentMs,
+          shares: postInsightIntervalMs ?? cadence.postInsightsRecentMs,
+          saves: postInsightIntervalMs ?? cadence.postInsightsRecentMs,
+          reach: cadence.accountInsightsMs,
+          views: cadence.accountInsightsMs,
+          profile_views: cadence.accountInsightsMs,
+          followers: cadence.followerCountMs,
+          newPosts: cadence.newPostDetectionMs,
+          ...(storiesIn !== undefined ? { stories: storyIntervalMs } : {}),
+        } : undefined;
 
         return {
           id: accId,
           username: acc.username,
           isActive: hasValidToken,
           lastSync: lastSync,
-          nextPollIn: nextPollAll, // Backward compatibility
+          nextPollIn: accountInsightsIn, // Backward compatibility (soonest account-level poll)
+          // How OFTEN each metric polls (the cadence/interval) — stable per ceiling tier.
+          metricsInterval,
+          // Time REMAINING until the next poll (countdown) — changes each refresh.
           metricsPollIn: {
-             likes: nextPollAll, 
-             shares: nextPollAll,
-             saves: nextPollAll,
-             reach: nextPollAll,
-             views: nextPollAll,
-             profile_views: nextPollAll,
-             stories: nextPollAll
+             // Likes / Reach + Shares / Saves ride the bundled media-insights cadence.
+             likes: postInsightsIn,
+             shares: postInsightsIn,
+             saves: postInsightsIn,
+             // Account-level insights (reach / views / profile views).
+             reach: accountInsightsIn,
+             views: accountInsightsIn,
+             profile_views: accountInsightsIn,
+             // Follower count + new-post detection have their own cadences.
+             followers: followerIn,
+             newPosts: newPostIn,
+             // Stories only appear when an active story is being polled.
+             ...(storiesIn !== undefined ? { stories: storiesIn } : {}),
           },
           tokenStatus: acc.tokenStatus || (hasValidToken ? 'valid' : 'missing')
         };
-      });
+      }));
 
       res.json({
         success: true,
@@ -1187,6 +1410,73 @@ app.use((req, res, next) => {
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to get polling status'
+      });
+    }
+  });
+
+  // Rate-limit usage endpoint — exposes BOTH App-Level and Account-Level (BUC) usage
+  // so users can see which Meta rate-limit ceiling is closest to being hit.
+  app.get('/api/instagram/rate-limit-usage', requireAuth, validateWorkspaceAccess({ source: 'query' }), async (req: Request, res: Response) => {
+    try {
+      const workspaceId = req.workspaceId!;
+      const { getUsageStoreInstance } = await import('./services/UsageStore');
+      const { SocialAccountModel } = await import('./models/Social');
+      const usageStore = getUsageStoreInstance();
+
+      // 1. App-Level usage (200 × users per hour) — single global value for the whole app
+      const appUsage = await usageStore.getAppUsage();
+
+      // 2. Account-Level (BUC) usage (4800 × impressions per 24h) — per connected account
+      const accounts = await SocialAccountModel.find({
+        platform: 'instagram',
+        workspaceId,
+      }).lean();
+
+      const accountUsages = await Promise.all(
+        accounts.map(async (acc: any) => {
+          const igId = acc.instagramAccountId || acc.accountId;
+          const effective = await usageStore.getEffectiveUsage(igId);
+          const record = await usageStore.getUsageRecord(igId);
+          return {
+            id: acc._id?.toString() || acc.id,
+            username: acc.username,
+            instagramAccountId: igId,
+            // Account-level BUC percentages (the 48,000/24h budget)
+            callCountPct: record?.callCountPct ?? 0,
+            totalCputimePct: record?.totalCputimePct ?? 0,
+            totalTimePct: record?.totalTimePct ?? 0,
+            effectivePct: effective.percentage,
+            tier: effective.tier,
+            isStale: effective.isStale,
+          };
+        })
+      );
+
+      res.json({
+        success: true,
+        // App-Level: the 200×users/hour budget — usually the tighter limit for small apps
+        appLevel: {
+          callCountPct: appUsage.callCountPct,
+          totalCputimePct: appUsage.totalCputimePct,
+          totalTimePct: appUsage.totalTimePct,
+          effectivePct: appUsage.percentage,
+          tier: appUsage.tier,
+          lastUpdatedAt: appUsage.lastUpdatedAt,
+          resetWindow: 'hourly',
+          budgetFormula: '200 × number of app users per hour',
+        },
+        // Account-Level: the 4800×impressions/24h budget — per Instagram account
+        accountLevel: {
+          resetWindow: '24h rolling',
+          budgetFormula: '4,800 × daily impressions per 24h',
+          accounts: accountUsages,
+        },
+      });
+    } catch (error: any) {
+      console.error('[RATE-LIMIT-USAGE] Error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to get rate-limit usage',
       });
     }
   });
@@ -1239,12 +1529,24 @@ app.use((req, res, next) => {
     traceLog(`Request for workspace: ${workspaceId}`);
     
     try {
+      // Post-auth cache: serve a recent computed result instantly. Short TTL so
+      // a manual sync's fresh numbers surface quickly. Fail-open.
+      try {
+        const { CachingSystem } = await import('./performance/caching-system');
+        const cached = await CachingSystem.getDashboardAnalytics(workspaceId);
+        if (cached) {
+          traceLog('Served from cache');
+          return res.json(cached);
+        }
+      } catch { /* cache miss/unavailable → compute */ }
+
       const { storage } = await import('./mongodb-storage');
       const accounts = await storage.getSocialAccountsByWorkspace(workspaceId);
       
       traceLog(`Found ${accounts.length} social accounts`);
 
-      // Aggregate metrics
+      // Aggregate metrics — use InstagramFollowerSnapshot for follower count
+      // (same source as Analytics dashboards) to ensure consistency everywhere.
       let totalFollowers = 0;
       let totalLikes = 0;
       let totalComments = 0;
@@ -1254,9 +1556,30 @@ app.use((req, res, next) => {
       let totalEngagement = 0;
       let accountCount = 0;
 
+      // Load latest snapshots for all IG accounts in one batch
+      const instagramAccounts = accounts.filter((acc: any) => acc.platform === 'instagram' && acc.accountId);
+      let snapshotMap: Map<string, number> = new Map();
+      try {
+        const { InstagramFollowerSnapshotModel } = await import('./models/Analytics');
+        const accountIds = instagramAccounts.map((a: any) => a.accountId);
+        if (accountIds.length > 0) {
+          // Get latest snapshot for each account
+          const snaps = await InstagramFollowerSnapshotModel.aggregate([
+            { $match: { instagramUserId: { $in: accountIds }, followerCount: { $gt: 0 } } },
+            { $sort: { snapshotDate: -1 } },
+            { $group: { _id: '$instagramUserId', followerCount: { $first: '$followerCount' } } },
+          ]);
+          for (const s of snaps) {
+            snapshotMap.set(s._id, s.followerCount);
+          }
+        }
+      } catch { /* fall back to SocialAccount.followersCount */ }
+
       for (const acc of accounts) {
         if (acc.platform === 'instagram') {
-          totalFollowers += (acc as any).followersCount || 0;
+          // Use latest snapshot for followers; fall back to SocialAccount.followersCount
+          const snapshotFollowers = (acc as any).accountId ? snapshotMap.get((acc as any).accountId) : undefined;
+          totalFollowers += snapshotFollowers ?? (acc as any).followersCount ?? 0;
           totalLikes += (acc as any).totalLikes || 0;
           totalComments += (acc as any).totalComments || 0;
           totalViews += (acc as any).totalViews || 0;
@@ -1278,11 +1601,19 @@ app.use((req, res, next) => {
         totalPosts,
         avgEngagement: Math.round(avgEngagement * 100) / 100,
         accountCount,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        _sv: SERVER_STARTUP_TS,  // server version: changes on every restart → busts client sessionStorage
       };
 
       traceLog(`Success: ${JSON.stringify(result)}`);
-      res.json({ success: true, data: result });
+      const payload = { success: true, data: result };
+      // Write-through cache (short TTL ~45s) so rapid reloads/navigation are
+      // instant without holding stale numbers after a sync. Fail-open.
+      try {
+        const { CachingSystem } = await import('./performance/caching-system');
+        void CachingSystem.set(`dashboard:${workspaceId}`, payload, 45, [`workspace:${workspaceId}`, 'dashboard']);
+      } catch { /* non-fatal */ }
+      res.json(payload);
     } catch (error: any) {
       traceLog(`Error: ${error.message}`);
       res.status(500).json({
@@ -1298,15 +1629,30 @@ app.use((req, res, next) => {
       const { CachingSystem } = await import('./performance/caching-system');
       const deleted = await CachingSystem.invalidateByTag('historical');
       const deleted2 = await CachingSystem.invalidateByTag('dashboard');
-      Logger.info('ADMIN', `Cleared analytics cache: ${deleted + deleted2} entries`);
-      res.json({ success: true, cleared: deleted + deleted2 });
+
+      // Also clear Redis-cached AI insights (recommendations + banners) so the
+      // next request regenerates with the latest code and data pipeline.
+      let redisCleared = 0;
+      try {
+        const { getSharedRedisConnection } = await import('./lib/redis');
+        const { isInsightsQueueAvailable } = await import('./queues/insightsQueue');
+        if (isInsightsQueueAvailable()) {
+          const redis = getSharedRedisConnection();
+          const keys = await redis.keys('veefore:insights:*');
+          if (keys.length > 0) {
+            await redis.del(...keys);
+            redisCleared = keys.length;
+          }
+        }
+      } catch { /* non-fatal — Redis may be unavailable */ }
+
+      Logger.info('ADMIN', `Cleared analytics cache: ${deleted + deleted2} entries, ${redisCleared} Redis insight keys`);
+      res.json({ success: true, cleared: deleted + deleted2, redisInsightsCleared: redisCleared });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-
-  const { WebSocketServer } = await import('ws');
 
   // Initialize logger for metrics system
   Logger.configure({
@@ -1342,6 +1688,38 @@ app.use((req, res, next) => {
     await MetricsWorker.start();
     console.log('✅  MetricsWorker: Started successfully for Phase 4 Background Job processing');
     console.log('📊 Instagram metrics continue via existing smart polling system');
+
+    // Analytics history worker: picks up any pending/delayed per-day backfill
+    // jobs from Redis on every server start — this ensures the phased 6-month
+    // backfill continues even if the server restarted between phases.
+    try {
+      const { getAnalyticsHistoryWorker } = await import('./workers/analyticsHistoryWorker');
+      getAnalyticsHistoryWorker();
+      console.log('✅  AnalyticsHistoryWorker: Started — will resume any pending backfill jobs from Redis');
+    } catch (e) {
+      console.log('⚠️  AnalyticsHistoryWorker startup skipped:', (e as Error).message);
+    }
+
+    // Insights worker: offloads AI banner + growth-recommendation generation
+    // (heavy MongoDB aggregation + LLM calls) off the request path.
+    try {
+      const { getInsightsWorker } = await import('./workers/insightsWorker');
+      getInsightsWorker();
+      console.log('✅  InsightsWorker: Started for AI banner + recommendations generation');
+    } catch (e) {
+      console.log('⚠️  InsightsWorker startup skipped:', (e as Error).message);
+    }
+
+    // Workspace-context worker: builds the consolidated VeeGPT context snapshot
+    // (user + accounts + content + recommendations + banner) into Redis so the
+    // chat path never queries MongoDB.
+    try {
+      const { getWorkspaceContextWorker } = await import('./workers/workspaceContextWorker');
+      getWorkspaceContextWorker();
+      console.log('✅  WorkspaceContextWorker: Started for VeeGPT live context');
+    } catch (e) {
+      console.log('⚠️  WorkspaceContextWorker startup skipped:', (e as Error).message);
+    }
   } catch (error) {
     console.log('⚠️  MetricsWorker startup failed:', error);
     console.log('⚠️  MetricsWorker: Redis unavailable, using smart polling fallback');
@@ -1456,7 +1834,28 @@ app.use((req, res, next) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
 
+      app.get('/signin', (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+
       app.get('/signup', (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+
+      app.get('/waitlist', (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+
+      app.get('/settings', (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+
+      // Catch-all for any other client-side routes (SPA fallback)
+      app.get('*', (req, res, next) => {
+        // Skip API routes and static assets
+        if (req.path.startsWith('/api/') || req.path.startsWith('/ws/') || req.path.includes('.')) {
+          return next();
+        }
         res.sendFile(path.join(distPath, "index.html"));
       });
     } finally {
@@ -1527,14 +1926,15 @@ app.use((req, res, next) => {
         app.use(express.static(staticPath, {
           maxAge: '1y',
           etag: true,
-          lastModified: true
+          lastModified: true,
+          index: false // let "/" fall through to the bootstrap-injecting handler
         }));
         // NOTE: JS/CSS caching is handled by Vite's content hashing (e.g., chunk-abc123.js).
         // When code changes, the hash changes, automatically invalidating the old cache.
         // index.html is set to no-cache below to ensure users get updated script references.
 
         // Handle SPA routes - serve index.html for all non-API routes
-        app.get('*', (req, res, next) => {
+        app.get('*', async (req, res, next) => {
           // Skip API routes, source files, and uploaded files
           if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/src') || req.path.startsWith('/node_modules') || req.path.startsWith('/@')) {
             return next();
@@ -1542,8 +1942,15 @@ app.use((req, res, next) => {
 
           const indexPath = path.join(staticPath, 'index.html');
           if (fs.existsSync(indexPath)) {
-            try { res.setHeader('Cache-Control', 'no-store'); res.setHeader('Pragma', 'no-cache'); res.setHeader('Expires', '0') } catch { }
-            res.sendFile(indexPath);
+            try { res.setHeader('Cache-Control', 'no-store'); res.setHeader('Pragma', 'no-cache'); res.setHeader('Expires', '0'); res.setHeader('Vary', 'Cookie') } catch { }
+            try {
+              const { injectAuthBootstrap } = await import('./lib/html-bootstrap');
+              const html = await fs.promises.readFile(indexPath, 'utf-8');
+              const bootstrapped = await injectAuthBootstrap(html, req, { ssrShell: true });
+              res.status(200).set('Content-Type', 'text/html').end(bootstrapped);
+            } catch {
+              res.sendFile(indexPath);
+            }
           } else {
             res.status(404).json({ error: 'Application not found' });
           }
@@ -1570,123 +1977,10 @@ app.use((req, res, next) => {
     }
   }
 
-  const wss = new WebSocketServer({ server: httpServer });
-
-  // Add global error handler for WebSocket server
-  wss.on('error', (error) => {
-    console.error('[WebSocket Server] Error:', error.message);
-    // Don't crash the server, just log the error
-  });
-
-  // Store WebSocket connections by conversation ID
-  const wsConnections = new Map<number, Set<any>>();
-
-  // Store buffered messages for conversations without active connections
-  const messageBuffer = new Map<number, any[]>();
-
-  // Helper function to safely send WebSocket messages
-  const safeSend = (ws: any, message: any) => {
-    try {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify(message));
-      }
-    } catch (error) {
-      console.error('[WebSocket] Send error:', error);
-    }
-  };
-
-  wss.on('connection', (ws, req) => {
-    console.log('[WebSocket] New client connected for chat streaming');
-
-    // Add error handling to prevent crashes
-    ws.on('error', (error) => {
-      console.error('[WebSocket] Connection error:', error.message);
-      // Don't crash the server, just log the error
-    });
-
-    ws.on('close', (code, reason) => {
-      console.log(`[WebSocket] Client disconnected: ${code} ${reason}`);
-      // Clean up connections
-      for (const [convId, connections] of wsConnections.entries()) {
-        if (connections.has(ws)) {
-          connections.delete(ws);
-          if (connections.size === 0) {
-            wsConnections.delete(convId);
-          }
-        }
-      }
-    });
-
-    ws.on('message', (message) => {
-      try {
-        const data = JSON.parse(message.toString());
-        console.log('[WebSocket] Received:', data);
-
-        if (data.type === 'subscribe' && data.conversationId) {
-          const convId = parseInt(data.conversationId);
-          if (!wsConnections.has(convId)) {
-            wsConnections.set(convId, new Set());
-          }
-          wsConnections.get(convId)!.add(ws);
-          console.log(`[WebSocket] Client subscribed to conversation ${convId}`);
-
-          // Send subscription confirmation
-          safeSend(ws, { type: 'subscribed', conversationId: convId });
-
-          // Send any buffered messages immediately
-          const buffered = messageBuffer.get(convId);
-          if (buffered && buffered.length > 0) {
-            console.log(`[WebSocket] Sending ${buffered.length} buffered messages to new client`);
-            buffered.forEach(message => {
-              safeSend(ws, message);
-            });
-            // Clear buffer after sending
-            messageBuffer.delete(convId);
-          }
-        }
-      } catch (error) {
-        console.error('[WebSocket] Parse error:', error);
-      }
-    });
-
-    ws.on('close', () => {
-      // Remove from all conversations
-      for (const [, connections] of wsConnections) {
-        connections.delete(ws);
-      }
-      console.log('[WebSocket] Client disconnected');
-    });
-  });
-
-  // Function to broadcast to all clients in a conversation
-  (global as any).broadcastToConversation = (conversationId: number, data: any) => {
-    const connections = wsConnections.get(conversationId);
-    console.log(`[WebSocket] Broadcasting to conversation ${conversationId}, connections: ${connections?.size || 0}`);
-
-    if (connections && connections.size > 0) {
-      connections.forEach(ws => {
-        if (ws.readyState === 1) { // WebSocket.OPEN
-          safeSend(ws, data);
-          console.log(`[WebSocket] Sent ${data.type} to client for conversation ${conversationId}`);
-        } else {
-          console.log(`[WebSocket] Removing closed connection for conversation ${conversationId}`);
-          connections.delete(ws);
-        }
-      });
-    } else {
-      // Buffer the message for when client connects
-      if (data.type === 'status') {
-        if (!messageBuffer.has(conversationId)) {
-          messageBuffer.set(conversationId, []);
-        }
-        messageBuffer.get(conversationId)!.push(data);
-        console.log(`[WebSocket] Buffered ${data.type} message for conversation ${conversationId}`);
-      } else {
-        console.log(`[WebSocket] No active connections for conversation ${conversationId}`);
-        console.log(`[WebSocket] Active conversations:`, Array.from(wsConnections.keys()));
-      }
-    }
-  };
+  // NOTE: VeeGPT chat streaming no longer uses WebSockets. It streams the reply
+  // over the SAME HTTP POST request (NDJSON) — see server/routes/veegpt-chat.routes.ts.
+  // This removed all the WebSocket fragility (connect/subscribe race, mid-stream
+  // reconnect, replay). The only remaining `ws` server is the video one (/ws/video).
 
   // Use environment port or default to 5000
   const port = parseInt(process.env.PORT || '5000', 10);

@@ -6,43 +6,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SocialAccountCardSkeleton } from '@/components/skeletons'
 import { useToast } from '@/hooks/use-toast'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { Users, TrendingUp, MessageSquare, Share2, Eye, Calendar, BarChart3, Heart, Instagram, Facebook, Twitter, Linkedin, Youtube, RefreshCw, Bookmark } from 'lucide-react'
 import { detectInvalidAccounts, getReconnectCopy, startReconnectFlow } from '@/lib/reconnect'
-
-function SocialAccountCardSkeleton() {
-  return (
-    <div className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-700">
-      <div className="flex items-center space-x-3 mb-4">
-        <Skeleton className="w-12 h-12 rounded-full" />
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-3 w-16" />
-        </div>
-        <Skeleton className="h-6 w-16 rounded-full" />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
-          <Skeleton className="h-6 w-16 mb-1" />
-          <Skeleton className="h-3 w-12" />
-        </div>
-        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
-          <Skeleton className="h-6 w-16 mb-1" />
-          <Skeleton className="h-3 w-12" />
-        </div>
-        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
-          <Skeleton className="h-6 w-16 mb-1" />
-          <Skeleton className="h-3 w-12" />
-        </div>
-        <div className="p-3 rounded-lg bg-white dark:bg-gray-700/50">
-          <Skeleton className="h-6 w-16 mb-1" />
-          <Skeleton className="h-3 w-12" />
-        </div>
-      </div>
-    </div>
-  )
-}
+import { RateLimitUsagePanel } from '@/components/dashboard/RateLimitUsagePanel'
 
 export function SocialAccountsSkeleton() {
   return (
@@ -79,72 +48,36 @@ export function SocialAccounts() {
   const workspaceData = useCurrentWorkspace()
   const { currentWorkspace, isReady, isLoading: workspaceLoading } = workspaceData || { currentWorkspace: undefined, isReady: false, isLoading: true }
 
-  // ✅ CRITICAL FIX: Clear cache on component mount to ensure fresh data
-  React.useEffect(() => {
-    // Skip if workspace not ready or in production
-    if (!isReady || !currentWorkspace) return;
-    if ((import.meta as any).env?.PROD) return;
+  // NOTE: a previous version cleared the React Query + localStorage social-accounts
+  // cache on every mount ("to ensure fresh data"). That defeated the cache and the
+  // bootstrap seed, forcing a cold refetch (and a loading skeleton) on EVERY
+  // dashboard open / sidebar navigation. Removed entirely — the query below is
+  // configured to serve cached/seeded data instantly (refetchOnMount:false,
+  // staleTime 5m) and is kept fresh by mutations, webhook events, and 10-min polling.
 
-    // Guard against SSR/environments without localStorage
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-
-    // Clear React Query cache for social accounts on mount
-    try {
-      queryClient.removeQueries({ queryKey: ['/api/social-accounts'] })
-      queryClient.removeQueries({ queryKey: ['/api/social-accounts', currentWorkspace?.id] })
-    } catch (err) {
-      console.error('[SOCIAL ACCOUNTS] Error clearing query cache:', err)
-    }
-
-    // Clear localStorage cache with defensive checks
-    try {
-      const keysToRemove: string[] = []
-      const storageLength = localStorage.length || 0
-      for (let i = 0; i < storageLength; i++) {
-        const key = localStorage.key(i)
-        if (key && (
-          key.startsWith('REACT_QUERY_OFFLINE_CACHE') ||
-          key.startsWith('tanstack-query') ||
-          key.includes('social-accounts')
-        )) {
-          keysToRemove.push(key)
-        }
-      }
-      keysToRemove.forEach(key => {
-        try {
-          localStorage.removeItem(key)
-        } catch (e) {
-          // Ignore individual removal errors
-        }
-      })
-      console.log(`[SOCIAL ACCOUNTS] ✅ Cleared ${keysToRemove.length} cache entries on mount`)
-    } catch (error) {
-      console.error('[SOCIAL ACCOUNTS] Error clearing cache on mount:', error)
-    }
-  }, [currentWorkspace?.id, isReady, currentWorkspace])
-
-  // Fetch social accounts data for current workspace - IMMEDIATE FETCH ON LOAD
+  // Fetch social accounts data for current workspace. Uses the SHARED cache
+  // (same key as useSocialAccounts) so the bootstrap-seeded data and the 5-min
+  // cache serve instantly instead of forcing a cold network round-trip on every
+  // dashboard open. Background polling still keeps metrics fresh.
   const { data: socialAccounts, isLoading, isFetching, refetch: refetchAccounts } = useQuery({
     queryKey: ['/api/social-accounts', currentWorkspace?.id],
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
-      // ✅ FORCE FRESH FETCH: Add timestamp to bypass cache
-      const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}&_t=${Date.now()}`);
-      console.log('[FRONTEND API] Raw API response:', response);
+      const response = await apiRequest(`/api/social-accounts?workspaceId=${currentWorkspace.id}`);
       // API returns { success: true, data: [...] } - extract the data array
       if (Array.isArray(response)) return response;
       if (response && Array.isArray(response.data)) return response.data;
       return [];
     },
     enabled: !!currentWorkspace?.id,
-    refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes for likes/followers/engagement (Meta-friendly)
-    refetchIntervalInBackground: false, // Don't poll when tab is not active to save API calls
-    staleTime: 0, // ✅ Data is always stale - ensures fresh fetch every time
-    refetchOnWindowFocus: true, // Refresh when user returns to tab
-    refetchOnMount: 'always', // ✅ ALWAYS fetch fresh data when component mounts - shows real data immediately!
-    refetchOnReconnect: true, // Refresh when network reconnects
-    gcTime: 0, // ✅ CRITICAL: Don't cache at all - always fetch fresh
-    placeholderData: undefined, // ✅ Don't show placeholder data - wait for real data
+    refetchInterval: 10 * 60 * 1000, // Smart polling every 10 minutes (Meta-friendly)
+    refetchIntervalInBackground: false,
+    staleTime: 30 * 1000, // 30s stale time — ensures fresh data after OAuth connects
+    refetchOnWindowFocus: true, // Refetch when user returns to tab (catches post-OAuth state)
+    refetchOnMount: true, // Always check for fresh data on mount
+    refetchOnReconnect: true,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: undefined,
   })
 
   // Removed aggressive cache clearing that caused infinite loops when shares/saves were genuinely 0
@@ -268,6 +201,30 @@ export function SocialAccounts() {
 
   // State hooks - must be before early return
   const [selectedAccount, setSelectedAccount] = useState('instagram')
+  const [isSyncing, setIsSyncing] = useState(false)
+
+  // Listen for sync status events from WebSocket
+  React.useEffect(() => {
+    const handleSyncStatus = (e: CustomEvent) => {
+      setIsSyncing(e.detail?.syncing || false)
+    }
+    window.addEventListener('instagram-sync-status', handleSyncStatus as EventListener)
+    return () => window.removeEventListener('instagram-sync-status', handleSyncStatus as EventListener)
+  }, [])
+
+  // Auto-poll every 5 seconds while initial sync is in progress to pick up completed sync
+  // Must be before early returns to maintain consistent hook ordering
+  const socialAccountsArrayForHook = Array.isArray(socialAccounts) ? socialAccounts : (socialAccounts?.data || [])
+  const hasUnsyncedAccount = socialAccountsArrayForHook.some((acc: any) => 
+    !acc.lastSyncAt && !acc.lastSync && acc.tokenStatus === 'valid'
+  )
+  React.useEffect(() => {
+    if (!hasUnsyncedAccount || !currentWorkspace?.id) return
+    const interval = setInterval(() => {
+      refetchAccounts()
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [hasUnsyncedAccount, refetchAccounts, currentWorkspace?.id])
 
   // Early return if workspace not ready - placed AFTER all hooks but BEFORE calculations
   if (!isReady || workspaceLoading || !currentWorkspace) {
@@ -289,6 +246,10 @@ export function SocialAccounts() {
 
   const isInitialLoading = isLoading && !Array.isArray(socialAccounts)
   const currentAccount = connectedAccounts.find((acc: any) => acc.platform === selectedAccount) || connectedAccounts[0]
+  
+  // Determine if this account is in initial sync state (connected but never synced)
+  const isInitialSync = !!(currentAccount && !currentAccount.lastSyncAt && !currentAccount.lastSync && currentAccount.tokenStatus === 'valid')
+
   // Debug logging (now safe - workspace ready)
   if (currentAccount) {
     console.log('[FRONTEND DEBUG] Current account being displayed:', {
@@ -311,17 +272,82 @@ export function SocialAccounts() {
     return num?.toString() || '0'
   }
 
+  /**
+   * Format a polling-timer duration (in ms) into a compact human-readable
+   * string: "<1m", "45m", "2h 58m", "3h", "1d 4h". Avoids raw large-minute
+   * values like "178m".
+   */
+  const formatPollTimer = (ms: number | undefined): string => {
+    if (ms === undefined || ms === null || !Number.isFinite(ms)) return 'N/A'
+    const totalMinutes = Math.max(0, Math.round(ms / 1000 / 60))
+    if (totalMinutes < 1) return '<1m'
+    if (totalMinutes < 60) return `${totalMinutes}m`
+
+    const totalHours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (totalHours < 24) {
+      return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`
+    }
+
+    const days = Math.floor(totalHours / 24)
+    const hours = totalHours % 24
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  }
+
+  /**
+   * Format a polling CADENCE (interval, in ms) as a stable "every X" label,
+   * e.g. "every 1h", "every 2h", "every 6h", "every 30m". This is how OFTEN a
+   * metric polls — distinct from the live countdown to the next poll.
+   */
+  const formatCadence = (ms: number | undefined): string => {
+    if (ms === undefined || ms === null || !Number.isFinite(ms) || ms <= 0) return 'N/A'
+    const totalMinutes = Math.round(ms / 1000 / 60)
+    if (totalMinutes < 60) return `every ${totalMinutes}m`
+    const totalHours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (totalHours < 24) {
+      return minutes > 0 ? `every ${totalHours}h ${minutes}m` : `every ${totalHours}h`
+    }
+    const days = Math.floor(totalHours / 24)
+    const hours = totalHours % 24
+    return hours > 0 ? `every ${days}d ${hours}h` : `every ${days}d`
+  }
+
+  /**
+   * Format a "last sync" timestamp relative to now, auto-picking the unit
+   * (minutes / hours / days) so it reads "5 minutes ago" / "5 hours ago" /
+   * "2 days ago" instead of "307 minutes ago".
+   */
+  const formatRelativeSync = (timestamp: string | number | Date): string => {
+    const then = new Date(timestamp).getTime()
+    if (!Number.isFinite(then)) return 'Never'
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+    const diffMs = then - Date.now()
+    const diffMinutes = Math.round(diffMs / (1000 * 60))
+    const absMinutes = Math.abs(diffMinutes)
+
+    if (absMinutes < 60) {
+      return rtf.format(diffMinutes, 'minute')
+    }
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60))
+    if (Math.abs(diffHours) < 24) {
+      return rtf.format(diffHours, 'hour')
+    }
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+    return rtf.format(diffDays, 'day')
+  }
+
   // Calculate real engagement rate from authentic data
   const calculateEngagement = (account: any) => {
     if (!account.followersCount || account.followersCount === 0) return '0.0'
 
-    // Use real engagement data if available
+    // Use the server-calculated engagement rate directly (no artificial caps)
+    if (account.engagementRate !== undefined && account.engagementRate !== null) {
+      return account.engagementRate.toFixed(1)
+    }
+
     if (account.avgEngagement) {
-      // Normalize extremely high engagement rates (typical for small accounts)
-      const normalizedRate = account.avgEngagement > 100 ?
-        Math.min(account.avgEngagement / 10, 15) : // Cap at 15% for display
-        account.avgEngagement
-      return normalizedRate.toFixed(1)
+      return account.avgEngagement.toFixed(1)
     }
 
     // Fallback calculation using real metrics
@@ -329,7 +355,7 @@ export function SocialAccounts() {
     const avgEngagementPerPost = account.mediaCount ? totalEngagement / account.mediaCount : 0
     const engagementRate = account.followersCount ? (avgEngagementPerPost / account.followersCount) * 100 : 0
 
-    return Math.min(engagementRate, 15).toFixed(1) // Cap at 15% for realistic display
+    return engagementRate.toFixed(1)
   }
 
   // Get platform icon
@@ -372,8 +398,13 @@ export function SocialAccounts() {
   }
 
   const getSafeAvatarUrl = (acc: any) => {
-    const bust = acc.lastSyncAt ? new Date(acc.lastSyncAt).getTime() : Date.now()
-    return `/public/instagram/profile-picture/${acc.id}?t=${bust}`
+    const id = acc.accountId || acc.id
+    const platform = (acc.platform || '').toLowerCase().replace('_advanced', '')
+    if (id && (platform === 'facebook' || platform === 'instagram')) {
+      return `/api/image-proxy/social?accountId=${encodeURIComponent(id)}&platform=${encodeURIComponent(platform)}`
+    }
+    // fallback: use stored URL directly
+    return acc.profilePictureUrl || acc.profilePicture || ''
   }
 
   return (
@@ -390,6 +421,7 @@ export function SocialAccounts() {
               {/* Polling status indicator */}
               {pollingStatus && pollingStatus.totalAccounts > 0 && (
                 <div className="flex items-center space-x-1 px-2 py-1 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-600 rounded text-xs text-green-700 dark:text-green-400">
+                  {/* skeleton-guard-allow: status-dot — live "polling active" status indicator, not a loading placeholder */}
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span>Live polling active</span>
                 </div>
@@ -463,8 +495,21 @@ export function SocialAccounts() {
                       : 'bg-white/60 dark:bg-gray-700/60 hover:bg-white/80 dark:hover:bg-gray-700/80 border border-gray-200 dark:border-gray-600'
                     }`}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(account.platform)}`}>
-                    <PlatformIcon className="w-4 h-4" />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(account.platform)} overflow-hidden`}>
+                    {account.accountId ? (
+                      <img
+                        src={getSafeAvatarUrl(account)}
+                        alt={account.username}
+                        className="w-8 h-8 rounded-full object-cover"
+                        onError={(e) => {
+                          const t = e.currentTarget as HTMLImageElement;
+                          t.style.display = 'none';
+                          const fb = t.nextElementSibling as HTMLElement;
+                          if (fb) fb.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <PlatformIcon className="w-4 h-4" style={{ display: account.accountId ? 'none' : 'block' }} />
                   </div>
                   <div className="text-left">
                     <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{account.username}</div>
@@ -478,14 +523,7 @@ export function SocialAccounts() {
 
         {isInitialLoading && (
           <div className="p-6">
-            <div className="animate-pulse">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-4"></div>
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-              </div>
-            </div>
+            <SocialAccountCardSkeleton />
           </div>
         )}
 
@@ -525,20 +563,25 @@ export function SocialAccounts() {
                 {/* Account Header */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center space-x-4">
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(currentAccount.platform)}`}>
-                      {currentAccount.profilePictureUrl || currentAccount.profilePicture ? (
-                        <img
-                          src={getSafeAvatarUrl(currentAccount)}
-                          alt={currentAccount.username}
-                          className="w-16 h-16 rounded-full object-cover"
-                          onError={(e) => {
-                            const fallback = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentAccount.username}`
-                              ; (e.currentTarget as HTMLImageElement).src = fallback
-                          }}
-                        />
-                      ) : (
-                        <span className="text-2xl font-bold">{currentAccount.username?.[0]?.toUpperCase() || 'A'}</span>
-                      )}
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white bg-gradient-to-r ${getPlatformColor(currentAccount.platform)} overflow-hidden`}>
+                      <img
+                        src={getSafeAvatarUrl(currentAccount)}
+                        alt={currentAccount.username}
+                        className="w-16 h-16 rounded-full object-cover"
+                        style={{ display: currentAccount.accountId ? 'block' : 'none' }}
+                        onError={(e) => {
+                          const t = e.currentTarget as HTMLImageElement;
+                          t.style.display = 'none';
+                          const fallback = t.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                      <span
+                        className="text-2xl font-bold"
+                        style={{ display: currentAccount.accountId ? 'none' : 'flex' }}
+                      >
+                        {currentAccount.username?.[0]?.toUpperCase() || 'A'}
+                      </span>
                     </div>
                     <div>
                       <div className="font-bold text-gray-900 dark:text-gray-100 text-lg">@{currentAccount.username}</div>
@@ -555,46 +598,59 @@ export function SocialAccounts() {
                           </Badge>
                         )}
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                          Last sync: {currentAccount.lastSyncAt ?
-                            new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
-                              Math.round((new Date(currentAccount.lastSyncAt).getTime() - Date.now()) / (1000 * 60)), 'minute'
-                            ) :
-                            currentAccount.lastSync ? new Date(currentAccount.lastSync).toLocaleDateString() : 'Never'
-                          }
+                          {(isSyncing || (!currentAccount.lastSyncAt && !currentAccount.lastSync && currentAccount.tokenStatus === 'valid')) ? (
+                            <span className="inline-flex items-center text-blue-500 dark:text-blue-400">
+                              <svg className="animate-spin -ml-0.5 mr-1.5 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Syncing your account...
+                            </span>
+                          ) : (
+                            <>Last sync: {currentAccount.lastSyncAt ?
+                              formatRelativeSync(currentAccount.lastSyncAt) :
+                              currentAccount.lastSync ? new Date(currentAccount.lastSync).toLocaleDateString() : 'Never'
+                            }</>
+                          )}
                         </span>
                       </div>
                       
                       {/* Detailed Real-time polling status for this account */}
                       {(() => {
                          const status = pollingStatus?.accounts?.find((acc: any) => acc.username === currentAccount.username);
-                         if (!status || !status.metricsPollIn) return null;
+                         if (!status || (!status.metricsInterval && !status.metricsPollIn)) return null;
                          
                          return (
                            <div className="mt-3 bg-blue-50/80 dark:bg-blue-900/20 p-2.5 rounded-lg border border-blue-100 dark:border-blue-800/30">
                              <div className="text-xs text-blue-600 dark:text-blue-400 mb-2 flex items-center space-x-1.5 font-semibold">
+                               {/* skeleton-guard-allow: status-dot — live "smart polling cadence" status indicator, not a loading placeholder */}
                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                               <span>Smart Polling Timers:</span>
+                               <span>Smart Polling Cadence:</span>
                              </div>
                              <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-[11px]">
                                <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
                                   <span className="text-gray-500 dark:text-gray-400">Likes / Reach</span>
-                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{Math.max(0, Math.round(status.metricsPollIn.likes / 1000 / 60))}m</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2" title={`Next in ${formatPollTimer(status.metricsPollIn?.likes)}`}>{formatCadence(status.metricsInterval?.likes)}</span>
                                </div>
                                <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
-                                  <span className="text-gray-500 dark:text-gray-400">Views</span>
-                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{Math.max(0, Math.round(status.metricsPollIn.views / 1000 / 60))}m</span>
+                                  <span className="text-gray-500 dark:text-gray-400">Account Insights</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2" title={`Next in ${formatPollTimer(status.metricsPollIn?.reach)}`}>{formatCadence(status.metricsInterval?.reach)}</span>
                                </div>
                                <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
                                   <span className="text-gray-500 dark:text-gray-400">Shares / Saves</span>
-                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{Math.max(0, Math.round(status.metricsPollIn.shares / 1000 / 60))}m</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2" title={`Next in ${formatPollTimer(status.metricsPollIn?.shares)}`}>{formatCadence(status.metricsInterval?.shares)}</span>
+                               </div>
+                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
+                                  <span className="text-gray-500 dark:text-gray-400">Followers</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2" title={`Next in ${formatPollTimer(status.metricsPollIn?.followers)}`}>{formatCadence(status.metricsInterval?.followers)}</span>
+                               </div>
+                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
+                                  <span className="text-gray-500 dark:text-gray-400">New Posts</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2" title={`Next in ${formatPollTimer(status.metricsPollIn?.newPosts)}`}>{formatCadence(status.metricsInterval?.newPosts)}</span>
                                </div>
                                <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
                                   <span className="text-gray-500 dark:text-gray-400">Stories</span>
-                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{status.metricsPollIn.stories !== undefined ? Math.max(0, Math.round(status.metricsPollIn.stories / 1000 / 60)) + 'm' : 'N/A'}</span>
-                               </div>
-                               <div className="flex justify-between w-full border-b border-blue-100/50 dark:border-blue-800/20 pb-1">
-                                  <span className="text-gray-500 dark:text-gray-400">Profile Views</span>
-                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{status.metricsPollIn.profile_views !== undefined ? Math.max(0, Math.round(status.metricsPollIn.profile_views / 1000 / 60)) + 'm' : 'N/A'}</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300 ml-2">{status.metricsInterval?.stories !== undefined ? formatCadence(status.metricsInterval.stories) : 'Idle'}</span>
                                </div>
                              </div>
                            </div>
@@ -603,7 +659,7 @@ export function SocialAccounts() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">{currentAccount.mediaCount || 0}</div>
+                    <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">{isInitialSync ? '-' : (currentAccount.mediaCount || 0)}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">Total Posts</div>
                   </div>
                 </div>
@@ -615,7 +671,7 @@ export function SocialAccounts() {
                       <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                      {formatNumber(currentAccount.followersCount || currentAccount.followers || 0)}
+                      {isInitialSync ? '-' : formatNumber(currentAccount.followersCount || currentAccount.followers || 0)}
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Followers</div>
                   </div>
@@ -624,7 +680,7 @@ export function SocialAccounts() {
                       <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
                     </div>
                     <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                      {calculateEngagement(currentAccount)}%
+                      {isInitialSync ? '-' : `${calculateEngagement(currentAccount)}%`}
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Engagement</div>
                   </div>
@@ -633,7 +689,7 @@ export function SocialAccounts() {
                       <Eye className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                      {currentAccount.mediaCount || currentAccount.posts || 0}
+                      {isInitialSync ? '-' : (currentAccount.mediaCount || currentAccount.posts || 0)}
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Posts</div>
                   </div>
@@ -642,7 +698,7 @@ export function SocialAccounts() {
                       <Share2 className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                      {formatNumber(currentAccount.totalShares || 0)}
+                      {isInitialSync ? '-' : formatNumber(currentAccount.totalShares || 0)}
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Shares</div>
                   </div>
@@ -651,7 +707,7 @@ export function SocialAccounts() {
                       <Bookmark className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                     </div>
                     <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
-                      {formatNumber(currentAccount.totalSaves || 0)}
+                      {isInitialSync ? '-' : formatNumber(currentAccount.totalSaves || 0)}
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Saves</div>
                   </div>
@@ -660,14 +716,14 @@ export function SocialAccounts() {
                 {/* Enhanced Engagement Metrics - Including Shares and Saves */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-4 mb-6">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-gray-900 dark:text-gray-100">Account Reach</h4>
-                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{currentAccount.totalReach || 0}</span>
+                    <h4 className="font-semibold text-gray-900 dark:text-gray-100">Account Reach <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(28d)</span></h4>
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400" title="Unique accounts reached in the last 28 days (Meta account-level reach)">{currentAccount.accountReach ?? currentAccount.totalReach ?? 0}</span>
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    Total engagement: {currentAccount.totalLikes || 0} likes • {currentAccount.totalComments || 0} comments • {currentAccount.totalShares || 0} shares • {currentAccount.totalSaves || 0} saves
+                    Total engagement: {isInitialSync ? '- likes • - comments • - shares • - saves' : `${currentAccount.totalLikes || 0} likes • ${currentAccount.totalComments || 0} comments • ${currentAccount.totalShares || 0} shares • ${currentAccount.totalSaves || 0} saves`}
                   </div>
                   <div className="w-full bg-white dark:bg-gray-600 rounded-full h-3 overflow-hidden">
-                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((currentAccount.totalReach || 0) / 500 * 100, 100)}%` }}></div>
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((currentAccount.accountReach ?? currentAccount.totalReach ?? 0) / 500 * 100, 100)}%` }}></div>
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                     Performance: {Number(currentAccount.avgComments || 0).toFixed(1)} avg comments per post
@@ -692,6 +748,13 @@ export function SocialAccounts() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Rate-limit usage — shows BOTH App-Level and Account-Level Meta limits */}
+        {connectedAccounts.length > 0 && (
+          <div className="mt-4">
+            <RateLimitUsagePanel />
           </div>
         )}
 

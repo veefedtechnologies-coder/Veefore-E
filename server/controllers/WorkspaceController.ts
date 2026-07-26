@@ -4,6 +4,7 @@ import { BaseController, TypedRequest } from './BaseController';
 import { workspaceService } from '../services';
 import { storage } from '../mongodb-storage';
 import { NotFoundError, ForbiddenError, PaymentRequiredError, ConflictError } from '../errors';
+import { invalidateBootstrapCache } from '../lib/html-bootstrap';
 
 const WorkspaceIdParams = z.object({
   workspaceId: z.string().min(1),
@@ -71,8 +72,20 @@ export class WorkspaceController extends BaseController {
     req: TypedRequest,
     res: Response
   ) => {
-    const userId = req.user!.id;
-    const workspaces = await workspaceService.getWorkspacesByUserId(userId);
+    // WorkspaceModel stores ownerId as Firebase UID (set by importAuthorizedBrand
+    // and workspace.routes.ts). Use firebaseUid preferentially so newly imported
+    // workspaces are returned. Fall back to MongoDB id for legacy workspaces.
+    const firebaseUid: string = (req.user as any).firebaseUid || req.user!.id;
+    const mongoId: string = req.user!.id;
+
+    let workspaces = await workspaceService.getWorkspacesByUserId(firebaseUid);
+
+    // If the Firebase UID lookup returns nothing, try the MongoDB _id as a fallback
+    // (covers users who still have workspaces keyed by mongoId from before the spec).
+    if (!workspaces || workspaces.length === 0) {
+      workspaces = await workspaceService.getWorkspacesByUserId(mongoId);
+    }
+
     this.sendSuccess(res, workspaces);
   });
 
@@ -82,6 +95,41 @@ export class WorkspaceController extends BaseController {
   ) => {
     const userId = req.user!.id;
     const input = CreateWorkspaceSchema.parse(req.body);
+
+    // ── Plan-based workspace limit enforcement ────────────────────────────────
+    // Reads from the real EntitlementService (backed by the Subscription
+    // document) instead of req.user.plan / a hardcoded limit table here.
+    // req.user.plan is the legacy User.plan field, which the Razorpay
+    // subscription system never writes to — it was always stale, and its
+    // plan names ("Starter"/"Growth"/"Agency") didn't even match the real
+    // plan IDs ("creator"/"pro"/"business"), so this check silently fell
+    // back to a limit of 1 for every paid plan.
+    const { getEntitlementService } = await import('../features/subscription/services/EntitlementService');
+    const { getRedisClient } = await import('../lib/redis');
+    const SubscriptionRepository = (await import('../features/subscription/db/repositories/SubscriptionRepository')).default;
+
+    const entitlementService = getEntitlementService(getRedisClient(), new SubscriptionRepository());
+    const userPlan = await entitlementService.getPlan(userId);
+    const remaining = await entitlementService.remainingWorkspaces(userId);
+
+    if (remaining !== Infinity && remaining <= 0) {
+      const planLimit = await entitlementService.getLimit(userId, 'maxWorkspaces');
+      const existingWorkspaces = await workspaceService.getWorkspacesByUserId(userId);
+      const currentCount = Array.isArray(existingWorkspaces) ? existingWorkspaces.length : 0;
+
+      throw new PaymentRequiredError(
+        `Your ${userPlan} plan allows a maximum of ${planLimit} workspace${planLimit === 1 ? '' : 's'}. You currently have ${currentCount}. Upgrade your plan to create more workspaces.`,
+        {
+          needsUpgrade: true,
+          currentPlan: userPlan,
+          currentCount,
+          planLimit,
+          upgradeUrl: '/settings?tab=billing',
+        }
+      );
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const workspace = await workspaceService.createWorkspace({
       userId,
       name: input.name,
@@ -89,6 +137,9 @@ export class WorkspaceController extends BaseController {
       theme: input.theme,
       aiPersonality: input.aiPersonality,
     });
+    // The bootstrap seeds the user's workspace list — invalidate so the next HTML
+    // load reflects the new workspace immediately.
+    void invalidateBootstrapCache(userId);
     this.sendCreated(res, workspace, 'Workspace created successfully');
   });
 
@@ -100,6 +151,14 @@ export class WorkspaceController extends BaseController {
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
     const input = UpdateWorkspaceSchema.parse(req.body);
     const workspace = await workspaceService.updateWorkspace(workspaceId, userId, input);
+
+    // Workspace data changed → refresh VeeGPT's cached context snapshot so chat
+    // reflects new profile / AI configuration immediately (background worker).
+    try {
+      const { refreshWorkspaceContext } = await import('../services/WorkspaceContextAccessor');
+      void refreshWorkspaceContext(workspaceId, userId, 'workspace-update');
+    } catch { /* non-critical */ }
+
     this.sendSuccess(res, workspace, 200, 'Workspace updated successfully');
   });
 
@@ -172,10 +231,13 @@ export class WorkspaceController extends BaseController {
       return;
     }
 
-    const user = await storage.getUser(userId);
-    const name = user?.displayName ? `${user.displayName}'s Workspace` : 'My Workspace';
-    const created = await storage.createWorkspace({ name, userId, isDefault: true, theme: 'space' });
-    this.sendSuccess(res, { success: true, workspaceId: created.id, created: true });
+    // BUG FIX: this previously auto-created a bare "My Workspace" (no brand)
+    // whenever the user had zero workspaces. Workspaces must always
+    // represent one connected brand — creating an empty placeholder here
+    // produced orphaned workspaces and corrupted the single-default invariant
+    // once a real (brand-backed) workspace was created later. Report that no
+    // workspace exists so the frontend can route the user to connect a brand.
+    this.sendSuccess(res, { success: true, workspaceId: null, created: false, needsBrandConnection: true });
   });
 
   getMembers = this.wrapAsync(async (

@@ -10,6 +10,7 @@ export interface TriggerEvaluationResult {
   matchType?: 'exact' | 'contains' | 'intent' | 'any';
   matchedKeyword?: string;
   intent?: string;
+  usedAI?: boolean;
 }
 
 export class TriggerEngine {
@@ -124,7 +125,7 @@ Does the comment match any of these intents? If yes, respond ONLY with the exact
           if (didGlobalIntentCheck) {
             // We already did a global OpenAI check
             if (globalDetectedIntent && intents.includes(globalDetectedIntent)) {
-              return { matched: true, rule, matchType: 'intent', intent: globalDetectedIntent };
+              return { matched: true, rule, matchType: 'intent', intent: globalDetectedIntent, usedAI: true };
             }
           } else {
             // Fallback basic fuzzy match if OpenAI wasn't configured
@@ -147,7 +148,18 @@ Does the comment match any of these intents? If yes, respond ONLY with the exact
   /**
    * Fetches active rules from the database and evaluates them against the incoming webhook data.
    */
-  static async evaluateAndTrigger(data: any): Promise<{ matched: boolean; ruleName?: string; intent?: string; matchedKeyword?: string }> {
+  static async evaluateAndTrigger(data: any): Promise<{
+    matched: boolean;
+    ruleName?: string;
+    intent?: string;
+    matchedKeyword?: string;
+    finalDM?: string;
+    finalCommentReply?: string | null;
+    ruleId?: string;
+    dmButtons?: any[];
+    followerGate?: any;
+    aiAssisted?: boolean;
+  }> {
     try {
       console.log(`[TRIGGER_ENGINE] Fetching active automation rules for workspace: ${data.workspaceId}`);
       
@@ -234,7 +246,8 @@ Does the comment match any of these intents? If yes, respond ONLY with the exact
             finalCommentReply: finalCommentReply,
             ruleId: result.rule._id?.toString(),
             dmButtons: dmButtons,
-            followerGate: result.rule.followerGate
+            followerGate: result.rule.followerGate,
+            aiAssisted: result.usedAI === true
           };
         } catch (vErr) {
           console.error(`[TRIGGER_ENGINE] ⚠️ Error processing variables:`, vErr);

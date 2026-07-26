@@ -202,6 +202,25 @@ export async function getRateLimitInfo(key: string, windowMs: number, maxRequest
 }
 
 /**
+ * Resolve the REAL client IP for rate-limit bucketing. Behind a Cloudflare tunnel
+ * the TCP peer is localhost, so `req.ip` can collapse to the tunnel address and
+ * make ALL users share one bucket. Cloudflare always sets `CF-Connecting-IP` to
+ * the true client; prefer it, then the left-most X-Forwarded-For entry, then
+ * `req.ip`. (Safe here because the origin is only reachable via the CF tunnel, so
+ * a client cannot spoof these headers past Cloudflare.)
+ */
+function getClientIp(req: Request): string {
+  const cf = req.headers['cf-connecting-ip'];
+  if (typeof cf === 'string' && cf.length > 0) return cf;
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.length > 0) {
+    const first = xff.split(',')[0].trim();
+    if (first) return first;
+  }
+  return req.ip || 'unknown';
+}
+
+/**
  * P1-3: Global rate limiter middleware - 60 requests per minute
  */
 export const globalRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
@@ -232,13 +251,33 @@ export const globalRateLimiter = async (req: Request, res: Response, next: NextF
     return next();
   }
 
+  // Auto-fired, token-verified session-maintenance endpoints. These run on every
+  // page load / refresh and must NEVER be blocked by the global bucket — a 429
+  // here breaks session creation/restore. They are not brute-forceable:
+  // session-login/update-token require a valid Firebase ID token, and
+  // /session & /refresh rely on the httpOnly cookie. (Password/credential brute
+  // force is still covered by the dedicated bruteForceMiddleware.)
+  const authMaintenanceExempt = [
+    '/api/auth/session-login',
+    '/api/auth/session-logout',
+    '/api/auth/session',
+    '/api/auth/update-token',
+    '/api/auth/refresh',
+  ];
+  if (authMaintenanceExempt.includes(req.path)) {
+    return next();
+  }
+
   // Detailed API logging for debugging
   // console.log(`[API-DEBUG] ${req.method} ${req.url} | IP: ${req.ip}`);
 
-  const key = `global_rl:${req.ip}`;
+  const key = `global_rl:${getClientIp(req)}`;
   const windowMs = 60 * 1000; // 1 minute
-  // Stricter limit: 120 requests per minute (2 req/sec) in production, 1000 for development polling
-  const maxRequests = process.env.NODE_ENV === 'development' ? 1000 : 120;
+  // Per-client limit. An authenticated SPA legitimately fires ~15-20 requests per
+  // page load, and power users keep several tabs open, so 120/min was too tight
+  // (a few simultaneous refreshes tripped it and broke data fetches). 300/min
+  // (5/sec sustained) gives real users headroom while still stopping floods/DDoS.
+  const maxRequests = process.env.NODE_ENV === 'development' ? 2000 : 300;
 
   const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
 
@@ -319,9 +358,28 @@ export const oauthRateLimiter = async (req: Request, res: Response, next: NextFu
     return next();
   }
 
-  const key = `oauth_rl:${req.ip}`;
+  // ALLOW-LIST (not deny-list). This limiter is mounted on the whole /api/auth
+  // router, but the ONLY brute-force-able thing worth throttling here is genuine
+  // OAuth *initiation* — i.e. GET /<provider>/start (e.g. /google/start), which
+  // mints a state + redirects to the provider. EVERYTHING ELSE under /api/auth
+  // (session restore/login/logout, token refresh/update, signin, link-firebase,
+  // associate-uid, email verification, OAuth callbacks, client debug logging)
+  // fires AUTOMATICALLY during a normal login → logout → login cycle. Counting
+  // those against one tiny shared bucket caused false 429s after only a couple
+  // of cycles (the bug this fixes). Those endpoints have their own protections
+  // (authRateLimiter, bruteForceMiddleware, Firebase token verification), so we
+  // let them through here and rate-limit ONLY the initiation endpoints.
+  const isOAuthInitiation = req.method === 'GET' && /\/start$/.test(req.path);
+  if (!isOAuthInitiation) {
+    return next();
+  }
+
+  const key = `oauth_rl:${getClientIp(req)}`;
   const windowMs = 60 * 1000; // 1 minute
-  const maxRequests = 10; // 10 requests per minute per IP
+  // A single login = exactly one /start request, so 30/min leaves enormous
+  // headroom for real users (incl. rapid logout→login testing) while still
+  // stopping an automated flood of OAuth-initiation requests.
+  const maxRequests = 30; // OAuth *initiation* requests per minute per IP
 
   const rateLimitInfo = await getRateLimitInfo(key, windowMs, maxRequests);
 
@@ -334,10 +392,28 @@ export const oauthRateLimiter = async (req: Request, res: Response, next: NextFu
       redisClient.incr(`oauth_rate_limit:${today}`).catch(console.error);
     }
 
+    const retryAfter = Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000);
+    res.setHeader('Retry-After', String(retryAfter));
+
+    // The OAuth initiation endpoints (e.g. /google/start) are reached via a
+    // FULL-PAGE browser redirect, so returning raw JSON dumps an ugly blob in
+    // the address bar. Detect a top-level browser navigation and redirect back
+    // to the sign-in page with ?error=too_many_requests, which the client
+    // renders as a friendly in-page alert (see oauthErrorHandler). API/XHR
+    // callers (Accept: application/json or fetch) still get JSON.
+    const acceptsHtml = (req.headers.accept || '').includes('text/html');
+    const isNavigation = req.method === 'GET' && acceptsHtml;
+    if (isNavigation) {
+      const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || '';
+      return res.redirect(
+        `${frontendUrl}/signin?error=too_many_requests&retryAfter=${retryAfter}`
+      );
+    }
+
     return res.status(429).json({
-      error: 'Too many requests',
+      error: 'too_many_requests',
       message: 'Too many requests, please try again later',
-      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
+      retryAfter,
     });
   }
 

@@ -35,6 +35,7 @@ export function Header({ className, onCreateClick }: HeaderProps) {
         <div className="flex flex-col space-y-2 lg:space-y-3 min-w-0 w-full">
           {/* Trial Badge */}
           <div className="flex items-center space-x-3">
+            {/* skeleton-guard-allow: status-dot — decorative 'trial ends' header accent dot, not a loading placeholder */}
             <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full animate-pulse"></div>
             <span className="text-xs lg:text-sm font-semibold tracking-wide text-[#1e63e5] dark:text-blue-400">TRIAL ENDS IN 25 DAYS</span>
           </div>

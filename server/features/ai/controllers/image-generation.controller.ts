@@ -2,7 +2,11 @@ import { Response } from 'express';
 import OpenAI from 'openai';
 import { AuthenticatedRequest } from '../../../types/express';
 import { storage } from '../../../mongodb-storage';
-import { AICreditService } from '../../../services/AICreditService';
+import {
+  aiCreditMeteringService,
+  InsufficientAICreditsError,
+} from '../../subscription/services/AICreditMeteringService';
+import { fromOpenAIUsage, recordAIUsage } from '../../../services/aiUsageTracker';
 
 /**
  * Image Generation Controller
@@ -22,18 +26,6 @@ export class ImageGenerationController {
 
       console.log('[AI IMAGE] Request:', { userId, platform, contentType, style });
 
-      const creditCost = AICreditService.calculateCost('image_generation');
-      const creditCheck = await AICreditService.checkCredits(userId, creditCost);
-      if (!creditCheck.hasCredits) {
-        res.status(402).json({ 
-          error: `Insufficient credits. Image generation requires ${creditCost} credits.`,
-          required: creditCost,
-          current: creditCheck.currentCredits,
-          upgradeModal: true 
-        });
-        return;
-      }
-
       const openaiApiKey = process.env.OPENAI_API_KEY;
       if (!openaiApiKey) {
         res.status(500).json({ 
@@ -45,13 +37,23 @@ export class ImageGenerationController {
 
       try {
         const openai = new OpenAI({ apiKey: openaiApiKey });
+        const requestIdHeader = req.headers['idempotency-key'] ?? req.headers['x-request-id'];
+        const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+        const idempotencyKey = requestId
+          ? `image-generation:${userId}:${requestId}`
+          : `image-generation:${userId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
+        const { result: generated, settlement } = await aiCreditMeteringService.runMetered(
+          'imageGeneration',
+          'image.generation',
+          { userId, workspaceId, idempotencyKey },
+          async () => {
         const imageResponse = await openai.images.generate({
           model: "dall-e-3",
           prompt: prompt,
           n: 1,
-          size: platform === 'instagram' ? "1024x1024" : "1792x1024",
-          quality: "hd",
+          size: "1024x1024",
+          quality: "standard",
           style: style === 'realistic' ? 'natural' : 'vivid'
         });
 
@@ -90,7 +92,10 @@ export class ImageGenerationController {
           temperature: 0.7
         });
 
-        const caption = captionResponse.choices[0]?.message?.content?.trim() || 'Amazing content created with AI! What do you think? 💭';
+        const caption = captionResponse.choices[0]?.message?.content?.trim() || '';
+        if (!caption) {
+          throw new Error('AI returned no usable image caption');
+        }
 
         const hashtagResponse = await openai.chat.completions.create({
           model: "gpt-4o",
@@ -115,37 +120,57 @@ export class ImageGenerationController {
 
         const hashtagText = hashtagResponse.choices[0]?.message?.content?.trim() || '';
         const hashtags = hashtagText.split(/\s+/).filter(tag => tag.startsWith('#')).slice(0, 12);
-
-        const deductResult = await AICreditService.deductCredits(userId, 'image_generation', {
-          creditsToDeduct: creditCost,
-          workspaceId,
-          endpoint: '/api/v1/ai/generate-image'
-        });
-
-        if (!deductResult.success) {
-          console.error('[AI IMAGE] Credit deduction failed:', deductResult.error);
-          res.status(402).json({ error: deductResult.error || 'Failed to deduct credits' });
-          return;
+        if (hashtags.length < 3) {
+          throw new Error('AI returned too few usable image hashtags');
         }
 
+        recordAIUsage({
+          provider: 'openai',
+          model: 'gpt-4o',
+          callType: 'text',
+          usage: fromOpenAIUsage(captionResponse.usage),
+          completionText: caption,
+        });
+        recordAIUsage({
+          provider: 'openai',
+          model: 'gpt-4o',
+          callType: 'text',
+          usage: fromOpenAIUsage(hashtagResponse.usage),
+          completionText: hashtagText,
+        });
+
+        return { imageUrl, caption, hashtags };
+          },
+          3.4,
+        );
+        const { imageUrl, caption, hashtags } = generated;
+
         if (workspaceId) {
-          await storage.createContent({
-            title: `AI Generated Image: ${prompt.substring(0, 50)}...`,
-            description: caption,
-            type: 'image',
-            platform: platform || null,
-            status: 'ready',
-            workspaceId: workspaceId,
-            creditsUsed: creditCost,
-            contentData: {
-              imageUrl,
-              caption,
-              hashtags,
-              prompt,
-              style,
-              dimensions: dimensions || { width: 1024, height: 1024 }
-            }
-          });
+          try {
+            await storage.createContent({
+              title: `AI Generated Image: ${prompt.substring(0, 50)}...`,
+              description: caption,
+              type: 'image',
+              platform: platform || null,
+              status: 'ready',
+              workspaceId: workspaceId,
+              creditsUsed: settlement.charged,
+              contentData: {
+                imageUrl,
+                caption,
+                hashtags,
+                prompt,
+                style,
+                dimensions: dimensions || { width: 1024, height: 1024 }
+              }
+            });
+          } catch (persistenceError) {
+            // The Create Post action is not successful unless its generated
+            // content is durably saved. Refund the settled reservation before
+            // surfacing the persistence failure.
+            await aiCreditMeteringService.refundSettlement(idempotencyKey);
+            throw persistenceError;
+          }
         }
 
         console.log('[AI IMAGE] Successfully generated image and caption');
@@ -155,14 +180,15 @@ export class ImageGenerationController {
           imageUrl,
           caption,
           hashtags,
-          creditsUsed: deductResult.creditsDeducted,
-          remainingCredits: deductResult.creditsAfter
+          creditsUsed: settlement.charged,
+          remainingCredits: settlement.remaining
         });
 
       } catch (aiError: any) {
         console.error('[AI IMAGE] OpenAI API error:', aiError);
-        res.status(500).json({ 
-          error: 'AI generation failed. Please try again.',
+        const status = aiError instanceof InsufficientAICreditsError ? 402 : 500;
+        res.status(status).json({ 
+          error: aiError.message || 'AI generation failed. Please try again.',
           details: aiError.message 
         });
         return;

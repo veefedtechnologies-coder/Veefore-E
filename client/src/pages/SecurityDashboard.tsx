@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { SecurityDashboardSkeleton } from '@/components/skeletons/pages';
 import { 
   Shield, 
   AlertTriangle, 
@@ -123,16 +124,7 @@ export default function SecurityDashboard() {
   };
   
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-            <p className="text-slate-600 dark:text-slate-300">Loading Security Operations Center...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <SecurityDashboardSkeleton />;
   }
   
   return (
