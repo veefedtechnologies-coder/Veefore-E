@@ -2,6 +2,7 @@ import { BaseRepository, PaginationOptions } from './BaseRepository';
 import { WorkspaceModel, IWorkspace } from '../models/Workspace/Workspace';
 import { logger } from '../config/logger';
 import { DatabaseError } from '../errors';
+import crypto from 'crypto';
 
 export class WorkspaceRepository extends BaseRepository<IWorkspace> {
   constructor() {
@@ -85,7 +86,7 @@ export class WorkspaceRepository extends BaseRepository<IWorkspace> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+      result += chars.charAt(crypto.randomInt(chars.length));
     }
     return result;
   }
