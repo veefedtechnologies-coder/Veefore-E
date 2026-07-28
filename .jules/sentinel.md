@@ -1,0 +1,4 @@
+## 2024-05-24 - [Fix] Insecure Randomness in Credential Generation
+**Vulnerability:** The application was using `Math.random()` to generate secure passwords and OTPs in `credentialGenerator.ts` and `security.ts`. `Math.random()` is not cryptographically secure and can lead to predictable random number generation. Additionally, shuffling arrays using `.sort(() => Math.random() - 0.5)` is statistically biased and insecure.
+**Learning:** Avoid using `Math.random()` for any security-sensitive operations such as password generation, API keys, tokens, or OTP generation.
+**Prevention:** Always use Node's native `crypto` module methods like `crypto.randomInt()`, `crypto.randomBytes()`, or `crypto.randomUUID()` for generating sensitive information. For array shuffling, implement a cryptographically secure Fisher-Yates shuffle using `crypto.randomInt()`.
