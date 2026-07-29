@@ -3,6 +3,7 @@ import { useQuery } from 'react-query';
 import { Search, X, Clock, User, Shield, CreditCard, Ticket, Webhook, Megaphone, ExternalLink } from 'lucide-react';
 import { apiClient as api } from '../../services/api';
 import { clsx } from 'clsx';
+import DOMPurify from 'dompurify';
 
 interface SearchResult {
   id: string;
@@ -89,7 +90,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onR
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, results, selectedIndex, onClose]);
+  }, [isOpen, results, selectedIndex, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset selected index when results change
   useEffect(() => {
@@ -199,7 +200,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onR
             ) : results.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <Search className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No results found for "{query}"</p>
+                <p>No results found for &quot;{query}&quot;</p>
               </div>
             ) : (
               <div ref={resultsRef} className="py-2">
@@ -224,7 +225,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onR
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-medium text-gray-900 truncate">
-                          <span dangerouslySetInnerHTML={{ __html: result.highlighted.title }} />
+                          <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.highlighted.title) }} />
                         </h3>
                         <div className="flex items-center space-x-2">
                           <span className="text-xs text-gray-500 capitalize">
@@ -234,7 +235,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onR
                         </div>
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
-                        <span dangerouslySetInnerHTML={{ __html: result.highlighted.description }} />
+                        <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.highlighted.description) }} />
                       </p>
                       {result.metadata && (
                         <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
