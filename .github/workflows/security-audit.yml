@@ -162,6 +162,7 @@ jobs:
           npx wait-on http://localhost:5000 --timeout 60000
         env:
           PORT: 5000
+          JWT_SECRET: "development-only-secret-key-for-testing"
           
       - name: Run Lighthouse CI
         uses: treosh/lighthouse-ci-action@v10
@@ -204,6 +205,7 @@ jobs:
           npx wait-on http://localhost:5000 --timeout 60000
         env:
           PORT: 5000
+          JWT_SECRET: "development-only-secret-key-for-testing"
           NODE_ENV: testing
           
       - name: Run OWASP ZAP Baseline Scan

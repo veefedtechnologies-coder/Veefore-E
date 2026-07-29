@@ -6,6 +6,7 @@ import {
   CreativeBrief, ContentRepurpose, CompetitorAnalysis,
   WaitlistUser
 } from "../domain/types";
+import crypto from 'crypto';
 import { tokenEncryption, EncryptedToken } from '../security/token-encryption';
 
 export function decryptStoredToken(encryptedToken: any): string | null {
@@ -117,7 +118,7 @@ export function generateReferralCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(crypto.randomInt(chars.length));
   }
   return result;
 }
