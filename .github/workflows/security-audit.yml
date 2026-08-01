@@ -65,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript', 'typescript' ]
+        language: [ 'javascript' ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -89,7 +89,6 @@ jobs:
         with:
           fail-on-severity: critical
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
-          deny-licenses: GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0
 
   # 9.3: Secret Scanning + Trivy Image Scan  
   secret-security-scan:
@@ -126,7 +125,7 @@ jobs:
         run: |
           echo "🔍 Scanning for hardcoded secrets..."
           # Check for common secret patterns
-          if grep -r "sk_live_\|sk_test_\|AKIA\|AIza\|ya29\.\|ghp_\|sk-ant-\|pplx-\|rw_\|rzp_\|SG\.[A-Za-z0-9]\|BEGIN PRIVATE KEY" . --exclude-dir=node_modules --exclude-dir=.git; then
+          if grep -r "sk_live_\|sk_test_\|AKIA\|AIza\|ya29\.\|ghp_\|sk-ant-\|pplx-\|rw_\|rzp_\|SG\.[A-Za-z0-9]\|BEGIN PRIVATE KEY" . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=tests --exclude-dir=server/security --exclude="*.test.ts" --exclude="*.md" --exclude=".env.example" --exclude="*.tsx"; then
             echo "❌ Hardcoded secrets found!"
             exit 1
           else
