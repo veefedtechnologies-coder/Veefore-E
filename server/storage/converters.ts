@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import {
   User, Workspace, SocialAccount, Content, Analytics, AutomationRule,
   Suggestion, CreditTransaction, Referral, Subscription, Payment, Addon,
@@ -117,7 +118,7 @@ export function generateReferralCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(crypto.randomInt(chars.length));
   }
   return result;
 }
