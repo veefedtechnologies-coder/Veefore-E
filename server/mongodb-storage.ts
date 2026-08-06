@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
+import crypto from 'crypto';
 import { IStorage } from "./storage";
 import {
   User, Workspace, SocialAccount, Content, Analytics, AutomationRule,
@@ -1357,7 +1358,7 @@ export class MongoStorage implements IStorage {
       email: data.email,
       displayName: data.firstName,
       username: data.email.split('@')[0] + '_' + Date.now(), // Generate unique username
-      firebaseUid: 'email_' + Date.now() + '_' + Math.random().toString(36).substring(7) as string, // Temporary UID for manual signup
+      firebaseUid: 'email_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex') as string, // Temporary UID for manual signup
       isEmailVerified: data.isEmailVerified,
       emailVerificationCode: data.emailVerificationCode,
       emailVerificationExpiry: data.emailVerificationExpiry,
