@@ -323,7 +323,7 @@ describe('GET /api/facebook/callback — success path', () => {
 
     expect(res.status).toBe(302)
     expect(res.headers.location).toContain('/settings')
-    expect(res.headers.location).toContain('connected=facebook')
+    expect(res.headers.location).toContain('brand_selection=true')
   })
 
   it('auto-connects SocialAccount in the callback (new auto-connect flow)', async () => {
@@ -339,7 +339,7 @@ describe('GET /api/facebook/callback — success path', () => {
       .query({ code: 'auth-code-abc', state: MOCK_WORKSPACE_ID })
 
     // The new auto-connect flow calls findOneAndUpdate directly in the callback
-    expect(SocialAccountModel.findOneAndUpdate).toHaveBeenCalled()
+    expect(SocialAccountModel.create).toHaveBeenCalled()
   })
 
   it('redirects to error page when /me/accounts returns empty list', async () => {
@@ -390,10 +390,10 @@ describe('Full OAuth flow: callback auto-connects Facebook Page', () => {
 
     // Callback now redirects directly to settings — no session token
     expect(callbackRes.status).toBe(302)
-    expect(callbackRes.headers.location).toContain('connected=facebook')
+    expect(callbackRes.headers.location).toContain('brand_selection=true')
 
     // SocialAccount was persisted by the callback itself
-    expect(SocialAccountModel.findOneAndUpdate).toHaveBeenCalled()
+    expect(SocialAccountModel.create).toHaveBeenCalled()
   })
 
   it('upserts SocialAccount with correct platform, pageId, and connectionStatus via callback', async () => {
@@ -408,26 +408,24 @@ describe('Full OAuth flow: callback auto-connects Facebook Page', () => {
       .get('/api/facebook/callback')
       .query({ code: 'auth-code-abc', state: MOCK_WORKSPACE_ID })
 
-    expect(SocialAccountModel.findOneAndUpdate).toHaveBeenCalled()
+    expect(SocialAccountModel.create).toHaveBeenCalled()
 
-    const [filter, update, options] = vi.mocked(SocialAccountModel.findOneAndUpdate).mock.calls[0]
+    const [doc] = vi.mocked(SocialAccountModel.create).mock.calls[0]
 
     // Upsert filter must target the compound unique key
-    expect(filter).toMatchObject({
+    expect(doc).toMatchObject({
       workspaceId: MOCK_WORKSPACE_ID,
       platform: 'facebook',
       accountId: MOCK_PAGE_ID,
     })
 
     // $set must contain required fields
-    const setDoc = (update as any).$set
+    const setDoc = doc
     expect(setDoc.platform).toBe('facebook')
     expect(setDoc.pageId).toBe(MOCK_PAGE_ID)
     expect(setDoc.pageName).toBe(MOCK_PAGE_NAME)
     expect(setDoc.connectionStatus).toBe('ACTIVE')
 
-    // Options must request an upsert
-    expect((options as any).upsert).toBe(true)
   })
 
   it('POST /pages/connect with valid session token (legacy flow) returns 200', async () => {
@@ -461,7 +459,7 @@ describe('Full OAuth flow: callback auto-connects Facebook Page', () => {
 
     expect(res.status).toBe(302)
     expect(res.headers.location).toMatch(/\/settings/)
-    expect(res.headers.location).toContain('connected=facebook')
+    expect(res.headers.location).toContain('brand_selection=true')
   })
 })
 

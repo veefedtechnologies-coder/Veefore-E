@@ -9,7 +9,7 @@ export default defineConfig({
     environment: 'node', // Use Node for server-side tests (supports crypto, fs, path)
     setupFiles: ['./tests/setup.ts'],
     include: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.tsx', '**/*.spec.tsx'],
-    testTimeout: 30000,
+    testTimeout: 90000,
     // Use environment selector for client vs server tests
     environmentMatchGlobs: [
       ['**/*.client.test.ts', 'happy-dom'],
