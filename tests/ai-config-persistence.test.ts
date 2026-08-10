@@ -166,7 +166,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
       $set: {
         'preferences.aiModel': customModel,
         'preferences.creativityLevel': 0.8,
-        'preferences.googleAiStudioKey': 'AIzaSy...'
+        'preferences.googleAiStudioKey': 'dummyKey...'
       }
     });
     
@@ -216,7 +216,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
    * - Test will PASS
    */
   test('should find API keys in workspace.aiConfiguration for AI generation', async () => {
-    const testApiKey = 'AIzaSy_test_key_12345';
+    const testApiKey = 'dummyKey_test_key_12345';
     
     // Simulate user saving API key via form (current buggy behavior)
     await User.findByIdAndUpdate(testUserId, {
@@ -289,7 +289,7 @@ describe('Bug Condition Exploration: AI Configuration Persistence', () => {
       contentSafety: 'strict',
       aiMemory: 'short-term',
       autoLearning: false,
-      googleAiStudioKey: 'AIzaSy_test',
+      googleAiStudioKey: 'dummyKey_test',
       openAiKey: 'sk-test'
     };
     

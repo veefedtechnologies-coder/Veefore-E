@@ -47,7 +47,7 @@ describe('Task 8.1: Full End-to-End User Flow - AI Configuration Persistence', (
     contentSafety: 'strict',
     aiMemory: 'long-term',
     autoLearning: true,
-    googleAiStudioKey: 'AIzaSy_test_e2e_key_12345',
+    googleAiStudioKey: 'dummyKey_test_e2e_key_12345',
     openAiKey: 'sk-test-e2e-key-67890'
   };
 

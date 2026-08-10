@@ -680,7 +680,7 @@ router.post('/pages/connect', requireAuth, async (req: Request, res: Response) =
 
   for (const pageId of pageIds as string[]) {
     // Find the page in the session (proves the user actually authorized this page)
-    const page = session.pages.find((p) => p.pageId === pageId);
+    const page = session.pages?.find((p) => p.pageId === pageId);
     if (!page) {
       // Skip unknown page IDs silently — they were not part of the authorized set
       console.warn(

@@ -79,7 +79,7 @@ const userAConfiguration = {
   contentSafety: 'moderate',
   aiMemory: 'session',
   autoLearning: true,
-  googleAiStudioKey: 'AIzaSy_userA_shared_key_12345',
+  googleAiStudioKey: 'dummyKey_userA_shared_key_12345',
   openAiKey: 'sk-userA-shared-key-67890'
 };
 ```

@@ -57,7 +57,7 @@ describe('Workspace UpdateWorkspaceSchema Validation', () => {
         contentSafety: 'strict',
         aiMemory: 'enabled',
         autoLearning: true,
-        googleAiStudioKey: 'AIzaSy...',
+        googleAiStudioKey: 'dummyKey...',
         openAiKey: 'sk-...'
       }
     };
@@ -134,7 +134,7 @@ describe('Workspace UpdateWorkspaceSchema Validation', () => {
       aiConfiguration: {
         aiModel: 'google-ai-studio',
         creativityLevel: 0.8,
-        googleAiStudioKey: 'AIzaSy...'
+        googleAiStudioKey: 'dummyKey...'
       }
     };
 

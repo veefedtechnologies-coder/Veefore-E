@@ -1,4 +1,4 @@
-const apiKey = 'AIzaSyB83z17nqQvXq8-gLSU0E7cSgjMnlkzznI';
+const apiKey = 'REPLACED_DUMMY_KEY_FOR_SECURITY_REASONS';
 const fetch = require('node-fetch');
 
 async function test() {
