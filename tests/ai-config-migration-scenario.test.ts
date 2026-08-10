@@ -60,7 +60,7 @@ describe('Task 8.4: Migration Scenario Test - Legacy to Workspace Config', () =>
     contentSafety: 'moderate',
     aiMemory: 'enabled',
     autoLearning: true,
-    googleAiStudioKey: 'AIzaSy_new_workspace_key_12345',
+    googleAiStudioKey: 'dummyKey_new_workspace_key_12345',
     openAiKey: 'sk-new-workspace-key-67890'
   };
 
@@ -223,7 +223,7 @@ describe('Task 8.4: Migration Scenario Test - Legacy to Workspace Config', () =>
     expect(updatedWorkspace?.aiConfiguration?.aiModel).toBe('google-ai-studio');
     expect(updatedWorkspace?.aiConfiguration?.creativityLevel).toBe(0.85);
     expect(updatedWorkspace?.aiConfiguration?.optimizationGoals).toBe('engagement');
-    expect(updatedWorkspace?.aiConfiguration?.googleAiStudioKey).toBe('AIzaSy_new_workspace_key_12345');
+    expect(updatedWorkspace?.aiConfiguration?.googleAiStudioKey).toBe('dummyKey_new_workspace_key_12345');
     
     console.log('   ✅ New settings saved to workspace.aiConfiguration');
     console.log('   ✅ Fixed form uses correct API endpoint');
@@ -285,7 +285,7 @@ describe('Task 8.4: Migration Scenario Test - Legacy to Workspace Config', () =>
     expect(aiModel).toBe('google-ai-studio'); // From workspace, NOT 'legacy-model-in-wrong-place'
     expect(creativityLevel).toBe(0.85); // From workspace, NOT 0.6
     expect(optimizationGoals).toBe('engagement'); // From workspace, NOT 'legacy-goals'
-    expect(apiKey).toBe('AIzaSy_new_workspace_key_12345'); // From workspace, NOT 'LEGACY_KEY_WRONG_LOCATION'
+    expect(apiKey).toBe('dummyKey_new_workspace_key_12345'); // From workspace, NOT 'LEGACY_KEY_WRONG_LOCATION'
 
     // Double-check: AI does NOT use legacy user preferences
     expect(aiModel).not.toBe(user?.preferences?.aiModel);
@@ -298,7 +298,7 @@ describe('Task 8.4: Migration Scenario Test - Legacy to Workspace Config', () =>
     console.log('      - Model: google-ai-studio (NOT legacy-model-in-wrong-place)');
     console.log('      - Creativity: 0.85 (NOT 0.6)');
     console.log('      - Goals: engagement (NOT legacy-goals)');
-    console.log('      - API Key: AIzaSy_new_workspace_key_12345 (NOT LEGACY_KEY_WRONG_LOCATION)');
+    console.log('      - API Key: dummyKey_new_workspace_key_12345 (NOT LEGACY_KEY_WRONG_LOCATION)');
     console.log('   ✅ AI does NOT use legacy userData.preferences');
   });
 
@@ -324,7 +324,7 @@ describe('Task 8.4: Migration Scenario Test - Legacy to Workspace Config', () =>
     // Workspace has new configuration
     expect(workspace?.aiConfiguration?.aiModel).toBe('google-ai-studio');
     expect(workspace?.aiConfiguration?.creativityLevel).toBe(0.85);
-    expect(workspace?.aiConfiguration?.googleAiStudioKey).toBe('AIzaSy_new_workspace_key_12345');
+    expect(workspace?.aiConfiguration?.googleAiStudioKey).toBe('dummyKey_new_workspace_key_12345');
     
     // User preferences have old values (but are not used by AI)
     expect(user?.preferences?.aiModel).toBe('legacy-model-in-wrong-place');
@@ -363,7 +363,7 @@ describe('Task 8.4: Migration Scenario Test - Legacy to Workspace Config', () =>
     expect(formData?.aiModel).toBe('google-ai-studio'); // NOT 'legacy-model-in-wrong-place'
     expect(formData?.creativityLevel).toBe(0.85); // NOT 0.6
     expect(formData?.optimizationGoals).toBe('engagement'); // NOT 'legacy-goals'
-    expect(formData?.googleAiStudioKey).toBe('AIzaSy_new_workspace_key_12345'); // NOT 'LEGACY_KEY_WRONG_LOCATION'
+    expect(formData?.googleAiStudioKey).toBe('dummyKey_new_workspace_key_12345'); // NOT 'LEGACY_KEY_WRONG_LOCATION'
 
     // Verify all 15 fields loaded from workspace
     expect(formData?.aiModel).toBe(newWorkspaceConfiguration.aiModel);

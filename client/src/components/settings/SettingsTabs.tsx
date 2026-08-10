@@ -1641,7 +1641,7 @@ export function AISettings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-1">
             <div className="space-y-3">
               <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Google AI Studio Key (Gemini)</label>
-              <Input type="password" placeholder="AIzaSy..." value={formData.googleAiStudioKey} onChange={(e) => updateField('googleAiStudioKey', e.target.value)} className="w-full h-11" />
+              <Input type="password" placeholder="dummyKey..." value={formData.googleAiStudioKey} onChange={(e) => updateField('googleAiStudioKey', e.target.value)} className="w-full h-11" />
             </div>
 
             <div className="space-y-3">

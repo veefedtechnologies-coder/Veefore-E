@@ -32,7 +32,7 @@ describe('Task 8.3: API Key Security Test', () => {
   
   // Test API keys that should be secure
   const testApiKeys = {
-    googleAiStudioKey: 'AIzaSy_TEST_SENSITIVE_KEY_12345_SHOULD_NOT_BE_EXPOSED',
+    googleAiStudioKey: 'dummyKey_TEST_SENSITIVE_KEY_12345_SHOULD_NOT_BE_EXPOSED',
     openAiKey: 'sk-test-SENSITIVE_OPENAI_KEY_67890_SHOULD_NOT_BE_EXPOSED'
   };
 
@@ -284,7 +284,7 @@ describe('Task 8.3: API Key Security Test', () => {
 
     // Step 5a: Update API keys (simulate user saving new keys)
     const newKeys = {
-      googleAiStudioKey: 'AIzaSy_NEW_KEY_UPDATED',
+      googleAiStudioKey: 'dummyKey_NEW_KEY_UPDATED',
       openAiKey: 'sk-new-updated-key'
     };
 

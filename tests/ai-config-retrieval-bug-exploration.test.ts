@@ -169,7 +169,7 @@ describe('Bug Condition Exploration: AI Configuration Retrieval', () => {
       contentSafety: 'standard',
       aiMemory: 'long-term',
       autoLearning: true,
-      googleAiStudioKey: 'AIzaSyTest123456789',
+      googleAiStudioKey: 'dummyKeyTest123456789',
       openAiKey: 'sk-test-key-123456789'
     };
     
@@ -213,7 +213,7 @@ describe('Bug Condition Exploration: AI Configuration Retrieval', () => {
     expect(retrievedWorkspace!.aiConfiguration?.contentSafety).toBe('standard');
     expect(retrievedWorkspace!.aiConfiguration?.aiMemory).toBe('long-term');
     expect(retrievedWorkspace!.aiConfiguration?.autoLearning).toBe(true);
-    expect(retrievedWorkspace!.aiConfiguration?.googleAiStudioKey).toBe('AIzaSyTest123456789');
+    expect(retrievedWorkspace!.aiConfiguration?.googleAiStudioKey).toBe('dummyKeyTest123456789');
     expect(retrievedWorkspace!.aiConfiguration?.openAiKey).toBe('sk-test-key-123456789');
     
     console.log('   ✅ All 15 AI configuration fields preserved during retrieval');
