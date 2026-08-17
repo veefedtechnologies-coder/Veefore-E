@@ -7,6 +7,7 @@ import {
   WaitlistUser
 } from "../domain/types";
 import { tokenEncryption, EncryptedToken } from '../security/token-encryption';
+import crypto from 'crypto';
 
 export function decryptStoredToken(encryptedToken: any): string | null {
   if (!encryptedToken) {
@@ -117,7 +118,7 @@ export function generateReferralCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(crypto.randomInt(chars.length));
   }
   return result;
 }
