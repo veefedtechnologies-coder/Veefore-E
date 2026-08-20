@@ -5,23 +5,18 @@ export const generateRandomPassword = (length: number = 12): string => {
   let password = '';
 
   // Ensure at least one character from each category
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[crypto.randomInt(26)]; // Uppercase
-  password += 'abcdefghijklmnopqrstuvwxyz'[crypto.randomInt(26)]; // Lowercase
-  password += '0123456789'[crypto.randomInt(10)]; // Number
-  password += '!@#$%^&*'[crypto.randomInt(8)]; // Special character
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
+  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
+  password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
+  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special character
 
   // Fill the rest randomly
   for (let i = password.length; i < length; i++) {
-    password += charset[crypto.randomInt(charset.length)];
+    password += charset[Math.floor(Math.random() * charset.length)];
   }
 
-  // Shuffle the password securely
-  const passwordArray = password.split('');
-  for (let i = passwordArray.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(i + 1);
-    [passwordArray[i], passwordArray[j]] = [passwordArray[j], passwordArray[i]];
-  }
-  return passwordArray.join('');
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
 export const generateDeviceFingerprint = (req: any): string => {
@@ -130,7 +125,7 @@ export const generateOTP = (length: number = 6): string => {
   const digits = '0123456789';
   let otp = '';
   for (let i = 0; i < length; i++) {
-    otp += digits[crypto.randomInt(10)];
+    otp += digits[Math.floor(Math.random() * 10)];
   }
   return otp;
 };

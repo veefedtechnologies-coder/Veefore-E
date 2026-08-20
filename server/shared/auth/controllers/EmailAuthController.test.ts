@@ -26,25 +26,25 @@ describe('EmailAuthController', () => {
   beforeEach(() => {
     // Mock EmailService
     mockEmailService = {
-      sendVerificationEmail: vi.fn().mockResolvedValue(true),
-      sendPasswordResetEmail: vi.fn().mockResolvedValue(true),
-      generateOTP: vi.fn().mockReturnValue('123456'),
-      generateExpiry: vi.fn().mockReturnValue(new Date(Date.now() + 15 * 60 * 1000))
+      sendVerificationEmail: jest.fn().mockResolvedValue(true),
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(true),
+      generateOTP: jest.fn().mockReturnValue('123456'),
+      generateExpiry: jest.fn().mockReturnValue(new Date(Date.now() + 15 * 60 * 1000))
     };
 
     // Mock UserRepository
     mockUserRepository = {
-      findByEmail: vi.fn().mockResolvedValue(null),
-      create: vi.fn(),
-      update: vi.fn()
+      findByEmail: jest.fn().mockResolvedValue(null),
+      create: jest.fn(),
+      update: jest.fn()
     };
 
     // Create controller instance
     controller = new EmailAuthController(mockEmailService, mockUserRepository);
 
     // Mock Express response
-    jsonSpy = vi.fn();
-    statusSpy = vi.fn().mockReturnValue({ json: jsonSpy });
+    jsonSpy = jest.fn();
+    statusSpy = jest.fn().mockReturnValue({ json: jsonSpy });
     mockResponse = {
       status: statusSpy,
       json: jsonSpy
@@ -57,7 +57,7 @@ describe('EmailAuthController', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('register', () => {
