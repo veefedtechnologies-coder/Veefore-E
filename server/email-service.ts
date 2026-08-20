@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { createTransporter } from './email-config';
 import sgMail from '@sendgrid/mail';
 
@@ -10,7 +11,7 @@ export class EmailService {
 
     // Generate 6-digit OTP
     generateOTP(): string {
-        return Math.floor(100000 + Math.random() * 900000).toString();
+        return crypto.randomInt(100000, 1000000).toString();
     }
 
     // Generate OTP expiry (15 minutes from now)

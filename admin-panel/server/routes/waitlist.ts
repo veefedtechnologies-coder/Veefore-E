@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express from 'express';
 import mongoose from 'mongoose';
 import { connectToMainApp } from '../services/userDataService';
@@ -339,7 +340,7 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
       // Create new user in main collection
       // Generate a temporary unique firebaseUid to satisfy unique index
       // This will be updated when the user actually signs up/logs in via Firebase
-      const tempFirebaseUid = `temp_approved_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      const tempFirebaseUid = `temp_approved_${Date.now()}_${crypto.randomInt(10000)}`;
 
       const newUser = new User({
         firebaseUid: tempFirebaseUid,

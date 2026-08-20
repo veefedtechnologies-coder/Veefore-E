@@ -37,24 +37,29 @@ export class CredentialGenerator {
     const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    
+
     const allChars = lowercase + uppercase + numbers + symbols;
-    
+
     let password = '';
-    
+
     // Ensure at least one character from each category
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += symbols[Math.floor(Math.random() * symbols.length)];
-    
+    password += lowercase[crypto.randomInt(lowercase.length)];
+    password += uppercase[crypto.randomInt(uppercase.length)];
+    password += numbers[crypto.randomInt(numbers.length)];
+    password += symbols[crypto.randomInt(symbols.length)];
+
     // Fill the rest with random characters
     for (let i = 4; i < this.PASSWORD_LENGTH; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
+      password += allChars[crypto.randomInt(allChars.length)];
     }
-    
-    // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+
+    // Shuffle the password securely
+    const passwordArray = password.split('');
+    for (let i = passwordArray.length - 1; i > 0; i--) {
+      const j = crypto.randomInt(i + 1);
+      [passwordArray[i], passwordArray[j]] = [passwordArray[j], passwordArray[i]];
+    }
+    return passwordArray.join('');
   }
 
   /**
@@ -148,7 +153,7 @@ export class CredentialGenerator {
    * Generate a secure random number
    */
   static generateRandomNumber(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    return crypto.randomInt(min, max + 1);
   }
 
   /**
