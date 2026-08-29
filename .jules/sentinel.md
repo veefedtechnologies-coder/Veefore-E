@@ -1,0 +1,4 @@
+## 2024-05-24 - [Insecure Randomness in Credential Generation]
+**Vulnerability:** Found `Math.random()` being used to generate passwords, OTPs, and other credentials in `admin-panel/server/utils/credentialGenerator.ts` and `admin-panel/server/utils/security.ts`. `Math.random()` is not cryptographically secure and its outputs can be predicted, leading to easily guessable credentials.
+**Learning:** Even when building custom credential generators (e.g., mixing char sets), utilizing a non-secure PRNG like `Math.random()` undermines the security completely. It's a common oversight to use it for shuffling or random character selection instead of Node's `crypto` module.
+**Prevention:** Always use Node.js's native `crypto.randomInt()` or `crypto.randomBytes()` for any random character generation, shuffling, or generation of sensitive tokens, passwords, and OTPs.
