@@ -37,24 +37,29 @@ export class CredentialGenerator {
     const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    
+
     const allChars = lowercase + uppercase + numbers + symbols;
-    
+
     let password = '';
-    
+
     // Ensure at least one character from each category
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += symbols[Math.floor(Math.random() * symbols.length)];
-    
+    password += lowercase[crypto.randomInt(0, lowercase.length)];
+    password += uppercase[crypto.randomInt(0, uppercase.length)];
+    password += numbers[crypto.randomInt(0, numbers.length)];
+    password += symbols[crypto.randomInt(0, symbols.length)];
+
     // Fill the rest with random characters
     for (let i = 4; i < this.PASSWORD_LENGTH; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
+      password += allChars[crypto.randomInt(0, allChars.length)];
     }
-    
+
     // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+    const arr = password.split('');
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = crypto.randomInt(0, i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.join('');
   }
 
   /**
@@ -82,7 +87,7 @@ export class CredentialGenerator {
    * Hash a password using bcrypt
    */
   static async hashPassword(password: string): Promise<string> {
-    const bcrypt = await import('bcrypt');
+    const bcrypt = await import('bcryptjs');
     const saltRounds = 12;
     return bcrypt.hash(password, saltRounds);
   }
@@ -91,7 +96,7 @@ export class CredentialGenerator {
    * Verify a password against its hash
    */
   static async verifyPassword(password: string, hash: string): Promise<boolean> {
-    const bcrypt = await import('bcrypt');
+    const bcrypt = await import('bcryptjs');
     return bcrypt.compare(password, hash);
   }
 
@@ -113,7 +118,7 @@ export class CredentialGenerator {
    * Generate a secure 2FA secret
    */
   static generate2FASecret(): string {
-    return crypto.randomBytes(20).toString('base32');
+    return crypto.randomBytes(20).toString('hex');
   }
 
   /**
@@ -148,7 +153,7 @@ export class CredentialGenerator {
    * Generate a secure random number
    */
   static generateRandomNumber(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    return crypto.randomInt(min, max + 1);
   }
 
   /**
