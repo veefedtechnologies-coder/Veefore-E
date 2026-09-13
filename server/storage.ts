@@ -1,25 +1,69 @@
 import type {
-  User, Workspace, WorkspaceMember, TeamInvitation, SocialAccount, Content,
-  Analytics, AutomationRule, CreditTransaction, Subscription, Payment,
-  AuditLog, Notification,
-  InsertUser, InsertWorkspace, InsertWorkspaceMember, InsertTeamInvitation,
-  InsertSocialAccount, InsertContent, InsertAutomationRule, InsertAnalytics,
-  InsertCreditTransaction, InsertSubscription, InsertPayment, InsertAuditLog, InsertNotification
-} from "./domain/types";
+  User,
+  Workspace,
+  WorkspaceMember,
+  TeamInvitation,
+  SocialAccount,
+  Content,
+  Analytics,
+  AutomationRule,
+  CreditTransaction,
+  Subscription,
+  Payment,
+  AuditLog,
+  Notification,
+  InsertUser,
+  InsertWorkspace,
+  InsertWorkspaceMember,
+  InsertTeamInvitation,
+  InsertSocialAccount,
+  InsertContent,
+  InsertAutomationRule,
+  InsertAnalytics,
+  InsertCreditTransaction,
+  InsertSubscription,
+  InsertPayment,
+  InsertAuditLog,
+  InsertNotification,
+} from './domain/types';
 
 import type {
-  Suggestion, Referral, Addon, ContentRecommendation, UserContentHistory,
-  Admin, AdminSession, Popup, AppSetting, FeedbackMessage,
-  CreativeBrief, ContentRepurpose, CompetitorAnalysis,
-  ChatConversation, ChatMessage,
-  InsertSuggestion, InsertReferral, InsertAddon,
-  InsertContentRecommendation, InsertUserContentHistory,
-  InsertAdmin, InsertPopup, InsertAppSetting, InsertFeedbackMessage,
-  InsertCreativeBrief, InsertContentRepurpose, InsertCompetitorAnalysis,
-  InsertChatConversation, InsertChatMessage,
-  DmConversation, DmMessage, InsertDmConversation, InsertDmMessage,
-  WaitlistUser, InsertWaitlistUser
-} from "./domain/types";
+  Suggestion,
+  Referral,
+  Addon,
+  ContentRecommendation,
+  UserContentHistory,
+  Admin,
+  AdminSession,
+  Popup,
+  AppSetting,
+  FeedbackMessage,
+  CreativeBrief,
+  ContentRepurpose,
+  CompetitorAnalysis,
+  ChatConversation,
+  ChatMessage,
+  InsertSuggestion,
+  InsertReferral,
+  InsertAddon,
+  InsertContentRecommendation,
+  InsertUserContentHistory,
+  InsertAdmin,
+  InsertPopup,
+  InsertAppSetting,
+  InsertFeedbackMessage,
+  InsertCreativeBrief,
+  InsertContentRepurpose,
+  InsertCompetitorAnalysis,
+  InsertChatConversation,
+  InsertChatMessage,
+  DmConversation,
+  DmMessage,
+  InsertDmConversation,
+  InsertDmMessage,
+  WaitlistUser,
+  InsertWaitlistUser,
+} from './domain/types';
 
 export interface IStorage {
   // User operations
@@ -32,12 +76,29 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   updateUserCredits(id: string, credits: number): Promise<User>;
   getUserCredits(userId: string): Promise<number>;
-  updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User>;
+  updateUserStripeInfo(
+    id: string,
+    stripeCustomerId: string,
+    stripeSubscriptionId?: string
+  ): Promise<User>;
 
   // Email verification operations
-  createUnverifiedUser(data: { email: string; firstName: string; emailVerificationCode: string; emailVerificationExpiry: Date; isEmailVerified: boolean }): Promise<User>;
-  updateUserEmailVerification(id: string, token: string, expires: Date): Promise<User>;
-  verifyUserEmail(id: string, data: { password?: string; firstName?: string; lastName?: string }): Promise<User>;
+  createUnverifiedUser(data: {
+    email: string;
+    firstName: string;
+    emailVerificationCode: string;
+    emailVerificationExpiry: Date;
+    isEmailVerified: boolean;
+  }): Promise<User>;
+  updateUserEmailVerification(
+    id: string,
+    token: string,
+    expires: Date
+  ): Promise<User>;
+  verifyUserEmail(
+    id: string,
+    data: { password?: string; firstName?: string; lastName?: string }
+  ): Promise<User>;
   hasClaimedWelcomeBonus(userId: string): Promise<boolean>;
   claimWelcomeBonus(userId: string): Promise<void>;
 
@@ -53,35 +114,63 @@ export interface IStorage {
   setDefaultWorkspace(userId: string, workspaceId: string): Promise<void>;
 
   // Team management operations
-  getWorkspaceMember(workspaceId: string, userId: string): Promise<WorkspaceMember | undefined>;
-  getWorkspaceMembers(workspaceId: string): Promise<(WorkspaceMember & { user: User })[]>;
+  getWorkspaceMember(
+    workspaceId: string,
+    userId: string
+  ): Promise<WorkspaceMember | undefined>;
+  getWorkspaceMembers(
+    workspaceId: string
+  ): Promise<(WorkspaceMember & { user: User })[]>;
   addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember>;
-  updateWorkspaceMember(workspaceId: string, userId: string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember>;
+  updateWorkspaceMember(
+    workspaceId: string,
+    userId: string,
+    updates: Partial<WorkspaceMember>
+  ): Promise<WorkspaceMember>;
   removeWorkspaceMember(workspaceId: string, userId: string): Promise<void>;
 
   // Team invitation operations
-  createTeamInvitation(invitation: InsertTeamInvitation): Promise<TeamInvitation>;
+  createTeamInvitation(
+    invitation: InsertTeamInvitation
+  ): Promise<TeamInvitation>;
   getTeamInvitation(id: string): Promise<TeamInvitation | undefined>;
   getTeamInvitationByToken(token: string): Promise<TeamInvitation | undefined>;
-  getTeamInvitations(workspaceId: string, status?: string): Promise<TeamInvitation[]>;
+  getTeamInvitations(
+    workspaceId: string,
+    status?: string
+  ): Promise<TeamInvitation[]>;
   getWorkspaceInvitations(workspaceId: string): Promise<TeamInvitation[]>;
-  updateTeamInvitation(id: string, updates: Partial<TeamInvitation>): Promise<TeamInvitation>;
+  updateTeamInvitation(
+    id: string,
+    updates: Partial<TeamInvitation>
+  ): Promise<TeamInvitation>;
 
   // Social account operations
   getSocialAccount(id: string): Promise<SocialAccount | undefined>;
   getSocialAccountsByWorkspace(workspaceId: string): Promise<SocialAccount[]>;
-  getSocialAccountsWithTokensInternal(workspaceId: string): Promise<SocialAccount[]>;
+  getSocialAccountsWithTokensInternal(
+    workspaceId: string
+  ): Promise<SocialAccount[]>;
   getAllSocialAccounts(): Promise<SocialAccount[]>;
-  getSocialAccountByPlatform(workspaceId: string, platform: string): Promise<SocialAccount | undefined>;
+  getSocialAccountByPlatform(
+    workspaceId: string,
+    platform: string
+  ): Promise<SocialAccount | undefined>;
   getSocialAccountByPageId(pageId: string): Promise<SocialAccount | undefined>;
   getSocialConnections(userId: string): Promise<SocialAccount[]>;
   createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount>;
-  updateSocialAccount(id: string, updates: Partial<SocialAccount>): Promise<SocialAccount>;
+  updateSocialAccount(
+    id: string,
+    updates: Partial<SocialAccount>
+  ): Promise<SocialAccount>;
   deleteSocialAccount(id: string): Promise<void>;
 
   // Content operations
   getContent(id: string): Promise<Content | undefined>;
-  getContentByWorkspace(workspaceId: string, limit?: number): Promise<Content[]>;
+  getContentByWorkspace(
+    workspaceId: string,
+    limit?: number
+  ): Promise<Content[]>;
   getScheduledContent(workspaceId?: string): Promise<Content[]>;
   createContent(content: InsertContent): Promise<Content>;
   updateContent(id: string, updates: Partial<Content>): Promise<Content>;
@@ -89,9 +178,16 @@ export interface IStorage {
   createPost(postData: any): Promise<any>;
 
   // Analytics operations
-  getAnalytics(workspaceId: string, platform?: string, days?: number): Promise<Analytics[]>;
+  getAnalytics(
+    workspaceId: string,
+    platform?: string,
+    days?: number
+  ): Promise<Analytics[]>;
   createAnalytics(analytics: InsertAnalytics): Promise<Analytics>;
-  getLatestAnalytics(workspaceId: string, platform: string): Promise<Analytics | undefined>;
+  getLatestAnalytics(
+    workspaceId: string,
+    platform: string
+  ): Promise<Analytics | undefined>;
   updateAnalytics(id: string, updates: Partial<Analytics>): Promise<Analytics>;
 
   // Automation rules
@@ -100,11 +196,17 @@ export interface IStorage {
   getActiveAutomationRules(): Promise<AutomationRule[]>;
   getAutomationRulesByType(type: string): Promise<AutomationRule[]>;
   createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule>;
-  updateAutomationRule(id: string, updates: Partial<AutomationRule>): Promise<AutomationRule>;
+  updateAutomationRule(
+    id: string,
+    updates: Partial<AutomationRule>
+  ): Promise<AutomationRule>;
   deleteAutomationRule(id: string): Promise<void>;
 
   // Automation logs
-  getAutomationLogs(workspaceId: string, options?: { limit?: number; type?: string }): Promise<any[]>;
+  getAutomationLogs(
+    workspaceId: string,
+    options?: { limit?: number; type?: string }
+  ): Promise<any[]>;
   createAutomationLog(log: any): Promise<any>;
 
   // Social accounts
@@ -122,20 +224,37 @@ export interface IStorage {
   getAnalyticsByWorkspace(workspaceId: string): Promise<Analytics[]>;
 
   // Credit transactions
-  getCreditTransactions(userId: string, limit?: number): Promise<CreditTransaction[]>;
-  createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction>;
+  getCreditTransactions(
+    userId: string,
+    limit?: number
+  ): Promise<CreditTransaction[]>;
+  createCreditTransaction(
+    transaction: InsertCreditTransaction
+  ): Promise<CreditTransaction>;
 
   // Referrals
   getReferrals(referrerId: string): Promise<Referral[]>;
-  getReferralStats(userId: string): Promise<{ totalReferrals: number; activePaid: number; totalEarned: number }>;
+  getReferralStats(
+    userId: string
+  ): Promise<{
+    totalReferrals: number;
+    activePaid: number;
+    totalEarned: number;
+  }>;
   createReferral(referral: InsertReferral): Promise<Referral>;
   confirmReferral(id: string): Promise<Referral>;
-  getLeaderboard(limit?: number): Promise<Array<User & { referralCount: number }>>;
+  getLeaderboard(
+    limit?: number
+  ): Promise<Array<User & { referralCount: number }>>;
 
   // Subscription operations
   getSubscription(userId: string): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
-  updateSubscriptionStatus(userId: string, status: string, canceledAt?: Date): Promise<Subscription>;
+  updateSubscriptionStatus(
+    userId: string,
+    status: string,
+    canceledAt?: Date
+  ): Promise<Subscription>;
 
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -148,40 +267,78 @@ export interface IStorage {
 
   // Feature usage tracking
   getFeatureUsage(userId: string): Promise<any[]>;
-  trackFeatureUsage(userId: string, featureId: string, usage: any): Promise<void>;
+  trackFeatureUsage(
+    userId: string,
+    featureId: string,
+    usage: any
+  ): Promise<void>;
 
   // Content recommendation operations
-  getContentRecommendation(id: string): Promise<ContentRecommendation | undefined>;
-  getContentRecommendations(workspaceId: string, type?: string, limit?: number): Promise<ContentRecommendation[]>;
-  createContentRecommendation(recommendation: InsertContentRecommendation): Promise<ContentRecommendation>;
-  updateContentRecommendation(id: string, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation>;
+  getContentRecommendation(
+    id: string
+  ): Promise<ContentRecommendation | undefined>;
+  getContentRecommendations(
+    workspaceId: string,
+    type?: string,
+    limit?: number
+  ): Promise<ContentRecommendation[]>;
+  createContentRecommendation(
+    recommendation: InsertContentRecommendation
+  ): Promise<ContentRecommendation>;
+  updateContentRecommendation(
+    id: string,
+    updates: Partial<ContentRecommendation>
+  ): Promise<ContentRecommendation>;
 
   // User content history operations
-  getUserContentHistory(userId: string, workspaceId: string): Promise<UserContentHistory[]>;
-  createUserContentHistory(history: InsertUserContentHistory): Promise<UserContentHistory>;
+  getUserContentHistory(
+    userId: string,
+    workspaceId: string
+  ): Promise<UserContentHistory[]>;
+  createUserContentHistory(
+    history: InsertUserContentHistory
+  ): Promise<UserContentHistory>;
 
-  // Pricing and plan operations
-  getPricingData(): Promise<any>;
-  updateUserSubscription(userId: string, planId: string): Promise<User>;
-  addCreditsToUser(userId: string, credits: number): Promise<User>;
+  // NOTE: `getPricingData`, `updateUserSubscription` and `addCreditsToUser` were
+  // removed from this interface. They existed only to serve the legacy billing
+  // endpoints (now retired) and let a caller set a user's PLAN or mint CREDITS
+  // with no payment and no ledger entry, bypassing the entitlement system.
+  // Plan changes now flow through SubscriptionService + Razorpay webhooks, and
+  // credit changes through AICreditsRepository, which keeps an auditable ledger.
 
   // Conversation management operations
-  createDmConversation(conversation: InsertDmConversation): Promise<DmConversation>;
+  createDmConversation(
+    conversation: InsertDmConversation
+  ): Promise<DmConversation>;
   createDmMessage(message: InsertDmMessage): Promise<DmMessage>;
   createConversationContext(context: any): Promise<any>;
   clearWorkspaceConversations(workspaceId: string): Promise<void>;
-  getDmConversations(workspaceId: string, limit?: number): Promise<DmConversation[]>;
+  getDmConversations(
+    workspaceId: string,
+    limit?: number
+  ): Promise<DmConversation[]>;
   getDmMessages(conversationId: string, limit?: number): Promise<DmMessage[]>;
 
   // VeeGPT Chat operations
-  getChatConversations(userId: string, workspaceId?: string): Promise<ChatConversation[]>;
+  getChatConversations(
+    userId: string,
+    workspaceId?: string
+  ): Promise<ChatConversation[]>;
   getChatConversation(id: string): Promise<ChatConversation | undefined>;
-  createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation>;
-  updateChatConversation(id: string, updates: Partial<ChatConversation>): Promise<ChatConversation>;
+  createChatConversation(
+    conversation: InsertChatConversation
+  ): Promise<ChatConversation>;
+  updateChatConversation(
+    id: string,
+    updates: Partial<ChatConversation>
+  ): Promise<ChatConversation>;
   deleteChatConversation(id: string): Promise<void>;
   getChatMessages(conversationId: string): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
-  updateChatMessage(id: string, updates: Partial<ChatMessage>): Promise<ChatMessage>;
+  updateChatMessage(
+    id: string,
+    updates: Partial<ChatMessage>
+  ): Promise<ChatMessage>;
   getChatMessage(id: string): Promise<ChatMessage | undefined>;
 
   // YouTube workspace data operations
@@ -207,7 +364,10 @@ export interface IStorage {
   getNotifications(userId?: string): Promise<Notification[]>;
   getUserNotifications(userId: string): Promise<any[]>;
   markNotificationAsRead(notificationId: string, userId: string): Promise<void>;
-  updateNotification(id: string, updates: Partial<Notification>): Promise<Notification>;
+  updateNotification(
+    id: string,
+    updates: Partial<Notification>
+  ): Promise<Notification>;
   deleteNotification(id: string): Promise<void>;
   markNotificationRead(id: string): Promise<void>;
 
@@ -223,7 +383,11 @@ export interface IStorage {
   getAppSetting(key: string): Promise<AppSetting | undefined>;
   getAllAppSettings(): Promise<AppSetting[]>;
   getPublicAppSettings(): Promise<AppSetting[]>;
-  updateAppSetting(key: string, value: string, updatedBy?: string): Promise<AppSetting>;
+  updateAppSetting(
+    key: string,
+    value: string,
+    updatedBy?: string
+  ): Promise<AppSetting>;
   deleteAppSetting(key: string): Promise<void>;
 
   // Audit log operations
@@ -231,15 +395,31 @@ export interface IStorage {
   getAuditLogs(limit?: number, adminId?: string): Promise<AuditLog[]>;
 
   // Feedback operations
-  createFeedbackMessage(feedback: InsertFeedbackMessage): Promise<FeedbackMessage>;
+  createFeedbackMessage(
+    feedback: InsertFeedbackMessage
+  ): Promise<FeedbackMessage>;
   getFeedbackMessages(status?: string): Promise<FeedbackMessage[]>;
-  updateFeedbackMessage(id: string, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage>;
+  updateFeedbackMessage(
+    id: string,
+    updates: Partial<FeedbackMessage>
+  ): Promise<FeedbackMessage>;
   deleteFeedbackMessage(id: string): Promise<void>;
 
   // Admin-specific operations
-  getAdminUsers(page?: number, limit?: number, search?: string): Promise<{ admins: Admin[], total: number }>;
-  getAdminContent(page?: number, limit?: number, filters?: any): Promise<{ content: Content[], total: number }>;
-  getAdminNotifications(page?: number, limit?: number): Promise<{ notifications: Notification[], total: number }>;
+  getAdminUsers(
+    page?: number,
+    limit?: number,
+    search?: string
+  ): Promise<{ admins: Admin[]; total: number }>;
+  getAdminContent(
+    page?: number,
+    limit?: number,
+    filters?: any
+  ): Promise<{ content: Content[]; total: number }>;
+  getAdminNotifications(
+    page?: number,
+    limit?: number
+  ): Promise<{ notifications: Notification[]; total: number }>;
 
   // Admin analytics
   getAdminStats(): Promise<{
@@ -267,21 +447,38 @@ export interface IStorage {
   createCreativeBrief(brief: InsertCreativeBrief): Promise<CreativeBrief>;
   getCreativeBrief(id: string): Promise<CreativeBrief | undefined>;
   getCreativeBriefsByWorkspace(workspaceId: string): Promise<CreativeBrief[]>;
-  updateCreativeBrief(id: string, updates: Partial<CreativeBrief>): Promise<CreativeBrief>;
+  updateCreativeBrief(
+    id: string,
+    updates: Partial<CreativeBrief>
+  ): Promise<CreativeBrief>;
   deleteCreativeBrief(id: string): Promise<void>;
 
   // Content Repurpose operations
-  createContentRepurpose(repurpose: InsertContentRepurpose): Promise<ContentRepurpose>;
+  createContentRepurpose(
+    repurpose: InsertContentRepurpose
+  ): Promise<ContentRepurpose>;
   getContentRepurpose(id: string): Promise<ContentRepurpose | undefined>;
-  getContentRepurposesByWorkspace(workspaceId: string): Promise<ContentRepurpose[]>;
-  updateContentRepurpose(id: string, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose>;
+  getContentRepurposesByWorkspace(
+    workspaceId: string
+  ): Promise<ContentRepurpose[]>;
+  updateContentRepurpose(
+    id: string,
+    updates: Partial<ContentRepurpose>
+  ): Promise<ContentRepurpose>;
   deleteContentRepurpose(id: string): Promise<void>;
 
   // Competitor Analysis operations
-  createCompetitorAnalysis(analysis: InsertCompetitorAnalysis): Promise<CompetitorAnalysis>;
+  createCompetitorAnalysis(
+    analysis: InsertCompetitorAnalysis
+  ): Promise<CompetitorAnalysis>;
   getCompetitorAnalysis(id: string): Promise<CompetitorAnalysis | undefined>;
-  getCompetitorAnalysesByWorkspace(workspaceId: string): Promise<CompetitorAnalysis[]>;
-  updateCompetitorAnalysis(id: string, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis>;
+  getCompetitorAnalysesByWorkspace(
+    workspaceId: string
+  ): Promise<CompetitorAnalysis[]>;
+  updateCompetitorAnalysis(
+    id: string,
+    updates: Partial<CompetitorAnalysis>
+  ): Promise<CompetitorAnalysis>;
   deleteCompetitorAnalysis(id: string): Promise<void>;
 
   // Waitlist operations (MongoDB only)
@@ -310,7 +507,8 @@ export class MemStorage implements IStorage {
   private subscriptions: Map<string, Subscription> = new Map();
   private payments: Map<string, Payment> = new Map();
   private addons: Map<string, Addon> = new Map();
-  private contentRecommendations: Map<string, ContentRecommendation> = new Map();
+  private contentRecommendations: Map<string, ContentRecommendation> =
+    new Map();
   private userContentHistory: Map<string, UserContentHistory> = new Map();
   private chatConversations: Map<string, ChatConversation> = new Map();
   private chatMessages: Map<string, ChatMessage> = new Map();
@@ -321,7 +519,6 @@ export class MemStorage implements IStorage {
   private appSettings: Map<string, AppSetting> = new Map();
   private auditLogs: Map<string, AuditLog> = new Map();
   private feedbackMessages: Map<string, FeedbackMessage> = new Map();
-
 
   private currentUserId: number = 1;
   private currentWorkspaceId: number = 1;
@@ -347,15 +544,15 @@ export class MemStorage implements IStorage {
   private currentAuditLogId: number = 1;
   private currentFeedbackMessageId: number = 1;
 
-
-
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
   }
 
   async getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.firebaseUid === firebaseUid);
+    return Array.from(this.users.values()).find(
+      user => user.firebaseUid === firebaseUid
+    );
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -363,11 +560,15 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    return Array.from(this.users.values()).find(
+      user => user.username === username
+    );
   }
 
   async getUserByReferralCode(referralCode: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.referralCode === referralCode);
+    return Array.from(this.users.values()).find(
+      user => user.referralCode === referralCode
+    );
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -376,7 +577,7 @@ export class MemStorage implements IStorage {
       ...insertUser,
       id,
       credits: insertUser.credits || 0,
-      plan: insertUser.plan || "free",
+      plan: insertUser.plan || 'free',
       stripeCustomerId: undefined,
       stripeSubscriptionId: undefined,
       referralCode: insertUser.referralCode || `ref_${id}_${Date.now()}`,
@@ -388,7 +589,7 @@ export class MemStorage implements IStorage {
       onboardingStep: 0,
       onboardingData: {},
       goals: [],
-      status: insertUser.status || "active",
+      status: insertUser.status || 'active',
       dailyLoginStreak: 0,
       apiCallCount: 0,
       tokenStatus: 'active',
@@ -397,16 +598,15 @@ export class MemStorage implements IStorage {
       hasClaimedWelcomeBonus: false,
       socialPlatforms: [],
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.users.set(id, user);
     return user;
   }
 
-
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
     const user = this.users.get(id);
-    if (!user) throw new Error("User not found");
+    if (!user) throw new Error('User not found');
 
     const updatedUser = { ...user, ...updates, updatedAt: new Date() };
     this.users.set(id, updatedUser);
@@ -422,7 +622,11 @@ export class MemStorage implements IStorage {
     return user?.credits || 0;
   }
 
-  async updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User> {
+  async updateUserStripeInfo(
+    id: string,
+    stripeCustomerId: string,
+    stripeSubscriptionId?: string
+  ): Promise<User> {
     return this.updateUser(id, { stripeCustomerId, stripeSubscriptionId });
   }
 
@@ -435,7 +639,13 @@ export class MemStorage implements IStorage {
   }
 
   // Email verification operations
-  async createUnverifiedUser(data: { email: string; firstName: string; emailVerificationCode: string; emailVerificationExpiry: Date; isEmailVerified: boolean }): Promise<User> {
+  async createUnverifiedUser(data: {
+    email: string;
+    firstName: string;
+    emailVerificationCode: string;
+    emailVerificationExpiry: Date;
+    isEmailVerified: boolean;
+  }): Promise<User> {
     const id = (this.currentUserId++).toString();
     const user: User = {
       id,
@@ -467,30 +677,35 @@ export class MemStorage implements IStorage {
       socialPlatforms: [],
 
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.users.set(id, user);
     return user;
   }
 
-
-  async updateUserEmailVerification(id: string, token: string, expires: Date): Promise<User> {
+  async updateUserEmailVerification(
+    id: string,
+    token: string,
+    expires: Date
+  ): Promise<User> {
     const user = this.users.get(id);
-    if (!user) throw new Error("User not found");
-    const updated = { ...user, emailVerificationCode: token, emailVerificationExpiry: expires };
+    if (!user) throw new Error('User not found');
+    const updated = {
+      ...user,
+      emailVerificationCode: token,
+      emailVerificationExpiry: expires,
+    };
     this.users.set(id, updated);
     return updated;
   }
 
   async verifyUserEmail(id: string, data: any): Promise<User> {
     const user = this.users.get(id);
-    if (!user) throw new Error("User not found");
+    if (!user) throw new Error('User not found');
     const updated = { ...user, isEmailVerified: true, ...data };
     this.users.set(id, updated);
     return updated;
   }
-
-
 
   // Workspace operations
   async getWorkspace(id: string): Promise<Workspace | undefined> {
@@ -498,7 +713,9 @@ export class MemStorage implements IStorage {
   }
 
   async getWorkspacesByUserId(userId: string): Promise<Workspace[]> {
-    return Array.from(this.workspaces.values()).filter(workspace => workspace.userId === userId);
+    return Array.from(this.workspaces.values()).filter(
+      workspace => workspace.userId === userId
+    );
   }
 
   async getDefaultWorkspace(userId: string): Promise<Workspace | undefined> {
@@ -515,31 +732,37 @@ export class MemStorage implements IStorage {
       name: insertWorkspace.name,
       description: insertWorkspace.description || undefined,
       avatar: insertWorkspace.avatar || undefined,
-      theme: insertWorkspace.theme || "default",
-      aiPersonality: insertWorkspace.aiPersonality || "Helpful Assistant",
+      theme: insertWorkspace.theme || 'default',
+      aiPersonality: insertWorkspace.aiPersonality || 'Helpful Assistant',
       credits: insertWorkspace.credits || 0,
       maxTeamMembers: insertWorkspace.maxTeamMembers || 5,
       isDefault: insertWorkspace.isDefault || false,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.workspaces.set(id, workspace);
     return workspace;
   }
 
-
-  async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace> {
+  async updateWorkspace(
+    id: string,
+    updates: Partial<Workspace>
+  ): Promise<Workspace> {
     const workspace = this.workspaces.get(id);
-    if (!workspace) throw new Error("Workspace not found");
+    if (!workspace) throw new Error('Workspace not found');
 
-    const updatedWorkspace = { ...workspace, ...updates, updatedAt: new Date() };
+    const updatedWorkspace = {
+      ...workspace,
+      ...updates,
+      updatedAt: new Date(),
+    };
     this.workspaces.set(id, updatedWorkspace);
     return updatedWorkspace;
   }
 
   async updateWorkspaceCredits(id: string, credits: number): Promise<void> {
     const workspace = this.workspaces.get(id);
-    if (!workspace) throw new Error("Workspace not found");
+    if (!workspace) throw new Error('Workspace not found');
 
     const updatedWorkspace = { ...workspace, credits, updatedAt: new Date() };
     this.workspaces.set(id, updatedWorkspace);
@@ -549,7 +772,10 @@ export class MemStorage implements IStorage {
     this.workspaces.delete(id);
   }
 
-  async setDefaultWorkspace(userId: string, workspaceId: string): Promise<void> {
+  async setDefaultWorkspace(
+    userId: string,
+    workspaceId: string
+  ): Promise<void> {
     // First, unset all default workspaces for this user
     for (const workspace of this.workspaces.values()) {
       if (workspace.userId === userId && workspace.isDefault) {
@@ -566,17 +792,25 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async getWorkspaceByInviteCode(inviteCode: string): Promise<Workspace | undefined> {
-    return Array.from(this.workspaces.values()).find(workspace => workspace.inviteCode === inviteCode);
+  async getWorkspaceByInviteCode(
+    inviteCode: string
+  ): Promise<Workspace | undefined> {
+    return Array.from(this.workspaces.values()).find(
+      workspace => workspace.inviteCode === inviteCode
+    );
   }
 
-
   // Team management operations
-  async getWorkspaceMember(workspaceId: string, userId: string): Promise<WorkspaceMember | undefined> {
+  async getWorkspaceMember(
+    workspaceId: string,
+    userId: string
+  ): Promise<WorkspaceMember | undefined> {
     return this.workspaceMembers.get(`${workspaceId}-${userId}`);
   }
 
-  async getWorkspaceMembers(workspaceId: string): Promise<(WorkspaceMember & { user: User })[]> {
+  async getWorkspaceMembers(
+    workspaceId: string
+  ): Promise<(WorkspaceMember & { user: User })[]> {
     const members: (WorkspaceMember & { user: User })[] = [];
 
     for (const member of this.workspaceMembers.values()) {
@@ -591,7 +825,9 @@ export class MemStorage implements IStorage {
     return members;
   }
 
-  async addWorkspaceMember(insertMember: InsertWorkspaceMember): Promise<WorkspaceMember> {
+  async addWorkspaceMember(
+    insertMember: InsertWorkspaceMember
+  ): Promise<WorkspaceMember> {
     const id = (this.currentWorkspaceMemberId++).toString();
     const member: WorkspaceMember = {
       ...insertMember,
@@ -600,39 +836,45 @@ export class MemStorage implements IStorage {
       permissions: insertMember.permissions || {},
       joinedAt: new Date(),
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-
 
     this.workspaceMembers.set(`${member.workspaceId}-${member.userId}`, member);
     return member;
   }
 
-  async updateWorkspaceMember(workspaceId: string, userId: string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember> {
+  async updateWorkspaceMember(
+    workspaceId: string,
+    userId: string,
+    updates: Partial<WorkspaceMember>
+  ): Promise<WorkspaceMember> {
     const member = this.workspaceMembers.get(`${workspaceId}-${userId}`);
-    if (!member) throw new Error("Workspace member not found");
+    if (!member) throw new Error('Workspace member not found');
 
     const updatedMember = { ...member, ...updates };
     this.workspaceMembers.set(`${workspaceId}-${userId}`, updatedMember);
     return updatedMember;
   }
 
-  async removeWorkspaceMember(workspaceId: string, userId: string): Promise<void> {
+  async removeWorkspaceMember(
+    workspaceId: string,
+    userId: string
+  ): Promise<void> {
     this.workspaceMembers.delete(`${workspaceId}-${userId}`);
   }
 
-
   // Team invitation operations
-  async createTeamInvitation(insertInvitation: InsertTeamInvitation): Promise<TeamInvitation> {
+  async createTeamInvitation(
+    insertInvitation: InsertTeamInvitation
+  ): Promise<TeamInvitation> {
     const id = (this.currentTeamInvitationId++).toString();
     const invitation: TeamInvitation = {
       ...insertInvitation,
       id,
       status: insertInvitation.status || 'pending',
       permissions: insertInvitation.permissions || {},
-      createdAt: new Date()
+      createdAt: new Date(),
     };
-
 
     this.teamInvitations.set(id, invitation);
     return invitation;
@@ -642,50 +884,77 @@ export class MemStorage implements IStorage {
     return this.teamInvitations.get(id);
   }
 
-  async getTeamInvitationByToken(token: string): Promise<TeamInvitation | undefined> {
-    return Array.from(this.teamInvitations.values()).find(invitation => invitation.token === token);
-  }
-
-  async getTeamInvitations(workspaceId: string, status?: string): Promise<TeamInvitation[]> {
-    return Array.from(this.teamInvitations.values()).filter(invitation =>
-      invitation.workspaceId === workspaceId && (!status || invitation.status === status)
+  async getTeamInvitationByToken(
+    token: string
+  ): Promise<TeamInvitation | undefined> {
+    return Array.from(this.teamInvitations.values()).find(
+      invitation => invitation.token === token
     );
   }
 
-  async getWorkspaceInvitations(workspaceId: string): Promise<TeamInvitation[]> {
+  async getTeamInvitations(
+    workspaceId: string,
+    status?: string
+  ): Promise<TeamInvitation[]> {
+    return Array.from(this.teamInvitations.values()).filter(
+      invitation =>
+        invitation.workspaceId === workspaceId &&
+        (!status || invitation.status === status)
+    );
+  }
+
+  async getWorkspaceInvitations(
+    workspaceId: string
+  ): Promise<TeamInvitation[]> {
     return this.getTeamInvitations(workspaceId, 'pending');
   }
 
-  async updateTeamInvitation(id: string, updates: Partial<TeamInvitation>): Promise<TeamInvitation> {
+  async updateTeamInvitation(
+    id: string,
+    updates: Partial<TeamInvitation>
+  ): Promise<TeamInvitation> {
     const invitation = this.teamInvitations.get(id);
-    if (!invitation) throw new Error("Team invitation not found");
+    if (!invitation) throw new Error('Team invitation not found');
 
-    const updatedInvitation = { ...invitation, ...updates, updatedAt: new Date() };
+    const updatedInvitation = {
+      ...invitation,
+      ...updates,
+      updatedAt: new Date(),
+    };
     this.teamInvitations.set(id, updatedInvitation);
     return updatedInvitation;
   }
-
 
   // Social account operations
   async getSocialAccount(id: string): Promise<SocialAccount | undefined> {
     return this.socialAccounts.get(id);
   }
 
-  async getSocialAccountsByWorkspace(workspaceId: string): Promise<SocialAccount[]> {
-    return Array.from(this.socialAccounts.values()).filter(account => account.workspaceId === workspaceId);
+  async getSocialAccountsByWorkspace(
+    workspaceId: string
+  ): Promise<SocialAccount[]> {
+    return Array.from(this.socialAccounts.values()).filter(
+      account => account.workspaceId === workspaceId
+    );
   }
 
   async getAllSocialAccounts(): Promise<SocialAccount[]> {
     return Array.from(this.socialAccounts.values());
   }
 
-  async getSocialAccountByPlatform(workspaceId: string, platform: string): Promise<SocialAccount | undefined> {
+  async getSocialAccountByPlatform(
+    workspaceId: string,
+    platform: string
+  ): Promise<SocialAccount | undefined> {
     return Array.from(this.socialAccounts.values()).find(
-      account => account.workspaceId === workspaceId && account.platform === platform
+      account =>
+        account.workspaceId === workspaceId && account.platform === platform
     );
   }
 
-  async getSocialAccountByPageId(pageId: string): Promise<SocialAccount | undefined> {
+  async getSocialAccountByPageId(
+    pageId: string
+  ): Promise<SocialAccount | undefined> {
     return Array.from(this.socialAccounts.values()).find(
       account => account.pageId === pageId
     );
@@ -694,16 +963,20 @@ export class MemStorage implements IStorage {
   async getSocialConnections(userId: string): Promise<SocialAccount[]> {
     const userWorkspaces = await this.getWorkspacesByUserId(userId);
     const workspaceIds = userWorkspaces.map(w => w.id);
-    return Array.from(this.socialAccounts.values()).filter(
-      account => workspaceIds.includes(account.workspaceId)
+    return Array.from(this.socialAccounts.values()).filter(account =>
+      workspaceIds.includes(account.workspaceId)
     );
   }
 
-  async getSocialAccountsWithTokensInternal(workspaceId: string): Promise<SocialAccount[]> {
+  async getSocialAccountsWithTokensInternal(
+    workspaceId: string
+  ): Promise<SocialAccount[]> {
     return this.getSocialAccountsByWorkspace(workspaceId);
   }
 
-  async createSocialAccount(insertAccount: InsertSocialAccount): Promise<SocialAccount> {
+  async createSocialAccount(
+    insertAccount: InsertSocialAccount
+  ): Promise<SocialAccount> {
     const id = (this.currentSocialAccountId++).toString();
     const account: SocialAccount = {
       ...insertAccount,
@@ -712,15 +985,18 @@ export class MemStorage implements IStorage {
       expiresAt: insertAccount.expiresAt || undefined,
       isActive: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.socialAccounts.set(id, account);
     return account;
   }
 
-  async updateSocialAccount(id: string, updates: Partial<SocialAccount>): Promise<SocialAccount> {
+  async updateSocialAccount(
+    id: string,
+    updates: Partial<SocialAccount>
+  ): Promise<SocialAccount> {
     const account = this.socialAccounts.get(id);
-    if (!account) throw new Error("Social account not found");
+    if (!account) throw new Error('Social account not found');
 
     const updatedAccount = { ...account, ...updates, updatedAt: new Date() };
     this.socialAccounts.set(id, updatedAccount);
@@ -731,23 +1007,27 @@ export class MemStorage implements IStorage {
     this.socialAccounts.delete(id);
   }
 
-
   // Content operations
   async getContent(id: string): Promise<Content | undefined> {
     return this.content.get(id);
   }
 
-  async getContentByWorkspace(workspaceId: string, limit = 50): Promise<Content[]> {
+  async getContentByWorkspace(
+    workspaceId: string,
+    limit = 50
+  ): Promise<Content[]> {
     const workspaceContent = Array.from(this.content.values())
       .filter(content => content.workspaceId === workspaceId)
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      .sort(
+        (a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)
+      );
 
     return workspaceContent.slice(0, limit);
   }
 
   async getScheduledContent(workspaceId?: string): Promise<Content[]> {
     const allContent = Array.from(this.content.values()).filter(
-      content => content.status === "scheduled" && content.scheduledAt
+      content => content.status === 'scheduled' && content.scheduledAt
     );
 
     // If workspaceId is provided, filter by workspace
@@ -755,7 +1035,9 @@ export class MemStorage implements IStorage {
       ? allContent.filter(content => content.workspaceId === workspaceId)
       : allContent;
 
-    return filteredContent.sort((a, b) => (a.scheduledAt!.getTime() - b.scheduledAt!.getTime()));
+    return filteredContent.sort(
+      (a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime()
+    );
   }
 
   async createContent(insertContent: InsertContent): Promise<Content> {
@@ -767,12 +1049,12 @@ export class MemStorage implements IStorage {
       contentData: insertContent.contentData || {},
       prompt: insertContent.prompt || undefined,
       platform: insertContent.platform || undefined,
-      status: "draft",
+      status: 'draft',
       creditsUsed: insertContent.creditsUsed || 0,
       scheduledAt: insertContent.scheduledAt || undefined,
       publishedAt: undefined,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.content.set(id, content);
     return content;
@@ -780,7 +1062,7 @@ export class MemStorage implements IStorage {
 
   async updateContent(id: string, updates: Partial<Content>): Promise<Content> {
     const content = this.content.get(id);
-    if (!content) throw new Error("Content not found");
+    if (!content) throw new Error('Content not found');
 
     const updatedContent = { ...content, ...updates, updatedAt: new Date() };
     this.content.set(id, updatedContent);
@@ -796,17 +1078,23 @@ export class MemStorage implements IStorage {
     return { ...postData, id: Date.now().toString(), status: 'success' };
   }
 
-
   // Analytics operations
-  async getAnalytics(workspaceId: string, platform?: string, days = 30): Promise<Analytics[]> {
+  async getAnalytics(
+    workspaceId: string,
+    platform?: string,
+    days = 30
+  ): Promise<Analytics[]> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
 
-    return Array.from(this.analytics.values()).filter(analytics =>
-      analytics.workspaceId === workspaceId &&
-      (!platform || analytics.platform === platform) &&
-      analytics.date >= cutoff
-    ).sort((a, b) => b.date.getTime() - a.date.getTime());
+    return Array.from(this.analytics.values())
+      .filter(
+        analytics =>
+          analytics.workspaceId === workspaceId &&
+          (!platform || analytics.platform === platform) &&
+          analytics.date >= cutoff
+      )
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
   async createAnalytics(insertAnalytics: InsertAnalytics): Promise<Analytics> {
@@ -822,51 +1110,63 @@ export class MemStorage implements IStorage {
       followers: insertAnalytics.followers || 0,
       engagement: insertAnalytics.engagement || 0,
       reach: insertAnalytics.reach || 0,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     this.analytics.set(id, analytics);
     return analytics;
   }
 
-  async updateAnalytics(id: string, updates: Partial<Analytics>): Promise<Analytics> {
+  async updateAnalytics(
+    id: string,
+    updates: Partial<Analytics>
+  ): Promise<Analytics> {
     const analytics = this.analytics.get(id);
-    if (!analytics) throw new Error("Analytics record not found");
+    if (!analytics) throw new Error('Analytics record not found');
 
     const updated = { ...analytics, ...updates };
     this.analytics.set(id, updated);
     return updated;
   }
 
-
-
-  async getLatestAnalytics(workspaceId: string, platform: string): Promise<Analytics | undefined> {
+  async getLatestAnalytics(
+    workspaceId: string,
+    platform: string
+  ): Promise<Analytics | undefined> {
     const workspaceAnalytics = Array.from(this.analytics.values())
-      .filter(analytics => analytics.workspaceId === workspaceId && analytics.platform === platform)
+      .filter(
+        analytics =>
+          analytics.workspaceId === workspaceId &&
+          analytics.platform === platform
+      )
       .sort((a, b) => b.date.getTime() - a.date.getTime());
 
     return workspaceAnalytics[0];
   }
 
-
   // Automation rules
   async getAutomationRules(workspaceId: string): Promise<AutomationRule[]> {
-    return Array.from(this.automationRules.values()).filter(rule =>
-      rule.workspaceId === workspaceId
+    return Array.from(this.automationRules.values()).filter(
+      rule => rule.workspaceId === workspaceId
     );
   }
 
   async getActiveAutomationRules(): Promise<AutomationRule[]> {
-    return Array.from(this.automationRules.values()).filter(rule => rule.isActive);
-  }
-
-  async getAutomationRulesByType(type: string): Promise<AutomationRule[]> {
-    return Array.from(this.automationRules.values()).filter(rule =>
-      rule.isActive &&
-      (rule.trigger?.type === type || rule.action?.type === type)
+    return Array.from(this.automationRules.values()).filter(
+      rule => rule.isActive
     );
   }
 
-  async createAutomationRule(insertRule: InsertAutomationRule): Promise<AutomationRule> {
+  async getAutomationRulesByType(type: string): Promise<AutomationRule[]> {
+    return Array.from(this.automationRules.values()).filter(
+      rule =>
+        rule.isActive &&
+        (rule.trigger?.type === type || rule.action?.type === type)
+    );
+  }
+
+  async createAutomationRule(
+    insertRule: InsertAutomationRule
+  ): Promise<AutomationRule> {
     const id = (this.currentAutomationRuleId++).toString();
     const rule: AutomationRule = {
       ...insertRule,
@@ -880,17 +1180,18 @@ export class MemStorage implements IStorage {
       nextRun: undefined,
 
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.automationRules.set(id, rule);
     return rule;
   }
 
-
-
-  async updateAutomationRule(id: string, updates: Partial<AutomationRule>): Promise<AutomationRule> {
+  async updateAutomationRule(
+    id: string,
+    updates: Partial<AutomationRule>
+  ): Promise<AutomationRule> {
     const rule = this.automationRules.get(id);
-    if (!rule) throw new Error("Automation rule not found");
+    if (!rule) throw new Error('Automation rule not found');
 
     const updatedRule = { ...rule, ...updates, updatedAt: new Date() };
     this.automationRules.set(id, updatedRule);
@@ -901,20 +1202,22 @@ export class MemStorage implements IStorage {
     return this.automationRules.get(id);
   }
 
-
   async deleteAutomationRule(id: string): Promise<void> {
     this.automationRules.delete(id);
   }
 
-
-  async getAutomationRulesByWorkspace(workspaceId: string): Promise<AutomationRule[]> {
+  async getAutomationRulesByWorkspace(
+    workspaceId: string
+  ): Promise<AutomationRule[]> {
     return Array.from(this.automationRules.values())
       .filter(rule => rule.workspaceId === workspaceId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-
-  async getAutomationLogs(workspaceId: string | number, options?: { limit?: number; type?: string }): Promise<any[]> {
+  async getAutomationLogs(
+    workspaceId: string | number,
+    options?: { limit?: number; type?: string }
+  ): Promise<any[]> {
     // For now, return empty array - logs would be stored separately in a real implementation
     return [];
   }
@@ -924,25 +1227,33 @@ export class MemStorage implements IStorage {
     return { ...log, id: Date.now().toString(), createdAt: new Date() };
   }
 
-
   // Suggestions
-  async getSuggestions(workspaceId: string, type?: string): Promise<Suggestion[]> {
-    return Array.from(this.suggestions.values()).filter(suggestion =>
-      suggestion.workspaceId === workspaceId &&
-      (!type || suggestion.type === type)
-    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  async getSuggestions(
+    workspaceId: string,
+    type?: string
+  ): Promise<Suggestion[]> {
+    return Array.from(this.suggestions.values())
+      .filter(
+        suggestion =>
+          suggestion.workspaceId === workspaceId &&
+          (!type || suggestion.type === type)
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async getValidSuggestions(workspaceId: string): Promise<Suggestion[]> {
     const now = new Date();
-    return Array.from(this.suggestions.values()).filter(suggestion =>
-      suggestion.workspaceId === workspaceId &&
-      !suggestion.isUsed &&
-      (!suggestion.validUntil || suggestion.validUntil > now)
+    return Array.from(this.suggestions.values()).filter(
+      suggestion =>
+        suggestion.workspaceId === workspaceId &&
+        !suggestion.isUsed &&
+        (!suggestion.validUntil || suggestion.validUntil > now)
     );
   }
 
-  async createSuggestion(insertSuggestion: InsertSuggestion): Promise<Suggestion> {
+  async createSuggestion(
+    insertSuggestion: InsertSuggestion
+  ): Promise<Suggestion> {
     const id = (this.currentSuggestionId++).toString();
     const suggestion: Suggestion = {
       ...insertSuggestion,
@@ -951,7 +1262,7 @@ export class MemStorage implements IStorage {
       confidence: insertSuggestion.confidence || 0,
       isUsed: false,
       validUntil: undefined,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     this.suggestions.set(id, suggestion);
@@ -960,7 +1271,7 @@ export class MemStorage implements IStorage {
 
   async markSuggestionUsed(id: string): Promise<Suggestion> {
     const suggestion = this.suggestions.get(id);
-    if (!suggestion) throw new Error("Suggestion not found");
+    if (!suggestion) throw new Error('Suggestion not found');
 
     const updatedSuggestion = { ...suggestion, isUsed: true };
     this.suggestions.set(id, updatedSuggestion);
@@ -983,66 +1294,78 @@ export class MemStorage implements IStorage {
     }
   }
 
-
   async getAnalyticsByWorkspace(workspaceId: string): Promise<Analytics[]> {
     return Array.from(this.analytics.values())
       .filter(analytics => analytics.workspaceId === workspaceId)
       .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
   }
 
-
   // Credit transactions
-  async getCreditTransactions(userId: string, limit = 50): Promise<CreditTransaction[]> {
+  async getCreditTransactions(
+    userId: string,
+    limit = 50
+  ): Promise<CreditTransaction[]> {
     return Array.from(this.creditTransactions.values())
       .filter(transaction => transaction.userId === userId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
   }
 
-  async createCreditTransaction(insertTransaction: InsertCreditTransaction): Promise<CreditTransaction> {
+  async createCreditTransaction(
+    insertTransaction: InsertCreditTransaction
+  ): Promise<CreditTransaction> {
     const id = (this.currentCreditTransactionId++).toString();
     const transaction: CreditTransaction = {
       ...insertTransaction,
       id,
       workspaceId: insertTransaction.workspaceId || undefined,
-      description: insertTransaction.description || "",
+      description: insertTransaction.description || '',
       referenceId: insertTransaction.referenceId || undefined,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     this.creditTransactions.set(id, transaction);
     return transaction;
   }
 
-
   // Referrals
   async getReferrals(referrerId: string): Promise<Referral[]> {
-    return Array.from(this.referrals.values()).filter(referral => referral.referrerId === referrerId);
+    return Array.from(this.referrals.values()).filter(
+      referral => referral.referrerId === referrerId
+    );
   }
 
-  async getReferralStats(userId: string): Promise<{ totalReferrals: number; activePaid: number; totalEarned: number }> {
+  async getReferralStats(
+    userId: string
+  ): Promise<{
+    totalReferrals: number;
+    activePaid: number;
+    totalEarned: number;
+  }> {
     const userReferrals = await this.getReferrals(userId);
     const totalReferrals = userReferrals.length;
 
     // Count paid subscribers (users with non-free plans)
     const activePaid = userReferrals.filter(referral => {
       const referredUser = this.users.get(referral.referredId);
-      return referredUser && referredUser.plan !== "free";
+      return referredUser && referredUser.plan !== 'free';
     }).length;
 
-    const totalEarned = userReferrals.reduce((sum, referral) => sum + referral.rewardAmount, 0);
+    const totalEarned = userReferrals.reduce(
+      (sum, referral) => sum + referral.rewardAmount,
+      0
+    );
 
     return { totalReferrals, activePaid, totalEarned };
   }
-
 
   async createReferral(insertReferral: InsertReferral): Promise<Referral> {
     const id = (this.currentReferralId++).toString();
     const referral: Referral = {
       ...insertReferral,
       id,
-      status: "pending",
+      status: 'pending',
       rewardAmount: insertReferral.rewardAmount || 0,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     this.referrals.set(id, referral);
@@ -1051,24 +1374,25 @@ export class MemStorage implements IStorage {
 
   async confirmReferral(id: string): Promise<Referral> {
     const referral = this.referrals.get(id);
-    if (!referral) throw new Error("Referral not found");
+    if (!referral) throw new Error('Referral not found');
 
     const updatedReferral = {
       ...referral,
-      status: "confirmed" as const,
-      confirmedAt: new Date()
+      status: 'confirmed' as const,
+      confirmedAt: new Date(),
     };
     this.referrals.set(id, updatedReferral);
     return updatedReferral;
   }
 
-
-  async getLeaderboard(limit = 10): Promise<Array<User & { referralCount: number }>> {
+  async getLeaderboard(
+    limit = 10
+  ): Promise<Array<User & { referralCount: number }>> {
     const userReferralCounts = new Map<string, number>();
 
     // Count referrals for each user
     Array.from(this.referrals.values()).forEach(referral => {
-      if (referral.status === "confirmed") {
+      if (referral.status === 'confirmed') {
         const count = userReferralCounts.get(referral.referrerId) || 0;
         userReferralCounts.set(referral.referrerId, count + 1);
       }
@@ -1077,7 +1401,7 @@ export class MemStorage implements IStorage {
     // Get users with their referral counts
     const usersWithCounts = Array.from(this.users.values()).map(user => ({
       ...user,
-      referralCount: userReferralCounts.get(user.id) || 0
+      referralCount: userReferralCounts.get(user.id) || 0,
     }));
 
     // Sort by referral count and return top users
@@ -1086,42 +1410,52 @@ export class MemStorage implements IStorage {
       .slice(0, limit);
   }
 
-
   // Subscription operations
   async getSubscription(userId: string): Promise<Subscription | undefined> {
-    return Array.from(this.subscriptions.values()).find(subscription => subscription.userId === userId);
+    return Array.from(this.subscriptions.values()).find(
+      subscription => subscription.userId === userId
+    );
   }
 
-  async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
+  async createSubscription(
+    insertSubscription: InsertSubscription
+  ): Promise<Subscription> {
     const id = (this.currentSubscriptionId++).toString();
     const subscription: Subscription = {
       ...insertSubscription,
       id,
       monthlyCredits: insertSubscription.monthlyCredits || 0,
       extraCredits: insertSubscription.extraCredits || 0,
-      autoRenew: insertSubscription.autoRenew !== undefined ? insertSubscription.autoRenew : true,
+      autoRenew:
+        insertSubscription.autoRenew !== undefined
+          ? insertSubscription.autoRenew
+          : true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.subscriptions.set(id, subscription);
     return subscription;
   }
 
-
-  async updateSubscriptionStatus(userId: string, status: string, canceledAt?: Date): Promise<Subscription> {
-    const subscription = Array.from(this.subscriptions.values()).find(sub => sub.userId === userId);
-    if (!subscription) throw new Error("Subscription not found");
+  async updateSubscriptionStatus(
+    userId: string,
+    status: string,
+    canceledAt?: Date
+  ): Promise<Subscription> {
+    const subscription = Array.from(this.subscriptions.values()).find(
+      sub => sub.userId === userId
+    );
+    if (!subscription) throw new Error('Subscription not found');
 
     const updatedSubscription = {
       ...subscription,
       status,
       canceledAt,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.subscriptions.set(subscription.id, updatedSubscription);
     return updatedSubscription;
   }
-
 
   // Payment operations
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
@@ -1129,33 +1463,36 @@ export class MemStorage implements IStorage {
     const payment: Payment = {
       ...insertPayment,
       id,
-      currency: insertPayment.currency || "INR",
+      currency: insertPayment.currency || 'INR',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.payments.set(id, payment);
     return payment;
   }
 
   async getPaymentsByUser(userId: string): Promise<Payment[]> {
-    return Array.from(this.payments.values()).filter(payment => payment.userId === userId);
+    return Array.from(this.payments.values()).filter(
+      payment => payment.userId === userId
+    );
   }
-
 
   // Addon operations
   async getUserAddons(userId: string): Promise<Addon[]> {
-    return Array.from(this.addons.values()).filter(addon => addon.userId === userId && addon.isActive);
+    return Array.from(this.addons.values()).filter(
+      addon => addon.userId === userId && addon.isActive
+    );
   }
 
   async getActiveAddonsByUser(userId: string): Promise<Addon[]> {
     const now = new Date();
-    return Array.from(this.addons.values()).filter(addon =>
-      addon.userId === userId &&
-      addon.isActive &&
-      (!addon.expiresAt || addon.expiresAt > now)
+    return Array.from(this.addons.values()).filter(
+      addon =>
+        addon.userId === userId &&
+        addon.isActive &&
+        (!addon.expiresAt || addon.expiresAt > now)
     );
   }
-
 
   async createAddon(insertAddon: InsertAddon): Promise<Addon> {
     const id = (this.currentAddonId++).toString();
@@ -1164,29 +1501,37 @@ export class MemStorage implements IStorage {
       id,
       isActive: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.addons.set(id, addon);
     return addon;
   }
 
-
   // Content recommendation operations
-  async getContentRecommendation(id: string): Promise<ContentRecommendation | undefined> {
+  async getContentRecommendation(
+    id: string
+  ): Promise<ContentRecommendation | undefined> {
     return this.contentRecommendations.get(id);
   }
 
-  async getContentRecommendations(workspaceId: string, type?: string, limit?: number): Promise<ContentRecommendation[]> {
-    let recommendations = Array.from(this.contentRecommendations.values())
-      .filter(rec => rec.workspaceId === workspaceId && rec.isActive);
-
+  async getContentRecommendations(
+    workspaceId: string,
+    type?: string,
+    limit?: number
+  ): Promise<ContentRecommendation[]> {
+    let recommendations = Array.from(
+      this.contentRecommendations.values()
+    ).filter(rec => rec.workspaceId === workspaceId && rec.isActive);
 
     if (type) {
       recommendations = recommendations.filter(rec => rec.type === type);
     }
 
     // Sort by creation date (newest first)
-    recommendations.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+    recommendations.sort(
+      (a, b) =>
+        new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
+    );
 
     if (limit) {
       recommendations = recommendations.slice(0, limit);
@@ -1195,7 +1540,9 @@ export class MemStorage implements IStorage {
     return recommendations;
   }
 
-  async createContentRecommendation(insertRecommendation: InsertContentRecommendation): Promise<ContentRecommendation> {
+  async createContentRecommendation(
+    insertRecommendation: InsertContentRecommendation
+  ): Promise<ContentRecommendation> {
     const id = (this.currentContentRecommendationId++).toString();
     const recommendation: ContentRecommendation = {
       ...insertRecommendation,
@@ -1209,13 +1556,16 @@ export class MemStorage implements IStorage {
       sourceUrl: undefined,
       isActive: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.contentRecommendations.set(id, recommendation);
     return recommendation;
   }
 
-  async updateContentRecommendation(id: string, updates: Partial<ContentRecommendation>): Promise<ContentRecommendation> {
+  async updateContentRecommendation(
+    id: string,
+    updates: Partial<ContentRecommendation>
+  ): Promise<ContentRecommendation> {
     const existing = this.contentRecommendations.get(id);
     if (!existing) {
       throw new Error(`Content recommendation ${id} not found`);
@@ -1224,152 +1574,41 @@ export class MemStorage implements IStorage {
     const updated: ContentRecommendation = {
       ...existing,
       ...updates,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.contentRecommendations.set(id, updated);
     return updated;
   }
 
-
   // User content history operations
-  async getUserContentHistory(userId: string, workspaceId: string): Promise<UserContentHistory[]> {
+  async getUserContentHistory(
+    userId: string,
+    workspaceId: string
+  ): Promise<UserContentHistory[]> {
     return Array.from(this.userContentHistory.values())
-      .filter(history => history.userId === userId && history.workspaceId === workspaceId)
-      .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+      .filter(
+        history =>
+          history.userId === userId && history.workspaceId === workspaceId
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
+      );
   }
 
-
-  async createUserContentHistory(insertHistory: InsertUserContentHistory): Promise<UserContentHistory> {
+  async createUserContentHistory(
+    insertHistory: InsertUserContentHistory
+  ): Promise<UserContentHistory> {
     const id = (this.currentUserContentHistoryId++).toString();
     const history: UserContentHistory = {
       ...insertHistory,
       id,
       metadata: {},
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     this.userContentHistory.set(id, history);
     return history;
   }
-
-
-
-  // Pricing and plan operations
-  async getPricingData(): Promise<any> {
-    return {
-      plans: {
-        free: {
-          id: "free",
-          name: "Cosmic Explorer",
-          description: "Perfect for getting started in the social universe",
-          price: "Free",
-          credits: 0,
-          features: [
-            "Up to 2 social accounts",
-            "Basic analytics dashboard",
-            "50 AI-generated posts per month",
-            "Community support",
-            "Basic scheduling"
-          ]
-        },
-        pro: {
-          id: "pro",
-          name: "Stellar Navigator",
-          description: "Advanced features for growing brands",
-          price: 999,
-          credits: 500,
-          features: [
-            "Up to 10 social accounts",
-            "Advanced analytics & insights",
-            "500 AI-generated posts per month",
-            "Priority support",
-            "Advanced scheduling",
-            "Custom AI personality",
-            "Hashtag optimization"
-          ],
-          popular: true
-        },
-        enterprise: {
-          id: "enterprise",
-          name: "Galactic Commander",
-          description: "Ultimate power for large teams",
-          price: 2999,
-          credits: 2000,
-          features: [
-            "Unlimited social accounts",
-            "Enterprise analytics suite",
-            "2000 AI-generated posts per month",
-            "24/7 dedicated support",
-            "Advanced team collaboration",
-            "Custom integrations",
-            "White-label options"
-          ]
-        }
-      },
-      creditPackages: [
-        {
-          id: "credits_100",
-          name: "Starter Pack",
-          totalCredits: 100,
-          price: 199,
-          savings: "20% off"
-        },
-        {
-          id: "credits_500",
-          name: "Power Pack",
-          totalCredits: 500,
-          price: 799,
-          savings: "30% off"
-        },
-        {
-          id: "credits_1000",
-          name: "Mega Pack",
-          totalCredits: 1000,
-          price: 1399,
-          savings: "40% off"
-        }
-      ],
-      addons: {
-        extra_workspace: {
-          id: "extra_workspace",
-          name: "Additional Brand Workspace",
-          price: 49,
-          type: "workspace",
-          interval: "monthly",
-          benefit: "Add 1 extra brand workspace for team collaboration"
-        },
-        extra_social_account: {
-          id: "extra_social_account",
-          name: "Extra Social Account",
-          price: 49,
-          type: "social_connection",
-          interval: "monthly",
-          benefit: "Connect 1 additional social media account"
-        },
-        boosted_ai_content: {
-          id: "boosted_ai_content",
-          name: "Boosted AI Content Generation",
-          price: 99,
-          type: "ai_boost",
-          interval: "monthly",
-          benefit: "Generate 500 extra AI-powered posts per month"
-        }
-      }
-    };
-  }
-
-  async updateUserSubscription(userId: string, planId: string): Promise<User> {
-    return this.updateUser(userId, { plan: planId });
-  }
-
-  async addCreditsToUser(userId: string, credits: number): Promise<User> {
-    const user = this.users.get(userId);
-    if (!user) throw new Error("User not found");
-
-    const newCredits = (user.credits || 0) + credits;
-    return this.updateUser(userId, { credits: newCredits });
-  }
-
-
 
   // Admin operations (simplified in-memory implementation)
   async getAdmin(id: string): Promise<Admin | undefined> {
@@ -1377,11 +1616,15 @@ export class MemStorage implements IStorage {
   }
 
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
-    return Array.from(this.admins.values()).find(admin => admin.email === email);
+    return Array.from(this.admins.values()).find(
+      admin => admin.email === email
+    );
   }
 
   async getAdminByUsername(username: string): Promise<Admin | undefined> {
-    return Array.from(this.admins.values()).find(admin => admin.username === username);
+    return Array.from(this.admins.values()).find(
+      admin => admin.username === username
+    );
   }
 
   async getAllAdmins(): Promise<Admin[]> {
@@ -1393,19 +1636,18 @@ export class MemStorage implements IStorage {
     const admin: Admin = {
       ...insertAdmin,
       id,
-      role: insertAdmin.role || "admin",
+      role: insertAdmin.role || 'admin',
       isActive: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.admins.set(id, admin);
     return admin;
   }
 
-
   async updateAdmin(id: string, updates: Partial<Admin>): Promise<Admin> {
     const admin = this.admins.get(id);
-    if (!admin) throw new Error("Admin not found");
+    if (!admin) throw new Error('Admin not found');
 
     const updatedAdmin = { ...admin, ...updates, updatedAt: new Date() };
     this.admins.set(id, updatedAdmin);
@@ -1415,7 +1657,6 @@ export class MemStorage implements IStorage {
   async deleteAdmin(id: string): Promise<void> {
     this.admins.delete(id);
   }
-
 
   async getAdminStats(): Promise<{
     totalUsers: number;
@@ -1431,14 +1672,15 @@ export class MemStorage implements IStorage {
       totalContent: this.content.size,
       totalCreditsUsed: 0,
       revenueThisMonth: 0,
-      activeUsers: this.users.size
+      activeUsers: this.users.size,
     };
   }
 
-
-  async createAdminSession(session: Partial<AdminSession>): Promise<AdminSession> {
+  async createAdminSession(
+    session: Partial<AdminSession>
+  ): Promise<AdminSession> {
     // This is a stub - real implementation uses MongoDB
-    throw new Error("Admin operations require MongoDB");
+    throw new Error('Admin operations require MongoDB');
   }
 
   async getAdminSession(token: string): Promise<AdminSession | undefined> {
@@ -1454,27 +1696,32 @@ export class MemStorage implements IStorage {
     // This is a stub - real implementation uses MongoDB
   }
 
-  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+  async createNotification(
+    insertNotification: InsertNotification
+  ): Promise<Notification> {
     const id = (this.currentNotificationId++).toString();
     const notification: Notification = {
       ...insertNotification,
       id,
       isRead: false,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     this.notifications.set(id, notification);
     return notification;
   }
 
   async getNotifications(userId?: string): Promise<Notification[]> {
-    return Array.from(this.notifications.values()).filter(notification =>
-      !userId || notification.userId === userId
-    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return Array.from(this.notifications.values())
+      .filter(notification => !userId || notification.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async updateNotification(id: string, updates: Partial<Notification>): Promise<Notification> {
+  async updateNotification(
+    id: string,
+    updates: Partial<Notification>
+  ): Promise<Notification> {
     const notification = this.notifications.get(id);
-    if (!notification) throw new Error("Notification not found");
+    if (!notification) throw new Error('Notification not found');
 
     const updatedNotification = { ...notification, ...updates };
     this.notifications.set(id, updatedNotification);
@@ -1495,12 +1742,15 @@ export class MemStorage implements IStorage {
   }
 
   async getUserNotifications(userId: string): Promise<any[]> {
-    return Array.from(this.notifications.values()).filter(notification =>
-      notification.userId === userId
-    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return Array.from(this.notifications.values())
+      .filter(notification => notification.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async markNotificationAsRead(notificationId: string, userId: string): Promise<void> {
+  async markNotificationAsRead(
+    notificationId: string,
+    userId: string
+  ): Promise<void> {
     const notification = this.notifications.get(notificationId);
     if (notification && notification.userId === userId) {
       notification.isRead = true;
@@ -1509,17 +1759,16 @@ export class MemStorage implements IStorage {
     }
   }
 
-
-
   async createPopup(insertPopup: InsertPopup): Promise<Popup> {
     const id = (this.currentPopupId++).toString();
     const popup: Popup = {
       ...insertPopup,
       id,
       priority: insertPopup.priority || 0,
-      isActive: insertPopup.isActive !== undefined ? insertPopup.isActive : true,
+      isActive:
+        insertPopup.isActive !== undefined ? insertPopup.isActive : true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.popups.set(id, popup);
     return popup;
@@ -1535,7 +1784,7 @@ export class MemStorage implements IStorage {
 
   async updatePopup(id: string, updates: Partial<Popup>): Promise<Popup> {
     const popup = this.popups.get(id);
-    if (!popup) throw new Error("Popup not found");
+    if (!popup) throw new Error('Popup not found');
 
     const updatedPopup = { ...popup, ...updates, updatedAt: new Date() };
     this.popups.set(id, updatedPopup);
@@ -1546,10 +1795,9 @@ export class MemStorage implements IStorage {
     this.popups.delete(id);
   }
 
-
   async createAppSetting(setting: InsertAppSetting): Promise<AppSetting> {
     // This is a stub - real implementation uses MongoDB
-    throw new Error("Admin operations require MongoDB");
+    throw new Error('Admin operations require MongoDB');
   }
 
   async getAppSetting(key: string): Promise<AppSetting | undefined> {
@@ -1567,15 +1815,25 @@ export class MemStorage implements IStorage {
     return [];
   }
 
-  async updateAppSetting(key: string, value: string, updatedBy?: string): Promise<AppSetting> {
-    const setting = Array.from(this.appSettings.values()).find(s => s.key === key);
-    if (!setting) throw new Error("App setting not found");
+  async updateAppSetting(
+    key: string,
+    value: string,
+    updatedBy?: string
+  ): Promise<AppSetting> {
+    const setting = Array.from(this.appSettings.values()).find(
+      s => s.key === key
+    );
+    if (!setting) throw new Error('App setting not found');
 
-    const updatedSetting = { ...setting, value, updatedBy, updatedAt: new Date() };
+    const updatedSetting = {
+      ...setting,
+      value,
+      updatedBy,
+      updatedAt: new Date(),
+    };
     this.appSettings.set(setting.id, updatedSetting);
     return updatedSetting;
   }
-
 
   async deleteAppSetting(key: string): Promise<void> {
     // This is a stub - real implementation uses MongoDB
@@ -1586,42 +1844,46 @@ export class MemStorage implements IStorage {
     const log: AuditLog = {
       ...insertLog,
       id,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     this.auditLogs.set(id, log);
     return log;
   }
 
   async getAuditLogs(limit = 50, adminId?: string): Promise<AuditLog[]> {
-    return Array.from(this.auditLogs.values()).filter(log =>
-      !adminId || log.actorId === adminId
-    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    return Array.from(this.auditLogs.values())
+      .filter(log => !adminId || log.actorId === adminId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
   }
 
-
-  async createFeedbackMessage(insertFeedback: InsertFeedbackMessage): Promise<FeedbackMessage> {
+  async createFeedbackMessage(
+    insertFeedback: InsertFeedbackMessage
+  ): Promise<FeedbackMessage> {
     const id = (this.currentFeedbackMessageId++).toString();
     const feedback: FeedbackMessage = {
       ...insertFeedback,
       id,
-      status: "new",
+      status: 'new',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.feedbackMessages.set(id, feedback);
     return feedback;
   }
 
   async getFeedbackMessages(status?: string): Promise<FeedbackMessage[]> {
-    return Array.from(this.feedbackMessages.values()).filter(feedback =>
-      !status || feedback.status === status
-    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return Array.from(this.feedbackMessages.values())
+      .filter(feedback => !status || feedback.status === status)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async updateFeedbackMessage(id: string, updates: Partial<FeedbackMessage>): Promise<FeedbackMessage> {
+  async updateFeedbackMessage(
+    id: string,
+    updates: Partial<FeedbackMessage>
+  ): Promise<FeedbackMessage> {
     const feedback = this.feedbackMessages.get(id);
-    if (!feedback) throw new Error("Feedback message not found");
+    if (!feedback) throw new Error('Feedback message not found');
 
     const updatedFeedback = { ...feedback, ...updates, updatedAt: new Date() };
     this.feedbackMessages.set(id, updatedFeedback);
@@ -1631,7 +1893,6 @@ export class MemStorage implements IStorage {
   async deleteFeedbackMessage(id: string): Promise<void> {
     this.feedbackMessages.delete(id);
   }
-
 
   async getAdminStats(): Promise<{
     totalUsers: number;
@@ -1648,62 +1909,89 @@ export class MemStorage implements IStorage {
       totalContent: this.content.size,
       totalCreditsUsed: 0,
       revenueThisMonth: 0,
-      activeUsers: 0
+      activeUsers: 0,
     };
   }
 
   // Missing admin methods for interface compatibility
-  async getAdminUsers(page: number = 1, limit: number = 10, search?: string): Promise<{ admins: Admin[], total: number }> {
+  async getAdminUsers(
+    page: number = 1,
+    limit: number = 10,
+    search?: string
+  ): Promise<{ admins: Admin[]; total: number }> {
     const allAdmins = Array.from(this.admins.values());
     let filteredAdmins = allAdmins;
 
     if (search) {
-      filteredAdmins = allAdmins.filter(admin =>
-        admin.username.toLowerCase().includes(search.toLowerCase()) ||
-        admin.email.toLowerCase().includes(search.toLowerCase())
+      filteredAdmins = allAdmins.filter(
+        admin =>
+          admin.username.toLowerCase().includes(search.toLowerCase()) ||
+          admin.email.toLowerCase().includes(search.toLowerCase())
       );
     }
 
     const startIndex = (page - 1) * limit;
-    const paginatedAdmins = filteredAdmins.slice(startIndex, startIndex + limit);
+    const paginatedAdmins = filteredAdmins.slice(
+      startIndex,
+      startIndex + limit
+    );
 
     return {
       admins: paginatedAdmins,
-      total: filteredAdmins.length
+      total: filteredAdmins.length,
     };
   }
 
-  async getAdminContent(page: number = 1, limit: number = 10, filters?: any): Promise<{ content: Content[], total: number }> {
+  async getAdminContent(
+    page: number = 1,
+    limit: number = 10,
+    filters?: any
+  ): Promise<{ content: Content[]; total: number }> {
     const allContent = Array.from(this.content.values());
     let filteredContent = allContent;
 
     if (filters?.platform) {
-      filteredContent = filteredContent.filter(item => item.platform === filters.platform);
+      filteredContent = filteredContent.filter(
+        item => item.platform === filters.platform
+      );
     }
     if (filters?.status) {
-      filteredContent = filteredContent.filter(item => item.status === filters.status);
+      filteredContent = filteredContent.filter(
+        item => item.status === filters.status
+      );
     }
     if (filters?.type) {
-      filteredContent = filteredContent.filter(item => item.type === filters.type);
+      filteredContent = filteredContent.filter(
+        item => item.type === filters.type
+      );
     }
 
     const startIndex = (page - 1) * limit;
-    const paginatedContent = filteredContent.slice(startIndex, startIndex + limit);
+    const paginatedContent = filteredContent.slice(
+      startIndex,
+      startIndex + limit
+    );
 
     return {
       content: paginatedContent,
-      total: filteredContent.length
+      total: filteredContent.length,
     };
   }
 
-  async getAdminNotifications(page: number = 1, limit: number = 10): Promise<{ notifications: Notification[], total: number }> {
+  async getAdminNotifications(
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{ notifications: Notification[]; total: number }> {
     const allNotifications = Array.from(this.notifications.values());
     const startIndex = (page - 1) * limit;
-    const paginatedNotifications = allNotifications.slice(startIndex, startIndex + limit);
+    const paginatedNotifications = allNotifications.slice(
+      startIndex,
+      startIndex + limit
+    );
 
     return {
       notifications: paginatedNotifications,
-      total: allNotifications.length
+      total: allNotifications.length,
     };
   }
 
@@ -1711,7 +1999,11 @@ export class MemStorage implements IStorage {
     return [];
   }
 
-  async trackFeatureUsage(userId: string, featureId: string, usage: any): Promise<void> {
+  async trackFeatureUsage(
+    userId: string,
+    featureId: string,
+    usage: any
+  ): Promise<void> {
     // No-op for memory storage
   }
 
@@ -1731,11 +2023,17 @@ export class MemStorage implements IStorage {
     // No-op for memory storage
   }
 
-  async getDmConversations(workspaceId: string, limit: number = 50): Promise<any[]> {
+  async getDmConversations(
+    workspaceId: string,
+    limit: number = 50
+  ): Promise<any[]> {
     return [];
   }
 
-  async getDmMessages(conversationId: string | number, limit: number = 50): Promise<any[]> {
+  async getDmMessages(
+    conversationId: string | number,
+    limit: number = 50
+  ): Promise<any[]> {
     return [];
   }
 
@@ -1744,35 +2042,46 @@ export class MemStorage implements IStorage {
   }
 
   // VeeGPT Chat operations
-  async getChatConversations(userId: string, workspaceId: string): Promise<ChatConversation[]> {
+  async getChatConversations(
+    userId: string,
+    workspaceId: string
+  ): Promise<ChatConversation[]> {
     return Array.from(this.chatConversations.values())
-      .filter(conversation => conversation.userId === userId && conversation.workspaceId === workspaceId)
-      .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+      .filter(
+        conversation =>
+          conversation.userId === userId &&
+          conversation.workspaceId === workspaceId
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.lastMessageAt).getTime() -
+          new Date(a.lastMessageAt).getTime()
+      );
   }
-
 
   async getChatConversation(id: string): Promise<ChatConversation | undefined> {
     return this.chatConversations.get(id);
   }
 
-
-  async createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation> {
+  async createChatConversation(
+    conversation: InsertChatConversation
+  ): Promise<ChatConversation> {
     const id = (this.currentChatConversationId++).toString();
     const newConversation: ChatConversation = {
       ...conversation,
       id,
       lastMessageAt: conversation.lastMessageAt || new Date(),
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.chatConversations.set(id, newConversation);
     return newConversation;
   }
 
-
-
-
-  async updateChatConversation(id: string, updates: Partial<ChatConversation>): Promise<ChatConversation> {
+  async updateChatConversation(
+    id: string,
+    updates: Partial<ChatConversation>
+  ): Promise<ChatConversation> {
     const conversation = this.chatConversations.get(id);
     if (!conversation) {
       throw new Error(`Conversation with id ${id} not found`);
@@ -1780,7 +2089,7 @@ export class MemStorage implements IStorage {
     const updatedConversation = {
       ...conversation,
       ...updates,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.chatConversations.set(id, updatedConversation);
     return updatedConversation;
@@ -1801,7 +2110,10 @@ export class MemStorage implements IStorage {
   async getChatMessages(conversationId: string): Promise<ChatMessage[]> {
     return Array.from(this.chatMessages.values())
       .filter(message => message.conversationId === conversationId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
   }
 
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
@@ -1810,20 +2122,23 @@ export class MemStorage implements IStorage {
       ...message,
       id,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.chatMessages.set(id, newMessage);
     return newMessage;
   }
 
-  async updateChatMessage(id: string, updates: Partial<ChatMessage>): Promise<ChatMessage> {
+  async updateChatMessage(
+    id: string,
+    updates: Partial<ChatMessage>
+  ): Promise<ChatMessage> {
     const message = this.chatMessages.get(id);
     if (!message) throw new Error('Message not found');
 
     const updatedMessage = {
       ...message,
       ...updates,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     this.chatMessages.set(id, updatedMessage);
     return updatedMessage;
@@ -1834,15 +2149,17 @@ export class MemStorage implements IStorage {
   }
 
   // Creative Brief operations
-  async createCreativeBrief(insertBrief: InsertCreativeBrief): Promise<CreativeBrief> {
+  async createCreativeBrief(
+    insertBrief: InsertCreativeBrief
+  ): Promise<CreativeBrief> {
     const id = (Math.random() * 1000000).toString();
     const brief: CreativeBrief = {
       ...insertBrief,
       id,
-      status: "draft",
+      status: 'draft',
       creditsUsed: 0,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     return brief;
   }
@@ -1851,18 +2168,25 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async getCreativeBriefsByWorkspace(workspaceId: string): Promise<CreativeBrief[]> {
+  async getCreativeBriefsByWorkspace(
+    workspaceId: string
+  ): Promise<CreativeBrief[]> {
     return [];
   }
 
-  async updateCreativeBrief(id: string, updates: Partial<CreativeBrief>): Promise<CreativeBrief> {
-    throw new Error("Not implemented");
+  async updateCreativeBrief(
+    id: string,
+    updates: Partial<CreativeBrief>
+  ): Promise<CreativeBrief> {
+    throw new Error('Not implemented');
   }
 
-  async deleteCreativeBrief(id: string): Promise<void> { }
+  async deleteCreativeBrief(id: string): Promise<void> {}
 
   // Content Repurpose operations
-  async createContentRepurpose(insertRepurpose: InsertContentRepurpose): Promise<ContentRepurpose> {
+  async createContentRepurpose(
+    insertRepurpose: InsertContentRepurpose
+  ): Promise<ContentRepurpose> {
     const id = (Math.random() * 1000000).toString();
     const repurpose: ContentRepurpose = {
       ...insertRepurpose,
@@ -1870,7 +2194,7 @@ export class MemStorage implements IStorage {
       isApproved: false,
       creditsUsed: 0,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     return repurpose;
   }
@@ -1879,18 +2203,25 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async getContentRepurposesByWorkspace(workspaceId: string): Promise<ContentRepurpose[]> {
+  async getContentRepurposesByWorkspace(
+    workspaceId: string
+  ): Promise<ContentRepurpose[]> {
     return [];
   }
 
-  async updateContentRepurpose(id: string, updates: Partial<ContentRepurpose>): Promise<ContentRepurpose> {
-    throw new Error("Not implemented");
+  async updateContentRepurpose(
+    id: string,
+    updates: Partial<ContentRepurpose>
+  ): Promise<ContentRepurpose> {
+    throw new Error('Not implemented');
   }
 
-  async deleteContentRepurpose(id: string): Promise<void> { }
+  async deleteContentRepurpose(id: string): Promise<void> {}
 
   // Competitor Analysis operations
-  async createCompetitorAnalysis(insertAnalysis: InsertCompetitorAnalysis): Promise<CompetitorAnalysis> {
+  async createCompetitorAnalysis(
+    insertAnalysis: InsertCompetitorAnalysis
+  ): Promise<CompetitorAnalysis> {
     const id = (Math.random() * 1000000).toString();
     const analysis: CompetitorAnalysis = {
       ...insertAnalysis,
@@ -1899,31 +2230,47 @@ export class MemStorage implements IStorage {
       scrapedData: {},
       analysisResults: {},
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     return analysis;
   }
 
-  async getCompetitorAnalysis(id: string): Promise<CompetitorAnalysis | undefined> {
+  async getCompetitorAnalysis(
+    id: string
+  ): Promise<CompetitorAnalysis | undefined> {
     return undefined;
   }
 
-  async getCompetitorAnalysesByWorkspace(workspaceId: string): Promise<CompetitorAnalysis[]> {
+  async getCompetitorAnalysesByWorkspace(
+    workspaceId: string
+  ): Promise<CompetitorAnalysis[]> {
     return [];
   }
 
-  async updateCompetitorAnalysis(id: string, updates: Partial<CompetitorAnalysis>): Promise<CompetitorAnalysis> {
-    throw new Error("Not implemented");
+  async updateCompetitorAnalysis(
+    id: string,
+    updates: Partial<CompetitorAnalysis>
+  ): Promise<CompetitorAnalysis> {
+    throw new Error('Not implemented');
   }
 
-  async deleteCompetitorAnalysis(id: string): Promise<void> { }
+  async deleteCompetitorAnalysis(id: string): Promise<void> {}
 
   // Platform synchronization
-  async updateYouTubePlatformData(accountId: string, data: any): Promise<void> { }
+  async updateYouTubePlatformData(
+    accountId: string,
+    data: any
+  ): Promise<void> {}
 
   async createThumbnailProject(project: any): Promise<any> {
     const id = Date.now().toString();
-    const newProject = { ...project, id, createdAt: new Date(), status: 'processing', stage: 1 };
+    const newProject = {
+      ...project,
+      id,
+      createdAt: new Date(),
+      status: 'processing',
+      stage: 1,
+    };
     return newProject;
   }
 
@@ -1932,7 +2279,7 @@ export class MemStorage implements IStorage {
       id,
       status: 'completed',
       stage: 5,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
   }
 
@@ -1945,19 +2292,19 @@ export class MemStorage implements IStorage {
       {
         id: 1,
         variantNumber: 1,
-        layoutType: "Face Left - Text Right",
-        previewUrl: "/api/placeholder/1280x720",
+        layoutType: 'Face Left - Text Right',
+        previewUrl: '/api/placeholder/1280x720',
         predictedCtr: 8.5,
-        layoutClassification: "High Impact"
+        layoutClassification: 'High Impact',
       },
       {
         id: 2,
         variantNumber: 2,
-        layoutType: "Bold Title Top",
-        previewUrl: "/api/placeholder/1280x720",
+        layoutType: 'Bold Title Top',
+        previewUrl: '/api/placeholder/1280x720',
         predictedCtr: 7.2,
-        layoutClassification: "Attention Grabbing"
-      }
+        layoutClassification: 'Attention Grabbing',
+      },
     ];
   }
 
@@ -1979,14 +2326,18 @@ export class MemStorage implements IStorage {
   }
 
   async createThumbnailExport(exportData: any): Promise<any> {
-    return { ...exportData, id: Date.now().toString(), exportUrl: '/api/placeholder/export.png' };
+    return {
+      ...exportData,
+      id: Date.now().toString(),
+      exportUrl: '/api/placeholder/export.png',
+    };
   }
-
 }
-
 
 import { MongoStorage } from './mongodb-storage';
 
 // Use MongoDB Atlas if connection string is available, otherwise fallback to memory storage
-export const storage = (process.env.MONGODB_URI || process.env.DATABASE_URL) ? new MongoStorage() : new MemStorage();
-
+export const storage =
+  process.env.MONGODB_URI || process.env.DATABASE_URL
+    ? new MongoStorage()
+    : new MemStorage();

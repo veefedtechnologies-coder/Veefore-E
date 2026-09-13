@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { createOpenAI } from './ai-provider-guard';
 
 export interface Scene {
   id: string;
@@ -24,7 +25,7 @@ class OpenAIService {
   private client: OpenAI;
 
   constructor() {
-    this.client = new OpenAI({
+    this.client = createOpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
   }

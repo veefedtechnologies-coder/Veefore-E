@@ -49,6 +49,11 @@ export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
     configFile: path.resolve(__dirname, "..", "client", "vite.config.ts"),
     root: path.resolve(__dirname, "..", "client"),
+    // Serve Vite's optimized dependency bundles from a versioned cache dir so
+    // their request URLs (/node_modules/.vite-v2/deps/…) never collide with
+    // any `immutable`-cached copies a browser holds from an earlier optimize
+    // run. Bump the suffix if a browser ever gets stuck on stale dep chunks.
+    cacheDir: path.resolve(__dirname, "..", "client", "node_modules", ".vite-v2"),
     customLogger: {
       ...viteLogger,
       error: (msg: string, options?: any) => {

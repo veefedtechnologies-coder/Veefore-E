@@ -4,6 +4,7 @@
  */
 
 import OpenAI from 'openai';
+import { createOpenAI } from './services/ai-provider-guard';
 
 let openaiClient: OpenAI | null = null;
 
@@ -17,9 +18,9 @@ export const getOpenAIClient = (): OpenAI => {
       console.warn('[OPENAI] API key not configured - OpenAI features will not work');
       // Create client with placeholder to avoid startup errors
       // It will fail gracefully when actually used
-      openaiClient = new OpenAI({ apiKey: 'sk-placeholder' });
+      openaiClient = createOpenAI({ apiKey: 'sk-placeholder' });
     } else {
-      openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      openaiClient = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
     }
   }
   return openaiClient;

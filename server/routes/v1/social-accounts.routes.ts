@@ -6,6 +6,7 @@ import { validateWorkspaceAccess, requireWorkspaceMember } from '../../middlewar
 import { auditMiddleware } from '../../middleware/audit-middleware';
 import { AuditActions } from '../../utils/audit-logger';
 import { syncRateLimiter } from '../../middleware/rate-limiting-working';
+import { requireProfileLimit, requireWorkspaceAccessible } from '../../middleware/entitlement.middleware';
 import { z } from 'zod';
 
 const router = Router();
@@ -21,6 +22,7 @@ const WorkspaceIdParams = z.object({
 router.get('/',
   requireAuth,
   validateWorkspaceAccess({ source: 'query' }),
+  requireWorkspaceAccessible(),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string;
@@ -40,6 +42,7 @@ router.get('/',
 router.get('/workspace/:workspaceId',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   socialAccountController.getByWorkspace
 );
@@ -54,7 +57,9 @@ router.get('/:accountId',
 router.post('/workspace/:workspaceId',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
+  requireProfileLimit(),
   auditMiddleware(AuditActions.SOCIAL_ACCOUNT.CONNECT, { resource: 'social_account' }),
   socialAccountController.connectAccount
 );

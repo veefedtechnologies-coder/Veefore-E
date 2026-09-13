@@ -20,17 +20,14 @@ export class WorkspaceRepository extends BaseRepository<IWorkspace> {
     return this.findOne({ inviteCode });
   }
 
-  async createDefaultWorkspace(userId: string, name: string = 'My Workspace'): Promise<IWorkspace> {
-    return this.create({
-      userId,
-      name,
-      isDefault: true,
-      credits: 0,
-      theme: 'space',
-      aiPersonality: 'professional',
-      maxTeamMembers: 1
-    });
-  }
+  // NOTE: `createDefaultWorkspace` was intentionally removed. It fabricated a
+  // brandless placeholder workspace (`isDefault: true`, no social account),
+  // which was the source of the orphaned auto-created workspaces
+  // ("My Workspace" / "My VeeFore Workspace" / "{username}'s Workspace").
+  // Per the workspace-meta-connection spec, workspaces are created ONLY via
+  // the Meta OAuth brand-import flow (WorkspaceService.importAuthorizedBrand),
+  // so there is no longer any legitimate caller for a default-workspace
+  // factory here.
 
   async createWithDefaults(data: Partial<IWorkspace>): Promise<IWorkspace> {
     return this.create({

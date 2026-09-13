@@ -679,7 +679,14 @@ export class SocialAccountService extends BaseService {
         const [profileResult, insightsResult, mediaResult] = await Promise.allSettled([
           instagramService.getUserProfile(accessToken, account.accountId),
           fetchInsights ? instagramService.getAccountInsights(accessToken, account.accountId) : Promise.resolve({} as any),
-          fetchMedia ? InstagramApiService.getUserMedia(accessToken, mediaLimit, account.accountId).then(res => res.data) : Promise.resolve([])
+          fetchMedia
+            ? (isBackfill
+                // Full import → follow pagination so EVERY feed post is captured
+                // (single-page fetch previously under-counted accounts with more
+                // media than one page).
+                ? InstagramApiService.getAllUserMedia(accessToken, account.accountId, 200)
+                : InstagramApiService.getUserMedia(accessToken, mediaLimit, account.accountId).then(res => res.data))
+            : Promise.resolve([])
         ]);
 
         // Profile is mandatory: without it there is nothing meaningful to persist.
@@ -1361,23 +1368,31 @@ export class SocialAccountService extends BaseService {
 
     const [profileResult, analyticsResult, analytics1dResult, analytics7dResult, postsResult] = await Promise.allSettled([
       facebookProvider.getProfile(accessToken, accountId),
+      // skipPostInsights: the sync gets posts from getPagePosts (below) and the
+      // published-post count from the Content store — it never uses getAnalytics'
+      // published_posts / facebook_post_clicks. Skipping avoids re-fetching the
+      // posts list + a per-post post_clicks Graph call in EACH of these three
+      // window calls (posts were previously fetched 4× per sync).
       facebookProvider.getAnalytics({
         accessToken,
         accountId,
         from: twentyEightDaysAgo,
         to: now,
+        skipPostInsights: true,
       }),
       facebookProvider.getAnalytics({
         accessToken,
         accountId,
         from: oneDayAgo,
         to: now,
+        skipPostInsights: true,
       }),
       facebookProvider.getAnalytics({
         accessToken,
         accountId,
         from: sevenDaysAgo,
         to: now,
+        skipPostInsights: true,
       }),
       facebookProvider.getPagePosts(accessToken, accountId, 25),
     ]);

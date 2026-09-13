@@ -10,6 +10,7 @@ import { apiRequest } from '@/lib/queryClient'
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { format, isToday, isTomorrow, isThisWeek } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
+import { useSocialAccountsMap, getPostDisplayTitle, PostTypeBadge, PostMedia } from '@/components/dashboard/scheduled-posts'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function formatScheduledTime(dateStr: string): string {
@@ -54,6 +55,7 @@ export function ScheduledPostsSection() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
+  const accountMap = useSocialAccountsMap(currentWorkspace?.id)
 
   const { data: resp, isLoading } = useQuery({
     queryKey: ['/api/v1/content/workspace/scheduled', currentWorkspace?.id],
@@ -97,7 +99,7 @@ export function ScheduledPostsSection() {
           <Button
             variant="outline" size="sm"
             className="text-xs text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:text-blue-600"
-            onClick={() => setLocation('/posts/scheduled')}
+            onClick={() => setLocation('/plan?tab=scheduled')}
           >
             View all
           </Button>
@@ -127,24 +129,28 @@ export function ScheduledPostsSection() {
             <div className={`divide-y divide-gray-100 dark:divide-gray-700/50 ${expanded ? 'max-h-[480px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700' : ''}`}>
               {visiblePosts.map((post: any) => {
                 const id = post._id || post.id
-                const title = post.title || post.contentData?.text || 'Untitled'
+                const title = getPostDisplayTitle(post)
                 const isFailed = post.status === 'failed'
+                const accountId = post.accountId || post.contentData?.accountId
+                const account = accountId ? accountMap.get(accountId) : null
+                const username = post.contentData?.username || account?.username || null
 
                 return (
                   <div key={id} className="flex items-start gap-3 py-3">
-                    {/* Thumbnail / type icon */}
-                    <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 flex items-center justify-center flex-shrink-0 border border-blue-100 dark:border-blue-900/30">
-                      {isFailed
-                        ? <AlertCircle className="w-5 h-5 text-red-400" />
-                        : <span className="text-blue-500 dark:text-blue-400">{typeIcon(post.type || 'image')}</span>
-                      }
+                    {/* Thumbnail (image or video) */}
+                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 relative bg-gray-100 dark:bg-gray-700 border border-gray-100 dark:border-gray-700">
+                      <PostMedia post={post} />
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-tight">{title}</p>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <PostTypeBadge post={post} />
                         {statusBadge(post.status)}
+                        {username && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate max-w-[90px]">@{username}</span>
+                        )}
                         <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-0.5">
                           <Clock className="w-3 h-3" />
                           {post.scheduledAt ? formatScheduledTime(post.scheduledAt) : 'Unscheduled'}
@@ -160,10 +166,16 @@ export function ScheduledPostsSection() {
                           Re-upload
                         </Button>
                       ) : (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 text-gray-500 hover:text-gray-700"
-                          onClick={() => setLocation(`/create?editId=${id}`)}>
-                          Edit
-                        </Button>
+                        <>
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2.5 text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            onClick={() => handleCancel(id)}>
+                            Cancel
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 text-gray-500 hover:text-gray-700"
+                            onClick={() => setLocation(`/create?editId=${id}`)}>
+                            Edit
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

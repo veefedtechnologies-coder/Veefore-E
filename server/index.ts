@@ -849,7 +849,18 @@ app.use((req, res, next) => {
     } catch (e) {
       console.warn('[INFRA] Subscription cron init failed (Redis may be unavailable):', (e as Error).message);
     }
-    
+
+    // VGU maintenance scheduler — reservation sweeper (§10), ledger repair +
+    // outbox drain (§34/§55) and cost/consistency alerts (§57). Idempotent;
+    // timers are unref'd and it self-disables with VGU_SCHEDULER=off.
+    try {
+      const { startVGUScheduler } = await import('./services/veegpt-scheduler');
+      startVGUScheduler();
+      console.log('[INFRA] VGU maintenance scheduler started (sweep + repair + alerts)');
+    } catch (e) {
+      console.warn('[INFRA] VGU scheduler start failed (Redis may be unavailable):', (e as Error).message);
+    }
+
     // REMOVED: Eager worker starts (Task 5.6: Redis Optimization)
     // startSocialListeningWorker();      // Now lazy: getSocialListeningWorker() called on first job
     // startSocialListeningAIWorker();    // Now lazy: getSocialListeningAIWorker() called on first job

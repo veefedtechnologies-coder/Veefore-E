@@ -4,8 +4,9 @@
  * form: the AI already gathered everything; the user just reviews and confirms.
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Calendar, Send, Loader2, Check, X } from 'lucide-react'
+import { MediaLightbox } from './MediaLightbox'
 
 export type PostPlan = {
   type?: 'post' | 'reel' | 'story'
@@ -51,15 +52,9 @@ export const PostConfirmCard: React.FC<PostConfirmCardProps> = ({
   const media = mediaUrls[0]
   const isVideo = !!media && /\.(mp4|mov|webm|m4v)(\?|$)/i.test(media)
   const [viewerOpen, setViewerOpen] = useState(false)
-  useEffect(() => {
-    if (!viewerOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setViewerOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [viewerOpen])
 
   return (
-    <div className={`mt-2 max-w-md rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800/60 overflow-hidden ${cancelled ? 'opacity-70' : ''}`}>
+    <div className={`mt-2 max-w-md rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800/60 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500 ease-out ${cancelled ? 'opacity-70' : ''}`}>
       <div className="p-3 flex gap-3">
         {media && (
           isVideo ? (
@@ -140,18 +135,12 @@ export const PostConfirmCard: React.FC<PostConfirmCardProps> = ({
       )}
 
       {viewerOpen && media && (
-        <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewerOpen(false)}>
-          <button onClick={() => setViewerOpen(false)} className="absolute top-3 right-3 p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10" title="Close (Esc)">
-            <X className="w-5 h-5" />
-          </button>
-          <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            {isVideo ? (
-              <video src={media} className="max-w-[90vw] max-h-[85vh] rounded-lg" controls autoPlay playsInline />
-            ) : (
-              <img src={media} alt="post media" className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg" />
-            )}
-          </div>
-        </div>
+        <MediaLightbox
+          url={media}
+          mimeType={isVideo ? 'video/mp4' : 'image/jpeg'}
+          name={`post-media${isVideo ? '.mp4' : '.jpg'}`}
+          onClose={() => setViewerOpen(false)}
+        />
       )}
     </div>
   )

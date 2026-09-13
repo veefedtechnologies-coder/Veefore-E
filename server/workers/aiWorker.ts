@@ -33,12 +33,30 @@ export const getAIWorker = (): Worker | null => {
         
         try {
           if (type === 'competitor_analysis') {
-            // Offload competitor analysis to the background
-            const analysisResult = await generateCompetitorAnalysis({
-              competitorUsername: payload.competitorUsername,
-              platform: payload.platform,
-              analysisType: payload.analysisType || 'full_profile'
-            });
+            // Offload competitor analysis to the background. It still runs
+            // through the SAME VGU engine as the synchronous route, so queuing
+            // work is not a way to spend outside the user's budget. The job id
+            // is the idempotency key, so a re-delivered job cannot double-charge.
+            const { withVGUForUser } = await import('../services/veegpt-metering');
+            const { result: analysisResult } = await withVGUForUser(
+              {
+                userId,
+                workspaceId,
+                feature: 'competitor.analysis',
+                requestId: job.id ? `aiworker_${job.id}` : undefined,
+                // Server-generated: a re-delivered BullMQ job is the SAME logical
+                // operation, so it must reuse its reservation even after the first
+                // attempt reached a terminal state.
+                requestIdTrusted: true,
+                meta: { userId, source: 'ai-worker', type },
+              },
+              () =>
+                generateCompetitorAnalysis({
+                  competitorUsername: payload.competitorUsername,
+                  platform: payload.platform,
+                  analysisType: payload.analysisType || 'full_profile',
+                })
+            );
             
             await storage.createCompetitorAnalysis({
               workspaceId: workspaceId,

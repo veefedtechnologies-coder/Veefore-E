@@ -104,12 +104,50 @@ export interface StrategyMissionInput {
   brandVoice: string
   /** Account local language; strategy narration/themes honour it when present (R9). */
   localLanguage?: string
+  /**
+   * The workspace's configured AI settings (model, BYO keys, persona,
+   * creativity, content-safety, memory), loaded once per tick by the loop and
+   * threaded through so THINK honors the same "AI Models" settings the rest of
+   * the app's AI features do. Optional — omitted defaults to `{}`.
+   */
+  workspaceAIPreferences?: UserAIPreferences
   /** The previous Strategy, revised each iteration from the latest MEASURE (R2.6). */
   strategy?: Partial<Strategy> | Record<string, unknown>
   /** LEARN insights feeding the next THINK (R2.6). */
   strategyMemory?: Record<string, unknown>[]
   /** Recent MEASURE progress history feeding the next THINK (R2.6). */
   progress?: { at: Date; value: number }[]
+  /**
+   * The mission's available media inventory (vision-grounded), so THINK proposes
+   * themes/formats the creator can actually produce rather than generic ideas.
+   * Populated by the loop from the mission's Media_Pool (cached vision
+   * descriptions + per-item intent); empty when the pool is empty/unavailable.
+   */
+  mediaInventory?: MediaInventoryItem[]
+  /**
+   * Recent agent memory entries — the last N actions the autopilot has taken
+   * (posts scheduled, automations activated, user instructions). Injected by
+   * the loop so THINK knows what was already done and avoids repeating itself
+   * (e.g. proposing themes already posted recently, re-activating automations
+   * that are already live). This is the autopilot's long-term memory fed into
+   * the planning prompt.
+   */
+  agentMemory?: Array<{
+    role: string
+    content: string
+    at: Date
+    type?: string
+  }>
+}
+
+/** A single available media item summarised for strategy grounding. */
+export interface MediaInventoryItem {
+  /** Pool media type (`image` | `video`). */
+  mediaType?: string
+  /** What the media shows (cached vision description), when analyzed. */
+  description?: string
+  /** The creator's stated intent for the item, when set. */
+  intent?: string
 }
 
 /** Per-call options for {@link StrategyService.deriveStrategy}. */
@@ -312,12 +350,14 @@ export class StrategyService {
   }
 
   /**
-   * Map the Mission's AI preferences for the generation call. The account's
-   * local language becomes the target language so themes/actions honour R9 when
-   * a language is configured.
+   * Map the Mission's AI preferences for the generation call: starts from the
+   * workspace's configured AI settings (model, BYO keys, persona, creativity,
+   * content-safety, memory — the same "AI Models" settings every other AI
+   * feature honors), then overlays the mission's own local language so themes/
+   * actions honour R9 when one is configured.
    */
   private preferences(mission: StrategyMissionInput): UserAIPreferences {
-    const preferences: UserAIPreferences = {}
+    const preferences: UserAIPreferences = { ...(mission.workspaceAIPreferences ?? {}) }
     if (isNonEmptyString(mission.localLanguage)) {
       preferences.multilingual = mission.localLanguage
     }
@@ -351,7 +391,20 @@ export class StrategyService {
       mission.progress && mission.progress.length > 0
         ? JSON.stringify(mission.progress.slice(-10))
         : 'none'
+    const inventory =
+      mission.mediaInventory && mission.mediaInventory.length > 0
+        ? JSON.stringify(mission.mediaInventory.slice(0, 30))
+        : 'none (no media uploaded yet — themes will rely on AI-generated visuals)'
     const language = isNonEmptyString(mission.localLanguage) ? mission.localLanguage : 'English'
+
+    // Recent agent actions help THINK avoid repetition and build on past work.
+    const agentHistory =
+      mission.agentMemory && mission.agentMemory.length > 0
+        ? mission.agentMemory
+            .slice(-15)
+            .map((e) => `[${new Date(e.at).toISOString().slice(0, 10)}] ${e.role.toUpperCase()}: ${e.content}`)
+            .join('\n')
+        : 'none (no previous actions recorded)'
 
     return [
       'You are the strategy engine for an autonomous Instagram growth agent.',
@@ -362,13 +415,24 @@ export class StrategyService {
       `BRAND VOICE: ${mission.brandVoice}`,
       `OUTPUT LANGUAGE for themes and growth actions: ${language}`,
       '',
-      `CURRENT ANALYTICS: ${analytics}`,
+      `CURRENT ANALYTICS (includes audience best-post-times when available): ${analytics}`,
       `NICHE TREND RESEARCH: ${research}`,
+      // Ground the strategy in the media the creator actually has.
+      `AVAILABLE MEDIA INVENTORY (what the creator can post): ${inventory}`,
+      '',
+      'Reason like a growth strategist:',
+      '- Choose themes that match the AVAILABLE MEDIA INVENTORY when it is non-empty;',
+      '  only propose themes needing new media when the inventory cannot cover them.',
+      '- Bias the cadence toward the audience best-post-times in the analytics.',
+      '- Prefer the formats/themes the LEARNED INSIGHTS show performed best.',
+      '- AVOID repeating themes or actions already in the AGENT HISTORY below.',
       '',
       'When revising, refine (do not discard) the prior strategy using what the measured results show:',
       `PRIOR STRATEGY: ${priorStrategy}`,
       `LEARNED INSIGHTS: ${memory}`,
       `RECENT PROGRESS: ${progress}`,
+      '',
+      `AGENT HISTORY (what the autopilot has recently done — do not repeat these):\n${agentHistory}`,
       '',
       'Respond with ONLY a JSON object of this exact shape:',
       '{',

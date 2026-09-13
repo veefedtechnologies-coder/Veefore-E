@@ -1,413 +1,299 @@
-import { Router, Request, Response } from 'express';
-import { z } from 'zod';
+/**
+ * Legacy billing routes.
+ *
+ * This router is now READ-ONLY. Every purchase/verification endpoint it used to
+ * expose has been retired (410) because each priced money from a table that had
+ * drifted from the canonical `server/config/plan-config.ts`, and because
+ * entitlement is now granted exclusively from signed Razorpay webhooks rather
+ * than from client callbacks.
+ *
+ * Purchases live in the v2 API:
+ *   - plans / upgrades   → POST /api/v2/subscription/create | /upgrade
+ *   - AI credit packs    → POST /api/v2/subscription/credits/create-order
+ *   - add-ons            → POST /api/v2/subscription/addon/add
+ *
+ * Mounted exactly once, at /api/billing (see mountBillingRoutes in
+ * server/routes/v1/index.ts) — money endpoints must not be reachable at two
+ * prefixes.
+ *
+ * The request-validation schemas, `validateRequest` and `billingAuditMiddleware`
+ * imports were removed along with the handlers that used them; the remaining
+ * read endpoints take no request body.
+ */
+
+import { Router, Request, Response, type RequestHandler } from 'express';
 import { requireAuth } from '../../middleware/require-auth';
-import { validateRequest } from '../../middleware/validation';
-import { billingAuditMiddleware } from '../../middleware/audit-middleware';
-import { AuditActions } from '../../utils/audit-logger';
 import { storage } from '../../mongodb-storage';
 import { AuthenticatedRequest } from '../../types/express';
 
 const router = Router();
 
-const CreateOrderSchema = z.object({
-  packageId: z.string().min(1, 'Package ID is required'),
-});
+/**
+ * Adapts a handler written against `AuthenticatedRequest` (which carries
+ * `req.user`, populated by `requireAuth`) to Express's `RequestHandler`
+ * signature. `AuthenticatedRequest` is not assignable to `Request`, so passing
+ * these handlers directly produced a TS2769 overload error on every route.
+ * Narrowing here keeps the handlers strongly typed against `req.user`.
+ */
+const authed =
+  (
+    handler: (req: AuthenticatedRequest, res: Response) => unknown
+  ): RequestHandler =>
+  (req, res) =>
+    void handler(req as unknown as AuthenticatedRequest, res);
 
-const CreateSubscriptionSchema = z.object({
-  planId: z.string().min(1, 'Plan ID is required'),
-});
+router.get(
+  '/subscription',
+  requireAuth,
+  authed(async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user.id;
 
-const VerifyPaymentSchema = z.object({
-  razorpay_order_id: z.string().min(1, 'Order ID is required'),
-  razorpay_payment_id: z.string().min(1, 'Payment ID is required'),
-  razorpay_signature: z.string().min(1, 'Signature is required'),
-  type: z.enum(['subscription', 'credits', 'addon']),
-  planId: z.string().optional(),
-  packageId: z.string().optional(),
-});
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-const CreateAddonOrderSchema = z.object({
-  addonId: z.string().min(1, 'Addon ID is required'),
-});
+      const currentPlan = user.plan || 'free';
+      const creditBalance = user.credits || 0;
 
-router.get('/subscription', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user.id;
-    
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      // Resolve the monthly AI-credit allowance from the canonical plan config so
+      // this legacy read can never disagree with what the entitlement engine
+      // actually grants. Unknown/legacy plan strings fall back to the free tier.
+      const { PLAN_CONFIG, isValidPlan } =
+        await import('../../config/plan-config');
+      const canonicalMonthlyCredits = isValidPlan(currentPlan)
+        ? PLAN_CONFIG[currentPlan as keyof typeof PLAN_CONFIG].limits
+            .aiCreditsPerMonth
+        : PLAN_CONFIG.free.limits.aiCreditsPerMonth;
+
+      console.log(
+        `[SUBSCRIPTION] User ${userId} has plan: ${currentPlan} with ${creditBalance} credits`
+      );
+
+      const subscription = {
+        id: 0,
+        plan: currentPlan,
+        status: 'active',
+        userId: userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        priceId: null,
+        subscriptionId: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        canceledAt: null,
+        trialEnd: null,
+        // CONSOLIDATION: this was a hardcoded ladder (free:20, starter:300,
+        // pro:1100, business:2000) that matched neither the canonical
+        // PLAN_CONFIG allowances (free:50, creator:500, pro:2000, business:5000)
+        // nor the real plan set — 'starter' does not exist and 'creator' was
+        // missing entirely, so Creator users were reported the 50-credit fallback.
+        // Read the canonical allowance instead.
+        monthlyCredits: canonicalMonthlyCredits,
+        extraCredits: 0,
+        autoRenew: false,
+        credits: creditBalance,
+        lastUpdated: new Date(),
+      };
+
+      res.json(subscription);
+    } catch (error: any) {
+      console.error('[SUBSCRIPTION] Error:', error);
+      res
+        .status(500)
+        .json({ error: error.message || 'Failed to fetch subscription' });
     }
-    
-    const currentPlan = user.plan || 'free';
-    const creditBalance = user.credits || 0;
-    
-    console.log(`[SUBSCRIPTION] User ${userId} has plan: ${currentPlan} with ${creditBalance} credits`);
-    
-    const subscription = {
-      id: 0,
-      plan: currentPlan,
-      status: 'active',
-      userId: userId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      priceId: null,
-      subscriptionId: null,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
-      canceledAt: null,
-      trialEnd: null,
-      monthlyCredits: currentPlan === 'free' ? 20 : 
-                     currentPlan === 'starter' ? 300 :
-                     currentPlan === 'pro' ? 1100 : 
-                     currentPlan === 'business' ? 2000 : 50,
-      extraCredits: 0,
-      autoRenew: false,
-      credits: creditBalance,
-      lastUpdated: new Date()
-    };
-    
-    res.json(subscription);
-  } catch (error: any) {
-    console.error('[SUBSCRIPTION] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch subscription' });
-  }
-});
+  })
+);
 
-router.get('/subscription/plans', async (req: Request, res: Response) => {
+// Public plan catalogue.
+//
+// CONSOLIDATION: previously returned `pricing-config`'s SUBSCRIPTION_PLANS /
+// CREDIT_PACKAGES / ADDONS verbatim. Those tables disagreed with the canonical
+// `config/plan-config.ts` on plan names, plan prices AND credit-pack prices, so
+// this endpoint advertised numbers the checkout would never actually charge.
+// It now projects the canonical config — the same tables the v2 checkout,
+// renewal webhooks and entitlement engine price from.
+router.get('/subscription/plans', async (_req: Request, res: Response) => {
   try {
-    const pricingConfig = await import('../../pricing-config');
-    
-    res.json({
-      plans: pricingConfig.SUBSCRIPTION_PLANS,
-      creditPackages: pricingConfig.CREDIT_PACKAGES,
-      addons: pricingConfig.ADDONS
-    });
+    const { PLAN_CONFIG, ADDON_CONFIG } =
+      await import('../../config/plan-config');
+
+    const plans: Record<string, unknown> = {};
+    for (const plan of Object.values(PLAN_CONFIG)) {
+      // Enterprise pricing is negotiated off-platform (placeholder 0) — omit it
+      // rather than advertising it as free.
+      if (plan.id === 'enterprise') continue;
+      plans[plan.id] = {
+        id: plan.id,
+        name: plan.name,
+        price: plan.pricing.monthly / 100, // paise → rupees
+        yearlyPrice: plan.pricing.yearly / 100,
+        currency: 'INR',
+        interval: 'month',
+        credits: plan.limits.aiCreditsPerMonth,
+      };
+    }
+
+    // One-time prepaid credit packs, in the shape the legacy clients expect.
+    const creditPackages = Object.values(ADDON_CONFIG)
+      .filter(a => a.priceOneTime !== null)
+      .map(a => ({
+        id: a.type,
+        name: a.name,
+        totalCredits: a.quantityIncrement,
+        price: (a.priceOneTime as number) / 100,
+        currency: 'INR',
+      }));
+
+    // Recurring add-ons.
+    const addons = Object.values(ADDON_CONFIG)
+      .filter(a => a.priceMonthly !== null)
+      .map(a => ({
+        id: a.type,
+        type: a.type,
+        name: a.name,
+        price: (a.priceMonthly as number) / 100,
+        currency: 'INR',
+        interval: 'month',
+        requiredMinPlan: a.requiredMinPlan ?? null,
+      }));
+
+    res.json({ plans, creditPackages, addons });
   } catch (error: any) {
     console.error('[SUBSCRIPTION PLANS] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch subscription plans' });
+    res
+      .status(500)
+      .json({ error: error.message || 'Failed to fetch subscription plans' });
   }
 });
 
-router.get('/credit-transactions', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const transactions = await storage.getCreditTransactions(req.user.id);
-    
-    res.json(transactions);
-  } catch (error: any) {
-    console.error('[CREDIT TRANSACTIONS] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch credit transactions' });
-  }
-});
-
-router.post('/razorpay/create-order',
+router.get(
+  '/credit-transactions',
   requireAuth,
-  validateRequest({ body: CreateOrderSchema }),
-  billingAuditMiddleware(AuditActions.BILLING.CREDIT_PURCHASE),
-  async (req: AuthenticatedRequest, res: Response) => {
+  authed(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { packageId } = req.body;
+      const transactions = await storage.getCreditTransactions(req.user.id);
 
-      if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        return res.status(500).json({ error: 'Razorpay configuration missing' });
-      }
-
-      const Razorpay = (await import('razorpay')).default;
-      const rzp = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-      });
-
-      const { CREDIT_PACKAGES } = await import('../../pricing-config');
-      console.log(`[CREDIT PURCHASE] Available packages:`, CREDIT_PACKAGES.map(p => p.id));
-      console.log(`[CREDIT PURCHASE] Requested package ID: ${packageId}`);
-      const packageData = CREDIT_PACKAGES.find((pkg: any) => pkg.id === packageId);
-      
-      if (!packageData) {
-        console.error(`[CREDIT PURCHASE] Invalid package ID: ${packageId}`);
-        console.error(`[CREDIT PURCHASE] Available package IDs:`, CREDIT_PACKAGES.map(p => p.id));
-        return res.status(400).json({ error: 'Invalid package ID' });
-      }
-
-      const options = {
-        amount: packageData.price * 100,
-        currency: 'INR',
-        receipt: `credit_${packageId}_${Date.now()}`,
-        notes: {
-          userId: req.user.id,
-          packageId,
-          credits: packageData.totalCredits,
-        },
-      };
-
-      console.log(`[CREDIT PURCHASE] Creating order for package ${packageId}: ${packageData.totalCredits} credits, ₹${packageData.price}`);
-      const order = await rzp.orders.create(options);
-
-      res.json({
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        description: `${packageData.name} - ${packageData.totalCredits} Credits`,
-        type: 'credits',
-        packageId: packageId,
-        keyId: process.env.RAZORPAY_KEY_ID
-      });
+      res.json(transactions);
     } catch (error: any) {
-      console.error('[CREDIT PURCHASE] Error:', error);
-      res.status(500).json({ error: error.message || 'Failed to purchase credits' });
+      console.error('[CREDIT TRANSACTIONS] Error:', error);
+      res.status(500).json({
+        error: error.message || 'Failed to fetch credit transactions',
+      });
     }
-  }
+  })
 );
 
-router.post('/razorpay/create-subscription',
+// DISABLED — credit-pack purchase is owned by the v2 flow.
+//
+// CONSOLIDATION: this priced credit packs from `pricing-config.CREDIT_PACKAGES`,
+// which had drifted badly from the canonical `config/plan-config.ADDON_CONFIG`.
+// It OVERCHARGED by roughly 3x — Rs.999 for 500 credits where canonical pricing
+// is Rs.299, and Rs.5999 for 5,000 credits where canonical is Rs.1999 — and
+// offered pack sizes (100 / 1,000 / 2,500) the entitlement system never defined.
+//
+// Superseded by POST /api/v2/subscription/credits/create-order, which derives the
+// amount from ADDON_CONFIG and grants credits only from the verified
+// `payment.captured` webhook.
+router.post(
+  '/razorpay/create-order',
   requireAuth,
-  validateRequest({ body: CreateSubscriptionSchema }),
-  billingAuditMiddleware(AuditActions.BILLING.SUBSCRIPTION_CHANGE),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { planId } = req.body;
-
-      if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        return res.status(500).json({ error: 'Razorpay configuration missing' });
-      }
-
-      const Razorpay = (await import('razorpay')).default;
-      const rzp = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-      });
-
-      const pricingData = await storage.getPricingData();
-      const planData = pricingData.plans[planId];
-      
-      if (!planData) {
-        console.log('[SUBSCRIPTION] Available plans:', Object.keys(pricingData.plans));
-        console.log('[SUBSCRIPTION] Requested plan:', planId);
-        return res.status(400).json({ error: 'Invalid plan ID' });
-      }
-
-      const options = {
-        amount: planData.price * 100,
-        currency: 'INR',
-        receipt: `sub_${planId}_${Date.now()}`,
-        notes: {
-          userId: req.user.id,
-          planId,
-          planName: planData.name,
-        },
-      };
-
-      const order = await rzp.orders.create(options);
-
-      res.json({
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        description: `${planData.name} Subscription - ₹${planData.price}/month`,
-        type: 'subscription',
-        planId: planId
-      });
-    } catch (error: any) {
-      console.error('[SUBSCRIPTION PURCHASE] Error:', error);
-      res.status(500).json({ error: error.message || 'Failed to create subscription' });
-    }
-  }
+  authed((_req: AuthenticatedRequest, res: Response) => {
+    console.warn('[BILLING] Blocked call to disabled /razorpay/create-order');
+    return res.status(410).json({
+      error: 'Endpoint removed',
+      message:
+        'This endpoint priced credit packs from a stale table and has been disabled. ' +
+        'Use POST /api/v2/subscription/credits/create-order instead.',
+    });
+  })
 );
 
-router.post('/razorpay/verify-payment',
+// DISABLED — subscription purchase is owned by the v2 flow.
+//
+// CONSOLIDATION: this created a ONE-OFF Razorpay order priced from
+// `storage.getPricingData()` — a third plan-price source alongside
+// `config/plan-config.ts` and `pricing-config.ts`. Two problems:
+//
+//  1. A one-off order registers no auto-renew mandate, so a "subscription"
+//     bought here would silently never renew.
+//  2. Its prices drift from the canonical PLAN_CONFIG that the entitlement
+//     engine and renewal webhooks use, so the customer could be charged an
+//     amount that does not correspond to the tier they were granted.
+//
+// POST /api/v2/subscription/create supersedes it: it prices from PLAN_CONFIG and
+// creates a real Razorpay subscription mandate.
+router.post(
+  '/razorpay/create-subscription',
   requireAuth,
-  validateRequest({ body: VerifyPaymentSchema }),
-  billingAuditMiddleware(AuditActions.BILLING.PAYMENT),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      console.log('[PAYMENT VERIFICATION] Endpoint hit with body:', req.body);
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, type, planId, packageId } = req.body;
-
-      console.log('[PAYMENT VERIFICATION] Starting verification:', {
-        userId: req.user.id,
-        orderId: razorpay_order_id,
-        paymentId: razorpay_payment_id,
-        type: type,
-        packageId: packageId,
-        planId: planId
-      });
-
-      const crypto = await import('crypto');
-      const hmac = crypto.default.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!);
-      hmac.update(razorpay_order_id + '|' + razorpay_payment_id);
-      const generated_signature = hmac.digest('hex');
-
-      if (generated_signature !== razorpay_signature) {
-        console.log('[PAYMENT VERIFICATION] Signature verification failed');
-        return res.status(400).json({ error: 'Payment verification failed' });
-      }
-
-      console.log('[PAYMENT VERIFICATION] Signature verified successfully');
-
-      console.log('[PAYMENT VERIFICATION] Processing payment type:', type, 'planId:', planId, 'packageId:', packageId);
-      
-      if (type === 'subscription' && planId) {
-        await storage.updateUserSubscription(req.user.id, planId);
-      } else if (type === 'credits' && packageId) {
-        console.log('[CREDIT PURCHASE] Processing credit purchase:', { packageId, userId: req.user.id });
-        
-        const { CREDIT_PACKAGES } = await import('../../pricing-config');
-        console.log('[CREDIT PURCHASE] Available packages:', CREDIT_PACKAGES.map(p => p.id));
-        const packageData = CREDIT_PACKAGES.find((pkg: any) => pkg.id === packageId);
-        
-        if (packageData) {
-          console.log('[CREDIT PURCHASE] Found package:', packageData);
-          console.log('[CREDIT PURCHASE] Adding credits to user:', req.user.id, 'credits:', packageData.totalCredits);
-          
-          await storage.addCreditsToUser(req.user.id, packageData.totalCredits);
-          console.log('[CREDIT PURCHASE] Credits added successfully');
-          
-          await storage.createCreditTransaction({
-            userId: req.user.id,
-            type: 'purchase',
-            amount: packageData.totalCredits,
-            description: `Credit purchase: ${packageData.name}`,
-            workspaceId: null,
-            referenceId: razorpay_payment_id
-          });
-          console.log('[CREDIT PURCHASE] Transaction record created');
-        } else {
-          console.log('[CREDIT PURCHASE] Package not found:', packageId);
-        }
-      } else if (type === 'addon' && packageId) {
-        console.log('[PAYMENT VERIFICATION] Processing addon purchase:', { type, packageId });
-        const pricingData = await storage.getPricingData();
-        console.log('[PAYMENT VERIFICATION] Available addons:', Object.keys(pricingData.addons));
-        const addon = pricingData.addons[packageId];
-        
-        if (addon) {
-          console.log('[ADDON PURCHASE] Creating addon for user:', req.user.id, 'addon:', addon);
-          
-          let targetUserId = req.user.id;
-          
-          console.log('[ADDON PURCHASE] Using userId:', targetUserId, 'for addon creation');
-          
-          try {
-            const createdAddon = await storage.createAddon({
-              userId: targetUserId,
-              type: addon.type,
-              name: addon.name,
-              price: addon.price,
-              isActive: true,
-              expiresAt: null,
-              metadata: { 
-                addonId: packageId, 
-                benefit: addon.benefit,
-                paymentId: razorpay_payment_id,
-                purchaseDate: new Date().toISOString(),
-                autoCreated: true,
-                createdFromPayment: true
-              }
-            });
-            console.log('[ADDON PURCHASE] Successfully created addon:', createdAddon);
-          } catch (addonError: any) {
-            console.error('[ADDON PURCHASE] Failed to create addon:', addonError);
-            console.error('[ADDON PURCHASE] Error details:', {
-              userId: req.user.id,
-              targetUserId: targetUserId,
-              addonType: addon.type,
-              error: addonError?.message || addonError
-            });
-            throw addonError;
-          }
-
-          if (addon.type === 'ai_boost') {
-            await storage.addCreditsToUser(req.user.id, 500);
-            await storage.createCreditTransaction({
-              userId: req.user.id,
-              type: 'addon_purchase',
-              amount: 500,
-              description: `${addon.name} - 500 AI credits`,
-              workspaceId: null,
-              referenceId: razorpay_payment_id
-            });
-          } else if (addon.type === 'workspace') {
-            const currentUser = await storage.getUser(req.user.id);
-            if (currentUser) {
-              await storage.createWorkspace({
-                name: `${currentUser.username}'s Brand Workspace`,
-                description: 'Additional workspace from addon purchase',
-                userId: req.user.id,
-                isDefault: false,
-                theme: 'cosmic',
-                aiPersonality: 'professional'
-              });
-            }
-          }
-        } else {
-          console.log('[ADDON PURCHASE] Addon not found in pricing data for packageId:', packageId);
-          console.log('[ADDON PURCHASE] Available addon IDs:', Object.keys(pricingData.addons));
-        }
-      } else {
-        console.log('[PAYMENT VERIFICATION] No matching payment type processed:', { type, planId: !!planId, packageId: !!packageId });
-      }
-
-      res.json({ success: true, message: 'Payment processed successfully' });
-    } catch (error: any) {
-      console.error('[PAYMENT VERIFICATION] Error:', error);
-      res.status(500).json({ error: error.message || 'Payment verification failed' });
-    }
-  }
+  authed((_req: AuthenticatedRequest, res: Response) => {
+    console.warn(
+      '[BILLING] Blocked call to disabled /razorpay/create-subscription'
+    );
+    return res.status(410).json({
+      error: 'Endpoint removed',
+      message:
+        'This endpoint created a non-renewing order from a stale pricing table. ' +
+        'Use POST /api/v2/subscription/create instead.',
+    });
+  })
 );
 
-router.post('/razorpay/create-addon-order',
+// DISABLED — client-driven payment verification is replaced by webhooks.
+//
+// CONSOLIDATION + SECURITY: this applied entitlement from `type`, `planId` and
+// `packageId` taken out of the REQUEST BODY after only checking the signature. A
+// signature proves the order/payment pair is genuine; it says nothing about what
+// was purchased. It was hardened with order binding, an amount check and a replay
+// guard, but the pattern itself is now unnecessary: granting entitlement from a
+// client callback is inherently weaker than granting it from a signed
+// server-to-server webhook, which cannot be skipped, replayed, or abandoned
+// mid-flow.
+//
+// Entitlement is now granted exclusively by the Razorpay webhook
+// (`payment.captured` for one-time credit packs; `subscription.activated` /
+// `subscription.charged` for plans), which re-reads the order/subscription from
+// Razorpay and re-derives the expected amount from PLAN_CONFIG / ADDON_CONFIG.
+router.post(
+  '/razorpay/verify-payment',
   requireAuth,
-  validateRequest({ body: CreateAddonOrderSchema }),
-  billingAuditMiddleware(AuditActions.BILLING.CREDIT_PURCHASE),
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { addonId } = req.body;
+  authed((_req: AuthenticatedRequest, res: Response) => {
+    console.warn('[BILLING] Blocked call to disabled /razorpay/verify-payment');
+    return res.status(410).json({
+      error: 'Endpoint removed',
+      message:
+        'Entitlement is now granted by the Razorpay webhook, not by client-side ' +
+        'verification. No action is needed after checkout completes.',
+    });
+  })
+);
 
-      if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        return res.status(500).json({ error: 'Razorpay configuration missing' });
-      }
-
-      const Razorpay = (await import('razorpay')).default;
-      const rzp = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-      });
-
-      const pricingConfig = await import('../../pricing-config');
-      const addon = pricingConfig.getAddonById(addonId) as { id: string; name: string; price: number; type: string; benefit: string } | undefined;
-      
-      if (!addon) {
-        console.log('[ADDON] Available addons:', Object.keys(pricingConfig.ADDONS));
-        console.log('[ADDON] Requested addon:', addonId);
-        return res.status(400).json({ error: 'Invalid addon ID' });
-      }
-
-      const options = {
-        amount: addon.price,
-        currency: 'INR',
-        receipt: `addon_${addonId}_${Date.now()}`,
-        notes: {
-          userId: req.user.id,
-          addonId,
-          addonName: addon.name,
-          type: 'addon'
-        },
-      };
-
-      const order = await rzp.orders.create(options);
-      console.log(`[ADDON PURCHASE] Created order for user ${req.user.id}, addon: ${addon.name}`);
-
-      res.json({
-        orderId: order.id,
-        amount: Math.floor(addon.price / 100),
-        currency: 'INR',
-        addon: addon
-      });
-    } catch (error: any) {
-      console.error('[ADDON PURCHASE] Error:', error);
-      res.status(500).json({ error: error.message || 'Failed to create addon order' });
-    }
-  }
+// DISABLED — add-on purchase is owned by the v2 flow.
+//
+// CONSOLIDATION: priced add-ons from `storage.getPricingData().addons` (yet
+// another table) and mixed paise/rupee units inconsistently with the credit-pack
+// route beside it. Recurring add-ons also require a real Razorpay mandate, which
+// a one-off order cannot provide — anything bought here would never renew.
+//
+// Superseded by POST /api/v2/subscription/addon/add, which prices from
+// ADDON_CONFIG, creates a proper subscription mandate for recurring add-ons, and
+// only activates them once payment is confirmed by webhook.
+router.post(
+  '/razorpay/create-addon-order',
+  requireAuth,
+  authed((_req: AuthenticatedRequest, res: Response) => {
+    console.warn(
+      '[BILLING] Blocked call to disabled /razorpay/create-addon-order'
+    );
+    return res.status(410).json({
+      error: 'Endpoint removed',
+      message:
+        'This endpoint priced add-ons from a stale table and created non-renewing ' +
+        'orders. Use POST /api/v2/subscription/addon/add instead.',
+    });
+  })
 );
 
 export default router;

@@ -153,12 +153,25 @@ export const businessInsightGuards = [
 // ---------------------------------------------------------------------------
 
 /**
- * Automation workflows: active subscription + automation feature flag
- * + workflow count within plan limit.
+ * Automation workflows: active subscription + workflow count within plan limit.
+ *
+ * NOTE: there is no `automation` boolean in PlanFeatures — every plan (incl.
+ * Free) supports automation up to its `workflowLimit`. Gating is therefore done
+ * purely by the numeric limit, not a feature flag. (The previous
+ * `requireFeature('automation' as any)` checked a non-existent flag.)
  */
 export const automationGuards = [
   requireSubscription(),
-  requireFeature('automation' as any),
+  requireAutomationLimit('workflows'),
+]
+
+/**
+ * Guard for RE-ENABLING an existing automation rule (toggle/update to enabled).
+ * After a downgrade a user may have MORE active rules than their new plan
+ * allows; this enforces the workflow limit so they can't re-activate beyond it.
+ */
+export const automationToggleGuards = [
+  requireSubscription(),
   requireAutomationLimit('workflows'),
 ]
 

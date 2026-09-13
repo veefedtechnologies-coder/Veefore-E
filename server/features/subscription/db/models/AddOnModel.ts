@@ -26,8 +26,17 @@ export interface IAddOn extends Document {
   type: AddOnType;
   /** Quantity purchased — minimum 1. */
   quantity: number;
-  /** Lifecycle state of the add-on. Defaults to 'active'. */
-  status: 'active' | 'cancelled';
+  /**
+   * Lifecycle state of the add-on. Defaults to 'active'.
+   *
+   * 'pending' — a recurring add-on whose Razorpay subscription has been created
+   * but whose mandate/first charge has NOT yet been confirmed. Pending add-ons
+   * grant NO entitlement (all entitlement queries filter on status 'active'),
+   * which prevents a user from receiving paid add-on limits by starting a
+   * checkout they never complete. The Razorpay `subscription.activated` /
+   * `subscription.charged` webhook promotes it to 'active'.
+   */
+  status: 'active' | 'pending' | 'cancelled';
   /** Razorpay subscription ID (sub_xxx) for recurring add-ons; null for one-time packs. */
   razorpaySubscriptionId: string | null;
   /**
@@ -88,7 +97,7 @@ const AddOnSchema = new Schema<IAddOn>(
     },
     status: {
       type: String,
-      enum: ['active', 'cancelled'],
+      enum: ['active', 'pending', 'cancelled'],
       default: 'active',
     },
     razorpaySubscriptionId: {

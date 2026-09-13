@@ -1,5 +1,5 @@
 import { BaseService } from './BaseService';
-import { userRepository, workspaceRepository } from '../repositories';
+import { userRepository } from '../repositories';
 import { IUser } from '../models/User';
 import { NotFoundError, ValidationError, ConflictError } from '../errors';
 import { syncNicheUpdate } from './niche.util';
@@ -83,14 +83,19 @@ export class UserService extends BaseService {
         await this.processReferral(input.referredBy, userId);
       }
 
-      const workspace = await workspaceRepository.createDefaultWorkspace(
-        userId,
-        `${input.username}'s Workspace`
-      );
-
-      await userRepository.updateById(userId, {
-        workspaceId: (workspace._id as any).toString()
-      });
+      // BUG FIX: this previously always created a placeholder workspace
+      // (`${username}'s Workspace`) with no brand and no social account for
+      // every new signup. That's the source of the orphaned auto-created
+      // workspaces (e.g. "My VeeFore Workspace" / "{username}'s Workspace")
+      // that showed up in the workspace switcher. Per the
+      // workspace-meta-connection spec, a workspace must always represent one
+      // connected brand — it is created ONLY via the Meta OAuth import flow
+      // (WorkspaceService.importAuthorizedBrand) once the user connects a
+      // social account. Zero workspaces is a valid state for a brand-new user
+      // who hasn't connected a brand yet, so we do NOT fabricate one here.
+      // This mirrors the same fix already applied in UserRepository,
+      // UserController, WorkspaceController, AuthController and the
+      // default-workspace-enforcer middleware.
 
       this.log('createUser', 'User created successfully', { userId });
       return user;

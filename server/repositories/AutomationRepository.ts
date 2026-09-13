@@ -103,6 +103,19 @@ export class AutomationRuleRepository extends BaseRepository<IAutomationRule> {
     return this.findAll({ workspaceId, isActive: true });
   }
 
+  /** Rules created by a specific Auto Pilot mission (newest first). */
+  async findByMissionId(missionId: string): Promise<IAutomationRule[]> {
+    const startTime = Date.now();
+    try {
+      const result = await this.model.find({ missionId }).sort({ createdAt: -1 }).exec();
+      logger.db.query('findByMissionId', this.entityName, Date.now() - startTime, { missionId });
+      return result;
+    } catch (error) {
+      logger.db.error('findByMissionId', error, { entityName: this.entityName, missionId });
+      throw new DatabaseError('Failed to find rules by mission', error as Error);
+    }
+  }
+
   async findActiveRules(options?: PaginationOptions) {
     return this.findMany({ isActive: true }, options);
   }

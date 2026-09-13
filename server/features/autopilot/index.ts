@@ -14,10 +14,12 @@
  *  2. Exposes `registerAutoPilot(app)` which must be called once during server
  *     startup to mount routes and initialize queues/workers.
  *
- * Scaffolding note (Task 1): `registerAutoPilot` is intentionally a no-op for
- * now. It is wired into `server/index.ts` so the startup path is in place, but
- * it mounts nothing until the routes and queues land in later tasks. This keeps
- * the server booting cleanly before any endpoints exist.
+ * Routing note (Task 18.1): the `/api/v1/autopilot` router is mounted by
+ * `mountV1Routes` in `server/routes/v1/index.ts` (the design's intended mount
+ * point), so route mounting does NOT happen here. `registerAutoPilot` remains a
+ * no-op reserved for lazy BullMQ queue/worker initialization, and is wired into
+ * `server/index.ts` so that startup hook is in place. This keeps the server
+ * booting cleanly regardless of Redis availability.
  *
  * Satisfies Requirements: 1
  */
@@ -59,10 +61,64 @@ export * from './ports'
  * Safe to call once during server startup.
  */
 export function registerAutoPilot(_app: Express): void {
-  // No-op scaffold. Routes and queue/worker initialization are wired in by
-  // Tasks 17–18. Referencing `_app` intentionally deferred until then.
-  logger.info('[autopilot] registerAutoPilot invoked (no-op scaffold)', {
-    module: 'autopilot',
-    action: 'register',
-  })
+  logger.info('[autopilot] registerAutoPilot invoked', { module: 'autopilot', action: 'register' })
+
+  // Start the BullMQ workers + resume active missions' loops. Fully guarded and
+  // async so it can never break the boot sequence, and a no-op without Redis
+  // (the worker initializers return null when REDIS_URL is absent).
+  void (async () => {
+    try {
+      const [{ getAutopilotLoopWorker }, { getAutopilotPublishWorker }, { getAutopilotBriefWorker }, { getAutopilotAutomationWorker }] =
+        await Promise.all([
+          import('./workers/autopilotLoopWorker'),
+          import('./workers/autopilotPublishWorker'),
+          import('./workers/autopilotBriefWorker'),
+          import('./workers/autopilotAutomationWorker'),
+        ])
+
+      const loop = getAutopilotLoopWorker()
+      const publish = getAutopilotPublishWorker()
+      getAutopilotBriefWorker()
+      getAutopilotAutomationWorker()
+
+      if (!loop || !publish) {
+        logger.warn('[autopilot] workers not started (Redis unavailable) — autonomous loop/publish disabled', {
+          module: 'autopilot',
+        })
+        return
+      }
+
+      // Resume the repeatable Operating-Loop job for every ACTIVE mission, so
+      // after a server restart Auto Pilot keeps sensing/planning/posting toward
+      // the goal without the user having to re-activate.
+      try {
+        const { missionRepository } = await import('./db/repositories')
+        const { AutopilotLoopQueueManager } = await import('./queues/autopilotLoopQueue')
+        const active = await missionRepository.findActiveMissions()
+        let resumed = 0
+        for (const mission of active) {
+          const ok = await AutopilotLoopQueueManager.scheduleMission({
+            missionId: String(mission._id),
+            workspaceId: String(mission.workspaceId),
+          })
+          if (ok) resumed++
+        }
+        logger.info('[autopilot] workers started; resumed active mission loops', {
+          module: 'autopilot',
+          activeMissions: active.length,
+          resumed,
+        })
+      } catch (e) {
+        logger.warn('[autopilot] failed to resume active mission loops', {
+          module: 'autopilot',
+          error: (e as Error).message,
+        })
+      }
+    } catch (e) {
+      logger.warn('[autopilot] worker startup failed', {
+        module: 'autopilot',
+        error: (e as Error).message,
+      })
+    }
+  })()
 }

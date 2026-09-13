@@ -9,6 +9,7 @@ export * from './AI';
 export * from './Automation';
 export * from './Chat';
 export * from './SocialListening';
+export * from './VideoEditor';
 
 export { IMetrics } from './Metrics';
 export { default as MetricsModel } from './Metrics';

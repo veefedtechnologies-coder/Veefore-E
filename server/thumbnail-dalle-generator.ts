@@ -1,8 +1,9 @@
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import axios from 'axios';
+import { createOpenAI } from './services/ai-provider-guard';
 
-const openai = new OpenAI({
+const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 

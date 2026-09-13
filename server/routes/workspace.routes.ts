@@ -75,7 +75,20 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = resolveUserId(req);
     const workspaces = await workspaceService.getUserWorkspaces(userId);
-    return res.json({ success: true, data: workspaces });
+
+    // PLAN ENFORCEMENT: annotate each workspace with `locked: true` when it is
+    // beyond the user's current plan limit. Data is NEVER deleted on downgrade.
+    // Uses the SHARED helper (which internally resolves the Mongo user id from
+    // the firebaseUid `resolveUserId` returns) so the locked flags match the
+    // /api/workspaces list and the SSR bootstrap exactly.
+    const { computeWorkspaceLockState } = await import('../lib/workspace-lock');
+    const lockState = await computeWorkspaceLockState(userId, workspaces as any[]);
+
+    return res.json({
+      success: true,
+      data: lockState.annotated,
+      requiresWorkspaceSelection: lockState.requiresSelection,
+    });
   } catch (err) {
     return handleWorkspaceError(err, res);
   }
@@ -159,6 +172,80 @@ router.get('/active', requireAuth, async (req: Request, res: Response) => {
     };
 
     return res.json({ success: true, data });
+  } catch (err) {
+    return handleWorkspaceError(err, res);
+  }
+});
+
+// ─── POST /preferred-active — Save user's preferred accessible workspace IDs ──
+/**
+ * Persists the user's chosen set of workspaces they want to keep accessible
+ * when their plan limits them to fewer than they own.  The locking logic in
+ * GET / uses this list (instead of always defaulting to oldest-first) so users
+ * can choose WHICH workspace(s) to keep active after a downgrade.
+ *
+ * Expects `{ workspaceIds: string[] }` — must not exceed the user's plan limit.
+ */
+router.post('/preferred-active', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { workspaceIds } = req.body as { workspaceIds?: string[] };
+    if (!Array.isArray(workspaceIds) || workspaceIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'workspaceIds must be a non-empty array' },
+      });
+    }
+
+    const userId = resolveUserId(req);
+
+    // Validate against plan limit
+    const { getEntitlementService } = await import('../features/subscription/services/EntitlementService');
+    const { getRedisClient } = await import('../lib/redis');
+    const SubscriptionRepository = (await import('../features/subscription/db/repositories/SubscriptionRepository')).default;
+    const entitlementService = getEntitlementService(getRedisClient(), new SubscriptionRepository());
+
+    // Resolve mongo user id for entitlement (entitlement keys by mongo _id)
+    const { User } = await import('../models/User/User');
+    const userDoc = await User.findOne({
+      $or: [{ firebaseUid: userId }, { _id: userId }],
+    }).select('_id').lean();
+    const mongoUserId = userDoc ? String((userDoc as any)._id) : userId;
+
+    const maxWorkspaces = await entitlementService.getLimit(mongoUserId, 'maxWorkspaces');
+    if (maxWorkspaces !== Infinity && workspaceIds.length > maxWorkspaces) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'EXCEEDS_PLAN_LIMIT',
+          message: `Your plan allows ${maxWorkspaces} workspace${maxWorkspaces === 1 ? '' : 's'}. You selected ${workspaceIds.length}.`,
+        },
+      });
+    }
+
+    // Verify each workspace belongs to this user (security check)
+    const workspaces = await workspaceService.getUserWorkspaces(userId);
+    const ownedIds = new Set(workspaces.map((w: any) => String(w._id ?? w.id)));
+    const allOwned = workspaceIds.every((id) => ownedIds.has(String(id)));
+    if (!allOwned) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'WORKSPACE_ACCESS_DENIED', message: 'One or more workspace IDs do not belong to you.' },
+      });
+    }
+
+    // Persist the preference — use firebaseUid or _id to match the user doc
+    await User.updateOne(
+      { $or: [{ firebaseUid: userId }, { _id: userId }] },
+      { $set: { preferredWorkspaceIds: workspaceIds } },
+    );
+
+    // Also switch active workspace to the first preferred one
+    const firstId = workspaceIds[0];
+    if (firstId) {
+      try { await workspaceService.switchWorkspace(userId, firstId); } catch { /* non-fatal */ }
+    }
+
+    return res.json({ success: true, data: { preferredWorkspaceIds: workspaceIds } });
   } catch (err) {
     return handleWorkspaceError(err, res);
   }

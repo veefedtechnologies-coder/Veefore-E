@@ -39,6 +39,7 @@
 
 import { logger } from '../../../../config/logger'
 import { analyticsService } from '../../../../services/AnalyticsService'
+import { socialAccountRepository } from '../../../../repositories/SocialAccountRepository'
 import {
   contentSlotRepository,
   type ContentSlotRepository,
@@ -83,6 +84,16 @@ export interface MeasureSlotStore {
   findByMissionAndStatus(missionId: string, status: ContentSlotStatus): Promise<IContentSlot[]>
 }
 
+/**
+ * Read port for resolving the mission's OWN social account, so the goal metric
+ * can be scoped to that account rather than the workspace-wide aggregate.
+ * Defaults to the shared `socialAccountRepository` (tries the external
+ * `accountId` first, then the Mongo `_id`). Kept structural for testability.
+ */
+export interface MeasureAccountReader {
+  getAccountByAnyId(accountId: string): Promise<Record<string, unknown> | null>
+}
+
 /** Write port for appending a MEASURE progress point to the Mission history. */
 export interface MeasureProgressStore {
   appendProgress(missionId: string, point: IMissionProgressPoint): Promise<unknown>
@@ -120,6 +131,14 @@ export interface MeasureMissionInput {
   _id: unknown
   /** Workspace the mission (and its analytics) is bound to (R1.4). */
   workspaceId: unknown
+  /**
+   * The specific social account this mission is growing. The goal metric is
+   * scoped to THIS account (a workspace may connect several accounts, and the
+   * workspace analytics summary sums followers across all of them — which would
+   * over-count a single-account goal). Falls back to the workspace summary when
+   * the account can't be resolved.
+   */
+  accountId?: string
   /** The Goal whose target metric MEASURE records progress toward (R3.4). */
   goal: { metric: MissionMetric }
 }
@@ -176,6 +195,8 @@ export interface MeasureServiceOptions {
   progressStore?: MeasureProgressStore
   /** Optional per-post metrics reader (defaults to none). */
   slotPerformanceReader?: SlotPerformanceReader
+  /** Account read transport for account-scoped metrics (defaults to the shared repo). */
+  accountReader?: MeasureAccountReader
   /** Audit transport for failure records (defaults to the shared service). */
   auditService?: Pick<AutoPilotAuditService, 'record'>
 }
@@ -183,6 +204,21 @@ export interface MeasureServiceOptions {
 const defaultAnalyticsReader: MeasureAnalyticsReader = {
   getPerformanceSummary: (workspaceId, days) =>
     analyticsService.getPerformanceSummary(workspaceId, days),
+}
+
+const defaultAccountReader: MeasureAccountReader = {
+  async getAccountByAnyId(accountId: string) {
+    // The mission's accountId is usually the external platform id; fall back to
+    // the Mongo _id for missions that stored the document id instead.
+    const byExternal = await socialAccountRepository.findByAccountId(accountId)
+    if (byExternal) return byExternal as unknown as Record<string, unknown>
+    try {
+      const byId = await socialAccountRepository.findById(accountId)
+      return (byId as unknown as Record<string, unknown>) ?? null
+    } catch {
+      return null
+    }
+  },
 }
 
 /** Return the first argument that is a finite number, else `null`. */
@@ -229,6 +265,38 @@ export function extractGoalMetricValue(
 }
 
 /**
+ * Extract the goal-metric value from a single social account record (the
+ * mission's own account). This is the account-scoped source of truth used
+ * before the workspace-wide analytics summary, so a mission targeting one
+ * account isn't credited with followers from the workspace's other accounts.
+ * Returns `null` when the account has no usable value for the metric.
+ */
+export function extractAccountMetricValue(
+  account: Record<string, unknown> | null | undefined,
+  metric: MissionMetric,
+): number | null {
+  if (account == null) return null
+  const a = account as {
+    followersCount?: number
+    subscriberCount?: number
+    accountReach?: number
+    totalReach?: number
+    engagementRate?: number
+    avgEngagement?: number
+  }
+  switch (metric) {
+    case 'followers':
+      return firstFinite(a.followersCount, a.subscriberCount)
+    case 'reach':
+      return firstFinite(a.accountReach, a.totalReach)
+    case 'engagement':
+      return firstFinite(a.engagementRate, a.avgEngagement)
+    default:
+      return null
+  }
+}
+
+/**
  * MEASURE stage — records the current goal-metric value into the Mission's
  * progress history and collects per-slot performance for LEARN (R3.4).
  */
@@ -237,6 +305,7 @@ export class MeasureService {
   private readonly slotStore: MeasureSlotStore
   private readonly progressStore: MeasureProgressStore
   private readonly slotPerformanceReader?: SlotPerformanceReader
+  private readonly accountReader: MeasureAccountReader
   private readonly auditService: Pick<AutoPilotAuditService, 'record'>
 
   constructor(options: MeasureServiceOptions = {}) {
@@ -244,6 +313,7 @@ export class MeasureService {
     this.slotStore = options.slotStore ?? (contentSlotRepository as ContentSlotRepository)
     this.progressStore = options.progressStore ?? (missionRepository as MissionRepository)
     this.slotPerformanceReader = options.slotPerformanceReader
+    this.accountReader = options.accountReader ?? defaultAccountReader
     this.auditService = options.auditService ?? autoPilotAuditService
   }
 
@@ -267,12 +337,19 @@ export class MeasureService {
     // still has slot-level signal even on a degraded iteration.
     const perSlot = await this.collectSlotPerformance(mission, missionId)
 
-    // Read the current goal-metric value from the analytics performance summary.
+    // Read the current goal-metric value. Prefer the mission's OWN account
+    // (the workspace analytics summary sums followers across every connected
+    // account, which over-counts a single-account goal — e.g. showing 7 when
+    // the targeted account has 3). Fall back to the workspace summary when the
+    // account can't be resolved or has no value for the metric.
     let value: number | null = null
     try {
-      const summary = await this.analyticsReader.getPerformanceSummary(workspaceId, analyticsDays)
-      if (summary == null) throw new Error('analytics returned no summary')
-      value = extractGoalMetricValue(summary, metric)
+      value = await this.readAccountScopedValue(mission, metric)
+      if (value == null) {
+        const summary = await this.analyticsReader.getPerformanceSummary(workspaceId, analyticsDays)
+        if (summary == null) throw new Error('analytics returned no summary')
+        value = extractGoalMetricValue(summary, metric)
+      }
       if (value == null) throw new Error(`analytics summary has no '${metric}' value`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -317,6 +394,33 @@ export class MeasureService {
     }
 
     return { metric, value, at, recorded, perSlot, analyticsAvailable: true }
+  }
+
+  /**
+   * Resolve the goal-metric value scoped to the mission's own account. Returns
+   * `null` (so the caller falls back to the workspace summary) when the mission
+   * has no account id, the account can't be resolved, or the account carries no
+   * usable value for the metric. Never throws.
+   */
+  private async readAccountScopedValue(
+    mission: MeasureMissionInput,
+    metric: MissionMetric,
+  ): Promise<number | null> {
+    const accountId = mission.accountId != null ? String(mission.accountId) : ''
+    if (!accountId) return null
+    try {
+      const account = await this.accountReader.getAccountByAnyId(accountId)
+      return extractAccountMetricValue(account, metric)
+    } catch (error) {
+      logger.warn('MEASURE: account-scoped metric read failed — falling back to workspace summary', {
+        component: COMPONENT,
+        missionId: String(mission._id),
+        accountId,
+        metric,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return null
+    }
   }
 
   /**

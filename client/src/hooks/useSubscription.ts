@@ -85,13 +85,28 @@ export interface AddOnView {
   currentPeriodEnd: string | null;
 }
 
+/**
+ * Active renewal-failure grace window. Present only while paid access is still
+ * retained (within the 3-day grace period); null once resolved or downgraded.
+ */
+export interface PaymentIssue {
+  status: string;
+  graceEndsAt: string | null;
+  retryCount: number;
+}
+
 export interface SubscriptionMeResponse {
   plan: string;
   billingCycle: string;
   status: string;
+  currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   nextBillingDate: string | null;
+  renewsAt: string | null;
+  accessEndsAt: string | null;
+  autoRenew: boolean;
   cancelAtPeriodEnd: boolean;
+  paymentIssue: PaymentIssue | null;
   limits: SubscriptionLimits;
   usage: SubscriptionUsage;
   aiCredits: AICreditsInfo;
@@ -139,9 +154,14 @@ export interface UseSubscriptionReturn {
   aiCredits: AICreditsInfo | undefined;
   addOns: AddOnView[] | undefined;
   cancelAtPeriodEnd: boolean | undefined;
+  currentPeriodStart: string | null | undefined;
   currentPeriodEnd: string | null | undefined;
   nextBillingDate: string | null | undefined;
+  renewsAt: string | null | undefined;
+  accessEndsAt: string | null | undefined;
+  autoRenew: boolean | undefined;
   billingCycle: string | undefined;
+  paymentIssue: PaymentIssue | null | undefined;
   isLoading: boolean;
   error: Error | null;
 }
@@ -176,9 +196,14 @@ export default function useSubscription(): UseSubscriptionReturn {
     aiCredits: data?.aiCredits,
     addOns: data?.addOns,
     cancelAtPeriodEnd: data?.cancelAtPeriodEnd,
+    currentPeriodStart: data?.currentPeriodStart,
     currentPeriodEnd: data?.currentPeriodEnd,
     nextBillingDate: data?.nextBillingDate,
+    renewsAt: data?.renewsAt,
+    accessEndsAt: data?.accessEndsAt,
+    autoRenew: data?.autoRenew,
     billingCycle: data?.billingCycle,
+    paymentIssue: data?.paymentIssue,
     isLoading,
     error: error ?? null,
   };

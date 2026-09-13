@@ -85,15 +85,37 @@ async function resolveUidFromToken(token: string): Promise<string | undefined> {
   }
 }
 
-/** Clear both auth cookies (same options used when setting / on logout). */
+/**
+ * Clear both auth cookies ROBUSTLY.
+ *
+ * CRITICAL: `auth_token` and `__session` are set with INCONSISTENT scoping across
+ * the codebase — the domain/secure attributes depend on a mix of `NODE_ENV` and a
+ * separate `FRONTEND_URL.startsWith('https')` check. In this deployment
+ * (`NODE_ENV=development` but served over https via the Cloudflare tunnel with
+ * `COOKIE_DOMAIN` set), `auth_token` ends up scoped to `COOKIE_DOMAIN` while a
+ * dev-style logout tried to clear it with NO domain. `clearCookie` only deletes a
+ * cookie when the domain (and path) match how it was set, so the domain-scoped
+ * cookie SURVIVED logout — the server kept resolving a valid session and the
+ * dashboard flashed on the next load. To be bulletproof regardless of how any
+ * given cookie was set, we clear EVERY plausible (domain, secure) variant.
+ */
 function clearAuthCookies(res: Response): void {
-  const isProd = process.env.NODE_ENV === 'production';
-  const domain = isProd ? process.env.COOKIE_DOMAIN : undefined;
-  const clearOpts = { httpOnly: true, secure: isProd, sameSite: 'lax' as const, path: '/', domain };
-  res.clearCookie('auth_token', clearOpts);
-  res.clearCookie('__session', clearOpts);
-  res.clearCookie('auth_token', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
-  res.clearCookie('__session', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+  const cookieDomain = process.env.COOKIE_DOMAIN;
+  const base = { httpOnly: true, sameSite: 'lax' as const, path: '/' };
+  const variants: Array<Record<string, unknown>> = [
+    { ...base },
+    { ...base, secure: true },
+    { ...base, secure: false },
+  ];
+  if (cookieDomain) {
+    variants.push({ ...base, domain: cookieDomain });
+    variants.push({ ...base, domain: cookieDomain, secure: true });
+    variants.push({ ...base, domain: cookieDomain, secure: false });
+  }
+  for (const opts of variants) {
+    res.clearCookie('auth_token', opts as any);
+    res.clearCookie('__session', opts as any);
+  }
 }
 
 /**
@@ -880,9 +902,6 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
  * @requirement 7.4 - Return 200 with success message
  */
 router.post('/logout', async (req: Request, res: Response) => {
-  const isProd = process.env.NODE_ENV === 'production';
-  const domain = isProd ? process.env.COOKIE_DOMAIN : undefined;
-
   // AUTHORITATIVE INVALIDATION: bump the user's sessionVersion BEFORE clearing
   // cookies. This is what makes logout actually stick. Clearing cookies alone is
   // racy — a still-open tab (or the OAuth/session-restore flow) can re-mint
@@ -916,13 +935,9 @@ router.post('/logout', async (req: Request, res: Response) => {
   //    the dashboard even though Firebase is signed out. (Previously this route
   //    cleared a cookie named 'session', which DOES NOT EXIST — the real name is
   //    '__session' — so logout left the user effectively still signed in.)
-  const clearOpts = { httpOnly: true, secure: isProd, sameSite: 'lax' as const, path: '/', domain };
-  res.clearCookie('auth_token', clearOpts);
-  res.clearCookie('__session', clearOpts);
-  // Defensive: also clear without an explicit domain, in case a cookie was set
-  // host-only (no domain attribute) in some environment.
-  res.clearCookie('auth_token', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
-  res.clearCookie('__session', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+  // Clear every plausible (domain, secure) variant — see clearAuthCookies for why
+  // a single dev-style clear left the domain-scoped `auth_token` alive after logout.
+  clearAuthCookies(res);
 
   console.log('[OAuth] User logged out — cleared auth_token + __session');
 

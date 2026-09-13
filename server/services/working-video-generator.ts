@@ -12,6 +12,7 @@ import Replicate from 'replicate';
 import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
+import { createOpenAI } from './ai-provider-guard';
 
 interface VideoJob {
   id: string;
@@ -40,7 +41,7 @@ export class WorkingVideoGenerator {
       : join(process.cwd(), 'media', 'generated');
     this.outputDir = baseDir;
     
-    this.openai = new OpenAI({
+    this.openai = createOpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
     this.replicate = new Replicate({

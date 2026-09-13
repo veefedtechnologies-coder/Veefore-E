@@ -66,6 +66,17 @@ function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0
 }
 
+/** Convert a Mongoose Map or plain object of country→count to a plain record. */
+function toCountryRecord(mapOrObj: unknown): Record<string, number> {
+  if (!mapOrObj) return {}
+  const obj = mapOrObj instanceof Map ? Object.fromEntries(mapOrObj) : (mapOrObj as Record<string, unknown>)
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = v
+  }
+  return out
+}
+
 /**
  * Return active Facebook SocialAccount records for a workspace.
  * Filters by `platform === 'facebook'` and `isActive === true`.
@@ -162,53 +173,41 @@ export class FacebookRollupReadStore
           // worker), returns null when coverage is incomplete, and enqueues a
           // background backfill automatically. On first connect the backfill runs
           // immediately (phase 0) so data populates within minutes.
+          // READ PATH IS DB-ONLY (DATA_ARCHITECTURE.md: reads are served
+          // Redis → MongoDB, never live Meta). `allowPartial` makes the durable
+          // store return whatever per-day data IS stored even when a window
+          // isn't fully covered (e.g. today not yet synced), instead of null —
+          // so a coverage miss no longer fans out into duplicate live Graph API
+          // calls (which previously fired for BOTH the current and compare
+          // windows, per account, on every dashboard load). Gaps self-heal via
+          // the background backfill the store enqueues.
           let metricsFromStore: Record<string, number> | null = null
           try {
             const { getFacebookInsightsRange } = await import('./facebookInsightsHistory')
-            metricsFromStore = await getFacebookInsightsRange(query.workspaceId, accountId, accessToken, from, to)
+            metricsFromStore = await getFacebookInsightsRange(
+              query.workspaceId, accountId, accessToken, from, to, { allowPartial: true }
+            )
           } catch {
-            // non-fatal — fall through to live API
+            // non-fatal — treated as no stored metrics below
           }
 
-          let rawMetrics: Record<string, number>
-
+          let rawMetrics: Record<string, number> = {}
           if (metricsFromStore !== null) {
-            // ── Served from durable store — map raw FB keys to normalized names ──
-            logger.info('[FacebookRollupReadStore] served from durable store', { accountId, keys: Object.keys(metricsFromStore) })
-
-            // Map the raw stored keys to the normalized metric names
             const { mapFacebookRawMetrics } = await import('./normalizeMetrics')
             rawMetrics = mapFacebookRawMetrics(metricsFromStore)
-          } else {
-            // ── Durable store not ready — fall back to live API (existing path) ──
-            logger.info('[FacebookRollupReadStore] durable store miss — falling back to live API', { accountId })
-
-            // Fetch analytics and profile in parallel
-            const [analyticsResult, profileResult] = await Promise.allSettled([
-              this.provider.getAnalytics({ accessToken, accountId, from, to }),
-              this.provider.getProfile(accessToken, accountId),
-            ])
-
-            const result = analyticsResult.status === 'fulfilled' ? analyticsResult.value : { metrics: {} }
-            const profile = profileResult.status === 'fulfilled' ? profileResult.value : null
-
-            if (analyticsResult.status === 'rejected') {
-              logger.warn('[FacebookRollupReadStore] analytics fetch failed', { accountId, error: (analyticsResult.reason as Error)?.message })
-            }
-            if (profileResult.status === 'rejected') {
-              logger.warn('[FacebookRollupReadStore] profile fetch failed', { accountId, error: (profileResult.reason as Error)?.message })
-            }
-            logger.info('[FacebookRollupReadStore] analytics result', { accountId, metricKeys: Object.keys(result.metrics), profileFollowers: profile?.followersCount })
-
-            rawMetrics = { ...result.metrics }
-
-            // Inject followers_total from the profile (fan_count)
-            if (profile && typeof profile.followersCount === 'number') {
-              rawMetrics.followers_total = profile.followersCount
-            }
           }
 
           const metrics = { ...rawMetrics }
+
+          // followers_total = current audience size from the already-synced
+          // SocialAccount (fan_count, refreshed every 2h by syncFacebookAccount).
+          // No Graph API call. Prefer it when the per-day snapshot is absent/zero
+          // (partial window), otherwise keep the stored window-end snapshot.
+          const syncedFollowers = (acc as any).followersCount
+          if ((!metrics.followers_total || metrics.followers_total === 0) &&
+              typeof syncedFollowers === 'number' && syncedFollowers > 0) {
+            metrics.followers_total = syncedFollowers
+          }
 
           // Also inject published_posts from stored Content if not in analytics
           if (!metrics.published_posts) {
@@ -371,13 +370,31 @@ export class FacebookRollupReadStore
 
     const results = await Promise.allSettled(
       accounts.map(async (acc) => {
+        // DB-FIRST: use the audience distribution already stored on the
+        // SocialAccount so the dashboard read path stays off Meta
+        // (DATA_ARCHITECTURE.md). Only when it's missing (e.g. never fetched
+        // yet) do we fetch once from the Graph API and WRITE IT THROUGH to the
+        // account, so every subsequent load is served from the DB — no repeated
+        // per-load Meta calls.
+        const stored = toCountryRecord((acc as any).audienceCountry)
+        if (Object.keys(stored).length > 0) return stored
+
         const accessToken = getAccessTokenFromAccount(acc)
-        if (!accessToken) return {}
-
         const accountId = String(acc.accountId ?? '')
-        if (!accountId) return {}
+        if (!accessToken || !accountId) return {}
 
-        return this.fetchFansByCountry(accessToken, accountId)
+        const fetched = await this.fetchFansByCountry(accessToken, accountId)
+        if (Object.keys(fetched).length > 0) {
+          try {
+            await socialAccountRepository.updateById(String((acc as any)._id ?? accountId), {
+              audienceCountry: fetched,
+              updatedAt: new Date(),
+            } as any)
+          } catch (e) {
+            logger.warn('[FacebookRollupReadStore] failed to persist audienceCountry', { accountId, error: (e as Error)?.message })
+          }
+        }
+        return fetched
       })
     )
 
@@ -410,33 +427,51 @@ export class FacebookRollupReadStore
    * Requirements: 7.6
    */
   async getTopContent(query: RollupReadQuery): Promise<TopItem[]> {
-    const accounts = await activeFacebookAccounts(query.workspaceId)
-    if (accounts.length === 0) return []
-
-    const allItems: (TopItem & { _sort: number })[] = []
-
-    const results = await Promise.allSettled(
-      accounts.map(async (acc) => {
-        const accessToken = getAccessTokenFromAccount(acc)
-        if (!accessToken) return []
-
-        const accountId = String(acc.accountId ?? '')
-        if (!accountId) return []
-
-        return this.fetchTopPosts(accessToken, accountId, query)
+    // DB-ONLY (DATA_ARCHITECTURE.md — reads never hit Meta). Facebook posts and
+    // their metrics are already persisted to the Content collection by the
+    // 2-hourly syncFacebookAccount, so we rank stored posts here instead of
+    // re-fetching them from the Graph API on every dashboard load (which
+    // duplicated the sync's work). Mirrors the Instagram top-content read.
+    try {
+      const { ContentModel } = await import('../../../models/Content/Content')
+      const rows = (await ContentModel.find({
+        workspaceId: query.workspaceId,
+        platform: 'facebook',
+        status: 'published',
       })
-    )
+        .sort({ publishedAt: -1 })
+        .limit(50)
+        .lean()) as any[]
 
-    for (const r of results) {
-      if (r.status === 'fulfilled') {
-        allItems.push(...r.value)
-      }
+      const items = rows.map((r) => {
+        const m = r.metrics ?? {}
+        const likes = num(m.likes)
+        const comments = num(m.comments)
+        const shares = num(m.shares)
+        const engagements = likes + comments + shares
+        const cd = r.contentData ?? {}
+        return {
+          id: String(r._id),
+          label: r.title || cd.message || cd.story || 'Facebook post',
+          value: engagements,
+          secondary: `${engagements.toLocaleString()} engagements`,
+          thumbnailUrl: cd.full_picture || undefined,
+          mediaType: cd.full_picture ? 'IMAGE' : 'TEXT',
+          permalink: cd.permalink_url,
+          publishedAt: r.publishedAt ? new Date(r.publishedAt).toISOString() : undefined,
+          metrics: { likes, comments, shares, engagements },
+          _sort: engagements,
+        }
+      })
+
+      return items
+        .sort((a, b) => b._sort - a._sort)
+        .slice(0, 10)
+        .map(({ _sort, ...item }) => item)
+    } catch (err) {
+      logger.warn('[FacebookRollupReadStore] getTopContent DB read failed', { error: (err as Error)?.message })
+      return []
     }
-
-    return allItems
-      .sort((a, b) => b._sort - a._sort)
-      .slice(0, 10)
-      .map(({ _sort, ...item }) => item)
   }
 
   // -------------------------------------------------------------------------
@@ -486,80 +521,6 @@ export class FacebookRollupReadStore
     }
   }
 
-  /**
-   * Fetch up to 25 recent posts for a Facebook Page with engagement fields:
-   * reactions count, comments, shares, full_picture, permalink_url, and
-   * created_time. Returns scored `TopItem` objects ready for sorting.
-   */
-  private async fetchTopPosts(
-    accessToken: string,
-    accountId: string,
-    query: RollupReadQuery
-  ): Promise<(TopItem & { _sort: number })[]> {
-    try {
-      const since = query.from
-        ? String(Math.floor(new Date(query.from).getTime() / 1000))
-        : undefined
-      const until = query.to
-        ? String(Math.floor(new Date(query.to).getTime() / 1000))
-        : undefined
-
-      const url = new URL(`${FB_GRAPH_BASE}/${FB_API_VERSION}/${accountId}/posts`)
-      url.searchParams.set(
-        'fields',
-        'id,message,created_time,full_picture,permalink_url,reactions.summary(true),comments.summary(true),shares'
-      )
-      url.searchParams.set('limit', '25')
-      url.searchParams.set('access_token', accessToken)
-      if (since) url.searchParams.set('since', since)
-      if (until) url.searchParams.set('until', until)
-
-      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(15_000) })
-      if (!response.ok) return []
-
-      const json = (await response.json()) as {
-        data?: Array<{
-          id: string
-          message?: string
-          created_time?: string
-          full_picture?: string
-          permalink_url?: string
-          reactions?: { summary?: { total_count?: number } }
-          comments?: { summary?: { total_count?: number } }
-          shares?: { count?: number }
-        }>
-      }
-
-      return (json.data ?? []).map((post) => {
-        const likes = num(post.reactions?.summary?.total_count)
-        const comments = num(post.comments?.summary?.total_count)
-        const shares = num(post.shares?.count)
-        const engagements = likes + comments + shares
-
-        const item: TopItem & { _sort: number } = {
-          id: post.id,
-          label: post.message
-            ? post.message.slice(0, 80) + (post.message.length > 80 ? '…' : '')
-            : 'Facebook post',
-          value: engagements,
-          secondary: `${engagements.toLocaleString()} engagements`,
-          thumbnailUrl: post.full_picture,
-          permalink: post.permalink_url,
-          publishedAt: post.created_time,
-          metrics: {
-            likes,
-            comments,
-            shares,
-            engagements,
-          },
-          _sort: engagements,
-        }
-        return item
-      })
-    } catch {
-      return []
-    }
-  }
 }
 
 /** Singleton instance — consumed by MultiPlatformRollupStore. */

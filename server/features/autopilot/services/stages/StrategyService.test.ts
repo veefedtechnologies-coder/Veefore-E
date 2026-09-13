@@ -352,3 +352,40 @@ describe('Property — a valid strategy payload round-trips its fields', () => {
     )
   })
 })
+
+// ─── Media-inventory grounding (Intelligence overhaul · reasoned planning) ──
+
+describe('StrategyService.deriveStrategy — media-inventory grounding', () => {
+  it('includes the available media inventory in the prompt when present', async () => {
+    const generateJSON = vi.fn(async () => validPayload())
+    const { svc } = makeService(generateJSON)
+
+    await svc.deriveStrategy(
+      {
+        ...mission,
+        mediaInventory: [
+          { mediaType: 'video', description: 'a home gym kettlebell workout', intent: 'promote the plan' },
+          { mediaType: 'image', description: 'a colorful vegan buddha bowl' },
+        ],
+      },
+      senseFull(),
+    )
+
+    const prompt = generateJSON.mock.calls[0][0] as string
+    expect(prompt).toContain('AVAILABLE MEDIA INVENTORY')
+    expect(prompt).toContain('a home gym kettlebell workout')
+    expect(prompt).toContain('a colorful vegan buddha bowl')
+    expect(prompt).toContain('promote the plan')
+  })
+
+  it('notes an empty inventory rather than omitting the section', async () => {
+    const generateJSON = vi.fn(async () => validPayload())
+    const { svc } = makeService(generateJSON)
+
+    await svc.deriveStrategy({ ...mission, mediaInventory: [] }, senseFull())
+
+    const prompt = generateJSON.mock.calls[0][0] as string
+    expect(prompt).toContain('AVAILABLE MEDIA INVENTORY')
+    expect(prompt).toContain('no media uploaded yet')
+  })
+})

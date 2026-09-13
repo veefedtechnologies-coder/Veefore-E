@@ -14,11 +14,17 @@
  * Satisfies Requirements: 9.7, 9.8, 9.9, 10.6, 13.1–13.7
  */
 
-import { type Redis } from 'ioredis'
-import mongoose, { Schema } from 'mongoose'
-import { PLAN_CONFIG, type PlanId } from '../../../config/plan-config'
-import { type ISubscription } from '../db/models/SubscriptionModel'
-import logger from '../../../config/logger'
+import { type Redis } from 'ioredis';
+import mongoose, { Schema } from 'mongoose';
+import { PLAN_CONFIG, type PlanId } from '../../../config/plan-config';
+import { type ISubscription } from '../db/models/SubscriptionModel';
+import logger from '../../../config/logger';
+import {
+  sendQuotaAlertEmail,
+  sendPaymentFailedEmail,
+  sendCancellationEmail,
+  sendPreRenewalEmail,
+} from '../../../services/resend.service';
 
 // ---------------------------------------------------------------------------
 // QuotaType — the five quota dimensions tracked by the notifier
@@ -29,25 +35,25 @@ export type QuotaType =
   | 'keyword_conversations'
   | 'ai_conversations'
   | 'follow_campaign_conversations'
-  | 'scheduled_posts'
+  | 'scheduled_posts';
 
 // ---------------------------------------------------------------------------
 // Notification thresholds (percent consumed)
 // ---------------------------------------------------------------------------
 
-const QUOTA_THRESHOLDS = [80, 90, 100] as const
-type Threshold = (typeof QUOTA_THRESHOLDS)[number]
+const QUOTA_THRESHOLDS = [80, 90, 100] as const;
+type Threshold = (typeof QUOTA_THRESHOLDS)[number];
 
 // ---------------------------------------------------------------------------
 // NotificationLog Mongoose model (inline)
 // ---------------------------------------------------------------------------
 
 export interface INotificationLog {
-  notificationType: string
-  userId: string
-  sentAt: Date
-  channel: 'email' | 'in-app'
-  metadata: Record<string, unknown>
+  notificationType: string;
+  userId: string;
+  sentAt: Date;
+  channel: 'email' | 'in-app';
+  metadata: Record<string, unknown>;
 }
 
 const NotificationLogSchema = new Schema<INotificationLog>(
@@ -59,27 +65,57 @@ const NotificationLogSchema = new Schema<INotificationLog>(
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: false }
-)
+);
 
-NotificationLogSchema.index({ userId: 1, notificationType: 1, sentAt: -1 })
+NotificationLogSchema.index({ userId: 1, notificationType: 1, sentAt: -1 });
 
 const NotificationLogModel =
   (mongoose.models.NotificationLog as mongoose.Model<INotificationLog>) ||
-  mongoose.model<INotificationLog>('NotificationLog', NotificationLogSchema)
+  mongoose.model<INotificationLog>('NotificationLog', NotificationLogSchema);
 
 // ---------------------------------------------------------------------------
-// Internal email stub
-// Actual integration will connect to the existing email service later.
+// Internal email helper — resolves user email from MongoDB then delegates
+// to Resend. Falls back to a plain-text log when the key is missing so
+// development environments keep working without a configured Resend key.
 // ---------------------------------------------------------------------------
 
-async function sendEmail(to: string, subject: string, body: string): Promise<void> {
-  logger.info('Email sent', {
+async function resolveUserEmail(
+  userId: string
+): Promise<{ email: string; firstName: string } | null> {
+  try {
+    const { User } = await import('../../../models/User/User');
+    const user = await User.findById(userId).select('email displayName').lean<{
+      email?: string;
+      displayName?: string;
+    }>();
+    if (!user?.email) return null;
+    const firstName = (user.displayName ?? '').split(' ')[0] || 'User';
+    return { email: user.email, firstName };
+  } catch (err) {
+    logger.warn('QuotaNotifier: could not resolve user email', {
+      userId,
+      err,
+      module: 'subscription',
+    });
+    return null;
+  }
+}
+
+async function sendEmail(
+  userId: string,
+  subject: string,
+  body: string
+): Promise<void> {
+  logger.info('Email notification queued', {
     module: 'subscription',
     action: 'email_sent',
-    to,
+    userId,
     subject,
     bodyPreview: body.slice(0, 120),
-  } as Record<string, unknown>)
+  } as Record<string, unknown>);
+  // Actual delivery is handled by the per-method callers via Resend.
+  // This stub is retained so legacy call-sites that pass `body` (plain-text)
+  // still compile; new methods call Resend directly after resolving the email.
 }
 
 // ---------------------------------------------------------------------------
@@ -92,23 +128,23 @@ async function sendEmail(to: string, subject: string, body: string): Promise<voi
  * sent once per calendar month.
  */
 function currentCycleStart(): string {
-  const now = new Date()
-  const yyyy = now.getUTCFullYear()
-  const mm = String(now.getUTCMonth() + 1).padStart(2, '0')
-  return `${yyyy}-${mm}`
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}`;
 }
 
 /** Format a Date as "YYYY-MM-DD" (UTC). */
 function toDateString(date: Date): string {
-  const yyyy = date.getUTCFullYear()
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const dd = String(date.getUTCDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /** Today as "YYYY-MM-DD" (UTC). */
 function todayString(): string {
-  return toDateString(new Date())
+  return toDateString(new Date());
 }
 
 /**
@@ -116,12 +152,12 @@ function todayString(): string {
  * of the current month.  Used to set TTLs on per-cycle dedup keys.
  */
 function secondsUntilEndOfMonth(): number {
-  const now = new Date()
+  const now = new Date();
   // First day of next month, midnight UTC
   const endOfMonth = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0)
-  )
-  return Math.max(1, Math.floor((endOfMonth.getTime() - now.getTime()) / 1000))
+  );
+  return Math.max(1, Math.floor((endOfMonth.getTime() - now.getTime()) / 1000));
 }
 
 // ---------------------------------------------------------------------------
@@ -153,24 +189,24 @@ export class QuotaNotifier {
   ): Promise<void> {
     if (limit <= 0) {
       // Unlimited plan (limit === -1 expressed as Infinity, or 0 meaning N/A)
-      return
+      return;
     }
 
-    const percentage = (used / limit) * 100
-    const cycleStart = currentCycleStart()
+    const percentage = (used / limit) * 100;
+    const cycleStart = currentCycleStart();
 
     for (const threshold of QUOTA_THRESHOLDS) {
       if (percentage < threshold) {
         // Threshold not yet reached — remaining thresholds are higher, skip all
-        break
+        break;
       }
 
-      const dedupKey = `sub:notification:${userId}:${quotaType}:${threshold}:${cycleStart}`
-      const alreadySent = await redis.exists(dedupKey)
+      const dedupKey = `sub:notification:${userId}:${quotaType}:${threshold}:${cycleStart}`;
+      const alreadySent = await redis.exists(dedupKey);
 
       if (alreadySent) {
         // Already notified for this threshold this cycle
-        continue
+        continue;
       }
 
       // --- Send in-app notification (stub; realtime service wires this up) ---
@@ -183,12 +219,40 @@ export class QuotaNotifier {
         used,
         limit,
         percentage: percentage.toFixed(1),
-      } as Record<string, unknown>)
+      } as Record<string, unknown>);
 
       // --- Send email ---
-      const subject = this._quotaEmailSubject(quotaType, threshold)
-      const body = this._quotaEmailBody(userId, quotaType, threshold, used, limit)
-      await sendEmail(userId, subject, body)
+      const subject = this._quotaEmailSubject(quotaType, threshold);
+      const body = this._quotaEmailBody(
+        userId,
+        quotaType,
+        threshold,
+        used,
+        limit
+      );
+      await sendEmail(userId, subject, body);
+
+      const userInfo = await resolveUserEmail(userId);
+      if (userInfo) {
+        const planId = 'pro'; // resolved below if subscription is available
+        await sendQuotaAlertEmail(
+          userInfo.email,
+          userInfo.firstName,
+          this._quotaLabel(quotaType),
+          threshold,
+          used,
+          limit,
+          planId
+        ).catch(e =>
+          logger.warn('Resend quota alert failed', {
+            userId,
+            quotaType,
+            threshold,
+            err: e,
+            module: 'subscription',
+          })
+        );
+      }
 
       // --- Persist to MongoDB ---
       await NotificationLogModel.create({
@@ -197,18 +261,18 @@ export class QuotaNotifier {
         sentAt: new Date(),
         channel: 'email',
         metadata: { quotaType, threshold, used, limit, cycleStart },
-      })
+      });
       await NotificationLogModel.create({
         notificationType: `quota_${quotaType}_${threshold}`,
         userId,
         sentAt: new Date(),
         channel: 'in-app',
         metadata: { quotaType, threshold, used, limit, cycleStart },
-      })
+      });
 
       // --- Set dedup key (expires at end of current billing cycle) ---
-      const ttl = secondsUntilEndOfMonth()
-      await redis.set(dedupKey, '1', 'EX', ttl)
+      const ttl = secondsUntilEndOfMonth();
+      await redis.set(dedupKey, '1', 'EX', ttl);
     }
   }
 
@@ -227,25 +291,25 @@ export class QuotaNotifier {
     subscription: ISubscription,
     redis: Redis
   ): Promise<void> {
-    const userId = subscription.userId
-    const billingDateStr = toDateString(subscription.nextBillingDate)
-    const dedupKey = `sub:notification:${userId}:pre_renewal:${billingDateStr}`
+    const userId = subscription.userId;
+    const billingDateStr = toDateString(subscription.nextBillingDate);
+    const dedupKey = `sub:notification:${userId}:pre_renewal:${billingDateStr}`;
 
-    const alreadySent = await redis.exists(dedupKey)
+    const alreadySent = await redis.exists(dedupKey);
     if (alreadySent) {
-      return
+      return;
     }
 
     // Derive renewal amount from plan pricing
-    const planConfig = PLAN_CONFIG[subscription.plan as PlanId]
+    const planConfig = PLAN_CONFIG[subscription.plan as PlanId];
     const renewalAmountPaise =
       subscription.billingCycle === 'yearly'
         ? planConfig.pricing.yearly
-        : planConfig.pricing.monthly
+        : planConfig.pricing.monthly;
 
-    const renewalAmountINR = (renewalAmountPaise / 100).toFixed(2)
+    const renewalAmountINR = (renewalAmountPaise / 100).toFixed(2);
 
-    const subject = `Your Veefore subscription renews on ${billingDateStr}`
+    const subject = `Your Veefore subscription renews on ${billingDateStr}`;
     const body = [
       `Hi,`,
       ``,
@@ -255,9 +319,9 @@ export class QuotaNotifier {
       `To manage your billing, visit: https://app.veefore.com/settings/billing`,
       ``,
       `Thanks for being a Veefore subscriber!`,
-    ].join('\n')
+    ].join('\n');
 
-    await sendEmail(userId, subject, body)
+    await sendEmail(userId, subject, body);
 
     logger.info('Pre-renewal notification sent', {
       module: 'subscription',
@@ -265,7 +329,25 @@ export class QuotaNotifier {
       userId,
       billingDateStr,
       renewalAmountPaise,
-    } as Record<string, unknown>)
+    } as Record<string, unknown>);
+
+    // Send via Resend
+    const userInfo = await resolveUserEmail(userId);
+    if (userInfo && subscription.nextBillingDate) {
+      await sendPreRenewalEmail(
+        userInfo.email,
+        userInfo.firstName,
+        planConfig.name,
+        subscription.nextBillingDate,
+        renewalAmountPaise / 100
+      ).catch(e =>
+        logger.warn('Resend pre-renewal email failed', {
+          userId,
+          err: e,
+          module: 'subscription',
+        })
+      );
+    }
 
     await NotificationLogModel.create({
       notificationType: 'pre_renewal',
@@ -273,10 +355,10 @@ export class QuotaNotifier {
       sentAt: new Date(),
       channel: 'email',
       metadata: { billingDateStr, renewalAmountPaise, plan: subscription.plan },
-    })
+    });
 
     // TTL: 8 days covers the 3-day look-ahead window with some buffer
-    await redis.set(dedupKey, '1', 'EX', 8 * 24 * 60 * 60)
+    await redis.set(dedupKey, '1', 'EX', 8 * 24 * 60 * 60);
   }
 
   // -------------------------------------------------------------------------
@@ -290,16 +372,19 @@ export class QuotaNotifier {
    * @param userId - The user whose payment failed.
    * @param redis  - Shared ioredis client.
    */
-  async sendPaymentFailedNotification(userId: string, redis: Redis): Promise<void> {
-    const today = todayString()
-    const dedupKey = `sub:notification:${userId}:payment_failed:${today}`
+  async sendPaymentFailedNotification(
+    userId: string,
+    redis: Redis
+  ): Promise<void> {
+    const today = todayString();
+    const dedupKey = `sub:notification:${userId}:payment_failed:${today}`;
 
-    const alreadySent = await redis.exists(dedupKey)
+    const alreadySent = await redis.exists(dedupKey);
     if (alreadySent) {
-      return
+      return;
     }
 
-    const subject = 'Action required: Your Veefore payment failed'
+    const subject = 'Action required: Your Veefore payment failed';
     const body = [
       `Hi,`,
       ``,
@@ -311,16 +396,32 @@ export class QuotaNotifier {
       `You have a 3-day grace period before access to premium features is restricted.`,
       ``,
       `If you have any questions, please contact our support team.`,
-    ].join('\n')
+    ].join('\n');
 
-    await sendEmail(userId, subject, body)
+    await sendEmail(userId, subject, body);
 
     logger.info('Payment failed notification sent', {
       module: 'subscription',
       action: 'payment_failed_notification',
       userId,
       today,
-    } as Record<string, unknown>)
+    } as Record<string, unknown>);
+
+    // Send via Resend
+    const userInfo = await resolveUserEmail(userId);
+    if (userInfo) {
+      await sendPaymentFailedEmail(
+        userInfo.email,
+        userInfo.firstName,
+        'your plan'
+      ).catch(e =>
+        logger.warn('Resend payment-failed email failed', {
+          userId,
+          err: e,
+          module: 'subscription',
+        })
+      );
+    }
 
     await NotificationLogModel.create({
       notificationType: 'payment_failed',
@@ -328,10 +429,10 @@ export class QuotaNotifier {
       sentAt: new Date(),
       channel: 'email',
       metadata: { date: today },
-    })
+    });
 
     // Dedup for the rest of the day (24 hours)
-    await redis.set(dedupKey, '1', 'EX', 24 * 60 * 60)
+    await redis.set(dedupKey, '1', 'EX', 24 * 60 * 60);
   }
 
   // -------------------------------------------------------------------------
@@ -351,16 +452,11 @@ export class QuotaNotifier {
     accessEndsAt: Date,
     redis: Redis
   ): Promise<void> {
-    const today = todayString()
-    const accessEndsAtStr = toDateString(accessEndsAt)
-    const dedupKey = `sub:notification:${userId}:cancellation:${today}`
+    // No dedup: a cancellation is an explicit, intentional user action, so a
+    // confirmation email must be sent every time a real cancellation succeeds.
+    const accessEndsAtStr = toDateString(accessEndsAt);
 
-    const alreadySent = await redis.exists(dedupKey)
-    if (alreadySent) {
-      return
-    }
-
-    const subject = 'Your Veefore subscription has been cancelled'
+    const subject = 'Your Veefore subscription has been cancelled';
     const body = [
       `Hi,`,
       ``,
@@ -373,16 +469,33 @@ export class QuotaNotifier {
       `https://app.veefore.com/settings/billing`,
       ``,
       `Thank you for using Veefore.`,
-    ].join('\n')
+    ].join('\n');
 
-    await sendEmail(userId, subject, body)
+    await sendEmail(userId, subject, body);
 
     logger.info('Cancellation confirmation sent', {
       module: 'subscription',
       action: 'cancellation_confirmation',
       userId,
       accessEndsAtStr,
-    } as Record<string, unknown>)
+    } as Record<string, unknown>);
+
+    // Send via Resend
+    const userInfo = await resolveUserEmail(userId);
+    if (userInfo) {
+      await sendCancellationEmail(
+        userInfo.email,
+        userInfo.firstName,
+        'your plan',
+        accessEndsAt
+      ).catch(e =>
+        logger.warn('Resend cancellation email failed', {
+          userId,
+          err: e,
+          module: 'subscription',
+        })
+      );
+    }
 
     await NotificationLogModel.create({
       notificationType: 'cancellation_confirmation',
@@ -390,10 +503,7 @@ export class QuotaNotifier {
       sentAt: new Date(),
       channel: 'email',
       metadata: { accessEndsAt: accessEndsAtStr },
-    })
-
-    // Dedup for the rest of the day
-    await redis.set(dedupKey, '1', 'EX', 24 * 60 * 60)
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -413,7 +523,7 @@ export class QuotaNotifier {
     creditsAdded: number,
     newBalance: number
   ): Promise<void> {
-    const subject = `You've added ${creditsAdded} AI credits to your Veefore account`
+    const subject = `You've added ${creditsAdded} AI credits to your Veefore account`;
     const body = [
       `Hi,`,
       ``,
@@ -425,9 +535,9 @@ export class QuotaNotifier {
       `Your credits are ready to use immediately across all AI features.`,
       ``,
       `Visit your dashboard: https://app.veefore.com`,
-    ].join('\n')
+    ].join('\n');
 
-    await sendEmail(userId, subject, body)
+    await sendEmail(userId, subject, body);
 
     logger.info('Credit purchase confirmation sent', {
       module: 'subscription',
@@ -435,7 +545,7 @@ export class QuotaNotifier {
       userId,
       creditsAdded,
       newBalance,
-    } as Record<string, unknown>)
+    } as Record<string, unknown>);
 
     await NotificationLogModel.create({
       notificationType: 'credit_purchase_confirmation',
@@ -443,19 +553,22 @@ export class QuotaNotifier {
       sentAt: new Date(),
       channel: 'email',
       metadata: { creditsAdded, newBalance },
-    })
+    });
   }
 
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
 
-  private _quotaEmailSubject(quotaType: QuotaType, threshold: Threshold): string {
-    const label = this._quotaLabel(quotaType)
+  private _quotaEmailSubject(
+    quotaType: QuotaType,
+    threshold: Threshold
+  ): string {
+    const label = this._quotaLabel(quotaType);
     if (threshold === 100) {
-      return `You've used all your Veefore ${label}`
+      return `You've used all your Veefore ${label}`;
     }
-    return `Veefore alert: ${threshold}% of your ${label} used`
+    return `Veefore alert: ${threshold}% of your ${label} used`;
   }
 
   private _quotaEmailBody(
@@ -465,14 +578,14 @@ export class QuotaNotifier {
     used: number,
     limit: number
   ): string {
-    const label = this._quotaLabel(quotaType)
-    const remaining = Math.max(0, limit - used)
+    const label = this._quotaLabel(quotaType);
+    const remaining = Math.max(0, limit - used);
     const urgency =
       threshold === 100
         ? 'You have no remaining units — AI operations requiring this quota are now blocked.'
         : threshold === 90
           ? 'You are running critically low on this quota.'
-          : 'You are approaching your quota limit.'
+          : 'You are approaching your quota limit.';
 
     return [
       `Hi,`,
@@ -486,7 +599,7 @@ export class QuotaNotifier {
       `https://app.veefore.com/settings/billing`,
       ``,
       `— The Veefore Team`,
-    ].join('\n')
+    ].join('\n');
   }
 
   private _quotaLabel(quotaType: QuotaType): string {
@@ -496,8 +609,8 @@ export class QuotaNotifier {
       ai_conversations: 'AI-powered conversations',
       follow_campaign_conversations: 'follow campaign conversations',
       scheduled_posts: 'scheduled posts',
-    }
-    return labels[quotaType]
+    };
+    return labels[quotaType];
   }
 }
 
@@ -505,7 +618,7 @@ export class QuotaNotifier {
 // Singleton export
 // ---------------------------------------------------------------------------
 
-export const quotaNotifier = new QuotaNotifier()
+export const quotaNotifier = new QuotaNotifier();
 
 // Export model for use in other services if needed
-export { NotificationLogModel }
+export { NotificationLogModel };

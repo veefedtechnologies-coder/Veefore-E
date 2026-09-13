@@ -9,6 +9,9 @@
 
 import { storageService, UploadFileResult } from './storage.service';
 import { imageProcessingService } from './image-processing.service';
+// Point fluent-ffmpeg at the bundled ffmpeg/ffprobe binaries (side effect).
+// Without this, ffprobe metadata extraction throws (no system ffprobe exists).
+import '../../../config/ffmpeg-paths';
 import ffmpeg from 'fluent-ffmpeg';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -113,8 +116,23 @@ export class VideoStorageService implements IVideoStorageService {
    * Extract metadata from video file
    */
   private extractMetadataFromFile(filePath: string): Promise<VideoMetadata> {
+    // Hard timeout so a stalled ffprobe (e.g. a broken/wrong-arch binary or a
+    // problematic HEVC .mov) can never hang the request forever.
+    const timeoutMs = (() => {
+      const raw = Number(process.env.INGEST_PROBE_TIMEOUT_MS);
+      return Number.isFinite(raw) && raw > 0 ? raw : 30_000;
+    })();
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(`FFprobe timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
       ffmpeg.ffprobe(filePath, (err, metadata) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         if (err) {
           return reject(err);
         }

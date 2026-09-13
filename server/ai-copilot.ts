@@ -2,9 +2,12 @@ import { Request, Response, Express } from 'express';
 import { IStorage } from './storage';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createOpenAI } from './services/ai-provider-guard';
+import { requireAuth } from './middleware/require-auth';
+import { meterAI } from './middleware/meter-ai';
 
 // Initialize OpenAI with the newest model gpt-4o which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({
+const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY || ''
 });
 
@@ -261,7 +264,16 @@ export function createCopilotRoutes(app: Express, storage: IStorage) {
   };
   registerPrivacyRoutes();
   // Chat endpoint
-  app.post('/api/copilot/chat', async (req: Request, res: Response) => {
+  // SECURITY / COST: these three endpoints called gpt-4o with NO authentication
+  // and NO usage accounting, so anyone on the internet could spend money through
+  // them. They now require a session and run under the VGU engine like every
+  // other AI path. Nothing in the client calls them, so requiring auth breaks
+  // no caller.
+  app.post(
+    '/api/copilot/chat',
+    requireAuth,
+    meterAI({ feature: 'veegpt.chat', model: 'openai-gpt4o' }),
+    async (req: Request, res: Response) => {
     try {
       const { message, language, context } = req.body;
 
@@ -296,7 +308,11 @@ export function createCopilotRoutes(app: Express, storage: IStorage) {
   });
 
   // Generate content endpoint
-  app.post('/api/copilot/generate', async (req: Request, res: Response) => {
+  app.post(
+    '/api/copilot/generate',
+    requireAuth,
+    meterAI({ feature: 'content.repurpose', model: 'openai-gpt4o' }),
+    async (req: Request, res: Response) => {
     try {
       const { type, prompt, language = 'en', platform, context } = req.body;
 
@@ -344,7 +360,11 @@ export function createCopilotRoutes(app: Express, storage: IStorage) {
   });
 
   // Analyze content endpoint
-  app.post('/api/copilot/analyze', async (req: Request, res: Response) => {
+  app.post(
+    '/api/copilot/analyze',
+    requireAuth,
+    meterAI({ feature: 'competitor.analysis', model: 'openai-gpt4o' }),
+    async (req: Request, res: Response) => {
     try {
       const { content, language = 'en' } = req.body;
 

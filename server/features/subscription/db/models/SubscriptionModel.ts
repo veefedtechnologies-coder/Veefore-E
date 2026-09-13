@@ -13,9 +13,9 @@
  * paid plan access.
  */
 
-import mongoose, { Schema, type Document } from 'mongoose'
-import { v4 as uuidv4 } from 'uuid'
-import type { PlanId, BillingCycle } from '../../../../config/plan-config'
+import mongoose, { Schema, type Document } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
+import type { PlanId, BillingCycle } from '../../../../config/plan-config';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,7 +46,7 @@ export type SubscriptionStatus =
    * If all retries and the grace period are exhausted, the cron worker
    * transitions the subscription to 'cancelled' and revokes paid access.
    */
-  | 'past_due'
+  | 'past_due';
 
 // ---------------------------------------------------------------------------
 // Interface
@@ -54,54 +54,69 @@ export type SubscriptionStatus =
 
 export interface ISubscription extends Document {
   /** UUID — primary application-level identifier for this subscription. */
-  subscriptionId: string
+  subscriptionId: string;
   /** The user this subscription belongs to. */
-  userId: string
+  userId: string;
   /** The workspace this subscription is associated with. */
-  workspaceId: string
+  workspaceId: string;
   /** Current plan tier. */
-  plan: PlanId
+  plan: PlanId;
+  /**
+   * A higher-tier plan the user has initiated an upgrade to but hasn't paid
+   * for yet. Set by SubscriptionService.upgrade() and cleared by the
+   * subscription.activated / subscription.charged webhook once the new plan's
+   * authentication charge is captured. Until then `plan` stays on the current
+   * paid tier so the user is never granted an unpaid upgrade.
+   */
+  pendingPlan: PlanId | null;
   /** Whether the user is billed monthly or yearly. */
-  billingCycle: BillingCycle
+  billingCycle: BillingCycle;
   /** Lifecycle status of the subscription. */
-  status: SubscriptionStatus
+  status: SubscriptionStatus;
   /** Start of the current paid period. */
-  currentPeriodStart: Date
+  currentPeriodStart: Date;
   /** End of the current paid period. */
-  currentPeriodEnd: Date
+  currentPeriodEnd: Date;
   /** Date when the next payment will be charged. */
-  nextBillingDate: Date
+  nextBillingDate: Date;
   /** If true, subscription cancels at the end of the current period instead of renewing. */
-  cancelAtPeriodEnd: boolean
+  cancelAtPeriodEnd: boolean;
 
   /** Razorpay subscription reference ID (sub_xxx); null before checkout is initiated. */
-  razorpaySubscriptionId: string | null
+  razorpaySubscriptionId: string | null;
   /** Razorpay customer ID (cust_xxx); null before customer record is created. */
-  razorpayCustomerId: string | null
+  razorpayCustomerId: string | null;
   /** Razorpay plan ID (plan_xxx) this subscription is linked to. */
-  razorpayPlanId: string | null
+  razorpayPlanId: string | null;
   /** Razorpay payment_id of the most recent successful charge (authentication or renewal). */
-  lastPaymentId: string | null
+  lastPaymentId: string | null;
 
   /**
    * Admin-managed per-feature overrides (e.g. force-enable a beta feature).
    * Keys are feature names, values are boolean overrides.
    */
-  featureOverrides: Map<string, boolean>
+  featureOverrides: Map<string, boolean>;
   /** Date after which a payment_failed subscription is fully downgraded; null if not in grace. */
-  gracePeriodEndsAt: Date | null
+  gracePeriodEndsAt: Date | null;
 
   /** Number of consecutive failed renewal attempts in the current retry cycle (resets to 0 on success). */
-  renewalRetryCount: number
+  renewalRetryCount: number;
   /** Timestamp of the most recent renewal retry attempt; null if no retry in progress. */
-  lastRenewalRetryAt: Date | null
+  lastRenewalRetryAt: Date | null;
   /** Timestamp the current 'past_due' grace period ends; access is revoked after this if unresolved. */
-  pastDueGraceEndsAt: Date | null
+  pastDueGraceEndsAt: Date | null;
+
+  /** Reason code the user selected when cancelling (voluntary cancellation only). */
+  cancellationReason: string | null;
+  /** Free-text feedback the user left when cancelling; null if none. */
+  cancellationFeedback: string | null;
+  /** Timestamp the user requested cancellation; null if not cancelled. */
+  cancellationRequestedAt: Date | null;
 
   /** Auto-managed by Mongoose timestamps option. */
-  createdAt: Date
+  createdAt: Date;
   /** Auto-managed by Mongoose timestamps option. */
-  updatedAt: Date
+  updatedAt: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +137,11 @@ const SubscriptionSchema = new Schema<ISubscription>(
       type: String,
       enum: ['free', 'creator', 'pro', 'business', 'enterprise'],
       required: true,
+    },
+    pendingPlan: {
+      type: String,
+      enum: ['free', 'creator', 'pro', 'business', 'enterprise', null],
+      default: null,
     },
     billingCycle: {
       type: String,
@@ -158,19 +178,23 @@ const SubscriptionSchema = new Schema<ISubscription>(
     renewalRetryCount: { type: Number, default: 0 },
     lastRenewalRetryAt: { type: Date, default: null },
     pastDueGraceEndsAt: { type: Date, default: null },
+
+    cancellationReason: { type: String, default: null },
+    cancellationFeedback: { type: String, default: null },
+    cancellationRequestedAt: { type: Date, default: null },
   },
   { timestamps: true }
-)
+);
 
 // ---------------------------------------------------------------------------
 // Indexes
 // ---------------------------------------------------------------------------
 
-SubscriptionSchema.index({ userId: 1 })
-SubscriptionSchema.index({ status: 1 })
-SubscriptionSchema.index({ nextBillingDate: 1 })
-SubscriptionSchema.index({ userId: 1, status: 1 })
-SubscriptionSchema.index({ razorpaySubscriptionId: 1 }, { sparse: true })
+SubscriptionSchema.index({ userId: 1 });
+SubscriptionSchema.index({ status: 1 });
+SubscriptionSchema.index({ nextBillingDate: 1 });
+SubscriptionSchema.index({ userId: 1, status: 1 });
+SubscriptionSchema.index({ razorpaySubscriptionId: 1 }, { sparse: true });
 
 // ---------------------------------------------------------------------------
 // Model (singleton-safe for hot-reload / ESM environments)
@@ -178,6 +202,6 @@ SubscriptionSchema.index({ razorpaySubscriptionId: 1 }, { sparse: true })
 
 const SubscriptionModel =
   (mongoose.models.Subscription as mongoose.Model<ISubscription>) ||
-  mongoose.model<ISubscription>('Subscription', SubscriptionSchema)
+  mongoose.model<ISubscription>('Subscription', SubscriptionSchema);
 
-export default SubscriptionModel
+export default SubscriptionModel;

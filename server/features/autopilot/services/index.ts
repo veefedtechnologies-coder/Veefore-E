@@ -206,5 +206,51 @@ export type {
   ApprovalLifecycleServiceOptions,
 } from './ApprovalLifecycleService'
 
+export {
+  AutoPilotOrchestrator,
+  createAutoPilotOrchestrator,
+  DistributedMissionLock,
+  LocalMissionLock,
+  LOOP_STAGE_ORDER,
+  SIDE_EFFECT_STAGES,
+} from './AutoPilotOrchestrator'
+export type {
+  LoopContext,
+  LoopStageStep,
+  StageStepResult,
+  IterationResult,
+  IterationSkipReason,
+  MissionLock,
+  MissionLockHandle,
+  DistributedLockClient,
+  DistributedMissionLockOptions,
+  MissionLoader,
+  EscalationTargetResolver,
+  AutoPilotOrchestratorOptions,
+} from './AutoPilotOrchestrator'
+
+export {
+  AutoPilotChatBridge,
+  autoPilotChatBridge,
+  chatModelConversationStore,
+  chatModelMessageStore,
+  realtimeBroadcaster,
+  AUTOPILOT_CHAT_EVENT,
+  AUTOPILOT_CONVERSATION_TITLE,
+} from './AutoPilotChatBridge'
+export type {
+  ChatBridgeMission,
+  AutoPilotCard,
+  ApprovalCardInput,
+  ConversationRef,
+  AutoPilotConversationStore,
+  AutoPilotMessageInput,
+  AppendedMessage,
+  AutoPilotMessageStore,
+  RealtimeBroadcaster,
+  AutoPilotChatBridgeOptions,
+  ChatPushResult,
+} from './AutoPilotChatBridge'
+
 // Operating Loop stage services (SENSE, THINK, PLAN, …).
 export * from './stages'

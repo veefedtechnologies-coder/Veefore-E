@@ -1,6 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import { connectToMainApp } from '../services/userDataService';
+import { sendEarlyAccessApprovalEmail } from '../utils/resendEmail';
 
 const router = express.Router();
 
@@ -396,6 +397,10 @@ router.post('/waitlist-users/:id/approve', async (req, res) => {
     });
 
     console.log(`[WAITLIST] User ${waitlistUser.email} approved for early access`);
+
+    // Send the branded "early access approved" email (non-fatal).
+    const approvalFirstName = (waitlistUser.name || '').split(' ')[0] || 'there';
+    void sendEarlyAccessApprovalEmail(waitlistUser.email, approvalFirstName);
 
     res.json({
       success: true,
@@ -806,6 +811,19 @@ router.post('/waitlist-users/bulk-action', async (req, res) => {
             status: newStatus,
             ...updateData
           });
+        }
+
+        // Send the branded approval email on bulk approve (non-fatal).
+        if (action === 'approve') {
+          try {
+            const approved = await WaitlistUser.findById(userId).lean() as { email?: string; name?: string } | null;
+            if (approved?.email) {
+              const firstName = (approved.name || '').split(' ')[0] || 'there';
+              void sendEarlyAccessApprovalEmail(approved.email, firstName);
+            }
+          } catch (emailErr) {
+            console.error(`[WAITLIST] Failed to send approval email for ${userId}:`, emailErr);
+          }
         }
 
         results.push({ userId, status: 'success', message: `${action} action completed` });

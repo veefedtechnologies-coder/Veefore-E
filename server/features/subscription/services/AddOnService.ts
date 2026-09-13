@@ -23,22 +23,22 @@
  * Satisfies Requirements: 8.1, 8.2, 8.3, 8.4
  */
 
-import { type Redis } from 'ioredis'
+import { type Redis } from 'ioredis';
 import {
   ADDON_CONFIG,
   type AddOnType,
   type BillingCycle,
   getPlanOrder,
   getPlanConfig,
-} from '../../../config/plan-config'
-import { AddOnModel, type IAddOn } from '../db/models/AddOnModel'
-import { AICreditsRepository } from '../db/repositories/AICreditsRepository'
-import SubscriptionRepository from '../db/repositories/SubscriptionRepository'
-import RazorpayPlanModel from '../db/models/RazorpayPlanModel'
-import { razorpaySubscriptionService } from './RazorpaySubscriptionService'
-import { quotaNotifier } from './QuotaNotifier'
-import logger from '../../../config/logger'
-import type EntitlementService from './EntitlementService'
+} from '../../../config/plan-config';
+import { AddOnModel, type IAddOn } from '../db/models/AddOnModel';
+import { AICreditsRepository } from '../db/repositories/AICreditsRepository';
+import SubscriptionRepository from '../db/repositories/SubscriptionRepository';
+import RazorpayPlanModel from '../db/models/RazorpayPlanModel';
+import { razorpaySubscriptionService } from './RazorpaySubscriptionService';
+import { quotaNotifier } from './QuotaNotifier';
+import logger from '../../../config/logger';
+import type EntitlementService from './EntitlementService';
 
 // ---------------------------------------------------------------------------
 // Internal constants
@@ -51,23 +51,23 @@ import type EntitlementService from './EntitlementService'
  * monthly cycles (~10 years) approximates "until cancelled", matching
  * TOTAL_BILLING_CYCLES.monthly in SubscriptionService.ts.
  */
-const ADDON_BILLING_CYCLE: BillingCycle = 'monthly'
-const ADDON_TOTAL_BILLING_CYCLES = 120
+const ADDON_BILLING_CYCLE: BillingCycle = 'monthly';
+const ADDON_TOTAL_BILLING_CYCLES = 120;
 
 // ---------------------------------------------------------------------------
 // AddOnService
 // ---------------------------------------------------------------------------
 
 export class AddOnService {
-  private readonly aiCreditsRepo: AICreditsRepository
-  private readonly subscriptionRepo: SubscriptionRepository
+  private readonly aiCreditsRepo: AICreditsRepository;
+  private readonly subscriptionRepo: SubscriptionRepository;
 
   constructor(
     private readonly entitlementService: EntitlementService,
     private readonly redis: Redis
   ) {
-    this.aiCreditsRepo = new AICreditsRepository()
-    this.subscriptionRepo = new SubscriptionRepository()
+    this.aiCreditsRepo = new AICreditsRepository();
+    this.subscriptionRepo = new SubscriptionRepository();
   }
 
   // -------------------------------------------------------------------------
@@ -90,31 +90,33 @@ export class AddOnService {
       planType: addonType,
       billingCycle: ADDON_BILLING_CYCLE,
       amountPaise,
-    }).lean()
+    }).lean();
 
     if (existing) {
-      return existing.razorpayPlanId
+      return existing.razorpayPlanId;
     }
 
     const razorpayPlanId = await razorpaySubscriptionService.createPlan({
       planType: addonType,
       billingCycle: ADDON_BILLING_CYCLE,
       amountRupees: amountPaise / 100,
-    })
+    });
 
     await RazorpayPlanModel.create({
       planType: addonType,
       billingCycle: ADDON_BILLING_CYCLE,
       amountPaise,
       razorpayPlanId,
-    })
+    });
 
-    logger.info(
-      'Created new Razorpay plan for add-on',
-      { addonType, amountPaise, razorpayPlanId, module: 'AddOnService' }
-    )
+    logger.info('Created new Razorpay plan for add-on', {
+      addonType,
+      amountPaise,
+      razorpayPlanId,
+      module: 'AddOnService',
+    });
 
-    return razorpayPlanId
+    return razorpayPlanId;
   }
 
   // -------------------------------------------------------------------------
@@ -142,63 +144,215 @@ export class AddOnService {
    * @param userId    - The user purchasing the add-on.
    * @param addonType - Which add-on to purchase (from AddOnType union).
    * @param quantity  - How many units to purchase (must be >= 1).
+   * @param options   - Internal trust context. `paymentVerified` MUST only be
+   *                    set by a caller that has already confirmed money was
+   *                    captured for this exact purchase (a verified Razorpay
+   *                    webhook or an authenticated admin grant). See the
+   *                    security note on the one-time branch below.
    */
-  async addAddOn(
+  /**
+   * Marker placed on Razorpay order notes so the webhook can recognise a
+   * credit-pack purchase. Must stay in sync with the webhook handler.
+   */
+  static readonly CREDIT_PACK_PURPOSE = 'ai_credit_pack';
+
+  /**
+   * Begin the purchase of a one-time prepaid AI credit pack.
+   *
+   * Creates a Razorpay ORDER (not a subscription — these packs must not register
+   * a recurring mandate) and returns the checkout parameters. No credits are
+   * granted here: the `payment.captured` webhook is the single place that grants
+   * them, once Razorpay confirms the money was actually captured.
+   *
+   * The amount is derived entirely from ADDON_CONFIG server-side. The client
+   * supplies only which pack and how many, so it can never influence the price.
+   */
+  async createCreditPackOrder(
     userId: string,
     addonType: AddOnType,
     quantity: number
-  ): Promise<void> {
-    // 1. Look up add-on definition
-    const addonDef = ADDON_CONFIG[addonType]
+  ): Promise<{
+    orderId: string;
+    amountPaise: number;
+    currency: string;
+    credits: number;
+    addonType: AddOnType;
+    keyId: string;
+  }> {
+    const addonDef = ADDON_CONFIG[addonType];
     if (!addonDef) {
-      throw new Error(`Unknown add-on type: ${addonType}`)
+      const error = new Error(`Unknown add-on type: ${addonType}`) as Error & {
+        statusCode?: number;
+      };
+      error.statusCode = 400;
+      throw error;
     }
 
-    logger.info(
-      'Adding add-on for user',
-      { userId, addonType, quantity, module: 'AddOnService' }
-    )
+    // Only one-time packs go through the Orders API. Recurring add-ons must use
+    // addAddOn() so they get a real auto-renew mandate.
+    if (addonDef.priceOneTime === null) {
+      const error = new Error(
+        `'${addonDef.name}' is a recurring add-on and cannot be bought as a one-time order.`
+      ) as Error & { statusCode?: number };
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      const error = new Error(
+        'Quantity must be a positive integer'
+      ) as Error & {
+        statusCode?: number;
+      };
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Cap quantity: without a bound, a single request could create an
+    // arbitrarily large order (and, on capture, an arbitrarily large credit
+    // grant). Buying more than this is an enterprise conversation.
+    const MAX_PACKS_PER_ORDER = 20;
+    if (quantity > MAX_PACKS_PER_ORDER) {
+      const error = new Error(
+        `You can buy at most ${MAX_PACKS_PER_ORDER} packs in a single order. Please contact sales for larger volumes.`
+      ) as Error & { statusCode?: number };
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const amountPaise = addonDef.priceOneTime * quantity;
+    const credits = addonDef.quantityIncrement * quantity;
+
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    if (!keyId) {
+      throw new Error('Missing required environment variable: RAZORPAY_KEY_ID');
+    }
+
+    const order = await razorpaySubscriptionService.createOrder(
+      amountPaise,
+      `cr_${addonType}_${Date.now()}`,
+      {
+        veefore_purpose: AddOnService.CREDIT_PACK_PURPOSE,
+        veefore_user_id: userId,
+        veefore_addon_type: addonType,
+        veefore_quantity: String(quantity),
+        veefore_credits: String(credits),
+      }
+    );
+
+    logger.info('Created AI credit pack order — awaiting payment capture', {
+      userId,
+      addonType,
+      quantity,
+      credits,
+      amountPaise,
+      orderId: order.orderId,
+      module: 'AddOnService',
+    });
+
+    return {
+      orderId: order.orderId,
+      amountPaise: order.amountPaise,
+      currency: order.currency,
+      credits,
+      addonType,
+      keyId,
+    };
+  }
+
+  async addAddOn(
+    userId: string,
+    addonType: AddOnType,
+    quantity: number,
+    options?: {
+      /** Set only when a captured payment for this purchase has been verified. */
+      paymentVerified?: boolean;
+      /** Razorpay payment id backing this grant, for audit/logging. */
+      razorpayPaymentId?: string;
+    }
+  ): Promise<void> {
+    // 1. Look up add-on definition
+    const addonDef = ADDON_CONFIG[addonType];
+    if (!addonDef) {
+      throw new Error(`Unknown add-on type: ${addonType}`);
+    }
+
+    logger.info('Adding add-on for user', {
+      userId,
+      addonType,
+      quantity,
+      module: 'AddOnService',
+    });
 
     // 2. Check requiredMinPlan if set
     if (addonDef.requiredMinPlan !== undefined) {
-      const userPlan = await this.entitlementService.getPlan(userId)
-      const userPlanOrder = getPlanOrder(userPlan)
-      const requiredPlanOrder = getPlanOrder(addonDef.requiredMinPlan)
+      const userPlan = await this.entitlementService.getPlan(userId);
+      const userPlanOrder = getPlanOrder(userPlan);
+      const requiredPlanOrder = getPlanOrder(addonDef.requiredMinPlan);
 
       if (userPlanOrder < requiredPlanOrder) {
-        const requiredPlanConfig = getPlanConfig(addonDef.requiredMinPlan)
-        const requiredPlanName = requiredPlanConfig?.name ?? addonDef.requiredMinPlan
+        const requiredPlanConfig = getPlanConfig(addonDef.requiredMinPlan);
+        const requiredPlanName =
+          requiredPlanConfig?.name ?? addonDef.requiredMinPlan;
 
-        logger.warn(
-          'Add-on purchase denied — insufficient plan',
-          {
-            userId,
-            addonType,
-            userPlan,
-            requiredMinPlan: addonDef.requiredMinPlan,
-            module: 'AddOnService',
-          }
-        )
+        logger.warn('Add-on purchase denied — insufficient plan', {
+          userId,
+          addonType,
+          userPlan,
+          requiredMinPlan: addonDef.requiredMinPlan,
+          module: 'AddOnService',
+        });
 
         const error = new Error(
           `The '${addonDef.name}' add-on requires the ${requiredPlanName} plan or higher. ` +
             `Your current plan is '${userPlan}'. Please upgrade to purchase this add-on.`
-        )
-        ;(error as NodeJS.ErrnoException & { statusCode?: number }).statusCode = 403
-        throw error
+        );
+        (error as NodeJS.ErrnoException & { statusCode?: number }).statusCode =
+          403;
+        throw error;
       }
     }
 
     // 3a. One-time AI credit pack
     if (addonDef.priceOneTime !== null) {
-      const creditsToAdd = addonDef.quantityIncrement * quantity
+      // SECURITY GATE — one-time packs are PREPAID goods. Granting them without
+      // a confirmed payment let any authenticated user mint unlimited credits
+      // by POSTing {addonType:'ai_credits_5000', quantity:N} to
+      // /api/v2/subscription/addon/add (quantity is client-supplied), which is
+      // a direct revenue-loss hole. Credits may only be issued once a captured
+      // payment has been verified (Razorpay webhook) or by an authenticated
+      // admin grant. Callers without that context are rejected with HTTP 402.
+      if (!options?.paymentVerified) {
+        logger.warn('Blocked unpaid one-time add-on grant attempt', {
+          userId,
+          addonType,
+          quantity,
+          priceOneTimePaise: addonDef.priceOneTime,
+          module: 'AddOnService',
+        });
+        const error = new Error(
+          `The '${addonDef.name}' add-on must be paid for before it can be applied. ` +
+            'Please complete checkout to purchase this pack.'
+        );
+        (error as NodeJS.ErrnoException & { statusCode?: number }).statusCode =
+          402;
+        throw error;
+      }
 
-      logger.info(
-        'Adding purchased AI credits',
-        { userId, addonType, quantity, creditsToAdd, module: 'AddOnService' }
-      )
+      const creditsToAdd = addonDef.quantityIncrement * quantity;
 
-      const updatedDoc = await this.aiCreditsRepo.addPurchasedCredits(userId, creditsToAdd)
+      logger.info('Adding purchased AI credits', {
+        userId,
+        addonType,
+        quantity,
+        creditsToAdd,
+        module: 'AddOnService',
+      });
+
+      const updatedDoc = await this.aiCreditsRepo.addPurchasedCredits(
+        userId,
+        creditsToAdd
+      );
 
       if (!updatedDoc) {
         // No credits doc exists yet — this shouldn't happen in the normal flow
@@ -206,11 +360,11 @@ export class AddOnService {
         logger.warn(
           'No AICredits document found for user when adding purchased credits',
           { userId, addonType, module: 'AddOnService' }
-        )
+        );
         throw new Error(
           'Unable to add credits: no credits account found for this user. ' +
             'Please ensure the user has an active subscription first.'
-        )
+        );
       }
 
       // Send purchase confirmation (newBalance is the total remainingCredits)
@@ -218,18 +372,15 @@ export class AddOnService {
         userId,
         creditsToAdd,
         updatedDoc.remainingCredits
-      )
+      );
 
-      logger.info(
-        'AI credits added successfully',
-        {
-          userId,
-          addonType,
-          creditsToAdd,
-          newBalance: updatedDoc.remainingCredits,
-          module: 'AddOnService',
-        }
-      )
+      logger.info('AI credits added successfully', {
+        userId,
+        addonType,
+        creditsToAdd,
+        newBalance: updatedDoc.remainingCredits,
+        module: 'AddOnService',
+      });
     } else {
       // 3b. Recurring add-on — create Razorpay subscription and AddOn document
       //
@@ -237,28 +388,33 @@ export class AddOnService {
       // base plan subscription (created in SubscriptionService.create).
       // Add-ons are billed to that same customer rather than creating a
       // second, duplicate Razorpay customer for the same user.
-      const subscription = await this.subscriptionRepo.findByUserId(userId)
-      const razorpayCustomerId = subscription?.razorpayCustomerId
+      const subscription = await this.subscriptionRepo.findByUserId(userId);
+      const razorpayCustomerId = subscription?.razorpayCustomerId;
 
       if (!razorpayCustomerId) {
         logger.warn(
           'Cannot create recurring add-on subscription — user has no Razorpay customer on file',
           { userId, addonType, module: 'AddOnService' }
-        )
+        );
         throw new Error(
           'Unable to purchase this add-on: no billing account found for this user. ' +
             'Please ensure the user has an active subscription first.'
-        )
+        );
       }
 
-      const amountPaise = addonDef.priceMonthly
+      const amountPaise = addonDef.priceMonthly;
       if (amountPaise === null) {
         // Should be unreachable given the priceOneTime check above, but
         // guards against a malformed ADDON_CONFIG entry.
-        throw new Error(`Add-on '${addonType}' has no recurring price configured`)
+        throw new Error(
+          `Add-on '${addonType}' has no recurring price configured`
+        );
       }
 
-      const razorpayPlanId = await this.getOrCreateRazorpayAddOnPlanId(addonType, amountPaise)
+      const razorpayPlanId = await this.getOrCreateRazorpayAddOnPlanId(
+        addonType,
+        amountPaise
+      );
 
       const razorpaySub = await razorpaySubscriptionService.createSubscription({
         customerId: razorpayCustomerId,
@@ -268,35 +424,39 @@ export class AddOnService {
           veefore_user_id: userId,
           veefore_addon_type: addonType,
         },
-      })
+      });
 
-      const currentPeriodEnd = new Date()
-      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30)
+      const currentPeriodEnd = new Date();
+      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
 
+      // Created as 'pending', NOT 'active'. A freshly created Razorpay
+      // subscription is in state 'created' — the customer still has to
+      // authorize the mandate and the first charge has not been captured.
+      // Marking it active here handed out paid add-on limits to anyone who
+      // started a checkout and abandoned it. The subscription.activated /
+      // subscription.charged webhook promotes it to 'active' once money is
+      // actually captured. Admin grants bypass this path entirely.
       await AddOnModel.create({
         userId,
         type: addonType,
         quantity,
-        status: 'active',
+        status: options?.paymentVerified ? 'active' : 'pending',
         razorpaySubscriptionId: razorpaySub.subscriptionId,
         currentPeriodEnd,
-      })
+      });
 
-      logger.info(
-        'Recurring add-on created successfully',
-        {
-          userId,
-          addonType,
-          quantity,
-          razorpaySubscriptionId: razorpaySub.subscriptionId,
-          currentPeriodEnd,
-          module: 'AddOnService',
-        }
-      )
+      logger.info('Recurring add-on created — awaiting payment confirmation', {
+        userId,
+        addonType,
+        quantity,
+        razorpaySubscriptionId: razorpaySub.subscriptionId,
+        currentPeriodEnd,
+        module: 'AddOnService',
+      });
     }
 
     // 4. Invalidate entitlement cache so updated limits are reflected immediately
-    await this.entitlementService.invalidateCache(userId)
+    await this.entitlementService.invalidateCache(userId);
   }
 
   // -------------------------------------------------------------------------
@@ -317,24 +477,28 @@ export class AddOnService {
    */
   async removeAddOn(userId: string, addOnId: string): Promise<void> {
     // 1. Find the AddOn document
-    const addOn = await AddOnModel.findOne({ addOnId, userId })
+    const addOn = await AddOnModel.findOne({ addOnId, userId });
 
     if (!addOn) {
-      logger.warn(
-        'Add-on not found or does not belong to user',
-        { userId, addOnId, module: 'AddOnService' }
-      )
+      logger.warn('Add-on not found or does not belong to user', {
+        userId,
+        addOnId,
+        module: 'AddOnService',
+      });
       const error = new Error(
         `Add-on '${addOnId}' was not found or does not belong to this user.`
-      )
-      ;(error as NodeJS.ErrnoException & { statusCode?: number }).statusCode = 404
-      throw error
+      );
+      (error as NodeJS.ErrnoException & { statusCode?: number }).statusCode =
+        404;
+      throw error;
     }
 
-    logger.info(
-      'Removing add-on for user',
-      { userId, addOnId, type: addOn.type, module: 'AddOnService' }
-    )
+    logger.info('Removing add-on for user', {
+      userId,
+      addOnId,
+      type: addOn.type,
+      module: 'AddOnService',
+    });
 
     // 2. Cancel Razorpay subscription if present.
     // cancelAtCycleEnd=true: the add-on remains active (and won't be charged
@@ -343,45 +507,43 @@ export class AddOnService {
     // used for base plan cancellation in SubscriptionService.cancel.
     if (addOn.razorpaySubscriptionId) {
       try {
-        await razorpaySubscriptionService.cancelSubscription(addOn.razorpaySubscriptionId, true)
+        await razorpaySubscriptionService.cancelSubscription(
+          addOn.razorpaySubscriptionId,
+          true
+        );
 
-        logger.info(
-          'Razorpay subscription cancelled for add-on',
-          {
-            userId,
-            addOnId,
-            razorpaySubscriptionId: addOn.razorpaySubscriptionId,
-            module: 'AddOnService',
-          }
-        )
+        logger.info('Razorpay subscription cancelled for add-on', {
+          userId,
+          addOnId,
+          razorpaySubscriptionId: addOn.razorpaySubscriptionId,
+          module: 'AddOnService',
+        });
       } catch (err) {
         // Log and re-throw — never mark the add-on as cancelled if Razorpay
         // cancellation fails, to avoid billing drift between local state and Razorpay
-        logger.error(
-          'Failed to cancel Razorpay subscription for add-on',
-          err,
-          {
-            userId,
-            addOnId,
-            razorpaySubscriptionId: addOn.razorpaySubscriptionId,
-            module: 'AddOnService',
-          }
-        )
-        throw err
+        logger.error('Failed to cancel Razorpay subscription for add-on', err, {
+          userId,
+          addOnId,
+          razorpaySubscriptionId: addOn.razorpaySubscriptionId,
+          module: 'AddOnService',
+        });
+        throw err;
       }
     }
 
     // 3. Soft-delete: mark status as cancelled (keep document for audit trail)
-    addOn.status = 'cancelled'
-    await addOn.save()
+    addOn.status = 'cancelled';
+    await addOn.save();
 
-    logger.info(
-      'Add-on marked as cancelled',
-      { userId, addOnId, type: addOn.type, module: 'AddOnService' }
-    )
+    logger.info('Add-on marked as cancelled', {
+      userId,
+      addOnId,
+      type: addOn.type,
+      module: 'AddOnService',
+    });
 
     // 4. Invalidate entitlement cache so removed limits are reflected immediately
-    await this.entitlementService.invalidateCache(userId)
+    await this.entitlementService.invalidateCache(userId);
   }
 
   // -------------------------------------------------------------------------
@@ -395,14 +557,17 @@ export class AddOnService {
    * @returns Array of IAddOn documents (may be empty if none active).
    */
   async listActiveAddOns(userId: string): Promise<IAddOn[]> {
-    const addOns = await AddOnModel.find({ userId, status: 'active' }).lean<IAddOn[]>()
+    const addOns = await AddOnModel.find({ userId, status: 'active' }).lean<
+      IAddOn[]
+    >();
 
-    logger.debug(
-      'Listed active add-ons',
-      { userId, count: addOns.length, module: 'AddOnService' }
-    )
+    logger.debug('Listed active add-ons', {
+      userId,
+      count: addOns.length,
+      module: 'AddOnService',
+    });
 
-    return addOns
+    return addOns;
   }
 }
 
@@ -410,7 +575,7 @@ export class AddOnService {
 // Factory / singleton helper
 // ---------------------------------------------------------------------------
 
-let _instance: AddOnService | null = null
+let _instance: AddOnService | null = null;
 
 /**
  * Returns a shared AddOnService singleton.
@@ -421,9 +586,9 @@ export function getAddOnService(
   redis: Redis
 ): AddOnService {
   if (!_instance) {
-    _instance = new AddOnService(entitlementService, redis)
+    _instance = new AddOnService(entitlementService, redis);
   }
-  return _instance
+  return _instance;
 }
 
-export default AddOnService
+export default AddOnService;

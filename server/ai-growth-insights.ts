@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
+import { createOpenAI } from './services/ai-provider-guard';
 
 /*
 <important_code_snippet_instructions>
@@ -32,7 +33,7 @@ function getAnthropic(): Anthropic {
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 function getOpenAI(): OpenAI {
   if (!openai && process.env.OPENAI_API_KEY) {
-    openai = new OpenAI({
+    openai = createOpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
   }

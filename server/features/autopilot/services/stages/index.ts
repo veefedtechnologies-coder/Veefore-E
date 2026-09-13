@@ -31,6 +31,7 @@ export type {
   Strategy,
   StrategyCadence,
   StrategyMissionInput,
+  MediaInventoryItem,
   DeriveStrategyOptions,
   DeriveStrategyResult,
   StrategyJSONGenerator,
@@ -109,3 +110,23 @@ export type {
   MeasureResult,
   MeasureServiceOptions,
 } from './MeasureService'
+export { SlotMetricsReader, slotMetricsReader } from './SlotMetricsReader'
+export type { ContentMetricsStore } from './SlotMetricsReader'
+export {
+  LearnService,
+  learnService,
+  deriveInsights,
+  scoreFieldForMetric,
+  LEARN_INSIGHT_VERSION,
+} from './LearnService'
+export type {
+  DerivableMeasureResult,
+  FormatInsight,
+  ThemeInsight,
+  StrategyInsight,
+  LearnOptions,
+  LearnResult,
+  LearnMissionInput,
+  StrategyMemoryStore,
+  LearnServiceOptions,
+} from './LearnService'

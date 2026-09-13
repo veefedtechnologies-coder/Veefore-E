@@ -50,6 +50,19 @@ export async function buildWorkspaceContext(
     storage.getContentRecommendations(workspaceId, undefined, 8).catch(() => [] as any[]),
   ]);
 
+  // Resolve the CANONICAL subscription plan (the legacy `user.plan` field is
+  // stale/unreliable — e.g. it showed "enterprise" for a free account). VeeGPT's
+  // context and the Settings profile panel must reflect the real plan.
+  let canonicalPlan = 'free';
+  try {
+    const { getEntitlementService } = await import('../features/subscription/services/EntitlementService');
+    const SubscriptionRepository = (await import('../features/subscription/db/repositories/SubscriptionRepository')).default;
+    const svc = getEntitlementService(getRedisClient(), new SubscriptionRepository());
+    canonicalPlan = await svc.getPlan(userId);
+  } catch {
+    /* default to free on any resolution error */
+  }
+
   // Pull the latest AI performance banner from the insights cache (if present).
   let performanceInsight: any = null;
   try {
@@ -87,7 +100,7 @@ export async function buildWorkspaceContext(
         name: deriveName(),
         username: (user as any).username,
         email: (user as any).email,
-        plan: (user as any).plan,
+        plan: canonicalPlan,
         // Niche lives in either the top-level `niche` field OR
         // `preferences.contentNiche` (onboarding) — resolve both so VeeGPT always
         // knows the user's niche (it's app/profile data, not social-account data).

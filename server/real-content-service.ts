@@ -32,7 +32,12 @@ export class RealContentService {
   private instagramAccessToken: string;
 
   constructor() {
-    this.youtubeApiKey = process.env.GOOGLE_API_KEY || '';
+    // Use the dedicated YouTube Data API key. Falls back to GOOGLE_API_KEY only
+    // if YOUTUBE_API_KEY is unset (legacy). This keeps the Gemini key
+    // (GOOGLE_API_KEY) decoupled from YouTube so swapping the AI key never
+    // affects YouTube Data API calls.
+    this.youtubeApiKey =
+      process.env.YOUTUBE_API_KEY || process.env.GOOGLE_API_KEY || '';
     this.instagramAccessToken = process.env.INSTAGRAM_ACCESS_TOKEN || '';
   }
 

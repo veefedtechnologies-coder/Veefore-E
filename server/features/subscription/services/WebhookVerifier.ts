@@ -55,6 +55,40 @@ export class WebhookVerifier {
     const key = `${PROCESSED_KEY_PREFIX}${eventId}`;
     await redis.set(key, '1', 'EX', PROCESSED_KEY_TTL_SECONDS);
   }
+
+  /**
+   * Atomically CLAIM an event for processing.
+   *
+   * Uses `SET key 1 EX ttl NX` so only the FIRST caller for a given eventId
+   * wins — this both dedupes concurrent duplicate deliveries (no check-then-act
+   * race) and marks the event processed in a single round-trip.
+   *
+   * Returns:
+   *   - true  → claim acquired, this delivery should process the event.
+   *   - false → another delivery already claimed/processed it, skip.
+   *
+   * If processing subsequently FAILS, call `release()` so Razorpay's retry can
+   * re-claim and reprocess — otherwise a transient error would permanently
+   * lose the event.
+   */
+  async claim(eventId: string, redis: Redis): Promise<boolean> {
+    const key = `${PROCESSED_KEY_PREFIX}${eventId}`;
+    const result = await redis.set(key, '1', 'EX', PROCESSED_KEY_TTL_SECONDS, 'NX');
+    return result === 'OK';
+  }
+
+  /**
+   * Release a previously-claimed event so a future delivery/retry can
+   * reprocess it. Called only when processing FAILED.
+   */
+  async release(eventId: string, redis: Redis): Promise<void> {
+    const key = `${PROCESSED_KEY_PREFIX}${eventId}`;
+    try {
+      await redis.del(key);
+    } catch {
+      /* best-effort — a lingering key only blocks reprocessing for 24h TTL */
+    }
+  }
 }
 
 export const webhookVerifier = new WebhookVerifier();

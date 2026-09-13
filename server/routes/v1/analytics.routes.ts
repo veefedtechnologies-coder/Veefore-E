@@ -7,6 +7,7 @@ import { createDashboardRouter, RedisAnalyticsCache } from '../../features/analy
 import { legacyDashboardService } from '../../features/analytics/bridge';
 import { analyticsHistoryGuard, clampAnalyticsHistoryWindow, dashboardEntitlementGuard, enforceSinglePlatformForBasicPlans } from '../../middleware/apply-route-guards';
 import { performanceBannerGuards, growthRecommendationGuards } from '../../middleware/ai-route-guards';
+import { requireWorkspaceAccessible } from '../../middleware/entitlement.middleware';
 import { z } from 'zod';
 
 const router = Router();
@@ -46,6 +47,7 @@ router.get(
   '/best-time',
   requireAuth,
   validateWorkspaceAccess({ source: 'query' }),
+  requireWorkspaceAccessible(),
   async (req: import('express').Request, res: import('express').Response) => {
     try {
       const workspaceId = (req as any).workspaceId ?? req.query.workspaceId as string
@@ -203,6 +205,7 @@ const WorkspaceIdParams = z.object({
 router.get('/workspace/:workspaceId',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   analyticsController.getByWorkspace
 );
@@ -210,6 +213,7 @@ router.get('/workspace/:workspaceId',
 router.get('/workspace/:workspaceId/platform',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   analyticsController.getByPlatform
 );
@@ -217,6 +221,7 @@ router.get('/workspace/:workspaceId/platform',
 router.get('/workspace/:workspaceId/date-range',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   analyticsHistoryGuard(),
   analyticsController.getDateRange
@@ -225,6 +230,7 @@ router.get('/workspace/:workspaceId/date-range',
 router.get('/workspace/:workspaceId/performance-summary',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   analyticsController.getPerformanceSummary
 );
@@ -232,6 +238,7 @@ router.get('/workspace/:workspaceId/performance-summary',
 router.get('/workspace/:workspaceId/daily',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   analyticsController.getDailyMetrics
 );
@@ -255,6 +262,7 @@ const PerformanceOverviewQuery = z.object({
 router.get('/workspace/:workspaceId/performance-overview',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   async (req: any, res) => {
     try {
@@ -457,6 +465,7 @@ const HistoricalQuery = z.object({
 router.get('/historical',
   requireAuth,
   validateWorkspaceAccess({ source: 'query' }),
+  requireWorkspaceAccessible(),
   analyticsHistoryGuard(),
   async (req, res) => {
     try {
@@ -567,6 +576,7 @@ async function loadAiPreferences(userId: string, workspaceId: string): Promise<a
 router.post('/workspace/:workspaceId/generate-insight',
   requireAuth,
   validateWorkspaceAccess({ source: 'params' }),
+  requireWorkspaceAccessible(),
   ...performanceBannerGuards,
   validateRequest({ params: WorkspaceIdParams, body: GenerateInsightSchema }),
   async (req: any, res) => {

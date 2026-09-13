@@ -7,8 +7,9 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import OpenAI from 'openai';
+import { createOpenAI } from './services/ai-provider-guard';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface VideoMetadata {
   duration: number;

@@ -4,13 +4,14 @@
  */
 
 import OpenAI from 'openai';
+import { createOpenAI } from './services/ai-provider-guard';
 
 // Initialize OpenAI client only when needed and API key is available
 const getOpenAIClient = () => {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OpenAI API key is not configured');
   }
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 };
 
 interface VideoSegment {

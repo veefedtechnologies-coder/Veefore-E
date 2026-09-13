@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <title>Resetting Veefore…</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #0f172a;
+        color: #fff;
+        display: grid;
+        place-items: center;
+      }
+      .card {
+        text-align: center;
+        max-width: 420px;
+        padding: 32px;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 20px;
+        border: 4px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      #log {
+        margin-top: 16px;
+        font: 12px/1.5 monospace;
+        color: #94a3b8;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="spinner"></div>
+      <h1>Clearing cached app…</h1>
+      <p>Unregistering service workers and wiping caches, then reloading.</p>
+      <div id="log"></div>
+    </div>
+    <script>
+      const log = (m) => {
+        document.getElementById('log').textContent += m + '\n';
+        // eslint-disable-next-line no-console
+        console.log('[reset]', m);
+      };
+
+      async function nuke() {
+        // 1) Unregister every service worker for this origin.
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            log('service workers: ' + regs.length);
+            await Promise.all(regs.map((r) => r.unregister()));
+            log('service workers unregistered');
+          }
+        } catch (e) {
+          log('sw error: ' + e);
+        }
+
+        // 2) Delete every Cache Storage bucket (this is where the old SW stashed
+        //    the stale JS chunks).
+        try {
+          if (window.caches) {
+            const keys = await caches.keys();
+            log('cache buckets: ' + keys.length);
+            await Promise.all(keys.map((k) => caches.delete(k)));
+            log('caches deleted');
+          }
+        } catch (e) {
+          log('cache error: ' + e);
+        }
+
+        // 3) Clear local/session storage (stale bootstrap, query cache markers).
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+          log('storage cleared');
+        } catch (e) {
+          log('storage error: ' + e);
+        }
+
+        // 4) Hard-redirect to the app with a cache-busting param so the very
+        //    first request skips any HTTP/edge cache for the document.
+        log('reloading…');
+        setTimeout(() => {
+          location.replace('/?fresh=' + Date.now());
+        }, 400);
+      }
+
+      nuke();
+    </script>
+  </body>
+</html>

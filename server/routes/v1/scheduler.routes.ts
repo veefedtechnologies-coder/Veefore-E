@@ -3,6 +3,7 @@ import { schedulerController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
 import { scheduleWithQuotaGuards } from '../../middleware/apply-route-guards';
+import { requireWorkspaceAccessible } from '../../middleware/entitlement.middleware';
 import { z } from 'zod';
 
 const router = Router();
@@ -29,6 +30,7 @@ const ListScheduledQuery = z.object({
 
 router.post('/create',
   requireAuth,
+  requireWorkspaceAccessible(),
   ...scheduleWithQuotaGuards,
   validateRequest({ body: CreateScheduledContentSchema }),
   schedulerController.createScheduledContent
@@ -36,14 +38,14 @@ router.post('/create',
 
 router.get('/list',
   requireAuth,
+  requireWorkspaceAccessible(),
   validateRequest({ query: ListScheduledQuery }),
   schedulerController.listScheduledContent
 );
 
-
-
 router.get('/upcoming',
   requireAuth,
+  requireWorkspaceAccessible(),
   validateRequest({ query: z.object({ workspaceId: z.string().min(1) }) }),
   schedulerController.getUpcoming
 );

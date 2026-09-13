@@ -3,6 +3,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IAutomationRule extends Document {
   name: string;
   workspaceId: any;
+  /** Auto Pilot mission that created this rule (present for autopilot-drafted rules). */
+  missionId?: string;
   description?: string;
   isActive: boolean;
   type?: string;
@@ -41,6 +43,7 @@ export interface IAutomationRule extends Document {
 export const AutomationRuleSchema = new Schema<IAutomationRule>({
   name: { type: String, required: true },
   workspaceId: { type: Schema.Types.Mixed, required: true },
+  missionId: { type: String, index: true },
   description: { type: String },
   isActive: { type: Boolean, default: true },
   type: { type: String },

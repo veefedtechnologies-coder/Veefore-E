@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI as _ } from '@google/generative-ai';
+import { createOpenAI, createGemini } from './services/ai-provider-guard';
 
 interface MessageContext {
   message: string;
@@ -69,7 +70,7 @@ class AIResponseGenerator {
     if (!process.env.GOOGLE_API_KEY && !process.env.OPENAI_API_KEY) {
       console.warn('⚠️  No AI API keys configured - AI response generation will be limited');
     }
-    this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    this.genAI = createGemini(process.env.GOOGLE_API_KEY);
   }
 
   async generateContextualResponse(
@@ -81,7 +82,7 @@ class AIResponseGenerator {
       const prompt = this.buildPrompt(context, config);
       let text = '';
       
-      const activeGenAI = config.googleAiStudioKey ? new GoogleGenerativeAI(config.googleAiStudioKey) : this.genAI;
+      const activeGenAI = config.googleAiStudioKey ? createGemini(config.googleAiStudioKey) : this.genAI;
 
       const tryGemini = async (modelName: string) => {
         const generationConfig = { temperature: config.creativityLevel ?? 0.7 };
@@ -105,7 +106,7 @@ class AIResponseGenerator {
 
       const tryOpenAI = async (modelName: string) => {
         if (!process.env.OPENAI_API_KEY) throw new Error('OpenAI API key not configured');
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const completion = await openai.chat.completions.create({
           messages: [{ role: "user", content: prompt }],
           model: modelName,

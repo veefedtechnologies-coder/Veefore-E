@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -7,6 +7,9 @@ import { WorkingVideoGenerator } from './services/working-video-generator';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { requireAuth as sharedRequireAuth } from './middleware/require-auth';
+import { requireSubscription, requireCredits } from './middleware/entitlement.middleware';
+import { AICreditService } from './services/AICreditService';
+import { meterAI } from './middleware/meter-ai';
 
 const router = express.Router();
 
@@ -16,6 +19,17 @@ const router = express.Router();
 // fixes spurious "User not found" 401s on uploads (e.g. from the VeeGPT post
 // composer) when getUserByFirebaseUid alone didn't resolve the account.
 const requireAuth = sharedRequireAuth;
+
+// SECURITY: the `/test-*` debug routes below run the (expensive) video pipeline
+// WITHOUT authentication. They must never be reachable in production. This guard
+// returns 404 unless explicitly enabled for local debugging.
+const blockInProd = (_req: Request, res: Response, next: NextFunction): void => {
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_VIDEO_TEST_ROUTES !== 'true') {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  next();
+};
 
 // Add download endpoint to serve files securely through /api proxy
 router.get('/download', async (req: Request, res: Response) => {
@@ -282,31 +296,20 @@ router.post('/adjust', requireAuth, upload.single('video'), async (req: Request,
   }
 });
 
-router.post('/upload-image', requireAuth, upload.single('image'), (req: Request, res: Response) => {
-  try {
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ error: 'No image file uploaded' });
-    }
-
-    const imageUrl = `/uploads/video-images/${file.filename}`;
-    res.json({
-      success: true,
-      imageUrl,
-      filename: file.filename,
-      originalName: file.originalname,
-      size: file.size
-    });
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    res.status(500).json({ error: 'Failed to upload image' });
-  }
-});
+// [REMOVED] POST /upload-image — legacy local-disk image upload.
+// All user-uploaded media (images + video) now goes through the shared S3 +
+// CloudFront path via `POST /api/chat/attachments/upload`, which stores to a
+// PRIVATE S3 bucket and serves through the authenticated proxy / CloudFront
+// signed URLs. Instagram publishing resolves those keys to short-lived signed
+// URLs at publish time (see server/config/publish-media-url.ts). This endpoint
+// wrote files to `/uploads/video-images/` (ephemeral local disk) and is dead.
 
 // Note: Script generation routes are defined below with proper ES module imports
 
 // Generate video with approved script
-router.post('/generate', requireAuth, (req: Request, res: Response) => {
+router.post('/generate', requireAuth, requireSubscription(), requireCredits(50),
+  meterAI({ feature: 'video.generation' }),
+  async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -326,6 +329,25 @@ router.post('/generate', requireAuth, (req: Request, res: Response) => {
     // Validate required fields
     if (!prompt?.trim() || !script) {
       return res.status(400).json({ error: 'Video prompt and approved script are required' });
+    }
+
+    // PLAN ENFORCEMENT / METERING: video generation is a metered AI operation
+    // (video_generation = 50 base credits, scaled by duration). Deduct up-front
+    // so the feature can't be used for free/unbounded. requireCredits() above
+    // already guaranteed the user has at least the base amount; this performs
+    // the actual charge. On failure we stop before starting the pipeline.
+    const videoDuration = typeof duration === 'number' ? duration : undefined;
+    const workspaceId = req.body?.workspaceId;
+    const deductResult = await AICreditService.deductCredits(userId, 'video_generation', {
+      videoDuration,
+      workspaceId,
+      endpoint: '/api/video/generate',
+    });
+    if (!deductResult.success) {
+      return res.status(402).json({
+        error: deductResult.error || 'Insufficient AI credits for video generation',
+        purchaseUrl: '/settings/billing?tab=credits',
+      });
     }
 
     // Create enhanced video job with complete 9-step structure
@@ -503,7 +525,9 @@ router.post('/debug-auth', requireAuth, async (req: Request, res: Response) => {
 });
 
 // Generate or regenerate script with hybrid AI service (Gemini + OpenAI fallback)
-router.post('/generate-script', requireAuth, async (req: Request, res: Response) => {
+router.post('/generate-script', requireAuth, requireSubscription(), requireCredits(1),
+  meterAI({ feature: 'video.script' }),
+  async (req: Request, res: Response) => {
   try {
     const { 
       prompt, 
@@ -517,6 +541,19 @@ router.post('/generate-script', requireAuth, async (req: Request, res: Response)
     
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    // METERING: script generation is a metered content_generation operation.
+    // Deduct up-front so it can't be used unbounded for free.
+    const scriptDeduct = await AICreditService.deductCredits(req.user!.id, 'content_generation', {
+      workspaceId: req.body?.workspaceId,
+      endpoint: '/api/video/generate-script',
+    });
+    if (!scriptDeduct.success) {
+      return res.status(402).json({
+        error: scriptDeduct.error || 'Insufficient AI credits for script generation',
+        purchaseUrl: '/settings/billing?tab=credits',
+      });
     }
 
     let script;
@@ -602,7 +639,9 @@ router.post('/generate-script', requireAuth, async (req: Request, res: Response)
 });
 
 // Generate AI images for script scenes
-router.post('/generate-images', requireAuth, async (req: Request, res: Response) => {
+router.post('/generate-images', requireAuth, requireSubscription(), requireCredits(1),
+  meterAI({ feature: 'image.generation' }),
+  async (req: Request, res: Response) => {
   try {
     console.log('[VIDEO API] Received image generation request:', {
       hasScript: !!req.body.script,
@@ -614,6 +653,20 @@ router.post('/generate-images', requireAuth, async (req: Request, res: Response)
     
     if (!script || !scenes || !Array.isArray(scenes)) {
       return res.status(400).json({ error: 'Script and scenes array are required' });
+    }
+
+    // METERING: image generation is a metered image_generation operation,
+    // charged per scene image. Deduct up-front so it can't be used unbounded.
+    const imagesDeduct = await AICreditService.deductCredits(req.user!.id, 'image_generation', {
+      imageCount: scenes.length,
+      workspaceId: req.body?.workspaceId,
+      endpoint: '/api/video/generate-images',
+    });
+    if (!imagesDeduct.success) {
+      return res.status(402).json({
+        error: imagesDeduct.error || 'Insufficient AI credits for image generation',
+        purchaseUrl: '/settings/billing?tab=credits',
+      });
     }
 
     console.log(`[VIDEO API] Generating ${scenes.length} AI images for script scenes...`);
@@ -652,7 +705,9 @@ router.post('/generate-images', requireAuth, async (req: Request, res: Response)
 });
 
 // Regenerate specific scene in script
-router.post('/regenerate-scene', requireAuth, async (req: Request, res: Response) => {
+router.post('/regenerate-scene', requireAuth, requireSubscription(), requireCredits(1),
+  meterAI({ feature: 'video.script' }),
+  async (req: Request, res: Response) => {
   try {
     const { 
       originalPrompt, 
@@ -665,6 +720,19 @@ router.post('/regenerate-scene', requireAuth, async (req: Request, res: Response
     if (!originalPrompt || !sceneId || !currentScript) {
       return res.status(400).json({ 
         error: 'originalPrompt, sceneId, and currentScript are required' 
+      });
+    }
+
+    // METERING: regenerating a scene is a metered image_generation operation.
+    const sceneDeduct = await AICreditService.deductCredits(req.user!.id, 'image_generation', {
+      imageCount: 1,
+      workspaceId: req.body?.workspaceId,
+      endpoint: '/api/video/regenerate-scene',
+    });
+    if (!sceneDeduct.success) {
+      return res.status(402).json({
+        error: sceneDeduct.error || 'Insufficient AI credits for scene regeneration',
+        purchaseUrl: '/settings/billing?tab=credits',
       });
     }
 
@@ -807,7 +875,7 @@ function createVideoJob(userId: string, jobData: any) {
 }
 
 // Test broadcast route for debugging WebSocket progress updates
-router.post('/test-broadcast', async (req, res) => {
+router.post('/test-broadcast', blockInProd, async (req, res) => {
   try {
     const jobId = '3a659be2-8c2b-4bcc-969b-f86ee252f54d';
     const job = videoJobs.get(jobId);
@@ -840,7 +908,7 @@ router.post('/test-broadcast', async (req, res) => {
 });
 
 // Test job status without authentication
-router.get('/test-job/:jobId', async (req, res) => {
+router.get('/test-job/:jobId', blockInProd, async (req, res) => {
   try {
     const job = videoJobs.get(req.params.jobId);
     if (!job) {
@@ -854,7 +922,7 @@ router.get('/test-job/:jobId', async (req, res) => {
 });
 
 // Test pipeline directly without authentication for debugging
-router.post('/test-pipeline', async (req, res) => {
+router.post('/test-pipeline', blockInProd, async (req, res) => {
   try {
     console.log('[TEST PIPELINE] Starting test video generation...');
     
@@ -882,7 +950,7 @@ router.post('/test-pipeline', async (req, res) => {
 });
 
 // Get all video jobs without authentication for debugging
-router.get('/test-jobs', (req, res) => {
+router.get('/test-jobs', blockInProd, (req, res) => {
   const allJobs = Array.from(videoJobs.entries()).map(([id, job]) => ({
     id,
     status: job.status,
@@ -899,7 +967,7 @@ router.get('/test-jobs', (req, res) => {
 });
 
 // Simple test route that bypasses complex pipeline
-router.post('/test-simple', async (req, res) => {
+router.post('/test-simple', blockInProd, async (req, res) => {
   try {
     console.log('[TEST SIMPLE] Starting simple video generation...');
     
@@ -944,7 +1012,7 @@ router.post('/test-simple', async (req, res) => {
 });
 
 // Working video generator test route - includes voiceover
-router.post('/test-working', async (req, res) => {
+router.post('/test-working', blockInProd, async (req, res) => {
   try {
     console.log('[TEST WORKING] Starting working video generation...');
     

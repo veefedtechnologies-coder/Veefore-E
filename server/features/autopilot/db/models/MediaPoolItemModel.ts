@@ -26,6 +26,10 @@ export interface IMediaPoolItem extends Document {
   format?: string
   sizeBytes: number
   visionAnalysis?: Record<string, unknown>
+  /** Free-text purpose the user attached to this item (grounds captions/automation). */
+  userIntent?: string
+  /** Explicit automation trigger keyword the user set for this item (overrides AI). */
+  userKeyword?: string
   available: boolean
   usedInSlots: mongoose.Types.ObjectId[]
   createdAt: Date
@@ -49,6 +53,9 @@ const MediaPoolItemSchema = new Schema<IMediaPoolItem>(
     sizeBytes: { type: Number, required: true, min: 0, max: 100 * 1024 * 1024 },
     // Cached analyzeMedia() output for vision-grounded captioning.
     visionAnalysis: { type: Schema.Types.Mixed, required: false },
+    // Per-item user intent + explicit automation trigger keyword.
+    userIntent: { type: String, required: false },
+    userKeyword: { type: String, required: false },
     // R6.6: reusable until the user removes it.
     available: { type: Boolean, required: true, default: true, index: true },
     usedInSlots: { type: [Schema.Types.ObjectId], default: [] },

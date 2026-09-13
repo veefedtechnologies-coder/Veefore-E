@@ -312,6 +312,13 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
+      },
+      // Real-time Socket.IO channel (metrics + Auto Pilot mission control).
+      '/ws': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
       }
     }
   },

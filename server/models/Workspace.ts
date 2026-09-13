@@ -30,6 +30,8 @@ export interface IWorkspace extends mongoose.Document {
   aiConfiguration?: {
     aiModel?: string;
     creativityLevel?: number;
+    reasoningEffort?: string;
+    showThinking?: boolean;
     optimizationGoals?: string;
     aiPersona?: string;
     captionStyle?: string;
@@ -150,6 +152,15 @@ const WorkspaceSchema = new mongoose.Schema({
       default: 0.7,
       min: 0,
       max: 1
+    },
+    reasoningEffort: {
+      type: String,
+      enum: ['minimal', 'low', 'medium', 'high'],
+      default: 'low'
+    },
+    showThinking: {
+      type: Boolean,
+      default: true
     },
     optimizationGoals: {
       type: String,

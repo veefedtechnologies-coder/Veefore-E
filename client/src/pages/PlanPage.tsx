@@ -20,6 +20,13 @@ import { apiRequest, SUBSCRIPTION_QUERY_KEY } from '@/lib/queryClient'
 import { PlanSkeleton } from '@/components/skeletons/pages'
 import useSubscription from '@/hooks/useSubscription'
 import { useToast } from '@/hooks/use-toast'
+import {
+  useSocialAccountsMap,
+  getPostMediaUrl,
+  getPostDisplayTitle,
+  PostTypeBadge,
+  PostMedia,
+} from '@/components/dashboard/scheduled-posts'
 
 // ── Skeleton pulse primitive ───────────────────────────────────────────────
 
@@ -298,25 +305,124 @@ function calcEngRate(metrics?: any): number | null {
   return Math.round((total / reach) * 1000) / 10 // one decimal place
 }
 
-/** Extract best thumbnail URL from post object */
+/** Extract best thumbnail URL from post object (camelCase + snake_case aware) */
 function getThumb(post: any): string | null {
+  return getPostMediaUrl(post) || null
+}
+
+/** Resolve the social account + profile picture / username for a post. */
+function usePostAccount(post: any) {
+  const { currentWorkspaceId } = useCurrentWorkspace()
+  const accountMap = useSocialAccountsMap(currentWorkspaceId ?? undefined)
+  const accountId = post?.accountId || post?.contentData?.accountId
+  const account = accountId ? accountMap.get(accountId) : null
+  return {
+    username: post?.contentData?.username || account?.username || account?.name || null,
+    profilePictureUrl:
+      post?.contentData?.profilePictureUrl ||
+      account?.profilePictureUrl ||
+      account?.profileImageUrl ||
+      account?.profile_picture_url ||
+      null,
+  }
+}
+
+/** Small avatar + @username row shared by the post cards. */
+function AccountBadge({ post }: { post: any }) {
+  const { username, profilePictureUrl } = usePostAccount(post)
+  if (!username && !profilePictureUrl) return null
   return (
-    post.mediaUrls?.[0] ||
-    post.contentData?.thumbnail_url ||
-    post.contentData?.media_url ||
-    post.contentData?.image_url ||
-    null
+    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 min-w-0">
+      {profilePictureUrl ? (
+        <img src={profilePictureUrl} alt="" className="h-4 w-4 rounded-full object-cover flex-shrink-0" />
+      ) : (
+        <span className="h-4 w-4 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+      )}
+      {username && <span className="font-medium truncate max-w-[120px]">@{username}</span>}
+    </span>
   )
 }
 
-/** Extract caption/title from post object */
-function getCaption(post: any): string {
+/** Mutations shared by the scheduled / draft cards (cancel, publish, delete). */
+function usePostActions() {
+  const { currentWorkspaceId } = useCurrentWorkspace()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['/api/content/workspace', currentWorkspaceId] })
+
+  const cancelSchedule = async (id: string) => {
+    try {
+      await apiRequest(`/api/content/${id}/cancel-schedule`, { method: 'POST' })
+      toast({ title: 'Schedule canceled' })
+      invalidate()
+    } catch (error: any) {
+      toast({ title: 'Action failed', description: error?.message, variant: 'destructive' })
+    }
+  }
+
+  const publishNow = async (id: string) => {
+    try {
+      await apiRequest(`/api/content/${id}/publish`, { method: 'POST' })
+      toast({ title: 'Published successfully' })
+      invalidate()
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          typeof q.queryKey[0] === 'string' &&
+          (q.queryKey[0] as string).startsWith('/api/v1/analytics/best-time'),
+      })
+    } catch (error: any) {
+      toast({ title: 'Publish failed', description: error?.message, variant: 'destructive' })
+    }
+  }
+
+  const remove = async (id: string) => {
+    try {
+      await apiRequest(`/api/content/${id}`, { method: 'DELETE' })
+      toast({ title: 'Post deleted' })
+      invalidate()
+    } catch (error: any) {
+      toast({ title: 'Delete failed', description: error?.message, variant: 'destructive' })
+    }
+  }
+
+  return { cancelSchedule, publishNow, remove }
+}
+
+/** Compact pill button used inside post cards. */
+function CardAction({
+  label,
+  onClick,
+  tone = 'default',
+}: {
+  label: string
+  onClick: (e: React.MouseEvent) => void
+  tone?: 'default' | 'danger' | 'primary'
+}) {
   return (
-    post.title ||
-    post.contentData?.caption ||
-    post.description ||
-    'Untitled post'
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick(e)
+      }}
+      className={cn(
+        'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors border',
+        tone === 'danger'
+          ? 'text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900/40 dark:hover:bg-red-900/20'
+          : tone === 'primary'
+            ? 'text-white border-transparent bg-emerald-600 hover:bg-emerald-700'
+            : 'text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+      )}
+    >
+      {label}
+    </button>
   )
+}
+
+/** Extract caption/title from post object (type-aware; never shows "New Post"). */
+function getCaption(post: any): string {
+  return getPostDisplayTitle(post)
 }
 
 // ── Data hook ─────────────────────────────────────────────────────────────
@@ -377,14 +483,14 @@ function MetricPill({ icon: Icon, value, label, color = 'text-gray-500' }: {
 function HeroPostCard({ post, badge, badgeColor, rank }: {
   post: any; badge?: string; badgeColor?: string; rank?: number
 }) {
-  const thumb = getThumb(post)
   const caption = getCaption(post)
   const engRate = calcEngRate(post.metrics)
   const [, setLocation] = useLocation()
+  const goAnalytics = () => setLocation(`/analytics/post/${post._id ?? post.id}`)
 
   return (
     <div
-      onClick={() => setLocation(`/analytics/post/${post._id ?? post.id}`)}
+      onClick={goAnalytics}
       className="group relative flex gap-5 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-md transition-all cursor-pointer"
     >
       {rank && (
@@ -394,21 +500,21 @@ function HeroPostCard({ post, badge, badgeColor, rank }: {
       )}
       {/* Thumbnail */}
       <div className="relative flex-shrink-0">
-        {thumb ? (
-          <img src={thumb} alt="" className="h-28 w-28 rounded-2xl object-cover" />
-        ) : (
-          <div className="h-28 w-28 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center">
-            <Instagram className="h-8 w-8 text-gray-300 dark:text-gray-600" />
-          </div>
-        )}
+        <div className="h-28 w-28 rounded-2xl overflow-hidden relative bg-gray-100 dark:bg-gray-800">
+          <PostMedia post={post} />
+        </div>
         {badge && (
-          <span className={cn('absolute -top-2 -right-2 rounded-full px-2 py-0.5 text-[9px] font-black text-white leading-none uppercase tracking-wide shadow', badgeColor ?? 'bg-gray-500')}>
+          <span className={cn('absolute -top-2 -right-2 rounded-full px-2 py-0.5 text-[9px] font-black text-white leading-none uppercase tracking-wide shadow z-10', badgeColor ?? 'bg-gray-500')}>
             {badge}
           </span>
         )}
       </div>
       {/* Body */}
       <div className="min-w-0 flex-1 flex flex-col gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <PostTypeBadge post={post} />
+          <AccountBadge post={post} />
+        </div>
         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug line-clamp-3">{caption}</p>
         {/* Metrics row */}
         <div className="flex flex-wrap items-center gap-3 mt-auto">
@@ -430,11 +536,11 @@ function HeroPostCard({ post, badge, badgeColor, rank }: {
             <MetricPill icon={Bookmark} value={post.metrics.saves} color="text-amber-500" />
           )}
         </div>
-        <p className="text-xs text-gray-400">{fmtDate(post.publishedAt)}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-gray-400">{fmtDate(post.publishedAt)}</p>
+          <CardAction label="View Analytics" onClick={goAnalytics} />
+        </div>
       </div>
-      <button className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all self-start flex-shrink-0">
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
     </div>
   )
 }
@@ -442,7 +548,6 @@ function HeroPostCard({ post, badge, badgeColor, rank }: {
 // ── COMPACT POST ROW (for lists) ───────────────────────────────────────────
 
 function CompactPostRow({ post, extra }: { post: any; extra?: React.ReactNode }) {
-  const thumb = getThumb(post)
   const caption = getCaption(post)
   const [, setLocation] = useLocation()
 
@@ -451,15 +556,14 @@ function CompactPostRow({ post, extra }: { post: any; extra?: React.ReactNode })
       onClick={() => setLocation(`/analytics/post/${post._id ?? post.id}`)}
       className="group flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors cursor-pointer"
     >
-      {thumb ? (
-        <img src={thumb} alt="" className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
-      ) : (
-        <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-          <Instagram className="h-4 w-4 text-gray-300 dark:text-gray-600" />
-        </div>
-      )}
+      <div className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0 relative bg-gray-100 dark:bg-gray-800">
+        <PostMedia post={post} />
+      </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{caption}</p>
+        <div className="flex items-center gap-1.5">
+          <PostTypeBadge post={post} />
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{caption}</p>
+        </div>
         {extra}
       </div>
       <ArrowRight className="h-4 w-4 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity" />
@@ -470,50 +574,79 @@ function CompactPostRow({ post, extra }: { post: any; extra?: React.ReactNode })
 // ── SCHEDULED POST CARD ────────────────────────────────────────────────────
 
 function ScheduledPostCard({ post, compact = false }: { post: any; compact?: boolean }) {
-  const thumb = getThumb(post)
   const caption = getCaption(post)
   const timeStr = fmtDate(post.scheduledAt)
   const [, setLocation] = useLocation()
+  const { cancelSchedule, remove } = usePostActions()
+  const editId = post._id ?? post.id
+  const isFailed = post.status === 'failed'
+  const goEdit = () => setLocation(`/create?editId=${editId}`)
 
   if (compact) {
     return (
-      <div
-        onClick={() => setLocation(`/create?edit=${post._id ?? post.id}`)}
-        className="group flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors cursor-pointer"
-      >
-        {thumb ? (
-          <img src={thumb} alt="" className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
-        ) : (
-          <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-            <Instagram className="h-4 w-4 text-gray-300 dark:text-gray-600" />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{caption}</p>
-          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Clock className="h-3 w-3" />{timeStr}</p>
+      <div className="group flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+        <div onClick={goEdit} className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0 relative bg-gray-100 dark:bg-gray-800 cursor-pointer">
+          <PostMedia post={post} />
         </div>
-        <ArrowRight className="h-4 w-4 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity" />
+        <div onClick={goEdit} className="min-w-0 flex-1 cursor-pointer">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{caption}</p>
+          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+            <PostTypeBadge post={post} />
+            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeStr}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isFailed ? (
+            <>
+              <CardAction label="Re-upload" onClick={goEdit} tone="primary" />
+              <CardAction label="Delete" onClick={() => remove(editId)} tone="danger" />
+            </>
+          ) : (
+            <>
+              <CardAction label="Cancel" onClick={() => cancelSchedule(editId)} tone="danger" />
+              <CardAction label="Edit" onClick={goEdit} />
+            </>
+          )}
+        </div>
       </div>
     )
   }
 
   return (
-    <div
-      onClick={() => setLocation(`/create?edit=${post._id ?? post.id}`)}
-      className="group flex gap-4 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer"
-    >
-      {thumb ? (
-        <img src={thumb} alt="" className="h-20 w-20 rounded-xl object-cover flex-shrink-0" />
-      ) : (
-        <div className="h-20 w-20 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center flex-shrink-0">
-          <Instagram className="h-6 w-6 text-blue-300 dark:text-gray-600" />
+    <div className="group flex flex-col gap-3 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 hover:shadow-sm transition-all">
+      <div onClick={goEdit} className="flex gap-4 cursor-pointer">
+        <div className="h-20 w-20 rounded-xl overflow-hidden flex-shrink-0 relative bg-gray-100 dark:bg-gray-800">
+          <PostMedia post={post} />
         </div>
-      )}
-      <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2">{caption}</p>
-        <span className="inline-flex items-center gap-1.5 w-fit text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-lg">
-          <Clock className="h-3 w-3" />{timeStr}
-        </span>
+        <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <PostTypeBadge post={post} />
+            <AccountBadge post={post} />
+          </div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2">{caption}</p>
+          <span className={cn(
+            'inline-flex items-center gap-1.5 w-fit text-xs font-semibold px-2.5 py-1 rounded-lg',
+            isFailed
+              ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+              : 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+          )}>
+            <Clock className="h-3 w-3" />{isFailed ? 'Failed to publish' : timeStr}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-50 dark:border-gray-800">
+        {isFailed ? (
+          <>
+            <CardAction label="Re-upload" onClick={goEdit} tone="primary" />
+            <CardAction label="Delete" onClick={() => remove(editId)} tone="danger" />
+          </>
+        ) : (
+          <>
+            <CardAction label="Cancel" onClick={() => cancelSchedule(editId)} tone="danger" />
+            <CardAction label="Reschedule" onClick={goEdit} />
+            <CardAction label="Edit" onClick={goEdit} />
+          </>
+        )}
       </div>
     </div>
   )
@@ -522,11 +655,14 @@ function ScheduledPostCard({ post, compact = false }: { post: any; compact?: boo
 // ── DRAFT POST CARD ────────────────────────────────────────────────────────
 
 function DraftPostCard({ post, compact = false }: { post: any; compact?: boolean }) {
-  const thumb = getThumb(post)
+  const mediaUrl = getPostMediaUrl(post)
   const caption = getCaption(post)
-  const hasCaption = !!(post.title || post.contentData?.caption || post.description)
-  const hasMedia = !!(post.mediaUrls?.length || post.contentData?.media_url)
+  const hasCaption = !!(post.title || post.contentData?.caption || post.contentData?.text || post.description)
+  const hasMedia = !!mediaUrl
   const [, setLocation] = useLocation()
+  const { publishNow, remove } = usePostActions()
+  const editId = post._id ?? post.id
+  const goEdit = () => setLocation(`/create?editId=${editId}`)
 
   const readiness = hasCaption && hasMedia ? 'ready' : hasCaption || hasMedia ? 'partial' : 'idea'
 
@@ -538,60 +674,53 @@ function DraftPostCard({ post, compact = false }: { post: any; compact?: boolean
 
   if (compact) {
     return (
-      <div
-        onClick={() => setLocation(`/create?edit=${post._id ?? post.id}`)}
-        className="group flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors cursor-pointer"
-      >
-        {thumb ? (
-          <img src={thumb} alt="" className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
-        ) : (
-          <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-            <PenLine className="h-4 w-4 text-gray-300 dark:text-gray-600" />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{caption}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Edited {fmtShort(post.updatedAt ?? post.createdAt)}</p>
+      <div className="group flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+        <div onClick={goEdit} className="h-10 w-10 rounded-lg overflow-hidden flex-shrink-0 relative bg-gray-100 dark:bg-gray-800 cursor-pointer">
+          <PostMedia post={post} />
         </div>
-        <span className={cn('rounded-full px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide flex-shrink-0', readinessBadge.color)}>
-          {readinessBadge.label}
-        </span>
+        <div onClick={goEdit} className="min-w-0 flex-1 cursor-pointer">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{caption}</p>
+          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+            <PostTypeBadge post={post} />
+            <span>Edited {fmtShort(post.updatedAt ?? post.createdAt)}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <CardAction label="Edit" onClick={goEdit} />
+          <CardAction label="Publish" onClick={() => publishNow(editId)} tone="primary" />
+        </div>
       </div>
     )
   }
 
   return (
-    <div
-      onClick={() => setLocation(`/create?edit=${post._id ?? post.id}`)}
-      className="group flex gap-4 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer"
-    >
-      {thumb ? (
-        <img src={thumb} alt="" className="h-20 w-20 rounded-xl object-cover flex-shrink-0" />
-      ) : (
-        <div className="h-20 w-20 rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center flex-shrink-0">
-          <PenLine className="h-6 w-6 text-amber-300 dark:text-gray-600" />
+    <div className="group flex flex-col gap-3 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 hover:shadow-sm transition-all">
+      <div onClick={goEdit} className="flex gap-4 cursor-pointer">
+        <div className="h-20 w-20 rounded-xl overflow-hidden flex-shrink-0 relative bg-gray-100 dark:bg-gray-800">
+          <PostMedia post={post} />
         </div>
-      )}
-      <div className="min-w-0 flex-1 flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2">{caption}</p>
-          <span className={cn('rounded-full px-2 py-0.5 text-[9px] font-black text-white uppercase tracking-wide flex-shrink-0 mt-0.5', readinessBadge.color)}>
-            {readinessBadge.label}
-          </span>
+        <div className="min-w-0 flex-1 flex flex-col gap-2">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2">{caption}</p>
+            <span className={cn('rounded-full px-2 py-0.5 text-[9px] font-black text-white uppercase tracking-wide flex-shrink-0 mt-0.5', readinessBadge.color)}>
+              {readinessBadge.label}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <PostTypeBadge post={post} />
+            <AccountBadge post={post} />
+          </div>
+          <div className="flex items-center gap-3">
+            {!hasCaption && <span className="flex items-center gap-1 text-xs text-amber-600"><AlertCircle className="h-3 w-3" />No caption</span>}
+            {!hasMedia && <span className="flex items-center gap-1 text-xs text-amber-600"><AlertCircle className="h-3 w-3" />No media</span>}
+          </div>
+          <p className="text-xs text-gray-400">Edited {fmtDate(post.updatedAt ?? post.createdAt)}</p>
         </div>
-        <div className="flex items-center gap-3">
-          {!hasCaption && <span className="flex items-center gap-1 text-xs text-amber-600"><AlertCircle className="h-3 w-3" />No caption</span>}
-          {!hasMedia && <span className="flex items-center gap-1 text-xs text-amber-600"><AlertCircle className="h-3 w-3" />No media</span>}
-          {readiness === 'ready' && (
-            <button
-              onClick={e => { e.stopPropagation(); setLocation(`/create?edit=${post._id ?? post.id}&action=schedule`) }}
-              className="text-xs font-semibold text-emerald-600 hover:underline"
-            >
-              Schedule →
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-gray-400">Edited {fmtDate(post.updatedAt ?? post.createdAt)}</p>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-50 dark:border-gray-800">
+        <CardAction label="Edit" onClick={goEdit} />
+        <CardAction label="Delete" onClick={() => remove(editId)} tone="danger" />
+        <CardAction label="Publish immediately" onClick={() => publishNow(editId)} tone="primary" />
       </div>
     </div>
   )
@@ -1086,8 +1215,8 @@ function DraftsView() {
     const ideas: any[] = []
 
     for (const p of drafts) {
-      const hasCaption = !!(p.title || p.contentData?.caption || p.description)
-      const hasMedia = !!(p.mediaUrls?.length || p.contentData?.media_url)
+      const hasCaption = !!(p.title || p.contentData?.caption || p.contentData?.text || p.description)
+      const hasMedia = !!getPostMediaUrl(p)
       if (hasCaption && hasMedia) ready.push(p)
       else if (hasCaption || hasMedia) partial.push(p)
       else ideas.push(p)
@@ -1212,9 +1341,17 @@ function DMView() {
 
 // ── Main PlanPage ──────────────────────────────────────────────────────────
 
+const VALID_TABS: NavId[] = ['calendar', 'scheduled', 'drafts', 'published', 'dm']
+
+function getInitialTab(): NavId {
+  if (typeof window === 'undefined') return 'calendar'
+  const tab = new URLSearchParams(window.location.search).get('tab') as NavId | null
+  return tab && VALID_TABS.includes(tab) ? tab : 'calendar'
+}
+
 export function PlanPage() {
   const [, setLocation] = useLocation()
-  const [activeNav, setActiveNav] = useState<NavId>('calendar')
+  const [activeNav, setActiveNav] = useState<NavId>(getInitialTab)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { limits } = useSubscription()
 

@@ -17,16 +17,20 @@ export default defineConfig({
     testTimeout: 30000,
     server: {
       deps: {
-        // Inline so the react/react-dom aliases below also apply inside
-        // @testing-library/react (otherwise it pulls a second React copy and
-        // hooks fail with a null dispatcher).
-        inline: [/@testing-library\//],
+        // Inline so the react/react-dom aliases below also apply inside these
+        // packages (otherwise they pull a second React copy from
+        // client/node_modules and hooks fail with a null dispatcher).
+        // @tanstack/react-query is included because the Auto Pilot chat cards
+        // render inside a QueryClientProvider (Task 19.5).
+        inline: [/@testing-library\//, /@tanstack\//],
       },
     },
   },
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
+      // Isomorphic modules shared by client + server (mirrors tsconfig paths).
+      '@shared': path.resolve(__dirname, './shared'),
       react: path.resolve(__dirname, '../node_modules/react'),
       'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
       'react/jsx-runtime': path.resolve(

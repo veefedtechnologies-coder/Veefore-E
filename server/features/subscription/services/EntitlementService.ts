@@ -17,8 +17,8 @@
  * Satisfies Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 5.3
  */
 
-import mongoose, { Schema } from 'mongoose'
-import { type Redis } from 'ioredis'
+import mongoose, { Schema } from 'mongoose';
+import { type Redis } from 'ioredis';
 import {
   PLAN_CONFIG,
   ADDON_CONFIG,
@@ -27,13 +27,20 @@ import {
   type PlanId,
   type PlanLimits,
   type PlanFeatures,
-} from '../../../config/plan-config'
-import SubscriptionRepository from '../db/repositories/SubscriptionRepository'
-import { AddOnModel } from '../db/models/AddOnModel'
-import AICreditsModel from '../db/models/AICreditsModel'
-import { AICreditsRepository, type DeductResult } from '../db/repositories/AICreditsRepository'
-import { quotaNotifier } from './QuotaNotifier'
-import logger from '../../../config/logger'
+} from '../../../config/plan-config';
+import SubscriptionRepository from '../db/repositories/SubscriptionRepository';
+import {
+  isCancellationExpired,
+  isCancellationPaidThrough,
+} from '../lib/subscriptionAccess';
+import { AddOnModel } from '../db/models/AddOnModel';
+import AICreditsModel from '../db/models/AICreditsModel';
+import {
+  AICreditsRepository,
+  type DeductResult,
+} from '../db/repositories/AICreditsRepository';
+import { quotaNotifier } from './QuotaNotifier';
+import logger from '../../../config/logger';
 
 // ---------------------------------------------------------------------------
 // AutomationType
@@ -49,17 +56,17 @@ export type AutomationType =
   | 'workflows'
   | 'aiWorkflows'
   | 'keywordTriggers'
-  | 'teamMembers'
+  | 'teamMembers';
 
 // ---------------------------------------------------------------------------
 // UsageCounterModel — inline Mongoose model for automation / conversation usage
 // ---------------------------------------------------------------------------
 
 interface IUsageCounter {
-  userId: string
-  type: AutomationType
-  countThisCycle: number
-  lastResetAt: Date
+  userId: string;
+  type: AutomationType;
+  countThisCycle: number;
+  lastResetAt: Date;
 }
 
 const UsageCounterSchema = new Schema<IUsageCounter>(
@@ -70,13 +77,13 @@ const UsageCounterSchema = new Schema<IUsageCounter>(
     lastResetAt: { type: Date, required: true, default: () => new Date() },
   },
   { timestamps: false }
-)
+);
 
-UsageCounterSchema.index({ userId: 1, type: 1 }, { unique: true })
+UsageCounterSchema.index({ userId: 1, type: 1 }, { unique: true });
 
 export const UsageCounterModel =
   (mongoose.models.UsageCounter as mongoose.Model<IUsageCounter>) ||
-  mongoose.model<IUsageCounter>('UsageCounter', UsageCounterSchema)
+  mongoose.model<IUsageCounter>('UsageCounter', UsageCounterSchema);
 
 // ---------------------------------------------------------------------------
 // Exported interfaces (consumed by middleware and controllers)
@@ -88,7 +95,7 @@ export const UsageCounterModel =
  */
 export interface EffectiveLimits extends PlanLimits {
   /** Full feature flag set for the user's current plan. */
-  features: PlanFeatures
+  features: PlanFeatures;
 }
 
 /**
@@ -96,11 +103,11 @@ export interface EffectiveLimits extends PlanLimits {
  * provides everything the frontend needs to render the upgrade dialog.
  */
 export interface EntitlementResult {
-  allowed: boolean
-  reason?: string
-  currentPlan: PlanId
-  requiredPlan?: PlanId
-  upgradeHint?: UpgradeHint
+  allowed: boolean;
+  reason?: string;
+  currentPlan: PlanId;
+  requiredPlan?: PlanId;
+  upgradeHint?: UpgradeHint;
 }
 
 /**
@@ -108,27 +115,33 @@ export interface EntitlementResult {
  * The frontend renders this directly — no hardcoded plan values on the client.
  */
 export interface UpgradeHint {
-  reason: string
-  currentLimit: number | string
-  nextPlan: PlanId
-  nextPlanLimit: number | string
-  upgradeUrl: string
+  reason: string;
+  currentLimit: number | string;
+  nextPlan: PlanId;
+  nextPlanLimit: number | string;
+  upgradeUrl: string;
 }
 
 // ---------------------------------------------------------------------------
 // Re-export DeductResult so callers don't need to import from the repository
 // ---------------------------------------------------------------------------
-export type { DeductResult }
+export type { DeductResult };
 
 // ---------------------------------------------------------------------------
 // Internal constants
 // ---------------------------------------------------------------------------
 
-const CACHE_KEY_PREFIX = 'sub:entitlement:'
-const CACHE_TTL_SECONDS = 60
+const CACHE_KEY_PREFIX = 'sub:entitlement:';
+const CACHE_TTL_SECONDS = 60;
 
 /** Ordered plan tiers, lowest → highest. */
-const PLAN_ORDER: PlanId[] = ['free', 'creator', 'pro', 'business', 'enterprise']
+const PLAN_ORDER: PlanId[] = [
+  'free',
+  'creator',
+  'pro',
+  'business',
+  'enterprise',
+];
 
 // ---------------------------------------------------------------------------
 // EntitlementService
@@ -158,16 +171,30 @@ export class EntitlementService {
    * status + pastDueGraceEndsAt field (renewal-retry grace period).
    */
   async getPlan(userId: string): Promise<PlanId> {
-    const subscription = await this.subscriptionRepo.findByUserId(userId)
+    const subscription = await this.subscriptionRepo.findByUserId(userId);
 
     if (!subscription) {
-      logger.debug('No subscription found, defaulting to free', { userId, module: 'EntitlementService' })
-      return 'free'
+      logger.debug('No subscription found, defaulting to free', {
+        userId,
+        module: 'EntitlementService',
+      });
+      return 'free';
+    }
+
+    // A voluntary cancellation has no grace period. The already-paid plan stays
+    // active through currentPeriodEnd, then becomes Free on the very next access
+    // check even if a Razorpay terminal webhook or the daily finalizer is late.
+    const now = new Date();
+    if (isCancellationExpired(subscription, now)) {
+      return 'free';
+    }
+    if (isCancellationPaidThrough(subscription, now)) {
+      return subscription.plan as PlanId;
     }
 
     // SECURITY: Only return a paid plan when the subscription is actually active or in trial.
     // Statuses 'started', 'cancelled', 'expired', 'inactive' all revert to 'free'.
-    const paidStatuses = ['active', 'trial']
+    const paidStatuses = ['active', 'trial'];
     if (!paidStatuses.includes(subscription.status)) {
       // payment_failed within grace period still counts as paid
       if (
@@ -175,13 +202,14 @@ export class EntitlementService {
         subscription.gracePeriodEndsAt != null &&
         subscription.gracePeriodEndsAt >= new Date()
       ) {
-        return subscription.plan as PlanId
+        return subscription.plan as PlanId;
       }
       if (subscription.status === 'payment_failed') {
-        logger.info(
-          'Grace period expired — downgrading to free plan',
-          { userId, gracePeriodEndsAt: subscription.gracePeriodEndsAt, module: 'EntitlementService' }
-        )
+        logger.info('Grace period expired — downgrading to free plan', {
+          userId,
+          gracePeriodEndsAt: subscription.gracePeriodEndsAt,
+          module: 'EntitlementService',
+        });
       }
       // past_due (Razorpay renewal failure) within grace period still counts as paid
       if (
@@ -189,18 +217,22 @@ export class EntitlementService {
         subscription.pastDueGraceEndsAt != null &&
         subscription.pastDueGraceEndsAt >= new Date()
       ) {
-        return subscription.plan as PlanId
+        return subscription.plan as PlanId;
       }
       if (subscription.status === 'past_due') {
         logger.info(
           'past_due grace period expired — downgrading to free plan',
-          { userId, pastDueGraceEndsAt: subscription.pastDueGraceEndsAt, module: 'EntitlementService' }
-        )
+          {
+            userId,
+            pastDueGraceEndsAt: subscription.pastDueGraceEndsAt,
+            module: 'EntitlementService',
+          }
+        );
       }
-      return 'free'
+      return 'free';
     }
 
-    return subscription.plan as PlanId
+    return subscription.plan as PlanId;
   }
 
   /**
@@ -216,29 +248,39 @@ export class EntitlementService {
    * status + pastDueGraceEndsAt field (renewal-retry grace period).
    */
   async getEffectiveLimits(userId: string): Promise<EffectiveLimits> {
-    // 1. Try cache first
-    const cached = await this.getCached(userId)
+    // 1. Cache first — this runs on every authenticated request, so it must
+    //    stay fast. The voluntary-cancellation cutoff is still enforced because
+    //    on a cache miss we bound the cache TTL so it never survives past the
+    //    paid-through date (see the setCached call below).
+    const cached = await this.getCached(userId);
     if (cached) {
-      logger.debug('Cache hit for effective limits', { userId, module: 'EntitlementService' })
-      return cached
+      logger.debug('Cache hit for effective limits', {
+        userId,
+        module: 'EntitlementService',
+      });
+      return cached;
     }
 
-    // 2. Cache miss — compute from DB
-    logger.debug('Cache miss, computing effective limits from DB', { userId, module: 'EntitlementService' })
-
+    // 2. Cache miss — compute from DB.
+    logger.debug('Computing effective limits from DB', {
+      userId,
+      module: 'EntitlementService',
+    });
     const [subscription, activeAddOns] = await Promise.all([
       this.subscriptionRepo.findByUserId(userId),
       AddOnModel.find({ userId, status: 'active' }).lean(),
-    ])
+    ]);
+
+    const cancellationExpired = isCancellationExpired(subscription);
 
     // Requirement 5.3: payment_failed with expired grace period → use free plan limits
     // SECURITY: Only grant paid plan limits when status is 'active' or 'trial'.
     // Any other status (started, cancelled, expired, payment_failed, inactive) → free.
-    let planId: PlanId = 'free'
-    if (subscription) {
-      const paidStatuses = ['active', 'trial']
+    let planId: PlanId = 'free';
+    if (subscription && !cancellationExpired) {
+      const paidStatuses = ['active', 'trial'];
       if (paidStatuses.includes(subscription.status)) {
-        planId = (subscription.plan as PlanId) ?? 'free'
+        planId = (subscription.plan as PlanId) ?? 'free';
       }
       // payment_failed within grace period still gets paid limits
       if (
@@ -246,7 +288,7 @@ export class EntitlementService {
         subscription.gracePeriodEndsAt != null &&
         subscription.gracePeriodEndsAt >= new Date()
       ) {
-        planId = (subscription.plan as PlanId) ?? 'free'
+        planId = (subscription.plan as PlanId) ?? 'free';
       }
       // payment_failed with expired grace period → free (already handled above by defaulting to free)
       if (
@@ -256,9 +298,13 @@ export class EntitlementService {
       ) {
         logger.info(
           'Grace period expired — effective limits computed from free plan',
-          { userId, gracePeriodEndsAt: subscription.gracePeriodEndsAt, module: 'EntitlementService' }
-        )
-        planId = 'free'
+          {
+            userId,
+            gracePeriodEndsAt: subscription.gracePeriodEndsAt,
+            module: 'EntitlementService',
+          }
+        );
+        planId = 'free';
       }
       // past_due (Razorpay renewal failure) within grace period still gets paid limits
       if (
@@ -266,7 +312,7 @@ export class EntitlementService {
         subscription.pastDueGraceEndsAt != null &&
         subscription.pastDueGraceEndsAt >= new Date()
       ) {
-        planId = (subscription.plan as PlanId) ?? 'free'
+        planId = (subscription.plan as PlanId) ?? 'free';
       }
       // past_due with expired grace period → free (already handled above by defaulting to free)
       if (
@@ -276,28 +322,59 @@ export class EntitlementService {
       ) {
         logger.info(
           'past_due grace period expired — effective limits computed from free plan',
-          { userId, pastDueGraceEndsAt: subscription.pastDueGraceEndsAt, module: 'EntitlementService' }
-        )
-        planId = 'free'
+          {
+            userId,
+            pastDueGraceEndsAt: subscription.pastDueGraceEndsAt,
+            module: 'EntitlementService',
+          }
+        );
+        planId = 'free';
+      }
+
+      // A voluntary cancellation preserves the plan through the paid-through
+      // cutoff regardless of provider status changes during that period.
+      if (isCancellationPaidThrough(subscription)) {
+        planId = (subscription.plan as PlanId) ?? 'free';
       }
     }
 
-    const planConfig = getPlanConfig(planId)
+    // Bound the cache TTL so a scheduled cancellation cutoff is honored without
+    // a per-request DB read: the entry expires at the cutoff (capped to the
+    // normal TTL), after which the next request recomputes to the free plan.
+    let cacheTtlSeconds = CACHE_TTL_SECONDS;
+    if (isCancellationPaidThrough(subscription)) {
+      const secondsUntilCutoff = Math.ceil(
+        (subscription.currentPeriodEnd.getTime() - Date.now()) / 1000
+      );
+      cacheTtlSeconds = Math.max(
+        1,
+        Math.min(CACHE_TTL_SECONDS, secondsUntilCutoff)
+      );
+    }
+
+    const planConfig = getPlanConfig(planId);
 
     if (!planConfig) {
       // Defensive: should never happen with a valid PlanId
-      logger.error('Unknown planId — falling back to free', undefined, { userId, planId, module: 'EntitlementService' })
-      const freeConfig = PLAN_CONFIG['free']
-      const fallback: EffectiveLimits = { ...freeConfig.limits, features: freeConfig.features }
-      await this.setCached(userId, fallback)
-      return fallback
+      logger.error('Unknown planId — falling back to free', undefined, {
+        userId,
+        planId,
+        module: 'EntitlementService',
+      });
+      const freeConfig = PLAN_CONFIG['free'];
+      const fallback: EffectiveLimits = {
+        ...freeConfig.limits,
+        features: freeConfig.features,
+      };
+      await this.setCached(userId, fallback, cacheTtlSeconds);
+      return fallback;
     }
 
     // Start with the base plan limits (spread to avoid mutation)
     const effectiveLimits: EffectiveLimits = {
       ...planConfig.limits,
       features: { ...planConfig.features },
-    }
+    };
 
     // 3. Merge active add-ons that affect numeric limits
     // Add-ons with limitKey === 'purchasedCredits' affect AICredits doc, not plan limits.
@@ -305,36 +382,46 @@ export class EntitlementService {
     // limitKey set to 'maxWorkspaces' as a placeholder — we skip those here and handle
     // feature flags via canUseFeature() + featureOverrides only.
     for (const addOn of activeAddOns) {
-      const { type, quantity } = addOn
+      const { type, quantity } = addOn;
 
       // Look up the add-on definition
-      const addonDef = ADDON_CONFIG[type as keyof typeof ADDON_CONFIG]
+      const addonDef = ADDON_CONFIG[type as keyof typeof ADDON_CONFIG];
 
       if (!addonDef) {
-        logger.warn('Unknown add-on type in DB, skipping', { userId, type, module: 'EntitlementService' })
-        continue
+        logger.warn('Unknown add-on type in DB, skipping', {
+          userId,
+          type,
+          module: 'EntitlementService',
+        });
+        continue;
       }
 
-      const { limitKey, quantityIncrement } = addonDef
+      const { limitKey, quantityIncrement } = addonDef;
 
       // Skip non-limit add-ons (purchasedCredits is on AICredits doc, not here)
-      if (limitKey === 'purchasedCredits') continue
+      if (limitKey === 'purchasedCredits') continue;
 
       // Skip feature-toggle add-ons whose limitKey is a placeholder
       // (white_label_reports / api_access / priority_support use maxWorkspaces as placeholder)
-      if (['white_label_reports', 'api_access', 'priority_support'].includes(type)) continue
+      if (
+        ['white_label_reports', 'api_access', 'priority_support'].includes(type)
+      )
+        continue;
 
       // Only increment if the plan limit is not already -1 (enterprise unlimited)
-      const currentValue = effectiveLimits[limitKey as keyof PlanLimits] as number
+      const currentValue = effectiveLimits[
+        limitKey as keyof PlanLimits
+      ] as number;
       if (currentValue !== -1) {
-        (effectiveLimits as unknown as Record<string, number>)[limitKey as string] =
-          currentValue + quantity * quantityIncrement
+        (effectiveLimits as unknown as Record<string, number>)[
+          limitKey as string
+        ] = currentValue + quantity * quantityIncrement;
       }
     }
 
     // 4. Cache and return
-    await this.setCached(userId, effectiveLimits)
-    return effectiveLimits
+    await this.setCached(userId, effectiveLimits, cacheTtlSeconds);
+    return effectiveLimits;
   }
 
   /**
@@ -342,9 +429,9 @@ export class EntitlementService {
    * Returns Infinity if the stored value is -1 (enterprise unlimited).
    */
   async getLimit(userId: string, limitKey: keyof PlanLimits): Promise<number> {
-    const limits = await this.getEffectiveLimits(userId)
-    const raw = limits[limitKey] as number
-    return raw === -1 ? Infinity : raw
+    const limits = await this.getEffectiveLimits(userId);
+    const raw = limits[limitKey] as number;
+    return raw === -1 ? Infinity : raw;
   }
 
   /**
@@ -360,57 +447,67 @@ export class EntitlementService {
     userId: string,
     featureKey: keyof PlanFeatures
   ): Promise<EntitlementResult> {
-    const planId = await this.getPlan(userId)
-    const limits = await this.getEffectiveLimits(userId)
+    const planId = await this.getPlan(userId);
+    const limits = await this.getEffectiveLimits(userId);
 
     // 1. Check featureOverrides on the Subscription document
-    const subscription = await this.subscriptionRepo.findByUserId(userId)
+    const subscription = await this.subscriptionRepo.findByUserId(userId);
     if (subscription?.featureOverrides) {
-      const overrideMap = subscription.featureOverrides as Map<string, boolean>
+      const overrideMap = subscription.featureOverrides as Map<string, boolean>;
       if (overrideMap instanceof Map && overrideMap.has(featureKey)) {
-        const overrideValue = overrideMap.get(featureKey)!
-        logger.debug(
-          'Feature resolved via admin override',
-          { userId, featureKey, overrideValue, module: 'EntitlementService' }
-        )
+        const overrideValue = overrideMap.get(featureKey)!;
+        logger.debug('Feature resolved via admin override', {
+          userId,
+          featureKey,
+          overrideValue,
+          module: 'EntitlementService',
+        });
         return {
           allowed: overrideValue,
           currentPlan: planId,
-          reason: overrideValue ? undefined : `Feature '${featureKey}' is disabled by admin override`,
-        }
+          reason: overrideValue
+            ? undefined
+            : `Feature '${featureKey}' is disabled by admin override`,
+        };
       }
       // Also handle plain object (lean() returns objects, not Maps)
-      const overrideObj = overrideMap as unknown as Record<string, boolean>
+      const overrideObj = overrideMap as unknown as Record<string, boolean>;
       if (typeof overrideObj === 'object' && featureKey in overrideObj) {
-        const overrideValue = overrideObj[featureKey]
-        logger.debug(
-          'Feature resolved via admin override (plain object)',
-          { userId, featureKey, overrideValue, module: 'EntitlementService' }
-        )
+        const overrideValue = overrideObj[featureKey];
+        logger.debug('Feature resolved via admin override (plain object)', {
+          userId,
+          featureKey,
+          overrideValue,
+          module: 'EntitlementService',
+        });
         return {
           allowed: overrideValue,
           currentPlan: planId,
-          reason: overrideValue ? undefined : `Feature '${featureKey}' is disabled by admin override`,
-        }
+          reason: overrideValue
+            ? undefined
+            : `Feature '${featureKey}' is disabled by admin override`,
+        };
       }
     }
 
     // 2. Check plan features
-    const featureValue = limits.features[featureKey]
+    const featureValue = limits.features[featureKey];
 
     // Boolean features
     if (typeof featureValue === 'boolean') {
       if (featureValue) {
-        return { allowed: true, currentPlan: planId }
+        return { allowed: true, currentPlan: planId };
       }
 
       // Denied — find the next plan that provides this feature
-      const upgradeHint = this.buildFeatureUpgradeHint(featureKey, planId)
+      const upgradeHint = this.buildFeatureUpgradeHint(featureKey, planId);
 
-      logger.info(
-        'Feature access denied — plan does not include feature',
-        { userId, featureKey, planId, module: 'EntitlementService' }
-      )
+      logger.info('Feature access denied — plan does not include feature', {
+        userId,
+        featureKey,
+        planId,
+        module: 'EntitlementService',
+      });
 
       return {
         allowed: false,
@@ -418,13 +515,13 @@ export class EntitlementService {
         reason: `Your ${planId} plan does not include '${featureKey}'. Upgrade to access this feature.`,
         requiredPlan: upgradeHint?.nextPlan,
         upgradeHint,
-      }
+      };
     }
 
     // Non-boolean feature values (veeGPTLevel, analyticsExport) — always allowed
     // but the value itself indicates the tier. We return allowed: true so callers
     // can read the value from EffectiveLimits directly if they need the tier.
-    return { allowed: true, currentPlan: planId }
+    return { allowed: true, currentPlan: planId };
   }
 
   /**
@@ -432,9 +529,13 @@ export class EntitlementService {
    * recompute from MongoDB. Call immediately after any subscription or add-on change.
    */
   async invalidateCache(userId: string): Promise<void> {
-    const key = this.cacheKey(userId)
-    await this.redis.del(key)
-    logger.debug('Entitlement cache invalidated', { userId, key, module: 'EntitlementService' })
+    const key = this.cacheKey(userId);
+    await this.redis.del(key);
+    logger.debug('Entitlement cache invalidated', {
+      userId,
+      key,
+      module: 'EntitlementService',
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -442,34 +543,42 @@ export class EntitlementService {
   // -------------------------------------------------------------------------
 
   async ensureCreditAccount(userId: string) {
-    const plan = await this.getPlan(userId)
-    if (plan === 'enterprise') return null
-    const allocation = PLAN_CONFIG[plan].limits.aiCreditsPerMonth
-    const repo = new AICreditsRepository()
-    const existing = await repo.findByUserId(userId)
-    const now = new Date()
-    const nextResetAt = new Date(now)
-    nextResetAt.setUTCMonth(nextResetAt.getUTCMonth() + 1)
+    const plan = await this.getPlan(userId);
+    if (plan === 'enterprise') return null;
+    const allocation = PLAN_CONFIG[plan].limits.aiCreditsPerMonth;
+    const repo = new AICreditsRepository();
+    const existing = await repo.findByUserId(userId);
+    const now = new Date();
+    const nextResetAt = new Date(now);
+    nextResetAt.setUTCMonth(nextResetAt.getUTCMonth() + 1);
 
-    if (!existing) return repo.ensureForUser(userId, allocation, nextResetAt)
+    if (!existing) return repo.ensureForUser(userId, allocation, nextResetAt);
 
     // Reconcile legacy/free documents immediately: older code allocated 100
     // Free credits. The repository performs this atomically from current DB
     // values so concurrent deductions cannot be overwritten, while purchased
     // and rollover balances remain untouched.
     if (plan === 'free' && existing.monthlyCredits !== allocation) {
-      const reconciled = await repo.reconcileMonthlyAllocation(userId, allocation)
-      return reconciled ?? repo.findByUserId(userId)
+      const reconciled = await repo.reconcileMonthlyAllocation(
+        userId,
+        allocation
+      );
+      return reconciled ?? repo.findByUserId(userId);
     }
 
     // Free users may have no Subscription document, so the subscription cron
     // cannot discover them. Compare-and-set on nextResetAt ensures concurrent
     // reads cannot replenish the same cycle twice or erase a deduction.
     if (existing.nextResetAt <= now) {
-      const reset = await repo.resetMonthly(userId, allocation, nextResetAt, now)
-      return reset ?? repo.findByUserId(userId)
+      const reset = await repo.resetMonthly(
+        userId,
+        allocation,
+        nextResetAt,
+        now
+      );
+      return reset ?? repo.findByUserId(userId);
     }
-    return existing
+    return existing;
   }
 
   /**
@@ -477,10 +586,10 @@ export class EntitlementService {
    * from the effective plan (Free users receive exactly 50 credits).
    */
   async remainingCredits(userId: string): Promise<number> {
-    const plan = await this.getPlan(userId)
-    if (plan === 'enterprise') return Infinity
-    const doc = await this.ensureCreditAccount(userId)
-    return Math.max(0, doc?.remainingCredits ?? 0)
+    const plan = await this.getPlan(userId);
+    if (plan === 'enterprise') return Infinity;
+    const doc = await this.ensureCreditAccount(userId);
+    return Math.max(0, doc?.remainingCredits ?? 0);
   }
 
   /**
@@ -494,20 +603,31 @@ export class EntitlementService {
    * @returns DeductResult — { success, remaining } on success,
    *          { success: false, reason: 'insufficient_credits', remaining } on failure.
    */
-  async deductCredits(userId: string, amount: number, idempotencyKey?: string): Promise<DeductResult> {
+  async deductCredits(
+    userId: string,
+    amount: number,
+    idempotencyKey?: string
+  ): Promise<DeductResult> {
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new Error('Credit deduction amount must be a positive finite number')
+      throw new Error(
+        'Credit deduction amount must be a positive finite number'
+      );
     }
-    await this.ensureCreditAccount(userId)
-    const normalizedAmount = Math.round((amount + Number.EPSILON) * 100) / 100
-    const repo = new AICreditsRepository()
-    const result = await repo.deductCredits(userId, normalizedAmount, 3, idempotencyKey)
+    await this.ensureCreditAccount(userId);
+    const normalizedAmount = Math.round((amount + Number.EPSILON) * 100) / 100;
+    const repo = new AICreditsRepository();
+    const result = await repo.deductCredits(
+      userId,
+      normalizedAmount,
+      3,
+      idempotencyKey
+    );
 
     if (result.success) {
       // Notifications are a non-critical side effect. A notifier failure must
       // never make callers believe the debit failed after MongoDB committed it.
       try {
-        const updatedDoc = await AICreditsModel.findOne({ userId }).lean()
+        const updatedDoc = await AICreditsModel.findOne({ userId }).lean();
         if (updatedDoc) {
           await quotaNotifier.checkAndNotify(
             userId,
@@ -515,18 +635,24 @@ export class EntitlementService {
             updatedDoc.usedThisCycle,
             updatedDoc.usedThisCycle + updatedDoc.remainingCredits,
             this.redis
-          )
+          );
         }
       } catch (notificationError) {
-        logger.warn('AI credit quota notification failed after successful debit', {
-          userId,
-          module: 'EntitlementService',
-          error: notificationError instanceof Error ? notificationError.message : String(notificationError),
-        })
+        logger.warn(
+          'AI credit quota notification failed after successful debit',
+          {
+            userId,
+            module: 'EntitlementService',
+            error:
+              notificationError instanceof Error
+                ? notificationError.message
+                : String(notificationError),
+          }
+        );
       }
     }
 
-    return result
+    return result;
   }
 
   // -------------------------------------------------------------------------
@@ -544,7 +670,10 @@ export class EntitlementService {
    * Returns Infinity if the plan limit is unlimited (-1).
    * Returns minimum 0 — never negative.
    */
-  async remainingAutomation(userId: string, type: AutomationType): Promise<number> {
+  async remainingAutomation(
+    userId: string,
+    type: AutomationType
+  ): Promise<number> {
     const limitKeyMap: Record<AutomationType, keyof PlanLimits> = {
       keywordConversations: 'keywordTriggerConversationsPerMonth',
       aiConversations: 'aiConversationsPerMonth',
@@ -553,13 +682,13 @@ export class EntitlementService {
       aiWorkflows: 'aiWorkflowLimit',
       keywordTriggers: 'keywordTriggerLimit',
       teamMembers: 'maxTeamMembers',
-    }
+    };
 
-    const limitKey = limitKeyMap[type]
-    const limit = await this.getLimit(userId, limitKey)
+    const limitKey = limitKeyMap[type];
+    const limit = await this.getLimit(userId, limitKey);
 
     if (limit === Infinity) {
-      return Infinity
+      return Infinity;
     }
 
     // For conversation-based types, read cycle usage from UsageCounterModel
@@ -567,17 +696,99 @@ export class EntitlementService {
       'keywordConversations',
       'aiConversations',
       'followCampaignConversations',
-    ]
+    ];
 
     if (conversationTypes.includes(type)) {
-      const counter = await UsageCounterModel.findOne({ userId, type }).lean()
-      const used = counter?.countThisCycle ?? 0
-      return Math.max(0, limit - used)
+      const counter = await UsageCounterModel.findOne({ userId, type }).lean();
+      const used = counter?.countThisCycle ?? 0;
+      return Math.max(0, limit - used);
     }
 
     // For non-conversation types (workflows, triggers, seats) — return the limit
     // since active counts are managed by their respective domain collections
-    return limit
+    return limit;
+  }
+
+  // -------------------------------------------------------------------------
+  // Automation usage accounting (conversation counters)
+  // -------------------------------------------------------------------------
+
+  /**
+   * The three per-cycle "conversation" quota dimensions. These are the only
+   * automation types whose usage is metered against a monthly cap via the
+   * UsageCounter collection — the rest (workflows/triggers/seats) are point-in-
+   * time counts owned by their domain collections.
+   */
+  private static readonly CONVERSATION_TYPES: readonly AutomationType[] = [
+    'keywordConversations',
+    'aiConversations',
+    'followCampaignConversations',
+  ];
+
+  /**
+   * Atomically records consumption of `delta` conversation units for a user in
+   * the current billing cycle. Upserts the counter so the first consumption of
+   * a cycle creates the row. No-op for non-conversation automation types.
+   *
+   * This is the write half that was previously missing — without it the
+   * UsageCounter was only ever read, so the monthly conversation caps
+   * (aiConversationsPerMonth etc.) could never actually trip.
+   *
+   * Best-effort/atomic: uses a single $inc upsert, safe under the concurrent
+   * webhook/worker traffic that drives automations.
+   */
+  async recordAutomationUsage(
+    userId: string,
+    type: AutomationType,
+    delta = 1
+  ): Promise<void> {
+    if (!EntitlementService.CONVERSATION_TYPES.includes(type)) return;
+    if (!userId || !Number.isFinite(delta) || delta <= 0) return;
+    await UsageCounterModel.updateOne(
+      { userId, type },
+      {
+        $inc: { countThisCycle: delta },
+        $setOnInsert: { lastResetAt: new Date() },
+      },
+      { upsert: true }
+    );
+  }
+
+  /**
+   * Convenience guard used at automation send points: returns true when the
+   * user still has remaining quota for the given conversation type (or the
+   * plan grants unlimited). Fails OPEN (returns true) on any error so an
+   * entitlement hiccup can never silently halt a paying customer's automations.
+   */
+  async canConsumeAutomation(
+    userId: string,
+    type: AutomationType
+  ): Promise<boolean> {
+    try {
+      const remaining = await this.remainingAutomation(userId, type);
+      return remaining > 0;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * Resets every per-cycle conversation counter for a user to zero at a billing
+   * boundary. Called alongside AICredits.resetMonthly from both the Razorpay
+   * subscription.charged webhook and the non-Razorpay monthly-quota cron, so
+   * the caps refresh in lock-step with the plan's monthly credit allocation.
+   */
+  async resetAutomationCounters(userId: string): Promise<void> {
+    if (!userId) return;
+    await UsageCounterModel.updateMany(
+      {
+        userId,
+        type: {
+          $in: EntitlementService.CONVERSATION_TYPES as AutomationType[],
+        },
+      },
+      { $set: { countThisCycle: 0, lastResetAt: new Date() } }
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -605,28 +816,32 @@ export class EntitlementService {
    */
   private async resolveWorkspaceIds(userId: string): Promise<string[]> {
     try {
-      const { User } = await import('../../../models/User/User')
-      const { workspaceService } = await import('../../../services/WorkspaceService')
+      const { User } = await import('../../../models/User/User');
+      const { workspaceService } =
+        await import('../../../services/WorkspaceService');
 
-      const userDoc = await User.findById(userId).select('firebaseUid').lean().catch(() => null)
-      const firebaseUid = (userDoc as any)?.firebaseUid as string | undefined
+      const userDoc = await User.findById(userId)
+        .select('firebaseUid')
+        .lean()
+        .catch(() => null);
+      const firebaseUid = (userDoc as any)?.firebaseUid as string | undefined;
 
       let workspaces = firebaseUid
         ? await workspaceService.getWorkspacesByUserId(firebaseUid)
-        : []
+        : [];
 
       if (!workspaces || workspaces.length === 0) {
-        workspaces = await workspaceService.getWorkspacesByUserId(userId)
+        workspaces = await workspaceService.getWorkspacesByUserId(userId);
       }
 
-      return (workspaces || []).map((w: any) => String(w._id ?? w.id))
+      return (workspaces || []).map((w: any) => String(w._id ?? w.id));
     } catch (err) {
       logger.warn('resolveWorkspaceIds failed, defaulting to empty list', {
         userId,
         err: (err as Error)?.message,
         module: 'EntitlementService',
-      })
-      return []
+      });
+      return [];
     }
   }
 
@@ -638,17 +853,17 @@ export class EntitlementService {
    * no top-level `userId` field, only `workspaceId`) scoped to those workspaces.
    */
   async remainingProfiles(userId: string): Promise<number> {
-    const limit = await this.getLimit(userId, 'maxProfiles')
-    if (limit === Infinity) return Infinity
+    const limit = await this.getLimit(userId, 'maxProfiles');
+    if (limit === Infinity) return Infinity;
 
-    const workspaceIds = await this.resolveWorkspaceIds(userId)
-    if (workspaceIds.length === 0) return limit
+    const workspaceIds = await this.resolveWorkspaceIds(userId);
+    if (workspaceIds.length === 0) return limit;
 
     const count = await mongoose.connection
       .collection('socialaccounts')
-      .countDocuments({ workspaceId: { $in: workspaceIds } })
+      .countDocuments({ workspaceId: { $in: workspaceIds } });
 
-    return Math.max(0, limit - count)
+    return Math.max(0, limit - count);
   }
 
   /**
@@ -658,11 +873,11 @@ export class EntitlementService {
    * switcher UI actually shows the user.
    */
   async remainingWorkspaces(userId: string): Promise<number> {
-    const limit = await this.getLimit(userId, 'maxWorkspaces')
-    if (limit === Infinity) return Infinity
+    const limit = await this.getLimit(userId, 'maxWorkspaces');
+    if (limit === Infinity) return Infinity;
 
-    const workspaceIds = await this.resolveWorkspaceIds(userId)
-    return Math.max(0, limit - workspaceIds.length)
+    const workspaceIds = await this.resolveWorkspaceIds(userId);
+    return Math.max(0, limit - workspaceIds.length);
   }
 
   /**
@@ -672,45 +887,56 @@ export class EntitlementService {
    * app's UI (workspace switcher, connected accounts, calendar) actually shows.
    */
   async getUsageCounts(userId: string): Promise<{
-    workspacesUsed: number
-    profilesUsed: number
-    teamMembersUsed: number
-    scheduledPostsThisCycle: number
+    workspacesUsed: number;
+    profilesUsed: number;
+    teamMembersUsed: number;
+    scheduledPostsThisCycle: number;
   }> {
-    const workspaceIds = await this.resolveWorkspaceIds(userId)
+    const workspaceIds = await this.resolveWorkspaceIds(userId);
 
     if (workspaceIds.length === 0) {
-      return { workspacesUsed: 0, profilesUsed: 0, teamMembersUsed: 0, scheduledPostsThisCycle: 0 }
+      return {
+        workspacesUsed: 0,
+        profilesUsed: 0,
+        teamMembersUsed: 0,
+        scheduledPostsThisCycle: 0,
+      };
     }
 
-    const now = new Date()
-    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    const now = new Date();
+    const startOfMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+    );
     // Strict upper bound: posts scheduled for a FUTURE month must not be charged
     // to the current month's quota. Window is [startOfMonth, startOfNextMonth).
-    const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+    const startOfNextMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    );
     const objectIds = workspaceIds
-      .filter((id) => mongoose.Types.ObjectId.isValid(id))
-      .map((id) => new mongoose.Types.ObjectId(id))
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
 
-    const [profilesUsed, teamMembersUsed, scheduledPostsThisCycle] = await Promise.all([
-      mongoose.connection
-        .collection('socialaccounts')
-        .countDocuments({ workspaceId: { $in: workspaceIds } }),
-      mongoose.connection
-        .collection('workspacemembers')
-        .countDocuments({ workspaceId: { $in: objectIds } })
-        .catch(() => 0),
-      mongoose.connection
-        .collection('contents')
-        .countDocuments({ workspaceId: { $in: workspaceIds }, scheduledAt: { $gte: startOfMonth, $lt: startOfNextMonth } }),
-    ])
+    const [profilesUsed, teamMembersUsed, scheduledPostsThisCycle] =
+      await Promise.all([
+        mongoose.connection
+          .collection('socialaccounts')
+          .countDocuments({ workspaceId: { $in: workspaceIds } }),
+        mongoose.connection
+          .collection('workspacemembers')
+          .countDocuments({ workspaceId: { $in: objectIds } })
+          .catch(() => 0),
+        mongoose.connection.collection('contents').countDocuments({
+          workspaceId: { $in: workspaceIds },
+          scheduledAt: { $gte: startOfMonth, $lt: startOfNextMonth },
+        }),
+      ]);
 
     return {
       workspacesUsed: workspaceIds.length,
       profilesUsed,
       teamMembersUsed,
       scheduledPostsThisCycle,
-    }
+    };
   }
 
   /**
@@ -724,21 +950,31 @@ export class EntitlementService {
    *
    * @param reference Any Date inside the month to measure. Defaults to now.
    */
-  async remainingPosts(userId: string, reference: Date = new Date()): Promise<number> {
-    const limit = await this.getLimit(userId, 'scheduledPostsPerMonth')
-    if (limit === Infinity) return Infinity
+  async remainingPosts(
+    userId: string,
+    reference: Date = new Date()
+  ): Promise<number> {
+    const limit = await this.getLimit(userId, 'scheduledPostsPerMonth');
+    if (limit === Infinity) return Infinity;
 
-    const workspaceIds = await this.resolveWorkspaceIds(userId)
-    if (workspaceIds.length === 0) return limit
+    const workspaceIds = await this.resolveWorkspaceIds(userId);
+    if (workspaceIds.length === 0) return limit;
 
-    const startOfMonth = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1))
-    const startOfNextMonth = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 1))
+    const startOfMonth = new Date(
+      Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1)
+    );
+    const startOfNextMonth = new Date(
+      Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 1)
+    );
 
     const count = await mongoose.connection
       .collection('contents')
-      .countDocuments({ workspaceId: { $in: workspaceIds }, scheduledAt: { $gte: startOfMonth, $lt: startOfNextMonth } })
+      .countDocuments({
+        workspaceId: { $in: workspaceIds },
+        scheduledAt: { $gte: startOfMonth, $lt: startOfNextMonth },
+      });
 
-    return Math.max(0, limit - count)
+    return Math.max(0, limit - count);
   }
 
   /**
@@ -750,7 +986,7 @@ export class EntitlementService {
    * Returns Infinity for unlimited plans.
    */
   async remainingKeywords(userId: string): Promise<number> {
-    return this.getLimit(userId, 'keywordTriggerLimit')
+    return this.getLimit(userId, 'keywordTriggerLimit');
   }
 
   /**
@@ -759,7 +995,7 @@ export class EntitlementService {
    * Delegates to remainingAutomation for consistent usage tracking.
    */
   async remainingFollowCampaigns(userId: string): Promise<number> {
-    return this.remainingAutomation(userId, 'followCampaignConversations')
+    return this.remainingAutomation(userId, 'followCampaignConversations');
   }
 
   // -------------------------------------------------------------------------
@@ -767,31 +1003,43 @@ export class EntitlementService {
   // -------------------------------------------------------------------------
 
   private cacheKey(userId: string): string {
-    return `${CACHE_KEY_PREFIX}${userId}`
+    return `${CACHE_KEY_PREFIX}${userId}`;
   }
 
   private async getCached(userId: string): Promise<EffectiveLimits | null> {
     try {
-      const raw = await this.redis.get(this.cacheKey(userId))
-      if (!raw) return null
-      return JSON.parse(raw) as EffectiveLimits
+      const raw = await this.redis.get(this.cacheKey(userId));
+      if (!raw) return null;
+      return JSON.parse(raw) as EffectiveLimits;
     } catch (err) {
-      logger.warn('Redis cache read failed, falling back to DB', { userId, err, module: 'EntitlementService' })
-      return null
+      logger.warn('Redis cache read failed, falling back to DB', {
+        userId,
+        err,
+        module: 'EntitlementService',
+      });
+      return null;
     }
   }
 
-  private async setCached(userId: string, data: EffectiveLimits): Promise<void> {
+  private async setCached(
+    userId: string,
+    data: EffectiveLimits,
+    ttlSeconds: number = CACHE_TTL_SECONDS
+  ): Promise<void> {
     try {
       await this.redis.set(
         this.cacheKey(userId),
         JSON.stringify(data),
         'EX',
-        CACHE_TTL_SECONDS
-      )
+        Math.max(1, Math.floor(ttlSeconds))
+      );
     } catch (err) {
       // Non-fatal: if Redis write fails, the next request will recompute from DB
-      logger.warn('Redis cache write failed', { userId, err, module: 'EntitlementService' })
+      logger.warn('Redis cache write failed', {
+        userId,
+        err,
+        module: 'EntitlementService',
+      });
     }
   }
 
@@ -807,13 +1055,13 @@ export class EntitlementService {
     featureKey: keyof PlanFeatures,
     currentPlanId: PlanId
   ): UpgradeHint | undefined {
-    const currentOrder = getPlanOrder(currentPlanId)
+    const currentOrder = getPlanOrder(currentPlanId);
 
     for (const planId of PLAN_ORDER) {
-      if (getPlanOrder(planId) <= currentOrder) continue // skip same or lower plans
+      if (getPlanOrder(planId) <= currentOrder) continue; // skip same or lower plans
 
-      const planConfig = PLAN_CONFIG[planId]
-      const featureValue = planConfig.features[featureKey]
+      const planConfig = PLAN_CONFIG[planId];
+      const featureValue = planConfig.features[featureKey];
 
       // For boolean features, check if enabled in this plan
       if (typeof featureValue === 'boolean' && featureValue) {
@@ -823,11 +1071,11 @@ export class EntitlementService {
           nextPlan: planId,
           nextPlanLimit: 'Included',
           upgradeUrl: `/upgrade?plan=${planId}&feature=${featureKey}`,
-        }
+        };
       }
     }
 
-    return undefined
+    return undefined;
   }
 }
 
@@ -835,7 +1083,7 @@ export class EntitlementService {
 // Singleton factory
 // ---------------------------------------------------------------------------
 
-let _instance: EntitlementService | null = null
+let _instance: EntitlementService | null = null;
 
 /**
  * Returns the shared EntitlementService singleton.
@@ -846,9 +1094,9 @@ export function getEntitlementService(
   subscriptionRepo: SubscriptionRepository
 ): EntitlementService {
   if (!_instance) {
-    _instance = new EntitlementService(redis, subscriptionRepo)
+    _instance = new EntitlementService(redis, subscriptionRepo);
   }
-  return _instance
+  return _instance;
 }
 
-export default EntitlementService
+export default EntitlementService;

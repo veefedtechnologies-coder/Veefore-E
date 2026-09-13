@@ -1,5 +1,6 @@
 import { createTransporter } from './email-config';
 import sgMail from '@sendgrid/mail';
+import { sendOtpEmail, sendWelcomeEmail as resendWelcome, sendWaitlistEmail } from './services/resend.service';
 
 export class EmailService {
     private transporter: any;
@@ -26,6 +27,19 @@ export class EmailService {
 
         // Always log OTP for development
         console.log(`[EMAIL DEV] Verification code for ${email}: ${otp}`);
+
+        // ── Resend (primary) ────────────────────────────────────────────────
+        if (process.env.RESEND_API_KEY) {
+            try {
+                const ok = await sendOtpEmail(email, otp, firstName);
+                if (ok) {
+                    console.log(`[EMAIL] ✅ OTP email sent via Resend to ${email}`);
+                    return true;
+                }
+            } catch (resendErr) {
+                console.error('[EMAIL] Resend OTP send failed, falling back:', resendErr);
+            }
+        }
 
         if (sendgridApiKey) {
             try {
@@ -99,6 +113,19 @@ export class EmailService {
 
     // Send welcome email after verification
     async sendWelcomeEmail(email: string, firstName?: string): Promise<boolean> {
+        // ── Resend (primary) ────────────────────────────────────────────────
+        if (process.env.RESEND_API_KEY) {
+            try {
+                const ok = await resendWelcome(email, firstName ?? 'User');
+                if (ok) {
+                    console.log(`[EMAIL] ✅ Welcome email sent via Resend to ${email}`);
+                    return true;
+                }
+            } catch (resendErr) {
+                console.error('[EMAIL] Resend welcome send failed, falling back:', resendErr);
+            }
+        }
+
         try {
             // Use environment variables for SendGrid configuration
             const fromEmail = process.env.SENDGRID_VERIFIED_SENDER || process.env.SENDGRID_FROM_EMAIL || 'noreply@veefore.com';
@@ -240,7 +267,7 @@ export class EmailService {
                                         <a href="#" style="display: inline-block; margin: 0 8px;"><img src="https://img.icons8.com/ios-filled/50/94a3b8/linkedin.png" width="20" alt="LinkedIn"></a>
                                     </div>
                                     <p style="color: #cbd5e1; font-size: 11px;">
-                                        &copy; ${new Date().getFullYear()} Veefed Technologies Inc.
+                                        &copy; ${new Date().getFullYear()} Veefed Technologies Pvt Limited
                                     </p>
                                 </td>
                             </tr>
@@ -335,6 +362,20 @@ export class EmailService {
 
         // Log for development
         console.log(`[EMAIL] Sending waitlist welcome email to ${email} (${name})`);
+
+        // ── Resend (primary) ────────────────────────────────────────────────
+        if (process.env.RESEND_API_KEY) {
+            try {
+                const firstName = name.split(' ')[0] || name;
+                const ok = await sendWaitlistEmail(email, firstName);
+                if (ok) {
+                    console.log(`[EMAIL] ✅ Waitlist email sent via Resend to ${email}`);
+                    return true;
+                }
+            } catch (resendErr) {
+                console.error('[EMAIL] Resend waitlist send failed, falling back:', resendErr);
+            }
+        }
 
         if (sendgridApiKey) {
             try {
@@ -578,7 +619,7 @@ export class EmailService {
                     You're receiving this email because you joined the Veefore waitlist.
                 </p>
                 <p style="color: rgba(255,255,255,0.5); font-size: 11px; margin: 8px 0 0 0;">
-                    © ${new Date().getFullYear()} Veefore Technologies Pvt Ltd. All rights reserved.
+                    © ${new Date().getFullYear()} Veefed Technologies Pvt Limited. All rights reserved.
                 </p>
                 <p style="margin: 10px 0 0 0;">
                     <a href="https://veefore.com" style="color: #94a3b8; font-size: 12px; text-decoration: none;">veefore.com</a>

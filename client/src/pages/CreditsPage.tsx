@@ -11,14 +11,16 @@
  *   - useSubscription() for the same live balance (kept in sync app-wide)
  */
 
-import { useState } from 'react'
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { apiRequest } from '@/lib/queryClient'
-import useSubscription from '@/hooks/useSubscription'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useState } from 'react';
+import { useQuery, keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest, SUBSCRIPTION_QUERY_KEY } from '@/lib/queryClient';
+import { openRazorpayOrderCheckout } from '@/lib/razorpayCheckout';
+import { useToast } from '@/hooks/use-toast';
+import useSubscription from '@/hooks/useSubscription';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -26,7 +28,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@/components/ui/table';
 import {
   Coins,
   TrendingDown,
@@ -37,56 +39,57 @@ import {
   ChevronRight,
   Wallet,
   RefreshCw,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+  Plus,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Types (mirror the /credits/history response)
 // ---------------------------------------------------------------------------
 
-type CreditKind = 'deduction' | 'refund' | 'adjustment' | 'skipped' | 'failed'
+type CreditKind = 'deduction' | 'refund' | 'adjustment' | 'skipped' | 'failed';
 
 interface CreditTransaction {
-  id: string
-  feature: string
-  kind: CreditKind
-  status: string
-  credits: number
-  providerCostInr: number
-  workspaceId: string | null
-  automatic: boolean
-  refundReason: string | null
-  reservedCredits: number | null
-  refundedPortion: number | null
-  adjustmentCredits: number | null
-  overageCredits: number | null
-  createdAt: string
-  updatedAt: string
+  id: string;
+  feature: string;
+  kind: CreditKind;
+  status: string;
+  credits: number;
+  providerCostInr: number;
+  workspaceId: string | null;
+  automatic: boolean;
+  refundReason: string | null;
+  reservedCredits: number | null;
+  refundedPortion: number | null;
+  adjustmentCredits: number | null;
+  overageCredits: number | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface CreditHistoryResponse {
   balance: {
-    remaining: number
-    monthly: number
-    purchased: number
-    rolloverCredits: number
-    usedThisCycle: number
-    nextResetAt: string | null
-    lastResetAt: string | null
-  }
+    remaining: number;
+    monthly: number;
+    purchased: number;
+    rolloverCredits: number;
+    usedThisCycle: number;
+    nextResetAt: string | null;
+    lastResetAt: string | null;
+  };
   totals: {
-    lifetimeSpent: number
-    lifetimeRefunded: number
-    transactionCount: number
-  }
-  items: CreditTransaction[]
+    lifetimeSpent: number;
+    lifetimeRefunded: number;
+    transactionCount: number;
+  };
+  items: CreditTransaction[];
   pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-    hasMore: boolean
-  }
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +109,7 @@ const FEATURE_LABELS: Record<string, string> = {
   automationDm: 'Automation DM',
   automationComment: 'Automation Comment',
   videoScript: 'Video Script',
-}
+};
 
 const FILTERS: Array<{ key: string; label: string }> = [
   { key: 'all', label: 'All' },
@@ -115,37 +118,65 @@ const FILTERS: Array<{ key: string; label: string }> = [
   { key: 'adjustment', label: 'Adjustments' },
   { key: 'skipped', label: 'Skipped' },
   { key: 'failed', label: 'Failed' },
-]
+];
 
-const KIND_META: Record<CreditKind, { label: string; badge: string; sign: '-' | '+' | ''; amount: string }> = {
-  deduction: { label: 'Deducted', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', sign: '-', amount: 'text-red-600 dark:text-red-400' },
-  refund: { label: 'Refunded', badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', sign: '+', amount: 'text-green-600 dark:text-green-400' },
-  adjustment: { label: 'Adjustment', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', sign: '', amount: 'text-amber-600 dark:text-amber-400' },
-  skipped: { label: 'Skipped', badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', sign: '', amount: 'text-gray-500 dark:text-gray-400' },
-  failed: { label: 'Failed', badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', sign: '', amount: 'text-gray-500 dark:text-gray-400' },
-}
+const KIND_META: Record<
+  CreditKind,
+  { label: string; badge: string; sign: '-' | '+' | ''; amount: string }
+> = {
+  deduction: {
+    label: 'Deducted',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    sign: '-',
+    amount: 'text-red-600 dark:text-red-400',
+  },
+  refund: {
+    label: 'Refunded',
+    badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    sign: '+',
+    amount: 'text-green-600 dark:text-green-400',
+  },
+  adjustment: {
+    label: 'Adjustment',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    sign: '',
+    amount: 'text-amber-600 dark:text-amber-400',
+  },
+  skipped: {
+    label: 'Skipped',
+    badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    sign: '',
+    amount: 'text-gray-500 dark:text-gray-400',
+  },
+  failed: {
+    label: 'Failed',
+    badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    sign: '',
+    amount: 'text-gray-500 dark:text-gray-400',
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 const fmt = (n: number | undefined | null) =>
-  n == null ? '—' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(n)
+  n == null ? '—' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(n);
 
 const featureLabel = (feature: string) =>
-  FEATURE_LABELS[feature] ?? feature.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
+  FEATURE_LABELS[feature] ?? feature.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
 
 const formatDate = (iso: string) => {
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return iso
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-  })
-}
+  });
+};
 
 // ---------------------------------------------------------------------------
 // Summary stat card
@@ -158,11 +189,11 @@ function StatCard({
   sub,
   accent,
 }: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: string
-  sub?: string
-  accent: string
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  sub?: string;
+  accent: string;
 }) {
   return (
     <Card className="p-5">
@@ -177,19 +208,152 @@ function StatCard({
         </div>
       </div>
     </Card>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-export default function CreditsPage() {
-  const [filter, setFilter] = useState('all')
-  const [page, setPage] = useState(1)
-  const limit = 20
+// ---------------------------------------------------------------------------
+// Credit packs — prepaid top-ups
+//
+// Prices here are for DISPLAY only. The server re-derives the real amount from
+// ADDON_CONFIG when it creates the Razorpay order, and the webhook re-checks it
+// again before granting, so a tampered client cannot change what is charged or
+// received. Keep these in sync with server/config/plan-config.ts ADDON_CONFIG.
+// ---------------------------------------------------------------------------
 
-  const { aiCredits } = useSubscription()
+interface CreditPack {
+  addonType: string
+  credits: number
+  priceInr: number
+  popular?: boolean
+}
+
+const CREDIT_PACKS: readonly CreditPack[] = [
+  { addonType: 'ai_credits_500', credits: 500, priceInr: 299 },
+  { addonType: 'ai_credits_2000', credits: 2000, priceInr: 899, popular: true },
+  { addonType: 'ai_credits_5000', credits: 5000, priceInr: 1999 },
+];
+
+interface CreateOrderResponse {
+  orderId: string;
+  amountPaise: number;
+  currency: string;
+  credits: number;
+  addonType: string;
+  keyId: string;
+}
+
+function BuyCreditsPanel({ onPurchased }: { onPurchased: () => void }) {
+  const { toast } = useToast();
+  const [pendingType, setPendingType] = useState<string | null>(null);
+
+  const createOrder = useMutation<CreateOrderResponse, Error, { addonType: string }>({
+    mutationFn: ({ addonType }) =>
+      apiRequest('/api/v2/subscription/credits/create-order', {
+        method: 'POST',
+        body: JSON.stringify({ addonType, quantity: 1 }),
+      }),
+  });
+
+  const handleBuy = async (addonType: string, credits: number) => {
+    setPendingType(addonType);
+    try {
+      const order = await createOrder.mutateAsync({ addonType });
+
+      await openRazorpayOrderCheckout({
+        orderId: order.orderId,
+        amountPaise: order.amountPaise,
+        currency: order.currency,
+        description: `${credits.toLocaleString('en-IN')} AI credits`,
+        onSuccess: () => {
+          // Credits are granted server-side by the payment.captured webhook,
+          // which may land a moment after Razorpay closes. Tell the user it is
+          // processing and refetch shortly rather than claiming success here.
+          toast({
+            title: 'Payment received',
+            description: 'Your credits are being added and will appear in a few seconds.',
+          });
+          setTimeout(onPurchased, 2500);
+        },
+        onDismiss: () => setPendingType(null),
+      });
+    } catch (err) {
+      toast({
+        title: 'Could not start checkout',
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPendingType(null);
+    }
+  };
+
+  return (
+    <Card className="mb-6 p-5">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+            Top up credits
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            One-time packs. Purchased credits never expire and carry over between cycles.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {CREDIT_PACKS.map(pack => {
+          const isPending = pendingType === pack.addonType;
+          return (
+            <div
+              key={pack.addonType}
+              className={cn(
+                'relative rounded-xl border p-4',
+                pack.popular
+                  ? 'border-blue-300 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-900/10'
+                  : 'border-gray-200 dark:border-gray-800'
+              )}
+            >
+              {pack.popular && (
+                <Badge className="absolute -top-2 right-3 bg-blue-600 text-white hover:bg-blue-600">
+                  Best value
+                </Badge>
+              )}
+              <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                {pack.credits.toLocaleString('en-IN')}
+              </p>
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">credits</p>
+              <p className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                &#8377;{pack.priceInr.toLocaleString('en-IN')}
+              </p>
+              <Button
+                size="sm"
+                className="w-full"
+                variant={pack.popular ? 'default' : 'outline'}
+                disabled={isPending || createOrder.isPending}
+                onClick={() => handleBuy(pack.addonType, pack.credits)}
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                {isPending ? 'Opening…' : 'Buy'}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+export default function CreditsPage() {
+  const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  const { aiCredits } = useSubscription();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<CreditHistoryResponse, Error>({
     queryKey: ['/api/v2/subscription/credits/history', filter, page],
@@ -200,25 +364,25 @@ export default function CreditsPage() {
       ),
     placeholderData: keepPreviousData,
     staleTime: 15_000,
-  })
+  });
 
   // Prefer the freshest balance: the app-wide subscription hook (live-synced),
   // falling back to the history endpoint's snapshot.
-  const balance = data?.balance
-  const remaining = aiCredits?.remaining ?? balance?.remaining
-  const monthly = aiCredits?.monthly ?? balance?.monthly
-  const purchased = aiCredits?.purchased ?? balance?.purchased
-  const usedThisCycle = aiCredits?.usedThisCycle ?? balance?.usedThisCycle
-  const nextResetAt = aiCredits?.nextResetAt ?? balance?.nextResetAt ?? null
+  const balance = data?.balance;
+  const remaining = aiCredits?.remaining ?? balance?.remaining;
+  const monthly = aiCredits?.monthly ?? balance?.monthly;
+  const purchased = aiCredits?.purchased ?? balance?.purchased;
+  const usedThisCycle = aiCredits?.usedThisCycle ?? balance?.usedThisCycle;
+  const nextResetAt = aiCredits?.nextResetAt ?? balance?.nextResetAt ?? null;
 
-  const totals = data?.totals
-  const items = data?.items ?? []
-  const pagination = data?.pagination
+  const totals = data?.totals;
+  const items = data?.items ?? [];
+  const pagination = data?.pagination;
 
   const changeFilter = (key: string) => {
-    setFilter(key)
-    setPage(1)
-  }
+    setFilter(key);
+    setPage(1);
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -274,6 +438,15 @@ export default function CreditsPage() {
         )}
       </div>
 
+      {/* Prepaid top-up packs */}
+      <BuyCreditsPanel
+        onPurchased={() => {
+          void refetch();
+          // Refresh the app-wide balance shown in the sidebar/header too.
+          void queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+        }}
+      />
+
       {/* Next reset banner */}
       {nextResetAt && (
         <div className="mb-6 flex items-center gap-2 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-900/10 px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
@@ -300,7 +473,7 @@ export default function CreditsPage() {
       <Card className="overflow-hidden">
         {/* Filter tabs */}
         <div className="flex flex-wrap items-center gap-1 border-b border-gray-100 dark:border-gray-800 p-3">
-          {FILTERS.map((f) => (
+          {FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => changeFilter(f.key)}
@@ -330,7 +503,9 @@ export default function CreditsPage() {
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 p-16 text-center">
             <Coins className="h-10 w-10 text-gray-300 dark:text-gray-600" />
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No credit activity yet</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              No credit activity yet
+            </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Credit deductions and refunds will appear here as you use AI features.
             </p>
@@ -347,8 +522,8 @@ export default function CreditsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((tx) => {
-                const meta = KIND_META[tx.kind]
+              {items.map(tx => {
+                const meta = KIND_META[tx.kind];
                 return (
                   <TableRow key={tx.id}>
                     <TableCell>
@@ -356,7 +531,9 @@ export default function CreditsPage() {
                         {featureLabel(tx.feature)}
                       </div>
                       {tx.automatic && (
-                        <span className="text-[11px] text-gray-400 dark:text-gray-500">Automatic</span>
+                        <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                          Automatic
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -389,7 +566,7 @@ export default function CreditsPage() {
                       {formatDate(tx.createdAt)}
                     </TableCell>
                   </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>
@@ -405,7 +582,7 @@ export default function CreditsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1 || isFetching}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -414,7 +591,7 @@ export default function CreditsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => setPage(p => p + 1)}
                 disabled={!pagination.hasMore || isFetching}
               >
                 Next
@@ -425,5 +602,5 @@ export default function CreditsPage() {
         )}
       </Card>
     </div>
-  )
+  );
 }

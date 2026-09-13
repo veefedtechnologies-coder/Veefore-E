@@ -31,6 +31,7 @@ import {
   AIProviderAuthError,
   AIProviderSafetyError,
 } from '../types/ai-provider.types';
+import { createGemini } from '../../../services/ai-provider-guard';
 
 /**
  * Gemini model configurations
@@ -72,7 +73,7 @@ export class GeminiService implements IGeminiProvider {
       console.warn('[GeminiService] No API key provided. Service will not be functional.');
     }
 
-    this.genAI = new GoogleGenerativeAI(apiKey || '');
+    this.genAI = createGemini(apiKey || '');
     this.config = {
       defaultModel: GeminiModel.PRO_2_5,
       safetyLevel: 'standard',

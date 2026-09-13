@@ -16,6 +16,30 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_META_PHASE_1_REVIEW_MODE': JSON.stringify(env.VITE_META_PHASE_1_REVIEW_MODE || env.META_PHASE_1_REVIEW_MODE || 'false')
     },
   plugins: [react()],
+  // Pre-bundle heavy/less-common deps at server startup so Vite does NOT
+  // trigger a mid-session re-optimization the first time VeeGPT (chat) mounts.
+  // Behind the Cloudflare tunnel, that mid-session re-optimize makes Vite hold
+  // dep requests long enough to return 504s (e.g. react-markdown, remark-gfm),
+  // which then cascades into "Failed to fetch dynamically imported module".
+  // Listing them here forces a single up-front optimize pass.
+  optimizeDeps: {
+    include: [
+      'react-markdown',
+      'remark-gfm',
+      'remark-math',
+      'rehype-katex',
+      'react-syntax-highlighter',
+      'react-syntax-highlighter/dist/esm/styles/prism',
+      'react-window',
+      'socket.io-client',
+      '@tanstack/react-query',
+      '@tanstack/react-query-persist-client',
+      'framer-motion',
+      'wouter',
+      'firebase/app',
+      'firebase/auth',
+    ],
+  },
   resolve: {
     // Force a SINGLE React instance. There is a stale React 18 copy in
     // client/node_modules while the project uses React 19 at the root; without
@@ -32,6 +56,11 @@ export default defineConfig(({ mode }) => {
       "@": path.resolve(__dirname, "./src"),
       "@assets": path.resolve(__dirname, "./src/assets"),
       "@platform-registry": path.resolve(__dirname, "../src/shared/platform-registry"),
+      // Isomorphic modules shared by client + server (e.g. attachment-support).
+      // This config is the one the DEV middleware loads (server/vite.ts), so it
+      // must carry every alias the production configs have — otherwise an import
+      // builds fine but fails at dev time.
+      "@shared": path.resolve(__dirname, "../shared"),
     },
   },
   server: {

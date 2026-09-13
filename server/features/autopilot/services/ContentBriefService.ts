@@ -109,6 +109,12 @@ export interface BriefMissionInput {
   localLanguage?: string
   /** The goal the content ultimately serves, grounding the concept/hook. */
   goal: { metric: 'followers' | 'engagement' | 'reach'; targetValue: number }
+  /**
+   * The workspace's configured AI settings (model, BYO keys, persona,
+   * creativity, content-safety, memory), so brief generation honors the same
+   * "AI Models" settings the rest of the app's AI features do.
+   */
+  workspaceAIPreferences?: UserAIPreferences
 }
 
 /** The minimal shape of the Content_Slot a brief is generated for. */
@@ -294,7 +300,10 @@ export class ContentBriefService {
         { userId: options.userId, workspaceId },
         () =>
           this.withTimeout(
-            (signal) => this.generator.generateJSON(prompt, this.preferences(language), { signal }),
+            (signal) =>
+              this.generator.generateJSON(prompt, this.preferences(language, mission.workspaceAIPreferences), {
+                signal,
+              }),
             timeoutMs,
           ),
       )
@@ -427,8 +436,8 @@ export class ContentBriefService {
    * Map the target language onto the generation preferences so the model authors
    * the brief in the Mission's local language (R9.3).
    */
-  private preferences(language: string): UserAIPreferences {
-    const preferences: UserAIPreferences = {}
+  private preferences(language: string, workspaceAIPreferences?: UserAIPreferences): UserAIPreferences {
+    const preferences: UserAIPreferences = { ...(workspaceAIPreferences ?? {}) }
     if (language && language !== DEFAULT_BRIEF_LANGUAGE) {
       preferences.multilingual = language
     }

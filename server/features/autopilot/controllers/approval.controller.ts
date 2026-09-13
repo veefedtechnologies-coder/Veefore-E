@@ -148,6 +148,34 @@ export class ApprovalController {
     return approval
   }
 
+  /**
+   * Fire-and-forget one Operating-Loop iteration (best-effort) so an approved
+   * item is scheduled for publishing immediately — the GATE/ACT stage schedules
+   * slots whose approval is now `approved`. Never throws.
+   */
+  private runImmediateIteration(missionId: string, workspaceId: string): void {
+    void (async () => {
+      try {
+        const [{ createLoopJobProcessor }, { createAutoPilotOrchestrator }, { buildDefaultLoopStages }] =
+          await Promise.all([
+            import('../workers/autopilotLoopWorker'),
+            import('../services/AutoPilotOrchestrator'),
+            import('../workers/loopStages'),
+          ])
+        const processJob = createLoopJobProcessor({
+          orchestrator: createAutoPilotOrchestrator({ stages: buildDefaultLoopStages() }),
+        })
+        await processJob({ missionId, workspaceId })
+      } catch (err) {
+        logger.warn('Auto Pilot approval: immediate iteration failed', {
+          component: COMPONENT,
+          missionId,
+          error: (err as Error).message,
+        })
+      }
+    })()
+  }
+
   /** POST /approvals/:id/approve — approve the card so its item may execute (R4.6). */
   async approve(req: Request, res: Response): Promise<void> {
     const userId = this.resolveUserId(req, res)
@@ -169,6 +197,10 @@ export class ApprovalController {
         })
         return
       }
+      // Kick an immediate loop iteration so the just-approved item is scheduled
+      // for publishing right away (the GATE/ACT stage picks up approved slots),
+      // instead of waiting for the next repeatable tick.
+      this.runImmediateIteration(String(approval.missionId), String(approval.workspaceId))
       res.status(200).json({ success: true, approval: serializeApproval(result.approval) })
     } catch (err) {
       const error = err as Error

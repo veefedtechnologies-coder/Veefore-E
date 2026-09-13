@@ -1,0 +1,68 @@
+# =============================================================================
+# LiteLLM Proxy — local/prod runtime
+# =============================================================================
+# Usage (from the Veefore-E/litellm directory):
+#   cp .env.litellm.example .env.litellm   # then fill in provider keys
+#   docker compose up -d
+#
+# The proxy listens on http://localhost:4000 and exposes an OpenAI-compatible
+# API at /v1/chat/completions. Point the app at it with:
+#   USE_LITELLM=true
+#   LITELLM_BASE_URL=http://localhost:4000/v1
+#   LITELLM_MASTER_KEY=sk-...        (same value as in .env.litellm)
+#
+# The Admin UI at http://localhost:4000/ui requires the Postgres service below.
+# Log in with UI_USERNAME / UI_PASSWORD from .env.litellm.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: veefore-litellm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    volumes:
+      - litellm-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U litellm -d litellm']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: veefore-litellm
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    command: ['--config', '/app/config.yaml', '--port', '4000']
+    environment:
+      # Persistence for the Admin UI (users, virtual keys, request logs).
+      DATABASE_URL: postgresql://litellm:litellm@postgres:5432/litellm
+    env_file:
+      - .env.litellm
+    healthcheck:
+      # The LiteLLM image ships Python but not curl, so probe with urllib.
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health/liveliness').status==200 else 1)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  litellm-pgdata:

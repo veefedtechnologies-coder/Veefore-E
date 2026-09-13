@@ -16,6 +16,8 @@
  */
 
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Edit,
   Search,
@@ -26,12 +28,21 @@ import {
   Trash2,
   Edit2,
   ChevronDown,
-  PanelLeft
+  ChevronUp,
+  PanelLeft,
+  Settings,
+  CreditCard,
+  LogOut,
+  Images,
+  Video
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useLocation } from 'wouter'
 import { apiRequest } from '@/lib/queryClient'
+import { logout } from '@/lib/auth'
 import { ChatConversation } from '../types/chat.types'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useVeeGPTTransition } from '@/features/veegpt/VeeGPTTransition'
 
 interface ConversationSidebarProps {
   conversations: ChatConversation[]
@@ -43,6 +54,19 @@ interface ConversationSidebarProps {
   onStartNewChat: () => void
   /** Open the ChatGPT-style search-chats modal. */
   onOpenSearch?: () => void
+  /** Open the in-page Auto Pilot view (keeps the VeeGPT sidebar). When omitted
+   *  the button falls back to navigating to the /autopilot route. */
+  onOpenAutoPilot?: () => void
+  /** Highlight the Auto Pilot nav item when its view is active. */
+  autopilotActive?: boolean
+  /** Open the in-page Album (gallery of generated/edited images). */
+  onOpenAlbum?: () => void
+  /** Highlight the Album nav item when its view is active. */
+  albumActive?: boolean
+  /** Open the in-page Video Editor (conversational AI video editing). */
+  onOpenVideoEditor?: () => void
+  /** Highlight the Video Editor nav item when its view is active. */
+  videoEditorActive?: boolean
   userData?: {
     displayName?: string
     email?: string
@@ -73,18 +97,102 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   onSelectConversation,
   onStartNewChat,
   onOpenSearch,
+  onOpenAutoPilot,
+  autopilotActive,
+  onOpenAlbum,
+  albumActive,
+  onOpenVideoEditor,
+  videoEditorActive,
   userData,
   userLoading,
   refreshKey
 }) => {
-  const [hoveredChatId, setHoveredChatId] = useState<number | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearchInput, setShowSearchInput] = useState(false)
   const [renamingChatId, setRenamingChatId] = useState<number | null>(null)
   const [newChatTitle, setNewChatTitle] = useState('')
-  
+  // Whether the chats list has been scrolled (drives the header shadow).
+  const [chatsScrolled, setChatsScrolled] = useState(false)
+  // Whether the chats list section is collapsed (hidden).
+  const [chatsCollapsed, setChatsCollapsed] = useState(false)
+  // Fixed-position anchor for the currently open "..." menu (rendered in a portal).
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+
+  // Bottom profile account menu (Settings / Billing / Log out), rendered in a
+  // portal above the profile row so it can't be clipped by the sidebar overflow.
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [profileMenuPos, setProfileMenuPos] = useState<{
+    left: number
+    bottom: number
+    width: number
+  } | null>(null)
+
+  const openMenu = (conversationId: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (dropdownOpen === conversationId) {
+      setDropdownOpen(null)
+      return
+    }
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const MENU_W = 176
+    setMenuPos({
+      top: r.bottom + 6,
+      left: Math.max(8, Math.min(r.right - MENU_W, window.innerWidth - MENU_W - 8)),
+    })
+    setDropdownOpen(conversationId)
+  }
+
   const queryClient = useQueryClient()
+  const [, setLocation] = useLocation()
+  const veegptTransition = useVeeGPTTransition()
+
+  // Return to the main VeeFore app (with the cinematic transition when available).
+  const handleReturnToApp = (e: React.MouseEvent) => {
+    if (veegptTransition.enabled) {
+      veegptTransition.exitVeeGPT(e)
+    } else {
+      setLocation('/')
+    }
+  }
+
+  // Toggle the bottom profile account menu. Anchored to the profile row and
+  // opened UPWARD (it sits at the very bottom of the sidebar).
+  const toggleProfileMenu = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (profileMenuOpen) {
+      setProfileMenuOpen(false)
+      return
+    }
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setProfileMenuPos({
+      left: r.left,
+      bottom: window.innerHeight - r.top + 6,
+      width: Math.max(r.width, 220),
+    })
+    setProfileMenuOpen(true)
+  }
+
+  // Navigate to a main-app route from the profile menu. VeeGPT is a full-screen
+  // surface, so leave it first (exit transition when available) then route.
+  const goToAppRoute = (url: string) => {
+    setProfileMenuOpen(false)
+    if (veegptTransition.enabled) {
+      // Play VeeGPT's slide-out, then land on the target route.
+      veegptTransition.exitVeeGPT(undefined, url)
+    } else {
+      setLocation(url)
+    }
+  }
+
+  const handleLogout = async () => {
+    setProfileMenuOpen(false)
+    try {
+      await logout()
+    } catch {
+      /* logout clears client state + redirects even on error */
+    }
+  }
 
   // Filter conversations based on search query
   const filteredConversations = conversations.filter(conv => 
@@ -153,91 +261,141 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   }
 
   return (
-    <div className={`${sidebarCollapsed ? 'w-16' : 'w-[17.5rem]'} bg-gray-100/80 dark:bg-slate-950/50 dark:backdrop-blur-xl border-r border-gray-200/80 dark:border-white/10 flex flex-col transition-all duration-500 ease-out`}>
-      {/* Scrollable Content Area - Everything scrolls except user profile */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll">
-        {/* Top Header with Logo */}
-        <div className={`p-3 flex items-center transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+    <div className={`${sidebarCollapsed ? 'w-[60px]' : 'w-[260px]'} relative z-10 bg-gray-50 dark:bg-slate-950/50 dark:backdrop-blur-xl border-r border-gray-200/70 dark:border-white/[0.06] shadow-[6px_0_16px_-8px_rgba(0,0,0,0.12)] dark:shadow-[6px_0_20px_-10px_rgba(0,0,0,0.55)] flex flex-col transition-all duration-500 ease-out`}>
+      {/* Fixed top region — header + primary nav stay put while chats scroll.
+          Casts a subtle shadow once the list below is scrolled. */}
+      <div className={`shrink-0 relative z-20 bg-gray-50 dark:bg-slate-950/50 transition-shadow duration-200 ${chatsScrolled ? 'shadow-[0_10px_18px_-12px_rgba(0,0,0,0.4)]' : ''}`}>
+        {/* Top Header with Logo — fixed h-14 + matching border so it lines up
+            flush with the chat header on the right (one continuous top bar). */}
+        <div className={`h-14 px-2.5 flex items-center border-b border-gray-200/70 dark:border-white/[0.06] transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
           {sidebarCollapsed ? (
             <button 
               onClick={() => setSidebarCollapsed(false)}
               className="group w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-200/70 dark:hover:bg-white/10 transition-colors"
               title="Open sidebar"
             >
-              <img src="/veefore-logo.png" alt="VeeFore" className="w-7 h-7 group-hover:hidden" />
+              <img src="/veefore-logo.png" alt="VeeFore" className="w-[22px] h-[22px] group-hover:hidden" />
               <PanelLeft className="w-5 h-5 text-gray-500 dark:text-gray-400 hidden group-hover:block" />
             </button>
           ) : (
             <>
-              <img src="/veefore-logo.png" alt="VeeFore" className="w-8 h-8" />
+              <button
+                onClick={handleReturnToApp}
+                className="group flex items-end rounded-lg py-1 pl-1.5 pr-2 transition-colors hover:bg-gray-200/70 dark:hover:bg-white/10"
+                title="Back to VeeFore app"
+              >
+                <img src="/veefore.svg" alt="V" className="h-[22px] w-auto shrink-0 transition-transform group-hover:scale-105" />
+                <span className="-ml-[5px] text-[19px] font-semibold leading-none tracking-tight text-gray-900 dark:text-white">eeGPT</span>
+              </button>
               <button 
                 onClick={() => setSidebarCollapsed(true)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-200/70 dark:hover:bg-white/10 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200/70 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 transition-colors"
                 title="Close sidebar"
               >
-                <PanelLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <PanelLeft className="w-[18px] h-[18px]" />
               </button>
             </>
           )}
         </div>
 
-        {/* New Chat Button */}
-        <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} pb-4 transition-all duration-300`}>
+        {/* Primary navigation (New chat + options share one spacing rhythm) */}
+        <div className="px-2 pt-3 pb-3 space-y-0.5 transition-all duration-300">
           <button
             onClick={onStartNewChat}
-            className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 hover:border-gray-300 dark:hover:border-white/20 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200"
+            className="group w-full flex items-center px-2.5 py-2 text-[14px] font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-200/70 dark:hover:bg-white/[0.06] rounded-lg transition-colors duration-150"
             title={sidebarCollapsed ? "New chat" : ""}
           >
-            <Edit className={`w-4 h-4 flex-shrink-0 text-blue-500 dark:text-blue-400 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5] mx-auto' : ''}`} />
-            <span className={`transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-3'}`}>New chat</span>
+            <span className={`flex items-center justify-center flex-shrink-0 rounded-md transition-all duration-300 ${sidebarCollapsed ? 'mx-auto' : ''}`}>
+              <Edit className="w-[18px] h-[18px] text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors" />
+            </span>
+            <span className={`transition-all duration-300 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-2.5'}`}>New chat</span>
           </button>
-        </div>
 
-        {/* Navigation Menu */}
-        <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} pb-5 space-y-0.5 transition-all duration-300`}>
           <button 
             onClick={() => (onOpenSearch ? onOpenSearch() : setShowSearchInput(!showSearchInput))}
-            className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
+            className="group w-full flex items-center px-2.5 py-2 text-[14px] font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors duration-150"
             title={sidebarCollapsed ? "Search chats" : ""}
           >
-            <Search className={`w-[18px] h-[18px] flex-shrink-0 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5] mx-auto' : ''}`} />
-            <span className={`transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-3'}`}>Search chats</span>
+            <Search className={`w-[18px] h-[18px] flex-shrink-0 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors ${sidebarCollapsed ? 'mx-auto' : ''}`} />
+            <span className={`transition-all duration-300 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-2.5'}`}>Search chats</span>
           </button>
           
           <button 
-            className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
-            title={sidebarCollapsed ? "Content Studio" : ""}
+            onClick={() => onOpenAlbum?.()}
+            className={`group w-full flex items-center px-2.5 py-2 text-[14px] font-medium rounded-lg transition-colors duration-150 ${
+              albumActive
+                ? 'bg-gray-200/80 dark:bg-white/[0.08] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white'
+            }`}
+            title={sidebarCollapsed ? "Album" : ""}
           >
-            <Edit3 className={`w-[18px] h-[18px] flex-shrink-0 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'stroke-[2.5] mx-auto' : ''}`} />
-            <span className={`transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-3'}`}>Content Studio</span>
+            <Images className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${albumActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200'} ${sidebarCollapsed ? 'mx-auto' : ''}`} />
+            <span className={`transition-all duration-300 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-2.5'}`}>Album</span>
           </button>
           
           {!sidebarCollapsed && (
             <button 
-              className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
+              onClick={() => (onOpenAutoPilot ? onOpenAutoPilot() : setLocation('/autopilot'))}
+              className={`group w-full flex items-center px-2.5 py-2 text-[14px] font-medium rounded-lg transition-colors duration-150 ${
+                autopilotActive
+                  ? 'bg-gray-200/80 dark:bg-white/[0.08] text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white'
+              }`}
               title="Auto Pilot"
             >
-              <Rocket className="w-[18px] h-[18px] flex-shrink-0 text-gray-400 dark:text-gray-500 transition-all duration-500" />
-              <span className="transition-all duration-500 opacity-100 w-auto ml-3">Auto Pilot</span>
+              <Rocket className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${autopilotActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200'}`} />
+              <span className="ml-2.5">Auto Pilot</span>
             </button>
           )}
+
+          <button
+            onClick={() => onOpenVideoEditor?.()}
+            className={`group w-full flex items-center px-2.5 py-2 text-[14px] font-medium rounded-lg transition-colors duration-150 ${
+              videoEditorActive
+                ? 'bg-gray-200/80 dark:bg-white/[0.08] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white'
+            }`}
+            title={sidebarCollapsed ? 'Video Editor' : ''}
+          >
+            <Video className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${videoEditorActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200'} ${sidebarCollapsed ? 'mx-auto' : ''}`} />
+            <span className={`transition-all duration-300 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden ml-0' : 'opacity-100 w-auto ml-2.5'}`}>Video Editor</span>
+          </button>
           
           {!sidebarCollapsed && (
             <button 
-              className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
+              className="group w-full flex items-center px-2.5 py-2 text-[14px] font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors duration-150"
               title="AI Models"
             >
-              <div className="w-[18px] h-[18px] flex-shrink-0 flex items-center justify-center transition-all duration-500">
-                <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full shadow-sm shadow-blue-500/40"></div>
+              <div className="w-[18px] h-[18px] flex-shrink-0 flex items-center justify-center">
+                <div className="w-[9px] h-[9px] bg-gradient-to-br from-blue-400 to-blue-600 rounded-full shadow-sm shadow-blue-500/40"></div>
               </div>
-              <span className="transition-all duration-500 opacity-100 w-auto ml-3">AI Models</span>
+              <span className="ml-2.5">AI Models</span>
             </button>
           )}
         </div>
 
+        {/* Chats label — stays fixed above the scrolling list. The chevron
+            collapses/expands the conversation list. */}
+        {!sidebarCollapsed && (
+          <button
+            onClick={() => setChatsCollapsed((v) => !v)}
+            className="group flex w-full items-center justify-between px-4 pt-2 pb-3 text-[11px] font-semibold tracking-wide text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            title={chatsCollapsed ? 'Expand chats' : 'Collapse chats'}
+          >
+            <span>Chats</span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${chatsCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+          </button>
+        )}
+      </div>
+
+      {/* Scrollable region — only the chats list scrolls */}
+      <div
+        onScroll={(e) => setChatsScrolled(e.currentTarget.scrollTop > 0)}
+        className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll px-2 pb-2"
+      >
         {/* Search Input */}
         {showSearchInput && !sidebarCollapsed && (
-          <div className="px-3 pb-4">
+          <div className="pb-3">
             <input
               type="text"
               placeholder="Search conversations..."
@@ -249,132 +407,162 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
           </div>
         )}
 
-        {/* Conversations Section */}
+        {/* Conversations list — animated collapse/expand */}
         {!sidebarCollapsed && (
-          <div className="px-3">
-            <div className={`text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 px-2 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
-              Chats
-            </div>
-            {conversationsLoading ? (
-              <ConversationListSkeleton />
-            ) : (
-              <div className="space-y-1">
-                {filteredConversations.map((conversation) => (
-                  <div
-                    key={conversation.id}
-                    className="relative"
-                    onMouseEnter={() => setHoveredChatId(conversation.id)}
-                    onMouseLeave={() => {
-                      setHoveredChatId(null)
-                      if (dropdownOpen === conversation.id) {
-                        setTimeout(() => setDropdownOpen(null), 200)
-                      }
-                    }}
-                  >
-                    <button
-                      onClick={() => onSelectConversation(conversation.id)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-200 group relative truncate ${
-                        currentConversationId === conversation.id
-                          ? 'bg-white dark:bg-white/10 text-gray-900 dark:text-white font-medium shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-none'
-                          : 'text-gray-900 dark:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
-                      }`}
-                      title={sidebarCollapsed ? conversation.title : ""}
-                    >
-                      {currentConversationId === conversation.id && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-gradient-to-b from-blue-500 to-blue-600" />
-                      )}
-                      {!sidebarCollapsed && (
-                        renamingChatId === conversation.id ? (
-                          <input
-                            type="text"
-                            value={newChatTitle}
-                            onChange={(e) => setNewChatTitle(e.target.value)}
-                            onBlur={() => handleRenameSubmit(conversation.id)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                handleRenameSubmit(conversation.id)
-                              }
-                            }}
-                            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white"
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                          <span className="block truncate whitespace-nowrap pr-1">{conversation.title}</span>
-                        )
-                      )}
-                      {/* Hover menu — overlays the title's end with a fade mask so
-                          the title can use the FULL row width when not hovered. */}
-                      {(hoveredChatId === conversation.id || dropdownOpen === conversation.id) && !sidebarCollapsed && renamingChatId !== conversation.id && (
+          <AnimatePresence initial={false}>
+            {!chatsCollapsed && (
+              <motion.div
+                key="chats-list"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+                className="overflow-hidden"
+              >
+                {conversationsLoading ? (
+                  <ConversationListSkeleton />
+                ) : (
+                  <div className="space-y-1">
+                    {filteredConversations.map((conversation) => {
+                      const isActive = currentConversationId === conversation.id
+                      const isRenaming = renamingChatId === conversation.id
+                      const isMenuOpen = dropdownOpen === conversation.id
+                      return (
                         <div
-                          className={`absolute right-1 top-1/2 -translate-y-1/2 pl-6 ${
-                            currentConversationId === conversation.id
-                              ? 'bg-gradient-to-l from-white via-white dark:from-[#1a2233] dark:via-[#1a2233]'
-                              : 'bg-gradient-to-l from-gray-200/95 via-gray-200/95 dark:from-slate-800 dark:via-slate-800'
-                          } to-transparent`}
+                          key={conversation.id}
+                          className={`group relative rounded-lg transition-colors duration-150 ${
+                            isRenaming
+                              ? ''
+                              : isActive || isMenuOpen
+                                ? 'bg-gray-200/80 dark:bg-white/[0.08]'
+                                : 'hover:bg-gray-200/70 dark:hover:bg-white/[0.06]'
+                          }`}
                         >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDropdownOpen(dropdownOpen === conversation.id ? null : conversation.id)
-                            }}
-                            className="p-1 rounded-md hover:bg-gray-300/70 dark:hover:bg-white/10"
-                          >
-                            <MoreHorizontal className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                          </button>
+                          {isRenaming ? (
+                            <input
+                              type="text"
+                              value={newChatTitle}
+                              onChange={(e) => setNewChatTitle(e.target.value)}
+                              onBlur={() => handleRenameSubmit(conversation.id)}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') handleRenameSubmit(conversation.id)
+                              }}
+                              className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-[14px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              autoFocus
+                            />
+                          ) : (
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => onSelectConversation(conversation.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  onSelectConversation(conversation.id)
+                                }
+                              }}
+                              className={`w-full text-left pl-2.5 pr-9 py-2 text-[14px] rounded-lg cursor-pointer truncate ${
+                                isActive
+                                  ? 'text-gray-900 dark:text-white font-medium'
+                                  : 'text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'
+                              }`}
+                              title={conversation.title}
+                            >
+                              <span className="block truncate whitespace-nowrap">{conversation.title}</span>
+                            </div>
+                          )}
 
-                          {dropdownOpen === conversation.id && (
-                            <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-lg py-1 z-10 min-w-[150px]">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setRenamingChatId(conversation.id)
-                                  setNewChatTitle(conversation.title)
-                                  setDropdownOpen(null)
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 flex items-center gap-3"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                                <span>Rename</span>
-                              </button>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  archiveConversationMutation.mutate(conversation.id)
-                                  setDropdownOpen(null)
-                                }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
-                                >
-                                  <Archive className="w-4 h-4" />
-                                  <span>Archive</span>
-                                </button>
-                                
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteConversation(conversation.id)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                    </button>
+                          {/* Options trigger — no background box of its own, so
+                              the whole row shows a single unified highlight. The
+                              menu is rendered in a portal (below). */}
+                          {!isRenaming && (
+                            <button
+                              type="button"
+                              onClick={(e) => openMenu(conversation.id, e)}
+                              className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-md transition ${
+                                isMenuOpen
+                                  ? 'opacity-100 text-gray-900 dark:text-white'
+                                  : 'opacity-0 group-hover:opacity-100 focus:opacity-100 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                              }`}
+                              title="Options"
+                              aria-label="Conversation options"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
-              </div>
+                )}
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
         )}
       </div>
 
+      {/* Conversation "..." menu — portaled to the body so it floats above the
+          sidebar's scroll/overflow. A full-screen catcher closes it on any
+          outside click. */}
+      {dropdownOpen !== null && menuPos && createPortal(
+        (() => {
+          const conv = conversations.find((c) => c.id === dropdownOpen)
+          if (!conv) return null
+          return (
+            <>
+              <div className="fixed inset-0 z-[60]" onClick={() => setDropdownOpen(null)} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.14, ease: 'easeOut' }}
+                style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, width: 176 }}
+                className="z-[61] bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenamingChatId(conv.id)
+                    setNewChatTitle(conv.title)
+                    setDropdownOpen(null)
+                  }}
+                  className="w-full text-left px-3.5 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 flex items-center gap-3"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  <span>Rename</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    archiveConversationMutation.mutate(conv.id)
+                    setDropdownOpen(null)
+                  }}
+                  className="w-full text-left px-3.5 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 flex items-center gap-3"
+                >
+                  <Archive className="w-4 h-4" />
+                  <span>Archive</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteConversation(conv.id)}
+                  className="w-full text-left px-3.5 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-3"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete</span>
+                </button>
+              </motion.div>
+            </>
+          )
+        })(),
+        document.body
+      )}
+
       {/* Bottom User Section - Fixed */}
-      <div key={refreshKey} className="p-2.5 border-t border-gray-200/80 dark:border-white/10">
+      {/* NOTE: no `key={refreshKey}` here — remounting this subtree whenever user
+          data changed made the profile button flicker on hover and swallowed the
+          first click (mousedown/mouseup landed on different element instances).
+          The profile updates reactively from `userData` props, so no remount is
+          needed. */}
+      <div className="p-2 border-t border-gray-200/70 dark:border-white/[0.06]">
         {userLoading && !userData ? (
           <div className="flex items-center space-x-3 px-2 py-2">
             <Skeleton variant="avatar" className="w-8 h-8 rounded-full flex-shrink-0" />
@@ -388,8 +576,17 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
             )}
           </div>
         ) : (
-          <div className="flex items-center space-x-3 px-2 py-2 hover:bg-gray-200/70 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 ring-2 ring-white dark:ring-white/10 shadow-sm">
+          <button
+            type="button"
+            onClick={toggleProfileMenu}
+            aria-haspopup="menu"
+            aria-expanded={profileMenuOpen}
+            title={sidebarCollapsed ? (userData?.displayName || 'Account') : 'Account'}
+            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors cursor-pointer ${
+              profileMenuOpen ? 'bg-gray-200/70 dark:bg-white/[0.08]' : 'hover:bg-gray-200/70 dark:hover:bg-white/[0.06]'
+            }`}
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
               {userData?.avatar ? (
                 <img 
                   src={userData.avatar} 
@@ -397,28 +594,92 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                   className="w-full h-full object-cover rounded-full"
                 />
               ) : (
-                <span className="text-white text-sm font-bold">
+                <span className="text-white text-[13px] font-semibold">
                   {userData?.displayName?.charAt(0)?.toUpperCase() || 
                    userData?.email?.charAt(0)?.toUpperCase() || 
                    'U'}
                 </span>
               )}
             </div>
-            <div className={`flex-1 min-w-0 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
-              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            <div className={`flex-1 min-w-0 text-left transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
+              <div className="text-[13px] font-medium text-gray-900 dark:text-white truncate leading-tight">
                 {userData?.displayName || 
                  userData?.email?.split('@')[0] || 
                  'User'}
-                {userData && ' ✅'}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                {userData?.plan || 'Free'}
+              <div className="text-[11px] text-gray-500 dark:text-gray-400 capitalize leading-tight mt-0.5">
+                {userData?.plan || 'Free'} plan
               </div>
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`} />
-          </div>
+            {profileMenuOpen ? (
+              <ChevronUp className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`} />
+            ) : (
+              <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`} />
+            )}
+          </button>
         )}
       </div>
+
+      {/* Account menu — portal (above the profile row) so it can't be clipped by
+          the sidebar's overflow. A full-screen catcher closes it on outside click. */}
+      {profileMenuOpen && profileMenuPos && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[998]"
+            onClick={() => setProfileMenuOpen(false)}
+          />
+          <div
+            role="menu"
+            className="fixed z-[999] rounded-xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-slate-900 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.35)] py-1.5 animate-in fade-in slide-in-from-bottom-1 duration-150"
+            style={{
+              left: profileMenuPos.left,
+              bottom: profileMenuPos.bottom,
+              width: profileMenuPos.width,
+            }}
+          >
+            {/* Header: who's signed in */}
+            <div className="px-3 py-2 border-b border-gray-100 dark:border-white/10">
+              <div className="text-[13px] font-medium text-gray-900 dark:text-white truncate">
+                {userData?.displayName || userData?.email?.split('@')[0] || 'User'}
+              </div>
+              {userData?.email && (
+                <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                  {userData.email}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => goToAppRoute('/settings')}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+            >
+              <Settings className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <span>Settings</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => goToAppRoute('/settings/billing')}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+            >
+              <CreditCard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <span>Billing &amp; plan</span>
+            </button>
+            <div className="my-1 border-t border-gray-100 dark:border-white/10" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Log out</span>
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   )
 }

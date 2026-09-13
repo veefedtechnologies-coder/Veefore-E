@@ -170,6 +170,90 @@ describe('StorageService', () => {
   });
 });
 
+describe('downloadFile (local storage)', () => {
+  // A durable, backend-agnostic read by key — the path used for multi-turn AI
+  // image editing so it never depends on a (relative/expiring) URL being
+  // fetchable over HTTP.
+  let localService: StorageService;
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    const os = await import('os');
+    const path = await import('path');
+    const fs = await import('fs');
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'veefore-storage-'));
+    localService = new StorageService({ useLocalStorage: true, localStoragePath: tmpDir });
+  });
+
+  it('reads back the exact bytes that were uploaded, by key', async () => {
+    // Minimal valid PNG (magic number) so validateFile accepts the upload.
+    const original = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02]);
+    const uploaded = await localService.uploadFile({
+      buffer: original,
+      originalName: 'seed.png',
+      mimetype: 'image/png',
+      folder: 'ai-images/ws',
+    });
+
+    const got = await localService.downloadFile(uploaded.key);
+
+    expect(got.buffer.equals(original)).toBe(true);
+    expect(got.size).toBe(original.length);
+    expect(got.contentType).toBe('image/png');
+  });
+
+  it('throws a 404 StorageError when the key does not exist', async () => {
+    await expect(localService.downloadFile('ai-images/ws/missing.png')).rejects.toMatchObject({
+      name: 'StorageError',
+      statusCode: 404,
+    });
+  });
+});
+
+describe('getPublicUrl (backend-aware URL building)', () => {
+  it('returns a relative /uploads path in local mode', async () => {
+    const local = new StorageService({ useLocalStorage: true });
+    expect(await local.getPublicUrl('ai-images/ws/x.png')).toBe('/uploads/ai-images/ws/x.png');
+  });
+
+  it('uses AWS virtual-hosted style by default', async () => {
+    const s3 = new StorageService({
+      accessKeyId: 'k',
+      secretAccessKey: 's',
+      region: 'ap-south-1',
+      bucket: 'veefore-prod',
+    });
+    expect(await s3.getPublicUrl('ai-images/x.png')).toBe(
+      'https://veefore-prod.s3.ap-south-1.amazonaws.com/ai-images/x.png'
+    );
+  });
+
+  it('uses path-style URL for a custom endpoint (Cloudflare R2)', async () => {
+    const r2 = new StorageService({
+      accessKeyId: 'k',
+      secretAccessKey: 's',
+      bucket: 'veefore-prod',
+      endpoint: 'https://acct.r2.cloudflarestorage.com',
+    });
+    expect(await r2.getPublicUrl('ai-images/x.png')).toBe(
+      'https://acct.r2.cloudflarestorage.com/veefore-prod/ai-images/x.png'
+    );
+  });
+
+  it('prefers an explicit public base URL (CDN / custom domain)', async () => {
+    const cdn = new StorageService({
+      accessKeyId: 'k',
+      secretAccessKey: 's',
+      bucket: 'veefore-prod',
+      endpoint: 'https://acct.r2.cloudflarestorage.com',
+      publicBaseUrl: 'https://cdn.veefore.com/',
+    });
+    expect(await cdn.getPublicUrl('ai-images/x.png')).toBe(
+      'https://cdn.veefore.com/ai-images/x.png'
+    );
+  });
+});
+
 describe('StorageService Factory Functions', () => {
   it('should create singleton instance', async () => {
     const { getStorageService } = await import('./storage.service.js');

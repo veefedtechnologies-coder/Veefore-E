@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import fetch from 'node-fetch';
+import { createOpenAI, createGemini } from './services/ai-provider-guard';
 
 // Types for AI responses and routing
 export interface AIProvider {
@@ -38,11 +39,11 @@ export class HybridAIService {
   private genAI: GoogleGenerativeAI;
   
   constructor() {
-    this.openai = new OpenAI({
+    this.openai = createOpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
     
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    this.genAI = createGemini(process.env.GEMINI_API_KEY || '');
   }
 
   /**

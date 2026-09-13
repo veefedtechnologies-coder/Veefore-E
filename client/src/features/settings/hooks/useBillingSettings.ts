@@ -1,9 +1,9 @@
 /**
  * Billing Settings Hook
- * 
+ *
  * Manages subscription state, payment methods, billing history,
  * and API mutations for subscription management operations.
- * 
+ *
  * Requirements: 11.2, 11.3, 11.6
  */
 
@@ -11,12 +11,8 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/hooks/useUser';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import type {
-  SubscriptionData,
-  PaymentMethod,
-  BillingHistoryItem,
-} from '../types/billing.types';
+import { apiRequest, SUBSCRIPTION_QUERY_KEY } from '@/lib/queryClient';
+import type { SubscriptionData, PaymentMethod, BillingHistoryItem } from '../types/billing.types';
 
 export const useBillingSettings = () => {
   const { userData } = useUser();
@@ -29,14 +25,11 @@ export const useBillingSettings = () => {
   const [isDowngrading, setIsDowngrading] = useState(false);
 
   // Fetch subscription data
-  const {
-    data: subscriptionData,
-    isLoading: isLoadingSubscription,
-  } = useQuery<SubscriptionData>({
-    queryKey: ['/api/subscription'],
+  const { data: subscriptionData, isLoading: isLoadingSubscription } = useQuery<SubscriptionData>({
+    queryKey: ['/api/v2/subscription/me'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('/api/subscription');
+        const response = await apiRequest('/api/v2/subscription/me');
         return response;
       } catch (error: any) {
         // If subscription endpoint doesn't exist yet, return mock data
@@ -55,10 +48,9 @@ export const useBillingSettings = () => {
   });
 
   // Fetch payment methods
-  const {
-    data: paymentMethods = [],
-    isLoading: isLoadingPaymentMethods,
-  } = useQuery<PaymentMethod[]>({
+  const { data: paymentMethods = [], isLoading: isLoadingPaymentMethods } = useQuery<
+    PaymentMethod[]
+  >({
     queryKey: ['/api/payment-methods'],
     queryFn: async () => {
       try {
@@ -76,10 +68,9 @@ export const useBillingSettings = () => {
   });
 
   // Fetch billing history
-  const {
-    data: billingHistory = [],
-    isLoading: isLoadingBillingHistory,
-  } = useQuery<BillingHistoryItem[]>({
+  const { data: billingHistory = [], isLoading: isLoadingBillingHistory } = useQuery<
+    BillingHistoryItem[]
+  >({
     queryKey: ['/api/billing-history'],
     queryFn: async () => {
       try {
@@ -108,7 +99,8 @@ export const useBillingSettings = () => {
       } else {
         toast({
           title: 'Coming Soon',
-          description: 'Stripe billing portal integration is in progress. You can manage your subscription directly through our interface for now.',
+          description:
+            'Stripe billing portal integration is in progress. You can manage your subscription directly through our interface for now.',
         });
       }
     } catch (error: any) {
@@ -116,7 +108,8 @@ export const useBillingSettings = () => {
       if (error.status === 404 || error.status === 501) {
         toast({
           title: 'Coming Soon',
-          description: 'Stripe billing portal integration is in progress. You can manage your subscription directly through our interface for now.',
+          description:
+            'Stripe billing portal integration is in progress. You can manage your subscription directly through our interface for now.',
         });
       } else {
         toast({
@@ -131,16 +124,24 @@ export const useBillingSettings = () => {
   // Cancel subscription mutation
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('/api/subscription/cancel', {
+      // v2 is the canonical subscription API. The legacy `/api/subscription`
+      // router never implemented /cancel or /downgrade (they 404'd), and its
+      // /upgrade required payment-verification fields this caller never sent,
+      // so this whole tab was silently non-functional.
+      return apiRequest('/api/v2/subscription/cancel', {
         method: 'POST',
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v2/subscription/me'] });
+      // Also refresh the app-wide subscription state (sidebar plan badge,
+      // credit balance) which reads the shared SUBSCRIPTION_QUERY_KEY.
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       toast({
         title: 'Subscription Cancelled',
-        description: 'Your subscription has been cancelled. You will have access until the end of your billing period.',
+        description:
+          'Your subscription has been cancelled. You will have access until the end of your billing period.',
       });
     },
     onError: (error: any) => {
@@ -155,17 +156,21 @@ export const useBillingSettings = () => {
   // Upgrade plan mutation
   const upgradePlanMutation = useMutation({
     mutationFn: async (planId: string) => {
-      return apiRequest('/api/subscription/upgrade', {
+      return apiRequest('/api/v2/subscription/upgrade', {
         method: 'POST',
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ newPlanId: planId }),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v2/subscription/me'] });
+      // Also refresh the app-wide subscription state (sidebar plan badge,
+      // credit balance) which reads the shared SUBSCRIPTION_QUERY_KEY.
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       toast({
         title: 'Plan Upgraded',
-        description: 'Your plan has been upgraded successfully. Changes will take effect immediately.',
+        description:
+          'Your plan has been upgraded successfully. Changes will take effect immediately.',
       });
     },
     onError: (error: any) => {
@@ -180,13 +185,16 @@ export const useBillingSettings = () => {
   // Downgrade plan mutation
   const downgradePlanMutation = useMutation({
     mutationFn: async (planId: string) => {
-      return apiRequest('/api/subscription/downgrade', {
+      return apiRequest('/api/v2/subscription/downgrade', {
         method: 'POST',
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ newPlanId: planId }),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v2/subscription/me'] });
+      // Also refresh the app-wide subscription state (sidebar plan badge,
+      // credit balance) which reads the shared SUBSCRIPTION_QUERY_KEY.
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       toast({
         title: 'Plan Downgraded',
@@ -209,7 +217,7 @@ export const useBillingSettings = () => {
         method: 'POST',
       });
     },
-    onSuccess: (response) => {
+    onSuccess: response => {
       if (response.setupUrl) {
         window.open(response.setupUrl, '_blank');
       } else {
@@ -284,7 +292,11 @@ export const useBillingSettings = () => {
 
   // Handlers
   const handleCancelSubscription = useCallback(async () => {
-    if (!window.confirm('Are you sure you want to cancel your subscription? You will have access until the end of your billing period.')) {
+    if (
+      !window.confirm(
+        'Are you sure you want to cancel your subscription? You will have access until the end of your billing period.'
+      )
+    ) {
       return;
     }
 
@@ -296,42 +308,58 @@ export const useBillingSettings = () => {
     }
   }, [cancelSubscriptionMutation]);
 
-  const handleUpgradePlan = useCallback(async (planId: string) => {
-    setIsUpgrading(true);
-    try {
-      await upgradePlanMutation.mutateAsync(planId);
-    } finally {
-      setIsUpgrading(false);
-    }
-  }, [upgradePlanMutation]);
+  const handleUpgradePlan = useCallback(
+    async (planId: string) => {
+      setIsUpgrading(true);
+      try {
+        await upgradePlanMutation.mutateAsync(planId);
+      } finally {
+        setIsUpgrading(false);
+      }
+    },
+    [upgradePlanMutation]
+  );
 
-  const handleDowngradePlan = useCallback(async (planId: string) => {
-    if (!window.confirm('Your plan will be downgraded at the end of your current billing period. Continue?')) {
-      return;
-    }
+  const handleDowngradePlan = useCallback(
+    async (planId: string) => {
+      if (
+        !window.confirm(
+          'Your plan will be downgraded at the end of your current billing period. Continue?'
+        )
+      ) {
+        return;
+      }
 
-    setIsDowngrading(true);
-    try {
-      await downgradePlanMutation.mutateAsync(planId);
-    } finally {
-      setIsDowngrading(false);
-    }
-  }, [downgradePlanMutation]);
+      setIsDowngrading(true);
+      try {
+        await downgradePlanMutation.mutateAsync(planId);
+      } finally {
+        setIsDowngrading(false);
+      }
+    },
+    [downgradePlanMutation]
+  );
 
   const handleAddPaymentMethod = useCallback(() => {
     addPaymentMethodMutation.mutate();
   }, [addPaymentMethodMutation]);
 
-  const handleRemovePaymentMethod = useCallback((paymentMethodId: string) => {
-    if (!window.confirm('Are you sure you want to remove this payment method?')) {
-      return;
-    }
-    removePaymentMethodMutation.mutate(paymentMethodId);
-  }, [removePaymentMethodMutation]);
+  const handleRemovePaymentMethod = useCallback(
+    (paymentMethodId: string) => {
+      if (!window.confirm('Are you sure you want to remove this payment method?')) {
+        return;
+      }
+      removePaymentMethodMutation.mutate(paymentMethodId);
+    },
+    [removePaymentMethodMutation]
+  );
 
-  const handleSetDefaultPaymentMethod = useCallback((paymentMethodId: string) => {
-    setDefaultPaymentMethodMutation.mutate(paymentMethodId);
-  }, [setDefaultPaymentMethodMutation]);
+  const handleSetDefaultPaymentMethod = useCallback(
+    (paymentMethodId: string) => {
+      setDefaultPaymentMethodMutation.mutate(paymentMethodId);
+    },
+    [setDefaultPaymentMethodMutation]
+  );
 
   const handleDownloadInvoice = useCallback((invoiceUrl: string) => {
     window.open(invoiceUrl, '_blank');

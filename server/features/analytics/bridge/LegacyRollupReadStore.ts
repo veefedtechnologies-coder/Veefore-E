@@ -936,6 +936,46 @@ export class LegacyRollupReadStore
   }
 
   /**
+   * Build the `platform` match for a content query so per-platform tabs and the
+   * combined "All Platforms" view always reconcile (All === Instagram + Facebook).
+   *
+   *  - A specific platform → match that platform, treating `instagram` and
+   *    `instagram_advanced` as the same platform (they're one product tab).
+   *  - "All Platforms" (no filter) → restrict to the platforms the workspace
+   *    actually has CONNECTED, so stray/legacy content with a null or
+   *    disconnected-platform value never inflates the combined count beyond the
+   *    sum of the per-platform views. Returns `undefined` (no restriction) only
+   *    when no connected platforms are known, to avoid hiding data outright.
+   */
+  private async contentPlatformMatch(
+    workspaceId: string,
+    platform?: string
+  ): Promise<unknown | undefined> {
+    const expand = (p: string): string[] =>
+      p === 'instagram' || p === 'instagram_advanced'
+        ? ['instagram', 'instagram_advanced']
+        : [p]
+
+    if (platform) {
+      const list = expand(platform)
+      return list.length === 1 ? list[0] : { $in: list }
+    }
+
+    try {
+      const accounts = await socialAccountRepository.findActiveByWorkspace(workspaceId)
+      const connected = new Set<string>()
+      for (const a of accounts) {
+        const p = a.platform ? String(a.platform) : ''
+        if (p) expand(p).forEach((x) => connected.add(x))
+      }
+      if (connected.size === 0) return undefined
+      return { $in: Array.from(connected) }
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
    * Count content documents by status within the selected window only.
    * Returns 0 when no posts match — does NOT fall back to all-time, so
    * "Published Posts" correctly shows 0 when nothing was published in the range.
@@ -953,7 +993,8 @@ export class LegacyRollupReadStore
         status,
         publishedAt: { $gte: startDate, $lte: endDate },
       }
-      if (platform) match.platform = platform
+      const platformMatch = await this.contentPlatformMatch(workspaceId, platform)
+      if (platformMatch !== undefined) match.platform = platformMatch
       return await ContentModel.countDocuments(match).exec()
     } catch {
       return 0
@@ -1009,10 +1050,14 @@ export class LegacyRollupReadStore
         status: 'published',
         publishedAt: { $gte: startDate, $lte: endDate },
       }
-      // When platform is specified, filter to only that platform's content.
-      // When undefined (All Platforms), include all connected platform content.
-      if (platform) {
-        baseMatch.platform = platform
+      // Scope by platform so per-platform tabs and the combined "All" view
+      // reconcile: a specific platform matches itself (instagram +
+      // instagram_advanced together); "All" restricts to the workspace's
+      // connected platforms so stray/legacy null-platform content never inflates
+      // the combined count past the sum of the per-platform views.
+      const platformMatch = await this.contentPlatformMatch(workspaceId, platform)
+      if (platformMatch !== undefined) {
+        baseMatch.platform = platformMatch
       }
       const row = await run(baseMatch)
       if (!row) return empty

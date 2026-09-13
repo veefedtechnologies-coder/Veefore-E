@@ -444,3 +444,71 @@ describe('AutomationDecisionService.draftRule — mapping', () => {
     }
   })
 })
+
+// ── Grounding + per-item user keyword override (Intelligence overhaul) ───────
+
+describe('AutomationDecisionService — grounding + user-keyword override', () => {
+  it('overrides the AI-derived keyword with the user keyword for comment-to-dm (R4.2)', async () => {
+    const svc = makeService(
+      fixedGenerator({
+        needsAutomation: true,
+        type: 'comment-to-dm',
+        triggerKeyword: 'AIGUESS',
+        commentReply: 'Sent!',
+        dmMessage: "Here's the guide",
+        reason: 'cta present',
+      }),
+    )
+
+    const decision = await svc.decide(mission(), slot(), 'Comment for the guide', {
+      grounding: { userKeyword: 'plan', description: 'a workout plan on screen' },
+    })
+
+    expect(decision.needsAutomation).toBe(true)
+    expect(decision.type).toBe('comment-to-dm')
+    expect(decision.triggerKeyword).toBe('plan')
+  })
+
+  it('overrides the keyword for dm-only', async () => {
+    const svc = makeService(
+      fixedGenerator({
+        needsAutomation: true,
+        type: 'dm-only',
+        triggerKeyword: 'GUESS',
+        dmMessage: 'DM body',
+        reason: 'dm cta',
+      }),
+    )
+    const decision = await svc.decide(mission(), slot(), 'DM me', {
+      grounding: { userKeyword: 'MEAL' },
+    })
+    expect(decision.triggerKeyword).toBe('MEAL')
+  })
+
+  it('does not fabricate automation when the model says no, even with a user keyword (safe default preserved)', async () => {
+    const svc = makeService(fixedGenerator({ needsAutomation: false, reason: 'no cta' }))
+    const decision = await svc.decide(mission(), slot(), 'just a photo', {
+      grounding: { userKeyword: 'PLAN' },
+    })
+    expect(decision.needsAutomation).toBe(false)
+    expect(decision.triggerKeyword).toBeUndefined()
+  })
+
+  it('passes the vision description + user intent/keyword into the prompt', async () => {
+    const generateJSON = vi.fn(async () => ({ needsAutomation: false, reason: 'n/a' }))
+    const svc = new AutomationDecisionService({ generator: { generateJSON }, timeoutMs: 50 })
+
+    await svc.decide(mission(), slot(), 'caption text', {
+      grounding: {
+        description: 'a red kayak on a lake',
+        userIntent: 'promote the kayak tour',
+        userKeyword: 'TOUR',
+      },
+    })
+
+    const prompt = String(generateJSON.mock.calls[0][0])
+    expect(prompt).toContain('a red kayak on a lake')
+    expect(prompt).toContain('promote the kayak tour')
+    expect(prompt).toContain('TOUR')
+  })
+})

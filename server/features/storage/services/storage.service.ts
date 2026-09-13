@@ -47,7 +47,8 @@ const MAX_SIGNED_URL_EXPIRATION = 86400; // 24 hours in seconds
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska', 'video/x-m4v'];
-const ALLOWED_MIME_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
+const ALLOWED_DOCUMENT_TYPES = ['application/pdf'];
+const ALLOWED_MIME_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES, ...ALLOWED_DOCUMENT_TYPES];
 
 // ============================================================================
 // Type Definitions
@@ -60,6 +61,12 @@ export interface StorageConfig {
   bucket?: string;
   useLocalStorage?: boolean;
   localStoragePath?: string;
+  /** Custom S3-compatible endpoint (e.g. Cloudflare R2). */
+  endpoint?: string;
+  /** Upload objects with public-read ACL (so display URLs resolve directly). */
+  publicRead?: boolean;
+  /** Base URL used to build public object URLs (CDN / R2 public bucket / custom domain). */
+  publicBaseUrl?: string;
 }
 
 export interface UploadOptions {
@@ -92,6 +99,13 @@ export interface UploadFileResult {
   etag?: string;
   versionId?: string;
   contentType?: string;
+}
+
+/** Raw bytes + content type read back from storage by key. */
+export interface DownloadFileResult {
+  buffer: Buffer;
+  contentType: string;
+  size: number;
 }
 
 export interface DeleteOptions {
@@ -154,6 +168,7 @@ export interface IStorageService {
   deleteFile(key: string, options?: DeleteOptions): Promise<DeleteResult>;
   getSignedUrl(key: string, options?: SignedUrlOptions): Promise<SignedUrlResult>;
   getPublicUrl(key: string): Promise<string>;
+  downloadFile(key: string): Promise<DownloadFileResult>;
   fileExists(key: string): Promise<boolean>;
   validateFile(buffer: Buffer, filename: string): Promise<FileValidation>;
   getFileMetadata(key: string): Promise<FileMetadata>;
@@ -171,6 +186,12 @@ export class StorageService implements IStorageService {
   private region: string;
   private useLocalStorage: boolean;
   private localStoragePath: string;
+  /** Custom endpoint (Cloudflare R2 / MinIO / other S3-compatible). Empty for AWS S3. */
+  private endpoint: string;
+  /** Whether to upload objects with a public-read ACL. */
+  private publicRead: boolean;
+  /** Base URL for public object links (CDN / R2 public domain). Empty → derive from bucket/region. */
+  private publicBaseUrl: string;
 
   constructor(config?: StorageConfig) {
     // Initialize AWS S3 configuration
@@ -180,6 +201,15 @@ export class StorageService implements IStorageService {
     this.bucket = config?.bucket || process.env.AWS_S3_BUCKET || 'veefore-uploads';
     this.useLocalStorage = config?.useLocalStorage ?? (process.env.USE_LOCAL_STORAGE === 'true' || !accessKeyId);
     this.localStoragePath = config?.localStoragePath || path.join(process.cwd(), 'uploads');
+    // S3-compatible endpoint (e.g. R2: https://<account>.r2.cloudflarestorage.com).
+    this.endpoint = (config?.endpoint || process.env.AWS_S3_ENDPOINT || '').trim();
+    // Public-read uploads so browser display URLs resolve without signing.
+    this.publicRead =
+      config?.publicRead ?? process.env.S3_PUBLIC_READ === 'true';
+    // Public base URL (CDN / R2 public bucket / custom domain). No trailing slash.
+    this.publicBaseUrl = (config?.publicBaseUrl || process.env.S3_PUBLIC_BASE_URL || '')
+      .trim()
+      .replace(/\/+$/, '');
 
     if (this.useLocalStorage) {
       console.log('[STORAGE SERVICE] Using local file storage at:', this.localStoragePath);
@@ -188,14 +218,17 @@ export class StorageService implements IStorageService {
         fs.mkdirSync(this.localStoragePath, { recursive: true });
       }
     } else {
-      console.log(`[STORAGE SERVICE] Using AWS S3 storage - bucket: ${this.bucket}, region: ${this.region}`);
-      
+      const target = this.endpoint ? `endpoint: ${this.endpoint}` : `region: ${this.region}`;
+      console.log(`[STORAGE SERVICE] Using S3-compatible storage - bucket: ${this.bucket}, ${target}`);
+
       if (!accessKeyId || !secretAccessKey) {
-        console.warn('[STORAGE SERVICE] AWS credentials not configured. Storage operations will fail.');
+        console.warn('[STORAGE SERVICE] Storage credentials not configured. Storage operations will fail.');
       }
 
       this.s3Client = new S3Client({
         region: this.region,
+        // A custom endpoint (R2/MinIO) needs path-style addressing.
+        ...(this.endpoint ? { endpoint: this.endpoint, forcePathStyle: true } : {}),
         credentials: accessKeyId && secretAccessKey ? {
           accessKeyId,
           secretAccessKey,
@@ -278,6 +311,11 @@ export class StorageService implements IStorageService {
       if (buffer.length >= 8 && buffer.toString('ascii', 4, 8) === 'ftyp') {
         return 'video/mp4';
       }
+
+      // PDF (%PDF-)
+      if (buffer.toString('ascii', 0, 4) === '%PDF') {
+        return 'application/pdf';
+      }
     }
 
     // Fallback to extension-based detection
@@ -296,6 +334,7 @@ export class StorageService implements IStorageService {
       '.webm': 'video/webm',
       '.mkv': 'video/x-matroska',
       '.m4v': 'video/x-m4v',
+      '.pdf': 'application/pdf',
     };
 
     return mimeMap[ext] || 'application/octet-stream';
@@ -429,13 +468,19 @@ export class StorageService implements IStorageService {
     this.ensureBucketConfigured();
 
     try {
+      // Default ACL: public-read when S3_PUBLIC_READ is on (so browser display
+      // URLs resolve without signing), else private. NOTE: custom endpoints like
+      // Cloudflare R2 do NOT support per-object ACLs — there, public access is
+      // configured at the bucket level, so we omit the ACL to avoid errors.
+      const defaultAcl = this.publicRead ? 'public-read' : 'private';
+      const resolvedAcl = options?.acl || defaultAcl;
       const uploadParams: PutObjectCommandInput = {
         Bucket: this.bucket,
         Key: key,
         Body: buffer,
         ContentType: mimetype,
-        ACL: (options?.acl || 'private') as ObjectCannedACL,
         Metadata: options?.metadata || {},
+        ...(this.endpoint ? {} : { ACL: resolvedAcl as ObjectCannedACL }),
       };
 
       // Add tags if provided
@@ -451,7 +496,7 @@ export class StorageService implements IStorageService {
       const command = new PutObjectCommand(uploadParams);
       const response = await this.s3Client.send(command);
 
-      const location = `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+      const location = this.buildPublicUrl(key);
 
       return {
         key,
@@ -610,7 +655,23 @@ export class StorageService implements IStorageService {
     if (this.useLocalStorage) {
       return `/uploads/${key}`;
     }
+    return this.buildPublicUrl(key);
+  }
 
+  /**
+   * Build the public URL for an object key. Precedence:
+   *  1. S3_PUBLIC_BASE_URL (CDN / R2 public domain / custom domain),
+   *  2. custom endpoint (R2/MinIO) → <endpoint>/<bucket>/<key> (path-style),
+   *  3. AWS virtual-hosted style → https://<bucket>.s3.<region>.amazonaws.com/<key>.
+   */
+  private buildPublicUrl(key: string): string {
+    if (this.publicBaseUrl) {
+      return `${this.publicBaseUrl}/${key}`;
+    }
+    if (this.endpoint) {
+      const base = this.endpoint.replace(/\/+$/, '');
+      return `${base}/${this.bucket}/${key}`;
+    }
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
@@ -648,6 +709,70 @@ export class StorageService implements IStorageService {
         { originalError: error, key }
       );
     }
+  }
+
+  /**
+   * Download a file's raw bytes by its storage key.
+   *
+   * Backend-agnostic: reads from local disk in dev, or S3 in production. This is
+   * the durable, instance-independent way to retrieve a stored object — used e.g.
+   * for multi-turn AI image editing, where re-fetching by (possibly relative or
+   * signed/expiring) URL is unreliable. Always resolves the current bytes.
+   */
+  async downloadFile(key: string): Promise<DownloadFileResult> {
+    if (this.useLocalStorage) {
+      const filePath = path.join(this.localStoragePath, key);
+      if (!fs.existsSync(filePath)) {
+        throw new StorageError('File not found', 'FILE_NOT_FOUND', 404, { key });
+      }
+      const buffer = await fs.promises.readFile(filePath);
+      return {
+        buffer,
+        contentType: this.detectMimeType(buffer, key),
+        size: buffer.length,
+      };
+    }
+
+    this.ensureBucketConfigured();
+
+    try {
+      const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+      const response = await this.s3Client.send(command);
+      const body = response.Body as unknown as {
+        transformToByteArray?: () => Promise<Uint8Array>;
+      };
+      // The AWS SDK v3 stream exposes transformToByteArray() in Node.
+      const bytes = body?.transformToByteArray
+        ? await body.transformToByteArray()
+        : await this.streamToBuffer(response.Body);
+      const buffer = Buffer.from(bytes);
+      return {
+        buffer,
+        contentType:
+          response.ContentType || this.detectMimeType(buffer, key),
+        size: buffer.length,
+      };
+    } catch (error: any) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        throw new StorageError('File not found', 'FILE_NOT_FOUND', 404, { key });
+      }
+      console.error('[STORAGE SERVICE] Download failed:', error);
+      throw new StorageError(
+        `File download failed: ${error.message}`,
+        'DOWNLOAD_ERROR',
+        500,
+        { originalError: error, key }
+      );
+    }
+  }
+
+  /** Fallback for turning a readable stream into a Buffer (non-Node SDK bodies). */
+  private async streamToBuffer(stream: any): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
   }
 
   /**

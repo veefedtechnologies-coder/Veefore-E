@@ -91,23 +91,18 @@ function NoHeaderShell({ children, pathname }: { children: React.ReactNode; path
 }
 
 /**
- * VeeGPT shell — sidebar icon-rail + the full-height VeeGPT canvas, mirroring
- * the `/veegpt` route EXACTLY (`h-screen` flex, no header, the content column is
- * `flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-slate-900` with no extra
- * flex wrapper). The conditional welcome-vs-chat layout and whether the
- * conversation sidebar shows are decided inside `VeeGPTSkeleton` itself (it
- * reads the page's persisted `veegpt-state` / `veegpt-has-conversations`
- * signals), so we just hand it the matching slot.
+ * VeeGPT shell — the full-height VeeGPT canvas, mirroring the `/veegpt` route
+ * EXACTLY. VeeGPT is presented as its OWN software: the main app icon-rail is
+ * intentionally NOT rendered here (VeeGPT provides its own ConversationSidebar).
+ * The conditional welcome-vs-chat layout and whether the conversation sidebar
+ * shows are decided inside `VeeGPTSkeleton` itself (it reads the page's
+ * persisted `veegpt-state` / `veegpt-has-conversations` signals), so we just
+ * hand it the matching full-width slot.
  */
-function VeeGPTShell({ pathname, chrome }: { pathname?: string; chrome?: ShellChrome }) {
+function VeeGPTShell({ chrome }: { chrome?: ShellChrome }) {
   return (
-    <div className="h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden relative transition-colors duration-300">
-      <div className="h-screen overflow-y-auto">
-        <SidebarSkeleton pathname={pathname} />
-      </div>
-      <div className="flex-1 h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
-        <VeeGPTSkeleton chrome={chrome} />
-      </div>
+    <div className="h-screen w-full overflow-hidden bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
+      <VeeGPTSkeleton chrome={chrome} />
     </div>
   )
 }
@@ -124,17 +119,16 @@ function resolveRouteSkeleton(pathname: string, chrome?: ShellChrome): React.Rea
   if (p.startsWith('/security-dashboard')) return <SecurityDashboardSkeleton />
 
   // No-header shells.
-  if (p.startsWith('/veegpt')) return <VeeGPTShell pathname={p} chrome={chrome} />
+  if (p.startsWith('/veegpt')) return <VeeGPTShell chrome={chrome} />
   if (p.startsWith('/video-generator')) return <NoHeaderShell pathname={p}><VideoGeneratorSkeleton /></NoHeaderShell>
   if (p.startsWith('/automation')) return <NoHeaderShell pathname={p}><AutomationSkeleton /></NoHeaderShell>
 
   // Standard shells (sidebar + header + main).
   if (p.startsWith('/settings')) return <StandardShell pathname={p} chrome={chrome} padded={false}><SettingsSkeleton /></StandardShell>
   if (p.startsWith('/plan')) return <StandardShell pathname={p} chrome={chrome}><PlanSkeleton /></StandardShell>
-  if (p.startsWith('/posts/scheduled')) return <StandardShell pathname={p} chrome={chrome}><ScheduledPostsSkeleton /></StandardShell>
-  if (p.startsWith('/posts/drafts')) return <StandardShell pathname={p} chrome={chrome}><DraftsSkeleton /></StandardShell>
-  if (p.startsWith('/posts/published')) return <StandardShell pathname={p} chrome={chrome}><PublishedPostsSkeleton /></StandardShell>
-  if (p.startsWith('/posts')) return <StandardShell pathname={p} chrome={chrome}><PostsSkeleton /></StandardShell>
+  // All /posts* routes now redirect into the Plan workspace — show the Plan
+  // skeleton so the instant shell matches the redirect target.
+  if (p.startsWith('/posts')) return <StandardShell pathname={p} chrome={chrome}><PlanSkeleton /></StandardShell>
   if (p.startsWith('/create')) return <StandardShell pathname={p} chrome={chrome}><CreatePostSkeleton /></StandardShell>
   if (p.startsWith('/analytics/post')) return <StandardShell pathname={p} chrome={chrome}><PostAnalyticsSkeleton /></StandardShell>
   if (p.startsWith('/analytics')) return <StandardShell pathname={p} chrome={chrome}><AnalyticsSkeleton /></StandardShell>

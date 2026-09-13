@@ -440,13 +440,14 @@ body {
 }
 
 /* ChatGPT-style shimmering "thinking" text. A bright band sweeps across a
-   muted base color, looping seamlessly. */
+   muted base color. The gradient tile is 200% wide and the animation shifts it
+   by EXACTLY one tile (200% → 0), so the loop is perfectly seamless (no jump). */
 @keyframes text-shimmer {
   0% {
-    background-position: 150% 0;
+    background-position: 100% 0;
   }
   100% {
-    background-position: -150% 0;
+    background-position: -100% 0;
   }
 }
 
@@ -503,25 +504,67 @@ mark.veegpt-mark {
   color: inherit;
 }
 
+/* Message send/enter animation — a user bubble slides up + fades in as it lands
+   in the thread, so a sent message reads as "flying" from the composer. Runs
+   once when the message element mounts. */
+/* The just-sent user bubble rises up + drifts from the composer (lower/centre)
+   into its right-aligned slot, scaling up as it lands — so it reads as the
+   message travelling out of the composer, not just fading in place. */
+@keyframes veegpt-msg-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(-18px, 26px, 0) scale(0.9);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+.veegpt-msg-in {
+  animation: veegpt-msg-in 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+  transform-origin: bottom right;
+}
+
+/* Placeholder for the contentEditable chat composer. The div is uncontrolled,
+   so a real <input> placeholder isn't available — we paint the prompt via a
+   :empty ::before that disappears the moment the user types. */
+.veegpt-chat-input:empty::before {
+  content: attr(data-placeholder);
+  color: rgb(107 114 128); /* gray-500 */
+  pointer-events: none;
+}
+.dark .veegpt-chat-input:empty::before {
+  color: rgb(148 163 184); /* slate-400 */
+}
+@media (prefers-reduced-motion: reduce) {
+  .veegpt-msg-in {
+    animation: none;
+  }
+}
+
 /* VeeGPT floating chat composer — visible, elevated pill in both themes. */.veegpt-composer {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), 0 1px 3px rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  box-shadow: 0 12px 34px -14px rgba(15, 23, 42, 0.22), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
 }
 .veegpt-composer:focus-within {
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 8px 28px rgba(59, 130, 246, 0.14), 0 1px 3px rgba(15, 23, 42, 0.06);
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 16px 40px -12px rgba(59, 130, 246, 0.28), 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 .dark .veegpt-composer {
-  background: rgba(30, 41, 59, 0.75);
+  background: rgba(30, 41, 59, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 16px 44px -16px rgba(0, 0, 0, 0.6);
 }
 .dark .veegpt-composer:focus-within {
-  border-color: rgba(96, 165, 250, 0.45);
-  box-shadow: 0 10px 34px rgba(59, 130, 246, 0.18);
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 18px 44px -14px rgba(59, 130, 246, 0.28), 0 0 0 3px rgba(59, 130, 246, 0.14);
 }
 
 
@@ -1268,5 +1311,152 @@ html.dark-gray {
     animation: none;
     background-image: none;
     background-color: rgb(var(--vf-skeleton-base));
+  }
+}
+
+/* ========================================================================
+   VeeGPT AI image generation card — premium processing treatment.
+   GPU-compositable (background-position / transform only). Blue accent,
+   never purple. Respects prefers-reduced-motion.
+   ======================================================================== */
+.veegpt-img-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgba(226, 232, 240, 0.35) 30%,
+    rgba(191, 219, 254, 0.65) 50%,
+    rgba(226, 232, 240, 0.35) 70%
+  );
+  background-size: 200% 100%;
+  animation: veegpt-img-shimmer 1.6s linear infinite;
+}
+.dark .veegpt-img-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgba(30, 41, 59, 0.5) 30%,
+    rgba(37, 99, 235, 0.35) 50%,
+    rgba(30, 41, 59, 0.5) 70%
+  );
+  background-size: 200% 100%;
+}
+@keyframes veegpt-img-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Scanning light bar that sweeps top→bottom over the frame. */
+.veegpt-img-scan {
+  background: linear-gradient(
+    180deg,
+    rgba(59, 130, 246, 0) 0%,
+    rgba(59, 130, 246, 0.35) 50%,
+    rgba(59, 130, 246, 0) 100%
+  );
+  animation: veegpt-img-scan 2.1s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes veegpt-img-scan {
+  0% { transform: translateY(-120%); }
+  100% { transform: translateY(420%); }
+}
+
+/* Pulsing "live" dot next to the status text (tailwind-ping style). */
+.veegpt-img-ping {
+  animation: veegpt-img-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes veegpt-img-ping {
+  0% { transform: scale(1); opacity: 0.75; }
+  75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Soft breathing glow used behind the generation status label. */
+.veegpt-img-pulse {
+  animation: veegpt-img-pulse 2.4s ease-in-out infinite;
+}
+@keyframes veegpt-img-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+/* Status text swap: a plain opacity CROSSFADE on a STABLE element.
+   This replaces the old `.veegpt-img-stage` entrance animation, which only ran
+   because the label was remounted via `key={stageText}` on every status change.
+   The video editor re-emits progress on every execution step and every step
+   tick, so that remount fired constantly and the whole status line — the live
+   dot with it — flickered. The element is now persistent (which the aria-live
+   region needs anyway) and `GenerativeDotGridSurface` toggles opacity through a
+   ref, so only the compositor is involved and no neighbouring animation is
+   restarted. No transform: a sliding label next to a pulsing dot was the loudest
+   part of the effect. */
+.veegpt-stage-label {
+  opacity: 1;
+  transition: opacity 220ms ease-out;
+}
+
+/* ========================================================================
+   VeeGPT AI video editor card — the video-specific companions to the image
+   treatment above. Same rules: GPU-compositable properties only
+   (transform / background-position), blue accent never purple, and every
+   animation is listed in the prefers-reduced-motion block at the bottom.
+   Anything DYNAMIC (the playhead sweep) is inline + Web Animations API in
+   the component instead, so it never depends on this stylesheet loading.
+   ======================================================================== */
+
+/* NOTE: `.veegpt-vid-sheen` and `.veegpt-vid-indeterminate` used to live here.
+   They existed only for the video-editor card's progress bar, which has been
+   removed from the card entirely, so both blocks (and their entries in the
+   prefers-reduced-motion list below) are deleted rather than left dead. */
+
+/* Soft blue pulse ring marking the step that is currently executing. */
+.veegpt-vid-step-pulse {
+  animation: veegpt-vid-step-pulse 1.9s ease-in-out infinite;
+}
+@keyframes veegpt-vid-step-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.5); }
+}
+
+/* Skeleton shimmer used while a signed artifact URL is resolving. */
+.veegpt-vid-skeleton {
+  background-image: linear-gradient(
+    100deg,
+    rgba(226, 232, 240, 0.35) 30%,
+    rgba(191, 219, 254, 0.6) 50%,
+    rgba(226, 232, 240, 0.35) 70%
+  );
+  background-size: 200% 100%;
+  animation: veegpt-vid-skeleton 1.6s linear infinite;
+}
+.dark .veegpt-vid-skeleton {
+  background-image: linear-gradient(
+    100deg,
+    rgba(30, 41, 59, 0.55) 30%,
+    rgba(37, 99, 235, 0.32) 50%,
+    rgba(30, 41, 59, 0.55) 70%
+  );
+  background-size: 200% 100%;
+}
+@keyframes veegpt-vid-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .veegpt-img-shimmer,
+  .veegpt-img-scan,
+  .veegpt-img-dots,
+  .veegpt-img-dots::after,
+  .veegpt-img-ping,
+  .veegpt-img-pulse,
+  .veegpt-vid-step-pulse,
+  .veegpt-vid-skeleton {
+    animation: none;
+  }
+  .veegpt-stage-label {
+    transition: none;
+    opacity: 1;
+  }
+  .veegpt-img-scan,
+  .veegpt-img-dots::after {
+    display: none;
   }
 }

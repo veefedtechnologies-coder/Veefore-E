@@ -340,25 +340,27 @@ export function CreatePost() {
       console.log(`[UPLOAD DEBUG] Uploading file: ${file.name}`);
       try {
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('file', file);
         
-        console.log(`[UPLOAD DEBUG] Sending POST to /api/video/upload-image`);
-        const res = await apiRequest('/api/video/upload-image', {
+        console.log(`[UPLOAD DEBUG] Sending POST to /api/chat/attachments/upload`);
+        const res = await apiRequest('/api/chat/attachments/upload', {
           method: 'POST',
           body: formData,
         });
         console.log(`[UPLOAD DEBUG] API Response:`, res);
         
-        if (res && res.success && res.imageUrl) {
-          console.log(`[UPLOAD DEBUG] Upload successful! URL: ${res.imageUrl}`);
-          setUploadedUrls(prev => [...prev, res.imageUrl]);
+        // Use absoluteUrl so the scheduling worker can fetch the media from the proxy
+        const uploadedUrl = res?.absoluteUrl || (res?.url ? `${window.location.origin}${res.url}` : null);
+        if (uploadedUrl) {
+          console.log(`[UPLOAD DEBUG] Upload successful! URL: ${uploadedUrl}`);
+          setUploadedUrls(prev => [...prev, uploadedUrl]);
           successCount++;
           toast({
             title: 'Upload Successful',
             description: `${file.name} uploaded successfully.`,
           });
         } else {
-          console.error(`[UPLOAD DEBUG] Upload failed or missing imageUrl in response:`, res);
+          console.error(`[UPLOAD DEBUG] Upload failed or missing url in response:`, res);
           throw new Error('Invalid response from server');
         }
       } catch (error: any) {
@@ -377,12 +379,13 @@ export function CreatePost() {
   const reuploadEditedFile = async (file: File, index: number) => {
     try {
       const formData = new FormData();
-      formData.append('image', file);
-      const res = await apiRequest('/api/video/upload-image', { method: 'POST', body: formData });
-      if (res && res.success && res.imageUrl) {
+      formData.append('file', file);
+      const res = await apiRequest('/api/chat/attachments/upload', { method: 'POST', body: formData });
+      const uploadedUrl = res?.absoluteUrl || (res?.url ? `${window.location.origin}${res.url}` : null);
+      if (uploadedUrl) {
         setUploadedUrls(prev => {
           const newUrls = [...prev];
-          newUrls[index] = res.imageUrl;
+          newUrls[index] = uploadedUrl;
           return newUrls;
         });
         toast({ title: 'Success', description: 'Image updated successfully.' });
@@ -648,8 +651,8 @@ export function CreatePost() {
       setMentions([]);
       setUploadedUrls([]);
       
-      // Navigate to dashboard drafts
-      setLocation('/posts');
+      // Navigate to the Plan drafts tab
+      setLocation('/plan?tab=drafts');
     } catch (error: any) {
       console.error('[CreatePost] Draft Error:', error);
       toast({

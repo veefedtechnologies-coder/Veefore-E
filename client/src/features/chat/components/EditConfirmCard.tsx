@@ -57,7 +57,7 @@ export const EditConfirmCard: React.FC<EditConfirmCardProps> = ({ card, onConfir
   const Icon = m.icon
 
   return (
-    <div className="mt-2 w-full rounded-2xl border border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-slate-800/60 shadow-sm overflow-hidden">
+    <div className="mt-2 w-full rounded-2xl border border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-slate-800/60 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500 ease-out">
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-2">
           <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />

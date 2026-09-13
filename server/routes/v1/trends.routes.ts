@@ -7,6 +7,7 @@ import { storage } from '../../mongodb-storage';
 import { TrendingTopicsAPI } from '../../trending-topics-api';
 import { generateAIGrowthInsights, generateVisualInsights } from '../../ai-growth-insights';
 import { AuthenticatedRequest } from '../../types/express';
+import { meterAI } from '../../middleware/meter-ai';
 
 const router = Router();
 const trendingTopicsAPI = TrendingTopicsAPI.getInstance();
@@ -99,6 +100,8 @@ function calculateContentScore(platforms: any[]): number {
 router.get('/ai-growth-insights',
   requireAuth,
   aiRateLimiter,
+  // Two LLM calls per request (insights + visual insights), previously unmetered.
+  meterAI({ feature: 'growth.recommendations', model: 'openai-gpt4o' }),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       console.log('[AI INSIGHTS API] Generating comprehensive growth insights for user:', req.user.id);

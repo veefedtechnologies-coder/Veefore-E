@@ -908,3 +908,247 @@ export function requirePlan(minimumPlan: PlanId): RequestHandler {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// 11. requireWorkspaceAccessible
+// ---------------------------------------------------------------------------
+
+/**
+ * ACCESS-TIME enforcement for workspaces after a plan downgrade.
+ *
+ * When a user downgrades (e.g. Pro→Free: 5 workspaces → 1 limit), their
+ * existing workspaces are PRESERVED in the database — we never delete data.
+ * However, API calls to workspaces that are "over the new limit" are blocked
+ * with a 403 upgrade prompt, so the user cannot actively use those workspaces
+ * without upgrading. Data stays safe; access is gated.
+ *
+ * How it works:
+ *   - Resolves ALL of the user's workspaces (same list as the UI shows),
+ *     sorted by createdAt ascending (oldest first = "base" workspaces).
+ *   - The first `limit` workspaces are always accessible.
+ *   - Any workspace beyond that index is "over-limit" and access is denied.
+ *
+ * Usage: add to any route that accepts a workspaceId param/query and needs
+ * this protection (workspace-specific reads/writes, not just creation).
+ *
+ *   router.get('/:workspaceId/...',
+ *     requireAuth,
+ *     validateWorkspaceAccess({ source: 'params' }),
+ *     requireWorkspaceAccessible(),
+ *     handler
+ *   );
+ *
+ * Enterprise users always pass. Unlimited plans (-1) always pass.
+ * The check is a no-op when the request has no workspaceId.
+ *
+ * HTTP 403 on denial:
+ *   { error, code: 'WORKSPACE_OVER_LIMIT', workspaceId, currentPlan,
+ *     maxWorkspaces, upgradeHint, upgradeUrl }
+ */
+export function requireWorkspaceAccessible(): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Resolve the target workspaceId from wherever the route put it.
+    const workspaceId =
+      (req as any).workspaceId ??
+      req.params?.workspaceId ??
+      (typeof req.query?.workspaceId === 'string' ? req.query.workspaceId : undefined) ??
+      (req.body as any)?.workspaceId
+
+    // If there's no workspaceId in scope, this guard is a no-op — let the
+    // downstream route handle the missing-id case.
+    if (!workspaceId) return next()
+
+    const userId = getUserId(req)
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+
+    try {
+      const service = getService()
+      const currentPlan = await service.getPlan(userId)
+
+      // Enterprise bypass — unlimited workspaces
+      if (currentPlan === 'enterprise') return next()
+
+      const maxWorkspaces = await service.getLimit(userId, 'maxWorkspaces')
+
+      // Unlimited plans always pass
+      if (maxWorkspaces === Infinity) return next()
+
+      // Resolve all workspaces for this user via the LEGACY storage layer — the
+      // same list the switcher/annotation use — so the accessible set matches
+      // the `locked` flags shown in the UI exactly.
+      const { storage } = await import('../mongodb-storage')
+      const { User } = await import('../models/User/User')
+
+      const userDoc = await User.findById(userId).select('firebaseUid').lean().catch(() => null)
+      const firebaseUid = (userDoc as any)?.firebaseUid as string | undefined
+
+      let allWorkspaces: any[] = await storage.getWorkspacesByUserId(userId).catch(() => [])
+      if ((!allWorkspaces || allWorkspaces.length === 0) && firebaseUid) {
+        allWorkspaces = await storage.getWorkspacesByUserId(firebaseUid).catch(() => [])
+      }
+
+      if (!allWorkspaces || allWorkspaces.length === 0) return next()
+
+      // Delegate the accessible-set computation to the shared helper so this
+      // access-time guard enforces EXACTLY the same selection the annotation
+      // produces (preferred IDs first, then oldest-first fill).
+      const { resolveAccessibleWorkspaceIds } = await import('../lib/workspace-lock')
+      const accessibleSet = await resolveAccessibleWorkspaceIds(userId, allWorkspaces)
+
+      // null → nothing locked (enterprise / unlimited / within limit)
+      if (accessibleSet === null || accessibleSet.has(String(workspaceId))) {
+        return next()
+      }
+
+      // The workspace exists but is over-limit — block with upgrade prompt.
+      logger.info('requireWorkspaceAccessible: workspace over plan limit', {
+        module: 'subscription',
+        userId,
+        action: 'entitlement_check',
+        limitKey: 'maxWorkspaces',
+        result: 'denied',
+        planId: currentPlan,
+        workspaceId,
+        maxWorkspaces,
+        totalWorkspaces: allWorkspaces.length,
+      })
+
+      res.status(403).json({
+        error: `This workspace is not accessible on your current ${currentPlan} plan`,
+        code: 'WORKSPACE_OVER_LIMIT',
+        workspaceId,
+        currentPlan,
+        maxWorkspaces,
+        totalWorkspaces: allWorkspaces.length,
+        upgradeHint: buildUpgradeHint(
+          currentPlan,
+          `Your ${currentPlan} plan allows up to ${maxWorkspaces} workspace(s). You have ${allWorkspaces.length} workspaces saved. Upgrade to access all of them — your data is preserved`
+        ),
+        upgradeUrl: '/settings/billing',
+      })
+    } catch (err) {
+      // Fail OPEN — an entitlement check error must never block a user from their
+      // own data. Log and continue.
+      logger.warn('requireWorkspaceAccessible: check failed, failing open', {
+        userId,
+        workspaceId,
+        err: err instanceof Error ? err.message : String(err),
+        module: 'subscription',
+      })
+      return next()
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 12. requireProfileAccessible (access-time social profile guard)
+// ---------------------------------------------------------------------------
+
+/**
+ * ACCESS-TIME enforcement for social profiles after a plan downgrade.
+ *
+ * Like requireWorkspaceAccessible but for social profiles / social accounts.
+ * Blocks requests that would USE a social account that is over the plan's
+ * maxProfiles limit (e.g., posting to it, viewing its analytics), while
+ * preserving the account in the database.
+ *
+ * Uses `socialAccountId` from req.params.accountId, req.params.socialAccountId,
+ * req.body.socialAccountId, or req.query.socialAccountId.
+ *
+ * Enterprise and unlimited plans always pass.
+ * No-op when the request has no social account id in scope.
+ *
+ * HTTP 403 on denial:
+ *   { error, code: 'PROFILE_OVER_LIMIT', accountId, currentPlan,
+ *     maxProfiles, upgradeHint, upgradeUrl }
+ */
+export function requireProfileAccessible(): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const accountId =
+      req.params?.accountId ??
+      req.params?.socialAccountId ??
+      (typeof req.query?.accountId === 'string' ? req.query.accountId : undefined) ??
+      (req.body as any)?.accountId ??
+      (req.body as any)?.socialAccountId
+
+    if (!accountId) return next()
+
+    const userId = getUserId(req)
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+
+    try {
+      const service = getService()
+      const currentPlan = await service.getPlan(userId)
+
+      if (currentPlan === 'enterprise') return next()
+
+      const maxProfiles = await service.getLimit(userId, 'maxProfiles')
+      if (maxProfiles === Infinity) return next()
+
+      // Resolve the user's workspaces and get all social accounts.
+      const { User } = await import('../models/User/User')
+      const { workspaceService } = await import('../services/WorkspaceService')
+      const mongoose = await import('mongoose')
+
+      const userDoc = await User.findById(userId).select('firebaseUid').lean().catch(() => null)
+      const firebaseUid = (userDoc as any)?.firebaseUid as string | undefined
+
+      let allWorkspaces: any[] = []
+      if (firebaseUid) {
+        allWorkspaces = await workspaceService.getWorkspacesByUserId(firebaseUid).catch(() => [])
+      }
+      if (!allWorkspaces || allWorkspaces.length === 0) {
+        allWorkspaces = await workspaceService.getWorkspacesByUserId(userId).catch(() => [])
+      }
+
+      if (!allWorkspaces || allWorkspaces.length === 0) return next()
+
+      const workspaceIds = allWorkspaces.map((w: any) => String(w._id ?? w.id))
+
+      // Fetch all social accounts across the user's workspaces, sorted oldest-first.
+      const accounts = await mongoose.default.connection
+        .collection('socialaccounts')
+        .find({ workspaceId: { $in: workspaceIds } })
+        .sort({ createdAt: 1 })
+        .toArray()
+
+      const accessibleIds = new Set(
+        accounts.slice(0, maxProfiles).map((a: any) => String(a._id))
+      )
+
+      if (accessibleIds.has(String(accountId))) return next()
+
+      // Account exists but is over-limit
+      logger.info('requireProfileAccessible: profile over plan limit', {
+        module: 'subscription', userId, action: 'entitlement_check',
+        limitKey: 'maxProfiles', result: 'denied', planId: currentPlan,
+        accountId, maxProfiles, totalProfiles: accounts.length,
+      })
+
+      res.status(403).json({
+        error: `This social profile is not accessible on your current ${currentPlan} plan`,
+        code: 'PROFILE_OVER_LIMIT',
+        accountId,
+        currentPlan,
+        maxProfiles,
+        totalProfiles: accounts.length,
+        upgradeHint: buildUpgradeHint(
+          currentPlan,
+          `Your ${currentPlan} plan allows up to ${maxProfiles} social profile(s). You have ${accounts.length} connected. Upgrade to access all of them — your data is preserved`
+        ),
+        upgradeUrl: '/settings/billing',
+      })
+    } catch (err) {
+      logger.warn('requireProfileAccessible: check failed, failing open', {
+        userId, accountId, err: err instanceof Error ? err.message : String(err), module: 'subscription',
+      })
+      return next()
+    }
+  }
+}

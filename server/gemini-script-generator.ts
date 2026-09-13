@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createGemini } from './services/ai-provider-guard';
 
 export class GeminiScriptGenerator {
   private genAI: GoogleGenerativeAI;
@@ -18,7 +19,7 @@ export class GeminiScriptGenerator {
     this.vertexAIEndpoint = `https://aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models`;
     
     // Initialize both standard Gemini and Vertex AI
-    this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    this.genAI = createGemini(process.env.GOOGLE_API_KEY);
     this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
     
     console.log('[GEMINI VERTEX] ✓ Vertex AI endpoint configured:', this.vertexAIEndpoint);

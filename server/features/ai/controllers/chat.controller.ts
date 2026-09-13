@@ -2,6 +2,7 @@ import { Response } from 'express';
 import OpenAI from 'openai';
 import { AuthenticatedRequest } from '../../../types/express';
 import { AICreditService } from '../../../services/AICreditService';
+import { createOpenAI } from '../../../services/ai-provider-guard';
 
 /**
  * Chat Controller
@@ -35,7 +36,7 @@ export class ChatController {
         return;
       }
 
-      const openai = new OpenAI({
+      const openai = createOpenAI({
         apiKey: process.env.OPENAI_API_KEY
       });
 

@@ -1,15 +1,58 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { requireSubscription, requireCredits } from '../../middleware/entitlement.middleware';
+import { AICreditService } from '../../services/AICreditService';
 import { storage } from '../../mongodb-storage';
 import { ThumbnailAIService } from '../../thumbnail-ai-service';
 // import { advancedThumbnailGenerator } from '../../advanced-thumbnail-generator'; // Temporarily disabled - requires canvas package
-import OpenAI from 'openai';
 import { AuthenticatedRequest } from '../../types/express';
+import { createOpenAI } from '../../services/ai-provider-guard';
+import { meterAI } from '../../middleware/meter-ai';
 
 const router = Router();
 const thumbnailAIService = new ThumbnailAIService(storage);
+
+// SECURITY: the unauthenticated `/test*` and `/debug*` thumbnail routes below
+// run the image-generation pipeline without auth. Block them in production.
+const blockInProd = (_req: Request, res: Response, next: NextFunction): void => {
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_THUMBNAIL_TEST_ROUTES !== 'true') {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  next();
+};
+
+/**
+ * Metering guard for thumbnail image generation. Deducts image_generation
+ * credits up-front (like the AI content controllers) so the feature can't be
+ * used unbounded for free. requireCredits() in the chain guarantees a non-zero
+ * balance before this runs.
+ */
+function meterThumbnailGeneration(imageCount = 1) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const deduct = await AICreditService.deductCredits(userId, 'image_generation', {
+        imageCount,
+        workspaceId: (req.body as any)?.workspaceId,
+        endpoint: req.originalUrl,
+      });
+      if (!deduct.success) {
+        res.status(402).json({
+          error: deduct.error || 'Insufficient AI credits for thumbnail generation',
+          purchaseUrl: '/settings/billing?tab=credits',
+        });
+        return;
+      }
+      next();
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to process thumbnail credits' });
+    }
+  };
+}
 
 const TestOptimizedGenerationSchema = z.object({
   title: z.string().min(1).max(200),
@@ -106,6 +149,7 @@ const ExportSchema = z.object({
 });
 
 router.post('/test-optimized-generation',
+  blockInProd,
   validateRequest({ body: TestOptimizedGenerationSchema }),
   async (req: Request, res: Response) => {
     console.log('[THUMBNAIL TEST] Route hit - req.body:', req.body);
@@ -207,12 +251,12 @@ router.post('/test-optimized-generation',
   }
 );
 
-router.get('/test', async (req: Request, res: Response) => {
+router.get('/test', blockInProd, async (req: Request, res: Response) => {
   try {
     console.log('[THUMBNAIL TEST] OpenAI API Key exists:', !!process.env.OPENAI_API_KEY);
     console.log('[THUMBNAIL TEST] Service instantiated:', !!thumbnailAIService);
     
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const testResponse = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [{ role: "user", content: "Say 'test successful'" }],
@@ -240,6 +284,7 @@ router.get('/ping', (req: Request, res: Response) => {
 });
 
 router.post('/debug-strategy',
+  blockInProd,
   validateRequest({ body: DebugStrategySchema }),
   async (req: Request, res: Response) => {
     try {
@@ -310,6 +355,7 @@ router.post('/quick-test',
 
 router.post('/generate-strategy-pro',
   requireAuth,
+  meterAI({ feature: 'thumbnail.generation', model: 'openai-gpt4o' }),
   validateRequest({ body: GenerateStrategyProSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -342,7 +388,7 @@ router.post('/generate-strategy-pro',
         "placement": "placement suggestion (left-face-right-text/etc)"
       }`;
 
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -367,6 +413,7 @@ router.post('/generate-strategy-pro',
 
 router.post('/match-trending',
   requireAuth,
+  meterAI({ feature: 'thumbnail.generation', model: 'openai-gpt4o' }),
   validateRequest({ body: MatchTrendingSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -409,6 +456,10 @@ router.post('/test-route',
 
 router.post('/generate-7stage-pro',
   requireAuth,
+  requireSubscription(),
+  requireCredits(1),
+  meterThumbnailGeneration(1),
+  meterAI({ feature: 'image.generation', model: 'openai-gpt4o' }),
   validateRequest({ body: Generate7StageProSchema }),
   async (req: AuthenticatedRequest, res: Response) => {
     console.log('[🚀 DALL-E PRO] === REAL DALL-E 3 GENERATION STARTED ===');
@@ -487,6 +538,10 @@ router.post('/generate-7stage-pro',
 
 router.post('/generate-complete',
   requireAuth,
+  requireSubscription(),
+  requireCredits(1),
+  meterThumbnailGeneration(1),
+  meterAI({ feature: 'image.generation', model: 'openai-gpt4o' }),
   validateRequest({ body: GenerateCompleteSchema }),
   async (req: AuthenticatedRequest, res: Response) => {
     console.log('[THUMBNAIL PRO] === 7-STAGE GENERATION PIPELINE STARTED ===');
@@ -554,6 +609,7 @@ router.post('/generate-complete',
 
 router.post('/generate-strategy',
   requireAuth,
+  meterAI({ feature: 'thumbnail.generation', model: 'openai-gpt4o' }),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       console.log('[THUMBNAIL API] ROUTE HIT: generate-strategy');
@@ -598,6 +654,10 @@ router.post('/generate-strategy',
 
 router.post('/generate-variants',
   requireAuth,
+  requireSubscription(),
+  requireCredits(1),
+  meterThumbnailGeneration(1),
+  meterAI({ feature: 'image.generation', model: 'openai-gpt4o' }),
   validateRequest({ body: GenerateVariantsSchema }),
   async (req: AuthenticatedRequest, res: Response) => {
     try {

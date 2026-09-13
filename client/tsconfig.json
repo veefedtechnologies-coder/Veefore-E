@@ -26,6 +26,9 @@
       "@/*": [
         "./src/*"
       ],
+      "@shared/*": [
+        "../shared/*"
+      ],
       "@assets/*": [
         "./src/assets/*"
       ],
@@ -35,7 +38,8 @@
     }
   },
   "include": [
-    "src"
+    "src",
+    "../shared"
   ],
   "exclude": [
     "**/*.test.ts",

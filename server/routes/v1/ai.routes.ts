@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import OpenAI from 'openai';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { aiRateLimiter } from '../../middleware/rate-limiting-working';
@@ -9,6 +8,8 @@ import { performanceCorrelationService } from '../../services/PerformanceCorrela
 import { generatedCaptionRepository } from '../../repositories/GeneratedCaptionRepository';
 import { AuthenticatedRequest } from '../../types/express';
 import { aiFeatureMiddleware } from '../../services/aiUsageTracker';
+import { createOpenAI } from '../../services/ai-provider-guard';
+import { meterAI } from '../../middleware/meter-ai';
 import { AICreditService } from '../../services/AICreditService';
 import { multiPlatformCaptionService } from '../../services/MultiPlatformCaptionService';
 import type { PlatformId } from '../../../../src/shared/platform-registry/types';
@@ -206,6 +207,7 @@ const RecordPerformanceSchema = z.object({
 router.post('/creative-brief',
   requireAuth,
   aiRateLimiter,
+  meterAI({ feature: 'content.brief', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('content.brief'),
   validateRequest({ body: CreativeBriefSchema }),
   ContentGenerationController.generateCreativeBrief
@@ -215,6 +217,7 @@ router.post('/creative-brief',
 router.post('/content-repurpose',
   requireAuth,
   aiRateLimiter,
+  meterAI({ feature: 'content.repurpose', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('content.repurpose'),
   validateRequest({ body: ContentRepurposeSchema }),
   ContentGenerationController.repurposeContent
@@ -223,6 +226,7 @@ router.post('/content-repurpose',
 router.post('/content-repurpose/bulk',
   requireAuth,
   aiRateLimiter,
+  meterAI({ feature: 'content.repurpose', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('content.repurpose'),
   validateRequest({ body: BulkRepurposeSchema }),
   ContentGenerationController.bulkRepurposeContent
@@ -232,6 +236,7 @@ router.post('/content-repurpose/bulk',
 router.post('/competitor-analysis',
   requireAuth,
   aiRateLimiter,
+  meterAI({ feature: 'competitor.analysis', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('competitor.analysis'),
   validateRequest({ body: CompetitorAnalysisSchema }),
   AnalysisController.analyzeCompetitor
@@ -242,6 +247,7 @@ router.post('/generate-caption',
   requireAuth,
   aiRateLimiter,
   ...captionGenerationGuards,
+  meterAI({ feature: 'caption.generation', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('caption.generation'),
   validateRequest({ body: GenerateCaptionSchema }),
   CaptionGenerationController.generateCaption
@@ -252,6 +258,7 @@ router.post('/regenerate-captions',
   requireAuth,
   aiRateLimiter,
   ...captionGenerationGuards,
+  meterAI({ feature: 'caption.regenerate', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('caption.regenerate'),
   validateRequest({ body: RegenerateCaptionsSchema }),
   CaptionGenerationController.regenerateCaptions
@@ -262,6 +269,7 @@ router.post('/generate-hashtags',
   requireAuth,
   aiRateLimiter,
   ...hashtagGenerationGuards,
+  meterAI({ feature: 'hashtag.generation', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('hashtag.generation'),
   validateRequest({ body: GenerateHashtagsSchema }),
   AnalysisController.generateHashtags
@@ -272,6 +280,7 @@ router.post('/generate-image',
   requireAuth,
   aiRateLimiter,
   ...imageGenerationGuards,
+  meterAI({ feature: 'image.generation', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('image.generation'),
   validateRequest({ body: GenerateImageSchema }),
   ImageGenerationController.generateImage
@@ -281,6 +290,7 @@ router.post('/generate-image',
 router.post('/generate-script',
   requireAuth,
   aiRateLimiter,
+  meterAI({ feature: 'video.script', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('video.script'),
   validateRequest({ body: GenerateScriptSchema }),
   ContentGenerationController.generateScript
@@ -290,6 +300,7 @@ router.post('/generate-content',
   requireAuth,
   aiRateLimiter,
   ...captionGenerationGuards,
+  meterAI({ feature: 'caption.generation', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('caption.generation'),
   (req, res, next) => {
     // Debug logging to see actual request body
@@ -416,6 +427,9 @@ router.post('/generate-content',
 router.post('/chat',
   requireAuth,
   aiRateLimiter,
+  // Fixed gpt-4o, chosen by the route rather than the user.
+  meterAI({ feature: 'veegpt.chat', model: 'openai-gpt4o' }),
+  aiFeatureMiddleware('veegpt.chat'),
   validateRequest({ body: ChatSchema }),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -437,7 +451,7 @@ router.post('/chat',
         });
       }
 
-      const openai = new OpenAI({
+      const openai = createOpenAI({
         apiKey: process.env.OPENAI_API_KEY
       });
 
@@ -1083,6 +1097,8 @@ router.post('/adapt-caption',
   requireAuth,
   aiRateLimiter,
   ...aiRewriteGuards,
+  meterAI({ feature: 'caption.regenerate', model: 'openai-gpt4o' }),
+  aiFeatureMiddleware('caption.regenerate'),
   validateRequest({ body: AdaptCaptionSchema }),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -1429,6 +1445,7 @@ router.post(
   '/generate-multi-platform-captions',
   requireAuth,
   aiRateLimiter,
+  meterAI({ feature: 'caption.generation', model: 'openai-gpt4o' }),
   aiFeatureMiddleware('caption.generation'),
   validateRequest({ body: GenerateMultiPlatformCaptionsSchema }),
   async (req: AuthenticatedRequest, res: Response) => {

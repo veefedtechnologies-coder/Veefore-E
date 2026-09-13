@@ -1,0 +1,204 @@
+# =============================================================================
+# LiteLLM Proxy — model gateway for VeeFore
+# =============================================================================
+# The proxy speaks the OpenAI Chat Completions API on the front and routes to
+# many providers on the back (OpenAI, Google Gemini, Anthropic, GitHub Models,
+# Perplexity, ...). The Node server talks to it through the OpenAI SDK by only
+# changing `baseURL` — see server/services/litellm/LiteLLMGateway.ts.
+#
+# Provider API keys are read from the proxy's environment (os.environ/VAR).
+# Never hard-code secrets here. Start with: docker compose up -d  (see README).
+#
+# `model_name` is the *public* id the app requests. Several physical models can
+# share the same `model_name` to form a "model group" that LiteLLM load-balances
+# and fails over across. `router_settings.fallbacks` chains one group to another.
+# =============================================================================
+
+model_list:
+  # --- VeeFore's default hybrid group -------------------------------------
+  # `veegpt-hybrid` leads with Gemini flash-lite (free-tier quota) and, via the
+  # fallbacks below, degrades to gemini-flash -> gpt-4o-mini automatically.
+  # NOTE: pinned 2.x ids (gemini-2.5-flash-lite / 2.5-flash / 2.0-flash) now
+  # return 404 "no longer available to new users" on current API keys, so the
+  # rolling `-latest` aliases are used instead. Verified against the live
+  # ListModels + generateContent endpoints.
+  - model_name: veegpt-hybrid
+    litellm_params:
+      model: gemini/gemini-flash-lite-latest
+      api_key: os.environ/GOOGLE_API_KEY
+
+  # --- Google Gemini -------------------------------------------------------
+  - model_name: gemini-2.5-flash-lite
+    litellm_params:
+      model: gemini/gemini-flash-lite-latest
+      api_key: os.environ/GOOGLE_API_KEY
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-flash-latest
+      api_key: os.environ/GOOGLE_API_KEY
+  - model_name: gemini-2.0-flash
+    litellm_params:
+      model: gemini/gemini-flash-latest
+      api_key: os.environ/GOOGLE_API_KEY
+  - model_name: gemini-flash-lite-latest
+    litellm_params:
+      model: gemini/gemini-flash-lite-latest
+      api_key: os.environ/GOOGLE_API_KEY
+  - model_name: gemini-flash-latest
+    litellm_params:
+      model: gemini/gemini-flash-latest
+      api_key: os.environ/GOOGLE_API_KEY
+  # `google-ai-studio` is an app alias that should behave like the flash-lite tier.
+  - model_name: google-ai-studio
+    litellm_params:
+      model: gemini/gemini-flash-lite-latest
+      api_key: os.environ/GOOGLE_API_KEY
+  # --- Gemini premium (paid-tier) models ----------------------------------
+  # Require billing enabled on the Google AI Studio / Cloud project for the
+  # GOOGLE_API_KEY. Pro models are Gemini's most capable tier; the 3.x flash
+  # models are the newest generation. All support a custom temperature, so the
+  # creativity slider works with them.
+  - model_name: gemini-3.5-flash
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: os.environ/GOOGLE_API_KEY
+  - model_name: gemini-3.6-flash
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GOOGLE_API_KEY
+  # Premium "pro" tier — most capable Gemini. Verified working on the paid key.
+  - model_name: gemini-3.1-pro
+    litellm_params:
+      model: gemini/gemini-3.1-pro-preview
+      api_key: os.environ/GOOGLE_API_KEY
+  - model_name: gemini-pro-latest
+    litellm_params:
+      model: gemini/gemini-pro-latest
+      api_key: os.environ/GOOGLE_API_KEY
+
+  # --- OpenAI (temperature-capable: creativity slider works) ---------------
+  # These GPT-4o / GPT-4.1 models honor a custom `temperature` (0–2), so the
+  # app's creativity slider genuinely changes output. GPT-5 reasoning models are
+  # intentionally NOT used here because OpenAI rejects any non-default
+  # temperature on them (the slider would have no effect). model_name equals the
+  # app's aiModel id so the gateway passes it straight through.
+  - model_name: openai-gpt-4.1-nano   # cheapest
+    litellm_params:
+      model: openai/gpt-4.1-nano
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-4o-mini    # cheap
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-4.1-mini   # balanced
+    litellm_params:
+      model: openai/gpt-4.1-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-4.1        # best (temperature-capable)
+    litellm_params:
+      model: openai/gpt-4.1
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt4o          # flagship 4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+  # Kept for internal fallback chains that reference these names.
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  # --- OpenAI (GPT-5 family: newest, reasoning) ----------------------------
+  # These do NOT support a custom temperature — the app hides the creativity
+  # slider when one is selected, and `drop_params: true` strips any temperature
+  # sent so a request never 400s.
+  - model_name: openai-gpt-5-nano       # cheapest GPT-5
+    litellm_params:
+      model: openai/gpt-5-nano
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-5-mini       # cheap GPT-5
+    litellm_params:
+      model: openai/gpt-5-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-5            # GPT-5
+    litellm_params:
+      model: openai/gpt-5
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-5.5          # GPT-5.5 flagship
+    litellm_params:
+      model: openai/gpt-5.5
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-5.6-sol      # GPT-5.6 Sol (newest)
+    litellm_params:
+      model: openai/gpt-5.6-sol
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-5.6-luna     # GPT-5.6 Luna (newest)
+    litellm_params:
+      model: openai/gpt-5.6-luna
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: openai-gpt-5.6-terra    # GPT-5.6 Terra (newest)
+    litellm_params:
+      model: openai/gpt-5.6-terra
+      api_key: os.environ/OPENAI_API_KEY
+
+  # --- Anthropic Claude ----------------------------------------------------
+  - model_name: claude-3-5-sonnet
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-3-5-haiku
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # --- GitHub Models (OpenAI-compatible, free tier) ------------------------
+  - model_name: github-gpt-4o-mini
+    litellm_params:
+      model: github/gpt-4o-mini
+      api_key: os.environ/GITHUB_TOKEN
+  - model_name: github-gpt-4.1-mini
+    litellm_params:
+      model: github/gpt-4.1-mini
+      api_key: os.environ/GITHUB_TOKEN
+
+  # --- Perplexity (web-grounded) ------------------------------------------
+  - model_name: perplexity-sonar
+    litellm_params:
+      model: perplexity/sonar
+      api_key: os.environ/PERPLEXITY_API_KEY
+
+# =============================================================================
+# Router: retries, cross-group fallbacks, timeouts.
+# =============================================================================
+router_settings:
+  routing_strategy: simple-shuffle
+  # NO CROSS-MODEL FALLBACKS, and no retries.
+  #
+  # The app now sends exactly the model the user picked in Settings → AI
+  # Configuration and expects that model to answer (see
+  # server/services/ai-model-routing.ts). A `fallbacks:` block here would silently
+  # re-route to a different model, so the user's selection would not be what
+  # actually ran — and each hop added seconds of latency before the first token.
+  # An error must surface instead.
+  num_retries: 0
+  timeout: 120
+
+# =============================================================================
+# Proxy-level settings.
+# =============================================================================
+litellm_settings:
+  # Drop provider-unsupported params (e.g. a Gemini-only field sent to OpenAI)
+  # instead of erroring — keeps a single client code path safe across providers.
+  drop_params: true
+  # Return responses in the OpenAI schema for every provider.
+  set_verbose: false
+
+general_settings:
+  # All inbound requests must present this key as the Bearer token. The Node
+  # gateway sends it as the OpenAI apiKey. Set LITELLM_MASTER_KEY in the proxy
+  # env; it MUST start with "sk-".
+  master_key: os.environ/LITELLM_MASTER_KEY

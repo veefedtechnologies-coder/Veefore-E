@@ -187,6 +187,35 @@ export class FacebookProvider implements SocialPlatformProvider {
   }
 
   /**
+   * Execute a POST request through GovernedHttpClient (used for publishing —
+   * /feed, /photos, /videos). The Graph API creates resources only on POST, so
+   * publishing must use this rather than {@link fbGet}. Fields are sent in the
+   * request body; the access token is attached by the client.
+   */
+  private async fbPost<T>(
+    path: string,
+    token: string,
+    body?: Record<string, string>
+  ): Promise<T> {
+    const client = this.makeClient();
+
+    const pageIdMatch = path.match(/\/v\d+\.\d+\/(\d{10,})\//);
+    const accountId = pageIdMatch ? pageIdMatch[1] : 'unknown';
+
+    const opts: GovernedRequestOptions = {
+      method: 'POST',
+      path,
+      token,
+      body,
+      accountId,
+      priority: 'normal',
+    };
+
+    const response = await client.request<T>(opts);
+    return response.data;
+  }
+
+  /**
    * Execute a DELETE via the GovernedHttpClient POST path (GovernedHttpClient
    * only supports GET/POST). For token revocation we fall back to axios so
    * the DELETE verb is correctly sent. Errors are intentionally swallowed by
@@ -425,18 +454,31 @@ export class FacebookProvider implements SocialPlatformProvider {
     accountId: string;
     from: Date;
     to: Date;
+    /**
+     * Skip the per-post insights fetch (post count + per-post `post_clicks`).
+     * `fetchPostInsights` costs 1 Graph call for the posts list PLUS one
+     * `post_clicks` call PER post (up to 100), so callers that don't need
+     * `published_posts` / `facebook_post_clicks` (e.g. the account sync, which
+     * gets posts from `getPagePosts` and post counts from the Content store)
+     * should set this to avoid a large, redundant burst of Meta calls.
+     * Defaults to false so existing callers are unaffected.
+     */
+    skipPostInsights?: boolean;
   }): Promise<NormalizedMetricResult> {
-    const { accessToken, accountId, from, to } = params;
+    const { accessToken, accountId, from, to, skipPostInsights } = params;
 
     // Facebook Insights API requires date ranges to be chunked into max 93-day windows
     // but supports up to 24 months of historical data (same as Instagram).
     const sinceSec = Math.floor(from.getTime() / 1000);
     const untilSec = Math.floor(to.getTime() / 1000);
 
-    // Fetch page insights and post count in parallel; partial failures allowed
+    // Fetch page insights and (optionally) post insights in parallel; partial
+    // failures allowed.
     const [pageInsightsResult, postInsightsResult] = await Promise.allSettled([
       this.fetchPageInsights(accessToken, accountId, sinceSec, untilSec),
-      this.fetchPostInsights(accessToken, accountId, from, to),
+      skipPostInsights
+        ? Promise.resolve({} as Record<string, number>)
+        : this.fetchPostInsights(accessToken, accountId, from, to),
     ]);
 
     // Merge raw data from fulfilled results
@@ -687,30 +729,65 @@ export class FacebookProvider implements SocialPlatformProvider {
     caption?: string;
     scheduledAt?: Date;
   }): Promise<PublishResult> {
-    const body: Record<string, string> = {};
+    const mt = (params.mediaType || '').toLowerCase();
+    const url = params.mediaUrl;
+    const isVideo =
+      mt.includes('video') ||
+      mt.includes('reel') ||
+      (!!url && /\.(mp4|mov|avi|mkv|webm|m4v|3gp)(\?|$)/i.test(url));
+    const isImage =
+      !isVideo &&
+      !!url &&
+      (mt.includes('image') ||
+        mt.includes('photo') ||
+        mt.includes('carousel') ||
+        /\.(jpg|jpeg|png|gif|webp|heic)(\?|$)/i.test(url));
 
-    if (params.caption) {
-      body.message = params.caption;
-    }
-    if (params.mediaUrl) {
-      body.link = params.mediaUrl;
-    }
-    if (params.scheduledAt) {
-      body.published = 'false';
-      body.scheduled_publish_time = String(
+    // Facebook allows scheduling 10 minutes–75 days out. Only set the schedule
+    // fields when the time is far enough ahead; otherwise publish immediately.
+    // (Auto Pilot's job scheduler already fires at slot time, so it publishes now.)
+    const scheduleFields: Record<string, string> = {};
+    if (params.scheduledAt && params.scheduledAt.getTime() > Date.now() + 10 * 60 * 1000) {
+      scheduleFields.published = 'false';
+      scheduleFields.scheduled_publish_time = String(
         Math.floor(params.scheduledAt.getTime() / 1000)
       );
     }
 
-    const result = await this.fbGet<{ id: string; post_id?: string }>(
+    // Native photo post → /photos with the image URL.
+    if (isImage && url) {
+      const body: Record<string, string> = { url, ...scheduleFields };
+      if (params.caption) body.caption = params.caption;
+      const result = await this.fbPost<{ id: string; post_id?: string }>(
+        `/${FB_API_VERSION}/${params.accountId}/photos`,
+        params.accessToken,
+        body
+      );
+      return { platformPostId: result.post_id || result.id };
+    }
+
+    // Video post → /videos with a hosted file URL.
+    if (isVideo && url) {
+      const body: Record<string, string> = { file_url: url, ...scheduleFields };
+      if (params.caption) body.description = params.caption;
+      const result = await this.fbPost<{ id: string }>(
+        `/${FB_API_VERSION}/${params.accountId}/videos`,
+        params.accessToken,
+        body
+      );
+      return { platformPostId: result.id };
+    }
+
+    // Text / link post → /feed.
+    const body: Record<string, string> = { ...scheduleFields };
+    if (params.caption) body.message = params.caption;
+    if (url) body.link = url;
+    const result = await this.fbPost<{ id: string; post_id?: string }>(
       `/${FB_API_VERSION}/${params.accountId}/feed`,
       params.accessToken,
       body
     );
-
-    return {
-      platformPostId: result.id,
-    };
+    return { platformPostId: result.post_id || result.id };
   }
 }
 

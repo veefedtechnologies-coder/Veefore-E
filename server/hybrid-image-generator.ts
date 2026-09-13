@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import axios from 'axios';
+import { createOpenAI, createGemini } from './services/ai-provider-guard';
 
 export class HybridImageGenerator {
   private geminiAI: GoogleGenerativeAI;
@@ -10,7 +11,7 @@ export class HybridImageGenerator {
   constructor() {
     // Initialize Gemini
     if (process.env.GOOGLE_API_KEY) {
-      this.geminiAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+      this.geminiAI = createGemini(process.env.GOOGLE_API_KEY);
       console.log('[HYBRID IMAGE] ✓ Gemini API initialized');
     } else {
       console.log('[HYBRID IMAGE] ⚠️ Gemini API key not found');
@@ -18,7 +19,7 @@ export class HybridImageGenerator {
 
     // Initialize OpenAI
     if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
+      this.openai = createOpenAI({
         apiKey: process.env.OPENAI_API_KEY,
       });
       console.log('[HYBRID IMAGE] ✓ OpenAI API initialized');

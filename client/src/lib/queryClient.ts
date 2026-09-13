@@ -178,7 +178,7 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
     try { const u = new URL(url); return u.pathname || '' } catch { return url }
   })()
   // [AI CONTENT UI DISPLAY FIX - Task 3.2] Increase timeout for AI endpoints
-  if (pathname.includes('/api/user') || pathname.includes('/api/social-accounts') || pathname.includes('/api/workspaces') || pathname.includes('/api/content') || pathname.includes('/api/v1/ai') || pathname.includes('/api/social-listening') || pathname.includes('/api/chat/post-agent') || pathname.includes('/api/video/upload-image') || pathname.includes('/api/v1/analytics/reports')) {
+  if (pathname.includes('/api/user') || pathname.includes('/api/social-accounts') || pathname.includes('/api/workspaces') || pathname.includes('/api/content') || pathname.includes('/api/v1/ai') || pathname.includes('/api/social-listening') || pathname.includes('/api/chat/post-agent') || pathname.includes('/api/chat/attachments/upload') || pathname.includes('/api/v1/analytics/reports')) {
     timeoutMs = 120000
   }
   const timeout = setTimeout(() => controller.abort(), timeoutMs)

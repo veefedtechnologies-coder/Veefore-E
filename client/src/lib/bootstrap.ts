@@ -89,11 +89,19 @@ export function isBootstrapCookied(): boolean {
 const AUTH_HINT_KEY = 'veefore_authed_hint';
 
 export function setAuthHint(): void {
-  try { localStorage.setItem(AUTH_HINT_KEY, String(Date.now())); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(AUTH_HINT_KEY, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearAuthHint(): void {
-  try { localStorage.removeItem(AUTH_HINT_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(AUTH_HINT_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 /** True if this browser was authed within the last 30 days (optimistic signal). */
@@ -150,8 +158,8 @@ export interface ShellChrome {
     hasConversations: boolean;
     conversations?: Array<{ id: number; title: string }>;
     /** Server-resolved layout (from the `vf_vg` cookie the page mirrors) so the
-     *  SSR overlay predicts the EXACT welcome-vs-chat variant the page renders. */
-    variant?: 'welcome' | 'chat';
+     *  SSR overlay predicts the EXACT variant the page renders. */
+    variant?: 'welcome' | 'chat' | 'album';
     showSidebar?: boolean;
   };
 }
@@ -169,13 +177,20 @@ export function setActiveWorkspaceCookie(id: string | null | undefined): void {
   try {
     if (!id || id === 'undefined' || id === 'null') return;
     const maxAge = 60 * 60 * 24 * 365; // 1 year
-    const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
+    const secure =
+      typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
     document.cookie = `${ACTIVE_WS_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=${maxAge}; SameSite=Lax${secure}`;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearActiveWorkspaceCookie(): void {
-  try { document.cookie = `${ACTIVE_WS_COOKIE}=; path=/; max-age=0; SameSite=Lax`; } catch { /* ignore */ }
+  try {
+    document.cookie = `${ACTIVE_WS_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -188,13 +203,20 @@ export function clearActiveWorkspaceCookie(): void {
  */
 export const VEEGPT_LAYOUT_COOKIE = 'vf_vg';
 
-export function setVeegptLayoutCookie(variant: 'welcome' | 'chat', showSidebar: boolean): void {
+export function setVeegptLayoutCookie(
+  variant: 'welcome' | 'chat' | 'album',
+  showSidebar: boolean
+): void {
   try {
-    const val = `${variant === 'chat' ? 'c' : 'w'}${showSidebar ? '1' : '0'}`;
+    const code = variant === 'chat' ? 'c' : variant === 'album' ? 'a' : 'w';
+    const val = `${code}${showSidebar ? '1' : '0'}`;
     const maxAge = 60 * 60 * 24 * 365; // 1 year
-    const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
+    const secure =
+      typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
     document.cookie = `${VEEGPT_LAYOUT_COOKIE}=${val}; path=/; max-age=${maxAge}; SameSite=Lax${secure}`;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Active-workspace list from the injected bootstrap (`/api/workspaces` envelope). */
@@ -203,7 +225,9 @@ function bootstrapWorkspaceList(): any[] {
   const wsEnvelope = boot?.workspaces as any;
   return Array.isArray(wsEnvelope?.data)
     ? wsEnvelope.data
-    : Array.isArray(wsEnvelope) ? wsEnvelope : [];
+    : Array.isArray(wsEnvelope)
+      ? wsEnvelope
+      : [];
 }
 
 /**
@@ -214,18 +238,29 @@ function bootstrapWorkspaceList(): any[] {
 export function resolveActiveWorkspaceId(): string | null {
   const boot = getBootstrap();
   if (!boot) return null;
-  const list = bootstrapWorkspaceList();
-  if (list.length === 0) return null;
+  const fullList = bootstrapWorkspaceList();
+  if (fullList.length === 0) return null;
+
+  // PLAN ENFORCEMENT: never resolve a LOCKED (over-plan-limit) workspace as the
+  // active one — that made the SSR pill/cookie and first paint point at a
+  // workspace whose data calls all 403. Prefer the accessible pool; fall back
+  // to the full list only if every workspace is locked (not expected).
+  const accessible = fullList.filter(w => !(w as any)?.locked);
+  const list = accessible.length > 0 ? accessible : fullList;
 
   let activeId: string | null = null;
-  try { activeId = localStorage.getItem('currentWorkspaceId'); } catch { /* ignore */ }
+  try {
+    activeId = localStorage.getItem('currentWorkspaceId');
+  } catch {
+    /* ignore */
+  }
   if (activeId === 'undefined' || activeId === 'null' || activeId === '') activeId = null;
 
   const defId = boot.dashboard?.workspaceId;
   const ws =
-    (activeId && list.find((w) => String(w?._id || w?.id) === activeId)) ||
-    list.find((w) => String(w?._id || w?.id) === String(defId)) ||
-    list.find((w) => w?.isDefault) ||
+    (activeId && list.find(w => String(w?._id || w?.id) === activeId)) ||
+    list.find(w => String(w?._id || w?.id) === String(defId)) ||
+    list.find(w => w?.isDefault) ||
     list[0];
   return ws ? String(ws?._id || ws?.id) : null;
 }
@@ -248,7 +283,7 @@ export function getBootstrapChrome(): ShellChrome | null {
   const userData = getBootstrapUserData();
   const list = bootstrapWorkspaceList();
   const activeId = resolveActiveWorkspaceId();
-  const ws = activeId ? list.find((w) => String(w?._id || w?.id) === activeId) : undefined;
+  const ws = activeId ? list.find(w => String(w?._id || w?.id) === activeId) : undefined;
 
   const chrome: ShellChrome = {};
   if (userData?.displayName) chrome.displayName = userData.displayName;
@@ -266,11 +301,11 @@ export function getBootstrapChrome(): ShellChrome | null {
   const chatSeed = boot.chat;
   if (chatSeed && Array.isArray(chatSeed.conversations)) {
     const conversations = (chatSeed.conversations as any[])
-      .map((c) => ({ id: Number(c?.id), title: String(c?.title ?? '') }))
-      .filter((c) => Number.isFinite(c.id));
+      .map(c => ({ id: Number(c?.id), title: String(c?.title ?? '') }))
+      .filter(c => Number.isFinite(c.id));
     chrome.veegpt = { hasConversations: chatSeed.conversations.length > 0, conversations };
   }
-  return (chrome.displayName || chrome.email || chrome.workspace || chrome.veegpt) ? chrome : null;
+  return chrome.displayName || chrome.email || chrome.workspace || chrome.veegpt ? chrome : null;
 }
 
 /**
@@ -358,9 +393,11 @@ export function hydrateQueryCacheFromBootstrap(queryClient: {
       try {
         localStorage.setItem(
           'veegpt-has-conversations',
-          boot.chat.conversations.length > 0 ? '1' : '0',
+          boot.chat.conversations.length > 0 ? '1' : '0'
         );
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   } catch {
     /* fail-open: fall back to normal fetching */

@@ -202,6 +202,7 @@ export type AICreditFeature =
   | 'automationDm'
   | 'automationComment'
   | 'videoScript'
+  | 'videoGenerativeEdit'
 
 export interface DynamicCreditRule {
   floor: number;
@@ -640,6 +641,10 @@ export const CREDIT_MODEL: Record<AICreditFeature, DynamicCreditRule> = {
   automationDm: { floor: 0.3, ceiling: 0.3, mode: 'fixed' },
   automationComment: { floor: 0.3, ceiling: 0.3, mode: 'fixed' },
   videoScript: { floor: 2, ceiling: 5, mode: 'dynamic' },
+  // Generative video editing (Gemini Omni / Veo). Billed by output seconds via
+  // additionalProviderCostInr; the ceiling is a generous pre-call reservation
+  // for a single segment edit, reconciled down to measured usage afterward.
+  videoGenerativeEdit: { floor: 10, ceiling: 50, mode: 'dynamic' },
 }
 
 /**

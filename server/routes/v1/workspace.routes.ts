@@ -7,6 +7,7 @@ import { validateRequest } from '../../middleware/validation';
 import { auditMiddleware } from '../../middleware/audit-middleware';
 import { AuditActions } from '../../utils/audit-logger';
 import { teamInviteGuards } from '../../middleware/ai-route-guards';
+import { requireWorkspaceAccessible } from '../../middleware/entitlement.middleware';
 import { z } from 'zod';
 
 // ─── Error handler helper ─────────────────────────────────────────────────────
@@ -60,6 +61,8 @@ const UpdateWorkspaceSchema = z.object({
   aiConfiguration: z.object({
     aiModel: z.string().optional(),
     creativityLevel: z.number().min(0).max(1).optional(),
+    reasoningEffort: z.enum(['minimal', 'low', 'medium', 'high']).optional(),
+    showThinking: z.boolean().optional(),
     optimizationGoals: z.string().optional(),
     aiPersona: z.string().optional(),
     captionStyle: z.string().optional(),
@@ -92,6 +95,7 @@ router.get('/', workspaceController.getUserWorkspaces);
 
 router.get('/:workspaceId', 
   validateRequest({ params: WorkspaceIdParams }), 
+  requireWorkspaceAccessible(),
   workspaceController.getWorkspace
 );
 
@@ -103,6 +107,7 @@ router.post('/',
 
 router.put('/:workspaceId', 
   validateRequest({ params: WorkspaceIdParams, body: UpdateWorkspaceSchema }), 
+  requireWorkspaceAccessible(),
   auditMiddleware(AuditActions.WORKSPACE.UPDATE, { resource: 'workspace' }),
   workspaceController.updateWorkspace
 );

@@ -66,6 +66,7 @@ function makeDeps() {
     validateUpload: vi.fn(() => ({ ok: true, mediaType: 'image' })),
     addUpload: vi.fn(async () => ({ added: true, item: makeItem() })),
     listAvailable: vi.fn(async () => [makeItem()]),
+    listAvailableByMission: vi.fn(async () => [makeItem()]),
     remove: vi.fn(async () => makeItem({ available: false })),
   }
   const missions = { findById: vi.fn(async () => ({ _id: 'm-1', workspaceId: 'ws-1' })) }
@@ -184,7 +185,7 @@ describe('MediaController.listMedia', () => {
       { params: { id: 'm-1' }, user: { id: 'u-1' } } as unknown as Request,
       res,
     )
-    expect(deps.mediaPool.listAvailable).toHaveBeenCalledWith('ws-1')
+    expect(deps.mediaPool.listAvailableByMission).toHaveBeenCalledWith('ws-1', 'm-1')
     expect(res.statusCode).toBe(200)
     expect((res.body as { items: unknown[] }).items).toHaveLength(1)
   })

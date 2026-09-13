@@ -97,7 +97,7 @@ function ProfileContent() {
             <p className="text-gray-600 dark:text-gray-400">{userData?.email}</p>
             <div className="flex items-center space-x-4 mt-2">
               <div className="text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 px-3 py-1 rounded-full font-medium">
-                {plan || userData?.plan || 'Free'} Plan
+                {(plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Free')} Plan
               </div>
               <div className="text-sm bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 px-3 py-1 rounded-full font-medium">
                 {creditLabel} Credits
@@ -193,7 +193,7 @@ function ProfileContent() {
                 <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 <div>
                   <div className="font-medium text-gray-900 dark:text-gray-100">Subscription Plan</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{plan || userData?.plan || 'Free'} Plan</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{(plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Free')} Plan</div>
                 </div>
               </div>
               <Button variant="outline" size="sm">

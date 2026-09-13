@@ -148,7 +148,11 @@ export class HashtagGeneratorService extends BaseService {
       const targetCount = params.targetCount || this.getRandomCountInRange(15, 25);
 
       // Step 1: Extract content themes
-      const themes = await this.extractContentThemes(params.caption, params.mediaAnalysis);
+      const themes = await this.extractContentThemes(
+        params.caption,
+        params.mediaAnalysis,
+        params.aiPreferences
+      );
       this.log(method, `Extracted ${themes.length} content themes`, { themes });
 
       // Step 2: Get niche context with trending hashtags
@@ -270,7 +274,11 @@ export class HashtagGeneratorService extends BaseService {
    * 
    * Requirement: 6.3
    */
-  private async extractContentThemes(caption: string, mediaAnalysis?: string): Promise<string[]> {
+  private async extractContentThemes(
+    caption: string,
+    mediaAnalysis?: string,
+    aiPreferences?: Record<string, any>
+  ): Promise<string[]> {
     const method = 'extractContentThemes';
     const themes = new Set<string>();
 
@@ -287,7 +295,11 @@ export class HashtagGeneratorService extends BaseService {
 
       // Use AI to extract deeper themes if needed
       if (themes.size < 5) {
-        const aiThemes = await this.extractThemesUsingAI(caption, mediaAnalysis);
+        const aiThemes = await this.extractThemesUsingAI(
+          caption,
+          mediaAnalysis,
+          aiPreferences
+        );
         aiThemes.forEach(theme => themes.add(theme));
       }
 
@@ -352,7 +364,11 @@ export class HashtagGeneratorService extends BaseService {
   /**
    * Use AI to extract themes from content
    */
-  private async extractThemesUsingAI(caption: string, mediaAnalysis?: string): Promise<string[]> {
+  private async extractThemesUsingAI(
+    caption: string,
+    mediaAnalysis?: string,
+    aiPreferences?: Record<string, any>
+  ): Promise<string[]> {
     try {
       const prompt = `Analyze this social media content and extract 5-10 specific content themes as single words or short phrases (max 2 words each).
 
@@ -364,8 +380,10 @@ Example format: "fitness, motivation, morning routine, healthy eating, workout"
 
 Themes:`;
 
+      // Do NOT pin a model here — the workspace's AI Configuration selection is
+      // authoritative. Omitting aiModel lets AIServiceManager resolve it.
       const response = await aiServiceManager.generateText(prompt, {
-        aiModel: 'veegpt-hybrid',
+        ...(aiPreferences || {}),
         creativityLevel: 0.5
       });
 
@@ -416,7 +434,7 @@ Return ONLY hashtags with # symbols, separated by spaces. No explanations.
 Hashtags:`;
 
       const response = await aiServiceManager.generateText(prompt, {
-        aiModel: params.aiPreferences?.aiModel || 'veegpt-hybrid',
+        ...(params.aiPreferences || {}),
         creativityLevel: 0.7
       });
 

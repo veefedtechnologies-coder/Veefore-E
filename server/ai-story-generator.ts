@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { PerformanceSnapshotService, PerformanceComparison } from './performance-snapshot-service';
+import { createOpenAI } from './services/ai-provider-guard';
 
 /*
 <important_code_snippet_instructions>
@@ -30,7 +31,7 @@ function getAnthropic(): Anthropic {
 function getOpenAI(): OpenAI {
   if (!openai && process.env.OPENAI_API_KEY) {
     console.log('[AI STORY] 🔑 Initializing OpenAI client with API key (length:', process.env.OPENAI_API_KEY.length, 'chars)');
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
   if (!openai) {
     console.error('[AI STORY] ❌ OpenAI API key not configured! process.env.OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'exists' : 'MISSING');

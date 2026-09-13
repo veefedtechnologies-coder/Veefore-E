@@ -8,6 +8,15 @@ export default defineConfig({
     globals: true,
     environment: 'node', // Use Node for server-side tests (supports crypto, fs, path)
     setupFiles: ['./tests/setup.ts'],
+    // Inline React + react-query so Vite transforms them and the resolve.dedupe
+    // below collapses the duplicate React copies across the root/workspace/client
+    // node_modules trees into one — otherwise provider-based component tests hit
+    // a null hooks dispatcher from a second React instance.
+    server: {
+      deps: {
+        inline: ['@tanstack/react-query', 'react', 'react-dom'],
+      },
+    },
     include: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.tsx', '**/*.spec.tsx'],
     testTimeout: 30000,
     // Use environment selector for client vs server tests
@@ -21,8 +30,15 @@ export default defineConfig({
     ],
   },
   resolve: {
+    dedupe: ['react', 'react-dom', '@tanstack/react-query'],
     alias: {
       '@': path.resolve(__dirname, './client/src'),
+      // Isomorphic modules shared by client + server (mirrors tsconfig paths).
+      '@shared': path.resolve(__dirname, './shared'),
+      // Pin React + React DOM to the copy @testing-library/react resolves to
+      // (the repo root) so inlined provider deps share one hooks dispatcher.
+      react: path.resolve(__dirname, '../node_modules/react'),
+      'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
       // Isomorphic platform capability registry (importable in both server + client).
       // Mirrors the tsconfig.json paths and vite.config.ts alias so server tests
       // can resolve the `@platform-registry` specifier and the relative path used

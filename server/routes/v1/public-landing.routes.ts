@@ -29,6 +29,11 @@ import {
   generateLandingCaptions,
   CaptionGenerationError,
 } from '../../services/LandingCaptionService';
+import { withVGU, VGUQuotaError } from '../../services/veegpt-metering';
+import {
+  LANDING_DEMO_FEATURE,
+  PUBLIC_DEMO_USER_ID,
+} from '../../config/veegpt-vgu.config';
 
 const router = Router();
 
@@ -125,9 +130,44 @@ router.post('/captions', landingCaptionRateLimiter, async (req: Request, res: Re
   const { topic, niche, tone } = parsed.data;
 
   try {
-    const captions = await generateLandingCaptions({ topic, niche, tone });
+    // COST CONTROL for an intentionally anonymous endpoint.
+    //
+    // There is no user to charge, and per-IP rate limiting bounds nothing when an
+    // attacker has many IPs. So every visitor's demo request is reserved against
+    // ONE synthetic quota owner, giving the endpoint a single global monthly VGU
+    // ceiling (LANDING_DEMO_FEATURE) plus a global concurrency limit. The demo
+    // degrades when the budget is spent; it can never run up an open-ended bill.
+    //
+    // The plan is `enterprise` deliberately: it carries no per-user budget, so the
+    // feature ceiling is the one and only binding limit and the numbers stay
+    // readable in one place.
+    const { result: captions } = await withVGU(
+      {
+        userId: PUBLIC_DEMO_USER_ID,
+        plan: 'enterprise',
+        feature: LANDING_DEMO_FEATURE,
+        model: 'openai-gpt-4o-mini',
+        modelChosenBy: 'platform',
+        promptChars: topic.length + niche.length + tone.length,
+        meta: { userId: PUBLIC_DEMO_USER_ID, source: 'public-landing-demo' },
+      },
+      () => generateLandingCaptions({ topic, niche, tone })
+    );
     return res.status(200).json({ captions });
   } catch (error) {
+    // The shared demo budget is spent. This is not the visitor's fault and not a
+    // per-IP limit, so it is reported as a temporarily unavailable demo.
+    if (error instanceof VGUQuotaError) {
+      if (error.retryAfterSec) {
+        res.setHeader('Retry-After', String(Math.max(1, error.retryAfterSec)));
+      }
+      return res.status(503).json({
+        error: 'demo_unavailable',
+        message:
+          'The live demo is at capacity right now. Sign up to generate captions for your own account.',
+      });
+    }
+
     // CaptionGenerationError carries a safe message → 502 generation_failed.
     if (error instanceof CaptionGenerationError) {
       return res.status(502).json({ error: 'generation_failed', message: error.message });

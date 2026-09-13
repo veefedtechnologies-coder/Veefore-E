@@ -57,16 +57,9 @@ interface ParityPair {
 }
 
 const PARITY_PAIRS: ParityPair[] = [
-  {
-    label: 'PostCard media slot reserves aspect-[4/5]',
-    token: 'aspect-[4/5]',
-    skeletonFile: 'client/src/components/skeletons/PostCardSkeleton.tsx',
-    finalFiles: [
-      'client/src/pages/ScheduledPostsPage.tsx',
-      'client/src/pages/PublishedPostsPage.tsx',
-      'client/src/pages/DraftsPage.tsx',
-    ],
-  },
+  // NOTE: the standalone ScheduledPosts/Drafts/PublishedPosts pages were removed
+  // and consolidated into the Plan workspace, so their aspect-[4/5] parity pair
+  // was dropped here. PostAnalytics still reserves the same media slot below.
   {
     label: 'PostAnalytics media slot reserves aspect-[4/5]',
     token: 'aspect-[4/5]',
