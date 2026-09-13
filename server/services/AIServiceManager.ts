@@ -1,4 +1,8 @@
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import {
+  GoogleGenerativeAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} from '@google/generative-ai';
 import OpenAI from 'openai';
 import { promptConstructorService } from './PromptConstructorService';
 import type { PromptConstructionParams } from './PromptConstructorService';
@@ -11,24 +15,51 @@ import type { VoiceProfile } from './VoiceProfileService';
 import type { AuthenticityScore } from './AuthenticityScorer';
 import type { EngagementPrediction } from '../domain/types';
 import type { ContentSafetyResult } from './ContentSafetyService';
-import { recordAIUsage, fromOpenAIUsage, fromGeminiUsage } from './aiUsageTracker';
+import {
+  recordAIUsage,
+  fromOpenAIUsage,
+  fromGeminiUsage,
+  currentAIContext,
+  currentAbortSignal,
+} from './aiUsageTracker';
+import { withProviderRetry } from './veegpt-retry';
 import {
   accumulateToolCallDeltas,
   finalizeToolCalls,
   type StreamingToolCall,
   type ParsedToolCall,
 } from './toolCallAccumulator';
+import { liteLLMGateway } from './litellm/LiteLLMGateway';
+import {
+  resolveRoute,
+  mustBypassGateway,
+  supportsCustomTemperature,
+  type Capability,
+} from './ai-model-routing';
+import { recordModelCall } from './ai-call-log';
 
 export interface UserAIPreferences {
-  aiModel?: string; 
-  creativityLevel?: number; 
-  optimizationGoals?: string; 
-  aiPersona?: string; 
-  captionStyle?: string; 
-  responseLength?: string; 
-  multilingual?: string; 
-  contentSafety?: string; 
-  aiMemory?: string; 
+  aiModel?: string;
+  creativityLevel?: number;
+  /**
+   * Reasoning effort for reasoning models (OpenAI GPT-5 family). Lower = faster
+   * & cheaper, higher = deeper but slower. Ignored by non-reasoning models.
+   * Only applied when routing through the LiteLLM gateway.
+   */
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  /**
+   * For Gemini thinking models: whether to request & stream the model's
+   * reasoning summary (the "Thinking" panel). Default true. When false, no
+   * reasoning is requested (faster, no panel). Ignored by non-thinking models.
+   */
+  showThinking?: boolean;
+  optimizationGoals?: string;
+  aiPersona?: string;
+  captionStyle?: string;
+  responseLength?: string;
+  multilingual?: string;
+  contentSafety?: string;
+  aiMemory?: string;
   autoHashtags?: boolean;
   googleAiStudioKey?: string;
   openAiKey?: string;
@@ -55,12 +86,24 @@ export interface UserAIPreferences {
   availableCapabilities?: string[];
 }
 
-/** A user-uploaded attachment (image or PDF) for multimodal analysis. */
+/** A user-uploaded attachment (image, video or PDF) for multimodal analysis. */
 export interface AIAttachment {
   /** MIME type, e.g. "image/png", "image/jpeg", "application/pdf". */
   mimeType: string;
-  /** Base64-encoded file data (no data: prefix). */
+  /**
+   * Base64-encoded file data (no data: prefix). Used for INLINE delivery — the
+   * bytes ride in the request. Empty when the file was uploaded to the Gemini
+   * Files API instead (see `fileUri`), which is how large video/PDF avoid the
+   * ~20MB inline request ceiling.
+   */
   data: string;
+  /**
+   * Gemini Files API resource URI (e.g. `https://generativelanguage.googleapis.com/v1beta/files/abc`).
+   * When set, the file is referenced by id rather than inlined, so it works for
+   * files far larger than the inline limit. Only valid on the native Gemini
+   * path (video/PDF/HEIC bypass the LiteLLM gateway, which can't use a fileUri).
+   */
+  fileUri?: string;
   /** Original filename (for context/logging). */
   name?: string;
 }
@@ -83,6 +126,90 @@ export interface ChatTool {
  * recursively strip/normalize those so the same tool definitions work on both
  * OpenAI-compatible providers AND Gemini.
  */
+/**
+ * Retired Gemini model ids → the live model that replaces them.
+ *
+ * Google has stopped serving the pinned `gemini-2.x-*` ids to newer API keys:
+ * `generateContent` answers 404 "This model … is no longer available to new
+ * users" even though ListModels still advertises them. Mapping them to the
+ * rolling `-latest` aliases at the single point where the model is actually
+ * constructed keeps stored user preferences (which may still say
+ * `gemini-2.5-flash`) working without a migration.
+ *
+ * ai-model-routing.ts already maps the app-level ids to live natives; this is the
+ * belt-and-braces guard for any raw id that reaches the SDK.
+ */
+const RETIRED_GEMINI_MODELS: Record<string, string> = {
+  // Google retires whole generations for new keys. As of late 2025 the 1.5 AND
+  // 2.x ids return 404 "no longer available to new users — use gemini-3.6-flash"
+  // (verified live against this project's key). Map every retired id to the
+  // current balanced flash so a stale reference never 404s on the first call
+  // (which was cascading into the fallback chain and rate-limiting the key).
+  'gemini-1.5-flash': 'gemini-3.6-flash',
+  'gemini-1.5-pro': 'gemini-3.6-flash',
+  'gemini-2.0-flash': 'gemini-3.6-flash',
+  'gemini-2.0-flash-exp': 'gemini-3.6-flash',
+  'gemini-2.0-flash-lite': 'gemini-3.6-flash',
+  'gemini-2.5-flash': 'gemini-3.6-flash',
+  'gemini-2.5-flash-lite': 'gemini-3.6-flash',
+  'gemini-2.5-pro': 'gemini-3.6-flash',
+};
+
+/** Map a possibly-retired Gemini model id to one that is still served. */
+export function resolveLiveGeminiModel(modelName: string): string {
+  return RETIRED_GEMINI_MODELS[modelName] || modelName;
+}
+
+/**
+ * Gemini's rolling `-latest` aliases intermittently answer with HTTP 503
+ * ("this model is currently experiencing high demand") or 429 under load. That
+ * is transient and NOT a bug in our request — the fix is to retry the CONNECTION
+ * (the 503 surfaces before any token streams) with backoff, and on the final
+ * failure fall back to a lighter alias that usually has spare capacity. This is
+ * what unblocked PDF/video analysis: the request was routed to Gemini correctly
+ * but every single attempt hit a 503 and there was no retry, so the reply came
+ * back empty and it LOOKED like the model "couldn't see" the file.
+ */
+export function isTransientGeminiError(err: any): boolean {
+  const msg = String(err?.message || err || '');
+  if (/\b(429|500|502|503|504)\b/.test(msg)) return true;
+  return /service unavailable|high demand|overloaded|try again later|rate.?limit|quota|deadline exceeded|\bunavailable\b|internal error/i.test(
+    msg
+  );
+}
+
+/** Per-connection retry budget for a transient Gemini failure. */
+const GEMINI_STREAM_MAX_ATTEMPTS = 3;
+/** Backoff between connection attempts (ms), indexed by attempt number. */
+const GEMINI_STREAM_BACKOFF_MS = [1000, 3000, 6000];
+/**
+ * Alternate models to try (in order) when the resolved model is overloaded (503)
+ * OR unavailable on this key (404). STABLE pinned ids first (real quota), with
+ * the rolling aliases last as a final resort. All read images, video and PDFs.
+ * Env-overridable via GEMINI_MEDIA_FALLBACKS (comma-separated).
+ */
+const GEMINI_STREAM_FALLBACKS: string[] = (
+  process.env.GEMINI_MEDIA_FALLBACKS
+    ? process.env.GEMINI_MEDIA_FALLBACKS.split(',').map(s => s.trim())
+    : [
+        process.env.GEMINI_MEDIA_MODEL || 'gemini-3.6-flash',
+        'gemini-3.7-flash',
+        'gemini-flash-latest',
+      ]
+).filter(Boolean);
+
+/**
+ * A model-unavailable error (bad/disallowed id) — NOT transient. The remedy is
+ * to try the NEXT candidate model, not to retry the same one. Distinct from
+ * {@link isTransientGeminiError} (503/429 → wait and retry the same model).
+ */
+function isModelUnavailableError(err: any): boolean {
+  const msg = String(err?.message || err || '');
+  return /\b40[034]\b/.test(msg)
+    ? /\b404\b/.test(msg) || /not found|not available|does not exist|unsupported|permission|access/i.test(msg)
+    : /not found|not available|does not exist|unsupported/i.test(msg);
+}
+
 function sanitizeSchemaForGemini(schema: any): any {
   if (Array.isArray(schema)) return schema.map(sanitizeSchemaForGemini);
   if (!schema || typeof schema !== 'object') return schema;
@@ -91,16 +218,20 @@ function sanitizeSchemaForGemini(schema: any): any {
     if (key === 'additionalProperties') continue; // unsupported by Gemini
     if (key === 'type' && Array.isArray(value)) {
       // Union type → pick the first non-null type (Gemini wants a single type).
-      out.type = (value as string[]).find((t) => t !== 'null') || 'string';
+      out.type = (value as string[]).find(t => t !== 'null') || 'string';
       continue;
     }
     if (key === 'properties' && value && typeof value === 'object') {
       const props: any = {};
-      for (const [pk, pv] of Object.entries(value as Record<string, unknown>)) props[pk] = sanitizeSchemaForGemini(pv);
+      for (const [pk, pv] of Object.entries(value as Record<string, unknown>))
+        props[pk] = sanitizeSchemaForGemini(pv);
       out.properties = props;
       continue;
     }
-    if (key === 'items') { out.items = sanitizeSchemaForGemini(value); continue; }
+    if (key === 'items') {
+      out.items = sanitizeSchemaForGemini(value);
+      continue;
+    }
     out[key] = value;
   }
   return out;
@@ -109,7 +240,13 @@ function sanitizeSchemaForGemini(schema: any): any {
 /** Structured event yielded by the tool-aware chat stream. */
 export type ChatStreamEvent =
   | { type: 'text'; delta: string }
-  | { type: 'toolCall'; name: string; args: Record<string, unknown>; id?: string };
+  | { type: 'reasoning'; delta: string }
+  | {
+      type: 'toolCall';
+      name: string;
+      args: Record<string, unknown>;
+      id?: string;
+    };
 
 export interface CaptionVariation {
   caption: string;
@@ -154,6 +291,110 @@ export class AIServiceManager {
   }
 
   /**
+   * Temperature params for an OpenAI-compatible request. GPT-5 reasoning models
+   * reject any non-default value with a 400, so for those we send nothing and let
+   * the API apply its default.
+   */
+  private temperatureFor(
+    aiModel: string | undefined,
+    creativityLevel: number
+  ): { temperature?: number } {
+    return supportsCustomTemperature(aiModel) ? { temperature: creativityLevel } : {};
+  }
+
+  /**
+   * Run a one-shot model call and audit which model actually served it.
+   * See server/services/ai-call-log.ts — this is how we prove the selected model
+   * is the one running, with no fallback.
+   */
+  private async audited<T>(
+    feature: string,
+    route: {
+      appModel: string;
+      requested: string;
+      provider: string;
+      overriddenFor?: string;
+    },
+    transport: 'litellm' | 'native',
+    capability: string,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    const t0 = Date.now();
+    try {
+      const out = await fn();
+      recordModelCall({
+        feature,
+        requested: route.requested,
+        used: route.appModel,
+        provider: route.provider,
+        transport,
+        capability,
+        substitutedFor: route.overriddenFor,
+        // A swap with no capability reason means the id was a retired provider.
+        retiredAlias:
+          !route.overriddenFor && route.appModel !== route.requested,
+        ms: Date.now() - t0,
+        ok: true,
+      });
+      return out;
+    } catch (err) {
+      recordModelCall({
+        feature,
+        requested: route.requested,
+        used: route.appModel,
+        provider: route.provider,
+        transport,
+        capability,
+        substitutedFor: route.overriddenFor,
+        retiredAlias:
+          !route.overriddenFor && route.appModel !== route.requested,
+        ms: Date.now() - t0,
+        ok: false,
+        error: (err as Error).message,
+      });
+      throw err;
+    }
+  }
+
+  /** Streaming counterpart of `audited` — logs once the stream ends or throws. */
+  private async *auditedStream<T>(
+    feature: string,
+    route: {
+      appModel: string;
+      requested: string;
+      provider: string;
+      overriddenFor?: string;
+    },
+    transport: 'litellm' | 'native',
+    capability: string,
+    gen: () => AsyncGenerator<T>
+  ): AsyncGenerator<T> {
+    const t0 = Date.now();
+    let failed: Error | null = null;
+    try {
+      yield* gen();
+    } catch (err) {
+      failed = err as Error;
+      throw err;
+    } finally {
+      recordModelCall({
+        feature,
+        requested: route.requested,
+        used: route.appModel,
+        provider: route.provider,
+        transport,
+        capability,
+        substitutedFor: route.overriddenFor,
+        retiredAlias:
+          !route.overriddenFor && route.appModel !== route.requested,
+        ms: Date.now() - t0,
+        ok: !failed,
+        error: failed?.message,
+      });
+    }
+  }
+
+  /**
    * Check if AI service is properly configured
    * Returns true if at least one AI provider (Google AI or OpenAI) is available
    */
@@ -161,40 +402,94 @@ export class AIServiceManager {
     const hasGoogleKey = !!process.env.GOOGLE_API_KEY;
     const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
     const hasGithubToken = !!process.env.GITHUB_TOKEN;
-    
-    // At least one provider must be configured
-    const isConfigured = hasGoogleKey || hasOpenAIKey || hasGithubToken;
-    
+    const hasLiteLLM = liteLLMGateway.isEnabled();
+
+    // At least one provider (or the LiteLLM gateway) must be configured.
+    const isConfigured =
+      hasLiteLLM || hasGoogleKey || hasOpenAIKey || hasGithubToken;
+
     if (!isConfigured) {
-      console.error('[AIServiceManager] No AI provider configured. Set GOOGLE_API_KEY or OPENAI_API_KEY environment variable.');
+      console.error(
+        '[AIServiceManager] No AI provider configured. Set GOOGLE_API_KEY or OPENAI_API_KEY, or enable the LiteLLM gateway (USE_LITELLM=true).'
+      );
     }
-    
+
     return isConfigured;
+  }
+
+  /**
+   * Server-side Gemini client accessor for the Video Editor's generative-video
+   * provider adapters (Gemini Omni / Veo). The client is constructed from
+   * `GOOGLE_API_KEY` inside the Node process; exposing it here keeps every
+   * provider call routed through `AIServiceManager` and guarantees provider API
+   * keys are never transmitted to the browser (Req 7.8). Returns `null` when no
+   * Google key is configured so callers surface an explicit unavailable state
+   * rather than fabricating success (No-Mock, Req 23).
+   */
+  public getGeminiVideoClient(): GoogleGenerativeAI | null {
+    if (!process.env.GOOGLE_API_KEY) return null;
+    return this.genAI;
   }
 
   private getSafetySettings(contentSafety?: string) {
     if (contentSafety === 'strict') {
       return [
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE }
+        {
+          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+          threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+          threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+          threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+          threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        },
       ];
     } else if (contentSafety === 'off') {
       return [
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }
+        {
+          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
       ];
     }
     // Default (standard) - Use BLOCK_ONLY_HIGH for more permissive caption generation
     // This prevents false positives while still blocking genuinely harmful content
     return [
-      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+      {
+        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
     ];
   }
 
@@ -206,63 +501,26 @@ export class AIServiceManager {
    * safety) are re-thrown immediately so the caller can fall through to another
    * model.
    */
-  /**
-   * Map a settings model id to a GitHub Models model id ({publisher}/{model}).
-   * Returns null if the id isn't a GitHub Models selection.
-   */
-  private resolveGithubModel(aiModel?: string): string | null {
-    switch (aiModel) {
-      case 'github-gpt-4o-mini': return 'openai/gpt-4o-mini';
-      case 'github-gpt-4.1-mini': return 'openai/gpt-4.1-mini';
-      default: return null;
-    }
-  }
 
-  /** Detect quota/rate-limit errors (HTTP 429). All Gemini free-tier models
-   * share the same per-project daily/per-minute quota, so once one returns 429
-   * the rest will too — callers use this to skip straight to a different
-   * provider (OpenAI) instead of failing through every Gemini model.
-   */
-  private isQuotaError(error: any): boolean {
-    const msg = String(error?.message || error || '');
-    return msg.includes('429') ||
-      msg.includes('Too Many Requests') ||
-      msg.includes('quota') ||
-      msg.includes('Quota') ||
-      msg.includes('RESOURCE_EXHAUSTED');
-  }
-
-  private async withTransientRetry<T>(fn: () => Promise<T>, label: string, attempts = 3): Promise<T> {    let lastErr: any;
-    for (let i = 0; i < attempts; i++) {
-      try {
-        return await fn();
-      } catch (error: any) {
-        const msg = String(error?.message || '');
-        const isTransient = msg.includes('503') || msg.includes('500') ||
-          msg.includes('overloaded') || msg.includes('high demand') || msg.includes('UNAVAILABLE');
-        lastErr = error;
-        if (!isTransient || i === attempts - 1) throw error;
-        const delay = 800 * Math.pow(2, i); // 0.8s, 1.6s
-        console.warn(`[AIServiceManager] ${label} transient error (attempt ${i + 1}/${attempts}), retrying in ${delay}ms: ${msg.slice(0, 80)}`);
-        await new Promise((r) => setTimeout(r, delay));
-      }
-    }
-    throw lastErr;
-  }
-
-  public async generateText(prompt: string, preferences: UserAIPreferences = {}, signal?: AbortSignal): Promise<string> {
-    const { 
-      aiModel = 'veegpt-hybrid', 
+  public async generateText(
+    prompt: string,
+    preferences: UserAIPreferences = {},
+    signal?: AbortSignal
+  ): Promise<string> {
+    const {
+      aiModel = 'veegpt-hybrid',
       creativityLevel = 0.7,
       contentSafety = 'standard',
       aiPersona = 'Professional & Authoritative',
       captionStyle = 'Storytelling',
       responseLength = 'medium',
       multilingual = 'auto',
-      aiMemory = 'long-term'
+      aiMemory = 'long-term',
     } = preferences;
 
-    console.log(`[AIServiceManager] Generating text using model: ${aiModel}, creativity: ${creativityLevel}, safety: ${contentSafety}`);
+    console.log(
+      `[AIServiceManager] Generating text using model: ${aiModel}, creativity: ${creativityLevel}, safety: ${contentSafety}`
+    );
 
     // Build platform-aware insight prefix when platformContext is supplied.
     // CapabilityGuard ensures only supported capabilities are referenced.
@@ -275,7 +533,10 @@ export class AIServiceManager {
           userId: '',
           workspaceId: '',
           postType: 'post',
-          platform: preferences.platformContext === 'all' ? 'instagram' : preferences.platformContext,
+          platform:
+            preferences.platformContext === 'all'
+              ? 'instagram'
+              : preferences.platformContext,
           aiPreferences: preferences,
         })
       : '';
@@ -292,26 +553,75 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
 
     // Prepend platform prefix before the user's prompt so the model always sees
     // the platform restrictions first.
-    const finalPrompt = globalSystemContext + (platformPrefix ? platformPrefix + '\n\n' : '') + prompt;
+    const finalPrompt =
+      globalSystemContext +
+      (platformPrefix ? platformPrefix + '\n\n' : '') +
+      prompt;
+
+    // NO FALLBACK: the selected model runs, or the request fails. See
+    // ai-model-routing.ts for the policy and the one capability exception.
+    const route = resolveRoute(aiModel, 'text');
+    if (liteLLMGateway.isEnabled()) {
+      return await this.audited('text', route, 'litellm', 'text', () =>
+        liteLLMGateway.chat(finalPrompt, {
+          model: route.appModel,
+          temperature: creativityLevel,
+          reasoningEffort: preferences.reasoningEffort || 'low',
+          showThinking: preferences.showThinking,
+          signal,
+          // Record real provider tokens so metering charges actual cost. The
+          // proxy normalizes every provider to the OpenAI usage shape.
+          onUsage: ({ usage, promptText, completionText }) =>
+            recordAIUsage({
+              provider: route.provider,
+              model: route.native,
+              callType: 'text',
+              usage: fromOpenAIUsage(usage),
+              promptText,
+              completionText,
+            }),
+        })
+      );
+    }
 
     const tryGemini = async (modelName: string) => {
       try {
-        console.log(`[AIServiceManager] Calling Google AI (${modelName}) with safety: ${contentSafety}`);
+        console.log(
+          `[AIServiceManager] Calling Google AI (${modelName}) with safety: ${contentSafety}`
+        );
         const generationConfig = { temperature: creativityLevel };
         const safetySettings = this.getSafetySettings(contentSafety);
-        console.log(`[AIServiceManager] Safety settings:`, safetySettings.map(s => `${s.category}: ${s.threshold}`));
-        
+        console.log(
+          `[AIServiceManager] Safety settings:`,
+          safetySettings.map(s => `${s.category}: ${s.threshold}`)
+        );
+
         signal?.throwIfAborted?.();
-        const client = preferences.googleAiStudioKey ? new GoogleGenerativeAI(preferences.googleAiStudioKey) : this.genAI;
-        const model = client.getGenerativeModel({ model: modelName, generationConfig, safetySettings });
-        const result = await this.withTransientRetry(
-          () => model.generateContent(finalPrompt, signal ? { signal } : undefined),
-          `Text ${modelName}`,
+        const client = preferences.googleAiStudioKey
+          ? new GoogleGenerativeAI(preferences.googleAiStudioKey)
+          : this.genAI;
+        const model = client.getGenerativeModel({
+          model: resolveLiveGeminiModel(modelName),
+          generationConfig,
+          safetySettings,
+        });
+        const result = await model.generateContent(
+          finalPrompt,
+          signal ? { signal } : undefined
         );
         const text = result.response.text();
-        recordAIUsage({ provider: 'gemini', model: modelName, callType: 'text', usage: fromGeminiUsage((result.response as any)?.usageMetadata), promptText: finalPrompt, completionText: text });
-        
-        console.log(`[AIServiceManager] Google AI generated text successfully (${text.length} chars)`);
+        recordAIUsage({
+          provider: 'gemini',
+          model: modelName,
+          callType: 'text',
+          usage: fromGeminiUsage((result.response as any)?.usageMetadata),
+          promptText: finalPrompt,
+          completionText: text,
+        });
+
+        console.log(
+          `[AIServiceManager] Google AI generated text successfully (${text.length} chars)`
+        );
         return text;
       } catch (error: any) {
         console.error(`[AIServiceManager] Google AI generation failed:`, {
@@ -319,7 +629,7 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
           error: error.message,
           errorType: error.constructor.name,
           isSafetyBlock: error.message?.includes('SAFETY'),
-          fullError: error
+          fullError: error,
         });
         throw error;
       }
@@ -328,110 +638,91 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
     const tryOpenAI = async (modelName: string) => {
       try {
         console.log(`[AIServiceManager] Calling OpenAI (${modelName})`);
-        const client = preferences.openAiKey ? new OpenAI({ apiKey: preferences.openAiKey }) : this.openai;
+        const client = preferences.openAiKey
+          ? new OpenAI({ apiKey: preferences.openAiKey })
+          : this.openai;
         if (!client) throw new Error('OpenAI is not configured.');
         signal?.throwIfAborted?.();
-        const completion = await client.chat.completions.create({
-          messages: [{ role: "user", content: finalPrompt }],
-          model: modelName,
-          temperature: creativityLevel,
-        }, signal ? { signal } : undefined);
+        const completion = await client.chat.completions.create(
+          {
+            messages: [{ role: 'user', content: finalPrompt }],
+            model: modelName,
+            ...this.temperatureFor(aiModel, creativityLevel),
+          },
+          signal ? { signal } : undefined
+        );
         const text = completion.choices[0]?.message?.content || '';
-        recordAIUsage({ provider: 'openai', model: modelName, callType: 'text', usage: fromOpenAIUsage((completion as any)?.usage), promptText: finalPrompt, completionText: text });
-        console.log(`[AIServiceManager] OpenAI generated text successfully (${text.length} chars)`);
+        recordAIUsage({
+          provider: 'openai',
+          model: modelName,
+          callType: 'text',
+          usage: fromOpenAIUsage((completion as any)?.usage),
+          promptText: finalPrompt,
+          completionText: text,
+        });
+        console.log(
+          `[AIServiceManager] OpenAI generated text successfully (${text.length} chars)`
+        );
         return text;
       } catch (error: any) {
         console.error(`[AIServiceManager] OpenAI generation failed:`, {
           model: modelName,
           error: error.message,
-          errorType: error.constructor.name
+          errorType: error.constructor.name,
         });
         throw error;
       }
     };
 
     const tryGithubText = async (modelName: string) => {
-      if (!this.githubModels) throw new Error('GitHub Models is not configured (GITHUB_TOKEN missing).');
+      if (!this.githubModels)
+        throw new Error(
+          'GitHub Models is not configured (GITHUB_TOKEN missing).'
+        );
       console.log(`[AIServiceManager] Calling GitHub Models (${modelName})`);
       signal?.throwIfAborted?.();
-      const completion = await this.githubModels.chat.completions.create({
-        messages: [{ role: "user", content: finalPrompt }],
-        model: modelName,
-        temperature: creativityLevel,
-      }, signal ? { signal } : undefined);
+      const completion = await this.githubModels.chat.completions.create(
+        {
+          messages: [{ role: 'user', content: finalPrompt }],
+          model: modelName,
+          ...this.temperatureFor(aiModel, creativityLevel),
+        },
+        signal ? { signal } : undefined
+      );
       const ghText = completion.choices[0]?.message?.content || '';
-      recordAIUsage({ provider: 'github', model: modelName, callType: 'text', usage: fromOpenAIUsage((completion as any)?.usage), promptText: finalPrompt, completionText: ghText });
+      recordAIUsage({
+        provider: 'github',
+        model: modelName,
+        callType: 'text',
+        usage: fromOpenAIUsage((completion as any)?.usage),
+        promptText: finalPrompt,
+        completionText: ghText,
+      });
       return ghText;
     };
 
+    // Gateway disabled → call the selected model's provider directly. Still one
+    // attempt only.
     try {
-      const githubModel = this.resolveGithubModel(aiModel);
-      if (githubModel) {
-        try {
-          return await tryGithubText(githubModel);
-        } catch (err) {
-          // GitHub free tier rate-limits (429) under burst load. Fall back to
-          // OpenAI, and if THAT also fails (e.g. quota exhausted), fall through
-          // to Gemini flash-lite (free quota) rather than throwing.
-          console.warn(`[AIServiceManager] Text github (${githubModel}) failed, falling back:`, (err as Error).message);
-          if (this.openai || preferences.openAiKey) {
-            try {
-              return await tryOpenAI('gpt-4o-mini');
-            } catch (openErr) {
-              console.warn('[AIServiceManager] Text OpenAI fallback failed, trying Gemini:', (openErr as Error).message);
-            }
-          }
-          const geminiChain = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-          for (let i = 0; i < geminiChain.length; i++) {
-            try {
-              return await tryGemini(geminiChain[i]);
-            } catch (gemErr) {
-              console.warn(`[AIServiceManager] Text gemini ${geminiChain[i]} fallback failed${i < geminiChain.length - 1 ? ', trying next' : ''}:`, (gemErr as Error).message);
-            }
-          }
-          throw err;
+      return await this.audited('text', route, 'native', 'text', () => {
+        switch (route.provider) {
+          case 'gemini':
+            return tryGemini(route.native);
+          case 'openai':
+            return tryOpenAI(route.native);
+          case 'github':
+            return tryGithubText(route.native);
+          default:
+            throw new Error(
+              `No provider configured for model "${route.requested}".`
+            );
         }
-      }
-
-      if (aiModel === 'openai-gpt4o') {
-        return await tryOpenAI('gpt-4o');
-      } else if (aiModel === 'gemini-1.5-flash') {
-        return await tryGemini('gemini-1.5-flash');
-      } else if (aiModel === 'gemini-2.0-flash-exp') {
-        return await tryGemini('gemini-2.0-flash');
-      } else if (aiModel === 'google-ai-studio') {
-        // "Google AI Studio API" → lead with models that have available free-tier
-        // quota. gemini-2.5-flash / 2.0-flash / flash-latest are quota-exhausted
-        // (429) or overloaded (503) on current free keys, so we lead with the
-        // *-flash-lite models which DO have free quota, then fall through.
-        const chain = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-        for (let i = 0; i < chain.length; i++) {
-          try {
-            return await tryGemini(chain[i]);
-          } catch (err) {
-            console.warn(`[AIServiceManager] Text google-ai-studio: ${chain[i]} failed${i < chain.length - 1 ? `, trying ${chain[i + 1]}` : ''}:`, (err as Error).message);
-          }
-        }
-        return await tryOpenAI('gpt-4o-mini');
-      } else {
-        // veegpt-hybrid: lead with the *-flash-lite models which have available
-        // free-tier quota (2.5-flash / 2.0-flash / pro are 429 quota-exhausted on
-        // current free keys), then fall back to flash/pro, then OpenAI.
-        const hybridChain = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-        for (let i = 0; i < hybridChain.length; i++) {
-          try {
-            return await tryGemini(hybridChain[i]);
-          } catch (err) {
-            console.warn(`[AIServiceManager] Text hybrid: ${hybridChain[i]} failed${i < hybridChain.length - 1 ? `, trying ${hybridChain[i + 1]}` : ', falling back to OpenAI'}:`, (err as Error).message);
-          }
-        }
-        return await tryOpenAI('gpt-4o-mini');
-      }
+      });
     } catch (error: any) {
-      console.error(`[AIServiceManager] ALL generation attempts failed:`, {
-        model: aiModel,
+      console.error(`[AIServiceManager] text generation failed:`, {
+        model: route.appModel,
+        requested: route.requested,
         error: error.message,
-        stack: error.stack
       });
       throw new Error(`AI generation failed: ${error.message}`);
     }
@@ -443,9 +734,15 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
    * (Gemini generateContentStream / OpenAI & GitHub Models stream:true). Honors
    * the same workspace AI configuration (model, creativity/temperature, persona,
    * style, length, language, content-safety and custom provider keys) as
-   * generateText, and falls back across providers the same way.
+   * generateText, and like generateText it runs the SELECTED model only — no
+   * cross-provider fallback.
    */
-  public async *generateTextStream(prompt: string, preferences: UserAIPreferences = {}, attachments: AIAttachment[] = [], signal?: AbortSignal): AsyncGenerator<string, void, unknown> {
+  public async *generateTextStream(
+    prompt: string,
+    preferences: UserAIPreferences = {},
+    attachments: AIAttachment[] = [],
+    signal?: AbortSignal
+  ): AsyncGenerator<string, void, unknown> {
     const {
       aiModel = 'veegpt-hybrid',
       creativityLevel = 0.7,
@@ -454,10 +751,12 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
       captionStyle = 'Storytelling',
       responseLength = 'medium',
       multilingual = 'auto',
-      aiMemory = 'long-term'
+      aiMemory = 'long-term',
     } = preferences;
 
-    console.log(`[AIServiceManager] Streaming text using model: ${aiModel}, creativity: ${creativityLevel}, safety: ${contentSafety}`);
+    console.log(
+      `[AIServiceManager] Streaming text using model: ${aiModel}, creativity: ${creativityLevel}, safety: ${contentSafety}`
+    );
 
     // Build platform-aware insight prefix when platformContext is supplied.
     // Requirements: 8.5, 8.6
@@ -468,7 +767,10 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
           userId: '',
           workspaceId: '',
           postType: 'post',
-          platform: preferences.platformContext === 'all' ? 'instagram' : preferences.platformContext,
+          platform:
+            preferences.platformContext === 'all'
+              ? 'instagram'
+              : preferences.platformContext,
           aiPreferences: preferences,
         })
       : '';
@@ -484,151 +786,279 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
 [/SYSTEM CONFIGURATION OVERRIDE]\n\n`;
 
     // Prepend platform prefix before the user's prompt.
-    const finalPrompt = globalSystemContext + (platformPrefix ? platformPrefix + '\n\n' : '') + prompt;
+    const finalPrompt =
+      globalSystemContext +
+      (platformPrefix ? platformPrefix + '\n\n' : '') +
+      prompt;
 
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
     // Gemini multimodal parts (supports images AND PDFs natively via inlineData).
     const geminiParts: any[] = hasAttachments
-      ? [{ text: finalPrompt }, ...attachments.map((a) => ({ inlineData: { mimeType: a.mimeType, data: a.data } }))]
+      ? [
+          { text: finalPrompt },
+          ...attachments.map(a =>
+            a.fileUri
+              ? { fileData: { mimeType: a.mimeType, fileUri: a.fileUri } }
+              : { inlineData: { mimeType: a.mimeType, data: a.data } }
+          ),
+        ]
       : [finalPrompt as any];
     // OpenAI/GitHub multimodal content (images only; PDFs are not supported by
     // the chat-completions image_url API, so those are skipped there).
     const openAiImages = hasAttachments
-      ? attachments.filter((a) => a.mimeType.startsWith('image/')).map((a) => ({
-          type: 'image_url' as const,
-          image_url: { url: `data:${a.mimeType};base64,${a.data}` },
-        }))
+      ? attachments
+          .filter(a => a.mimeType.startsWith('image/') && a.data && !a.fileUri)
+          .map(a => ({
+            type: 'image_url' as const,
+            image_url: { url: `data:${a.mimeType};base64,${a.data}` },
+          }))
       : [];
-    const openAiContent: any = hasAttachments && openAiImages.length
-      ? [{ type: 'text', text: finalPrompt }, ...openAiImages]
-      : finalPrompt;
+    const openAiContent: any =
+      hasAttachments && openAiImages.length
+        ? [{ type: 'text', text: finalPrompt }, ...openAiImages]
+        : finalPrompt;
 
-    const streamGemini = async function* (this: AIServiceManager, modelName: string): AsyncGenerator<string> {
-      console.log(`[AIServiceManager] Streaming Google AI (${modelName})${hasAttachments ? ` with ${attachments.length} attachment(s)` : ''}`);
+    const streamGemini = async function* (
+      this: AIServiceManager,
+      modelName: string
+    ): AsyncGenerator<string> {
+      console.log(
+        `[AIServiceManager] Streaming Google AI (${modelName})${hasAttachments ? ` with ${attachments.length} attachment(s)` : ''}`
+      );
       const generationConfig = { temperature: creativityLevel };
       const safetySettings = this.getSafetySettings(contentSafety);
-      const client = preferences.googleAiStudioKey ? new GoogleGenerativeAI(preferences.googleAiStudioKey) : this.genAI;
-      const model = client.getGenerativeModel({ model: modelName, generationConfig, safetySettings });
-      const result = await model.generateContentStream(hasAttachments ? geminiParts : finalPrompt);
+      const client = preferences.googleAiStudioKey
+        ? new GoogleGenerativeAI(preferences.googleAiStudioKey)
+        : this.genAI;
+      // Connect with retry+fallback. The 503 "high demand" surfaces HERE (before
+      // any token), so retrying the connection is safe — we never retry once
+      // tokens have started flowing, which would duplicate output.
+      const primary = resolveLiveGeminiModel(modelName);
+      const candidates = [
+        primary,
+        ...GEMINI_STREAM_FALLBACKS.filter(m => m !== primary),
+      ];
+      let result: Awaited<
+        ReturnType<ReturnType<typeof client.getGenerativeModel>['generateContentStream']>
+      > | null = null;
+      let lastErr: any = null;
+      connect: for (const candidateModel of candidates) {
+        const model = client.getGenerativeModel({
+          model: candidateModel,
+          generationConfig,
+          safetySettings,
+        });
+        for (let attempt = 0; attempt < GEMINI_STREAM_MAX_ATTEMPTS; attempt++) {
+          if (signal?.aborted) throw new Error('aborted');
+          try {
+            result = await model.generateContentStream(
+              hasAttachments ? geminiParts : finalPrompt
+            );
+            if (candidateModel !== primary)
+              console.log(
+                `[AIServiceManager] Gemini fell back to ${candidateModel} after ${primary} was unavailable`
+              );
+            break connect;
+          } catch (err: any) {
+            lastErr = err;
+            // Model doesn't exist / not allowed on this key → try the NEXT
+            // candidate immediately (no point retrying the same id).
+            if (isModelUnavailableError(err)) {
+              console.warn(
+                `[AIServiceManager] Gemini ${candidateModel} unavailable — trying next model: ${String(err?.message || '').slice(0, 140)}`
+              );
+              break;
+            }
+            // Not transient and not a bad id → a real error, surface it.
+            if (!isTransientGeminiError(err)) throw err;
+            const backoffMs = GEMINI_STREAM_BACKOFF_MS[attempt] ?? 6000;
+            console.warn(
+              `[AIServiceManager] Gemini ${candidateModel} transient error (attempt ${attempt + 1}/${GEMINI_STREAM_MAX_ATTEMPTS}) — retrying in ${backoffMs}ms: ${String(err?.message || '').slice(0, 140)}`
+            );
+            await new Promise(r => setTimeout(r, backoffMs));
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Gemini stream unavailable');
       let acc = '';
       for await (const chunk of result.stream) {
         const text = chunk.text();
-        if (text) { acc += text; yield text; }
+        if (text) {
+          acc += text;
+          yield text;
+        }
       }
       try {
         const agg = await result.response;
-        recordAIUsage({ provider: 'gemini', model: modelName, callType: 'stream', usage: fromGeminiUsage((agg as any)?.usageMetadata), promptText: finalPrompt, completionText: acc });
+        recordAIUsage({
+          provider: 'gemini',
+          model: modelName,
+          callType: 'stream',
+          usage: fromGeminiUsage((agg as any)?.usageMetadata),
+          promptText: finalPrompt,
+          completionText: acc,
+        });
       } catch {
-        recordAIUsage({ provider: 'gemini', model: modelName, callType: 'stream', promptText: finalPrompt, completionText: acc });
+        recordAIUsage({
+          provider: 'gemini',
+          model: modelName,
+          callType: 'stream',
+          promptText: finalPrompt,
+          completionText: acc,
+        });
       }
     }.bind(this);
 
-    const streamOpenAI = async function* (this: AIServiceManager, modelName: string): AsyncGenerator<string> {
-      console.log(`[AIServiceManager] Streaming OpenAI (${modelName})`);
-      const client = preferences.openAiKey ? new OpenAI({ apiKey: preferences.openAiKey }) : this.openai;
-      if (!client) throw new Error('OpenAI is not configured.');
-      const stream = await client.chat.completions.create({
-        messages: [{ role: 'user', content: openAiContent }],
-        model: modelName,
-        temperature: creativityLevel,
-        stream: true,
-        stream_options: { include_usage: true },
-      }, signal ? { signal } : undefined);
-      let acc = '';
-      let usage: any = null;
-      for await (const part of stream) {
-        if ((part as any).usage) usage = (part as any).usage;
-        const text = part.choices[0]?.delta?.content || '';
-        if (text) { acc += text; yield text; }
-      }
-      recordAIUsage({ provider: 'openai', model: modelName, callType: 'stream', usage: fromOpenAIUsage(usage), promptText: typeof openAiContent === 'string' ? openAiContent : finalPrompt, completionText: acc });
-    }.bind(this);
-
-    const streamGithub = async function* (this: AIServiceManager, modelName: string): AsyncGenerator<string> {
-      if (!this.githubModels) throw new Error('GitHub Models is not configured (GITHUB_TOKEN missing).');
-      console.log(`[AIServiceManager] Streaming GitHub Models (${modelName})`);
-      const stream = await this.githubModels.chat.completions.create({
-        messages: [{ role: 'user', content: openAiContent }],
-        model: modelName,
-        temperature: creativityLevel,
-        stream: true,
-        stream_options: { include_usage: true },
-      }, signal ? { signal } : undefined);
-      let acc = '';
-      let usage: any = null;
-      for await (const part of stream) {
-        if ((part as any).usage) usage = (part as any).usage;
-        const text = part.choices[0]?.delta?.content || '';
-        if (text) { acc += text; yield text; }
-      }
-      recordAIUsage({ provider: 'github', model: modelName, callType: 'stream', usage: fromOpenAIUsage(usage), promptText: typeof openAiContent === 'string' ? openAiContent : finalPrompt, completionText: acc });
-    }.bind(this);
-
-    // Try a chain of generators in order, falling back to the next only if the
-    // current one fails before yielding anything. Once a stream has yielded at
-    // least one chunk we commit to it (so we never duplicate partial output).
-    const streamWithFallback = async function* (
-      attempts: Array<{ label: string; gen: () => AsyncGenerator<string> }>,
+    const streamOpenAI = async function* (
+      this: AIServiceManager,
+      modelName: string
     ): AsyncGenerator<string> {
-      for (let i = 0; i < attempts.length; i++) {
-        const { label, gen } = attempts[i];
-        let yieldedAny = false;
-        try {
-          for await (const chunk of gen()) {
-            yieldedAny = true;
-            yield chunk;
-          }
-          return; // completed successfully
-        } catch (err) {
-          if (yieldedAny || i === attempts.length - 1) {
-            console.error(`[AIServiceManager] Stream ${label} failed after partial/last attempt:`, (err as Error).message);
-            throw err;
-          }
-          console.warn(`[AIServiceManager] Stream ${label} failed, falling back:`, (err as Error).message);
+      console.log(`[AIServiceManager] Streaming OpenAI (${modelName})`);
+      const client = preferences.openAiKey
+        ? new OpenAI({ apiKey: preferences.openAiKey })
+        : this.openai;
+      if (!client) throw new Error('OpenAI is not configured.');
+      const stream = await client.chat.completions.create(
+        {
+          messages: [{ role: 'user', content: openAiContent }],
+          model: modelName,
+          ...this.temperatureFor(aiModel, creativityLevel),
+          stream: true,
+          stream_options: { include_usage: true },
+        },
+        signal ? { signal } : undefined
+      );
+      let acc = '';
+      let usage: any = null;
+      for await (const part of stream) {
+        if ((part as any).usage) usage = (part as any).usage;
+        const text = part.choices[0]?.delta?.content || '';
+        if (text) {
+          acc += text;
+          yield text;
         }
       }
-    };
+      recordAIUsage({
+        provider: 'openai',
+        model: modelName,
+        callType: 'stream',
+        usage: fromOpenAIUsage(usage),
+        promptText:
+          typeof openAiContent === 'string' ? openAiContent : finalPrompt,
+        completionText: acc,
+      });
+    }.bind(this);
 
-    const githubModel = this.resolveGithubModel(aiModel);
-    let attempts: Array<{ label: string; gen: () => AsyncGenerator<string> }>;
-
-    // When the user attached files, prefer Gemini first — it natively analyzes
-    // BOTH images and PDFs via inlineData. GitHub/OpenAI chat models can't read
-    // PDFs (and GitHub free tier has no vision), so they're only a fallback for
-    // image-only attachments. A PDF with no Gemini available will degrade to
-    // text-only on those providers.
-    const hasPdf = hasAttachments && attachments.some((a) => a.mimeType === 'application/pdf');
-    if (hasAttachments) {
-      attempts = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite']
-        .map((m) => ({ label: `${m} (multimodal)`, gen: () => streamGemini(m) }));
-      // Image-only attachments can also fall back to OpenAI vision.
-      if (!hasPdf && (this.openai || preferences.openAiKey)) {
-        attempts.push({ label: 'openai gpt-4o-mini (vision)', gen: () => streamOpenAI('gpt-4o-mini') });
+    const streamGithub = async function* (
+      this: AIServiceManager,
+      modelName: string
+    ): AsyncGenerator<string> {
+      if (!this.githubModels)
+        throw new Error(
+          'GitHub Models is not configured (GITHUB_TOKEN missing).'
+        );
+      console.log(`[AIServiceManager] Streaming GitHub Models (${modelName})`);
+      const stream = await this.githubModels.chat.completions.create(
+        {
+          messages: [{ role: 'user', content: openAiContent }],
+          model: modelName,
+          ...this.temperatureFor(aiModel, creativityLevel),
+          stream: true,
+          stream_options: { include_usage: true },
+        },
+        signal ? { signal } : undefined
+      );
+      let acc = '';
+      let usage: any = null;
+      for await (const part of stream) {
+        if ((part as any).usage) usage = (part as any).usage;
+        const text = part.choices[0]?.delta?.content || '';
+        if (text) {
+          acc += text;
+          yield text;
+        }
       }
-    } else if (githubModel) {
-      attempts = [
-        { label: `github ${githubModel}`, gen: () => streamGithub(githubModel) },
-        { label: 'openai gpt-4o-mini', gen: () => streamOpenAI('gpt-4o-mini') },
-        { label: 'gemini-2.5-flash-lite', gen: () => streamGemini('gemini-2.5-flash-lite') },
-      ];
-    } else if (aiModel === 'openai-gpt4o') {
-      attempts = [{ label: 'openai gpt-4o', gen: () => streamOpenAI('gpt-4o') }];
-    } else if (aiModel === 'gemini-1.5-flash') {
-      attempts = [{ label: 'gemini-1.5-flash', gen: () => streamGemini('gemini-1.5-flash') }];
-    } else if (aiModel === 'gemini-2.0-flash-exp') {
-      attempts = [{ label: 'gemini-2.0-flash', gen: () => streamGemini('gemini-2.0-flash') }];
-    } else if (aiModel === 'google-ai-studio') {
-      attempts = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
-        .map((m) => ({ label: m, gen: () => streamGemini(m) }));
-      attempts.push({ label: 'openai gpt-4o-mini', gen: () => streamOpenAI('gpt-4o-mini') });
-    } else {
-      // veegpt-hybrid (default)
-      attempts = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
-        .map((m) => ({ label: m, gen: () => streamGemini(m) }));
-      attempts.push({ label: 'openai gpt-4o-mini', gen: () => streamOpenAI('gpt-4o-mini') });
+      recordAIUsage({
+        provider: 'github',
+        model: modelName,
+        callType: 'stream',
+        usage: fromOpenAIUsage(usage),
+        promptText:
+          typeof openAiContent === 'string' ? openAiContent : finalPrompt,
+        completionText: acc,
+      });
+    }.bind(this);
+
+    // ── SINGLE ATTEMPT ────────────────────────────────────────────────────────
+    // No fallback chain. The one substitution is capability: a model that cannot
+    // read the attached media is not asked to.
+    const hasPdf =
+      hasAttachments && attachments.some(a => a.mimeType === 'application/pdf');
+    const hasVideo =
+      hasAttachments && attachments.some(a => a.mimeType.startsWith('video/'));
+    // PDF and HEIC are their OWN capabilities: OpenAI chat models see JPEG/PNG but
+    // cannot read a PDF and reject HEIC outright, so folding either into "vision"
+    // would send it to a model that silently ignores it.
+    const hasHeic =
+      hasAttachments &&
+      attachments.some(a => /^image\/hei(c|f)/i.test(a.mimeType || ''));
+    const need: 'text' | 'vision' | 'video' | 'document' | 'heic' = hasVideo
+      ? 'video'
+      : hasPdf
+        ? 'document'
+        : hasHeic
+          ? 'heic'
+          : hasAttachments
+            ? 'vision'
+            : 'text';
+    const route = resolveRoute(aiModel, need);
+
+    // Video and PDF bypass the gateway — its OpenAI-compatible content builder
+    // inlines images only and drops the rest silently.
+    if (liteLLMGateway.isEnabled() && !mustBypassGateway(need, hasPdf)) {
+      yield* this.auditedStream('stream', route, 'litellm', need, () =>
+        liteLLMGateway.chatStream(finalPrompt, {
+          model: route.appModel,
+          temperature: creativityLevel,
+          reasoningEffort: preferences.reasoningEffort || 'low',
+          showThinking: preferences.showThinking,
+          attachments: hasAttachments
+            ? attachments.map(a => ({
+                mimeType: a.mimeType,
+                data: a.data,
+                name: a.name,
+              }))
+            : undefined,
+          signal,
+          // Record real provider tokens so metering charges actual cost.
+          onUsage: ({ usage, promptText, completionText }) =>
+            recordAIUsage({
+              provider: route.provider,
+              model: route.native,
+              callType: 'stream',
+              usage: fromOpenAIUsage(usage),
+              promptText,
+              completionText,
+            }),
+        })
+      );
+      return;
     }
 
-    yield* streamWithFallback(attempts);
+    yield* this.auditedStream('stream', route, 'native', need, () => {
+      switch (route.provider) {
+        case 'gemini':
+          return streamGemini(route.native);
+        case 'openai':
+          return streamOpenAI(route.native);
+        case 'github':
+          return streamGithub(route.native);
+        default:
+          throw new Error(
+            `No provider configured for model "${route.requested}".`
+          );
+      }
+    });
   }
 
   /**
@@ -640,16 +1070,25 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
    * decide "the user wants to post" WITHOUT a separate regex/triage step: the
    * LLM raises its hand via a tool call as part of generating its answer.
    *
-   * Targets OpenAI-compatible providers (OpenAI + GitHub Models) which support
-   * the `tools` parameter. If those fail or aren't configured, it falls back to
-   * plain text streaming (no tools) via the existing generateTextStream so chat
-   * still works — it just won't emit tool calls on that fallback.
+   * Runs the SELECTED model only. There is no fallback: degrading to a
+   * non-tool-capable model would make the assistant write the action as prose
+   * ("your post is scheduled") without anything actually happening, so a failure
+   * here is surfaced to the caller instead.
    */
   public async *generateChatStreamWithTools(
     prompt: string,
     tools: ChatTool[],
     preferences: UserAIPreferences = {},
     signal?: AbortSignal,
+    /**
+     * Uploaded image attachments for THIS turn. When present, they are sent to
+     * the tool-calling model as inline image parts (OpenAI multimodal format,
+     * which the LiteLLM proxy normalizes for Gemini) so ONE model both SEES the
+     * image and can call edit_image/generate_image — it decides edit vs.
+     * describe itself. Non-image attachments are not sent here (they keep the
+     * dedicated multimodal analysis path).
+     */
+    attachments: AIAttachment[] = []
   ): AsyncGenerator<ChatStreamEvent, void, unknown> {
     const {
       aiModel = 'veegpt-hybrid',
@@ -672,35 +1111,94 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
 [/SYSTEM CONFIGURATION OVERRIDE]\n\n`;
     const finalPrompt = globalSystemContext + prompt;
 
-    const githubModel = this.resolveGithubModel(aiModel);
+    // Multimodal user content: inline any uploaded IMAGES as data URLs alongside
+    // the text, so the tool-calling model can see them. Falls back to a plain
+    // string when there are no images (unchanged behaviour).
+    const inlineImages = (attachments || []).filter((a) =>
+      (a.mimeType || '').startsWith('image/')
+    );
+    const userContent: any = inlineImages.length
+      ? [
+          { type: 'text', text: finalPrompt },
+          ...inlineImages.map((a) => ({
+            type: 'image_url' as const,
+            image_url: { url: `data:${a.mimeType};base64,${a.data}` },
+          })),
+        ]
+      : finalPrompt;
+
+    // Gemini can SEE video and PDFs too (not just images). When such media is
+    // attached to a TOOL turn we route to native Gemini and inline ALL of it as
+    // parts, so ONE model both understands the media AND can call tools (e.g.
+    // video_editor on the same video it just watched). LiteLLM/OpenAI can't
+    // carry video/PDF, so those turns bypass the gateway (mustBypassGateway).
+    const geminiMediaParts = (attachments || [])
+      .filter((a) => {
+        const m = (a.mimeType || '').toLowerCase();
+        return (
+          m.startsWith('image/') ||
+          m.startsWith('video/') ||
+          m === 'application/pdf'
+        );
+      })
+      .map((a) =>
+        a.fileUri
+          ? { fileData: { mimeType: a.mimeType, fileUri: a.fileUri } }
+          : { inlineData: { mimeType: a.mimeType, data: a.data } }
+      );
+    const hasVideoAttachment = (attachments || []).some((a) =>
+      (a.mimeType || '').startsWith('video/')
+    );
+    const hasPdfAttachment = (attachments || []).some(
+      (a) => a.mimeType === 'application/pdf'
+    );
+    const hasHeicAttachment = (attachments || []).some((a) =>
+      /^image\/hei(c|f)/i.test(a.mimeType || '')
+    );
 
     // Stream from one OpenAI-compatible client, surfacing text + tool calls.
     const streamToolsFrom = async function* (
       this: AIServiceManager,
       client: OpenAI,
       modelName: string,
-      provider: 'openai' | 'github',
+      provider: 'openai' | 'github'
     ): AsyncGenerator<ChatStreamEvent> {
-      const stream = await client.chat.completions.create({
-        model: modelName,
-        messages: [{ role: 'user', content: finalPrompt }],
-        temperature: creativityLevel,
-        tools: tools as any,
-        tool_choice: 'auto',
-        stream: true,
-        stream_options: { include_usage: true },
-      }, signal ? { signal } : undefined);
+      const stream = await client.chat.completions.create(
+        {
+          model: modelName,
+          messages: [{ role: 'user', content: userContent }],
+          ...this.temperatureFor(aiModel, creativityLevel),
+          tools: tools as any,
+          tool_choice: 'auto',
+          stream: true,
+          stream_options: { include_usage: true },
+        },
+        signal ? { signal } : undefined
+      );
       let acc = '';
       let usage: any = null;
       const toolAcc = new Map<number, StreamingToolCall>();
       for await (const part of stream) {
         if ((part as any).usage) usage = (part as any).usage;
         const delta = part.choices?.[0]?.delta as any;
+        if (delta?.reasoning_content) {
+          yield { type: 'reasoning', delta: delta.reasoning_content };
+        }
         const text = delta?.content || '';
-        if (text) { acc += text; yield { type: 'text', delta: text }; }
+        if (text) {
+          acc += text;
+          yield { type: 'text', delta: text };
+        }
         accumulateToolCallDeltas(toolAcc, delta?.tool_calls);
       }
-      recordAIUsage({ provider, model: modelName, callType: 'stream', usage: fromOpenAIUsage(usage), promptText: finalPrompt, completionText: acc });
+      recordAIUsage({
+        provider,
+        model: modelName,
+        callType: 'stream',
+        usage: fromOpenAIUsage(usage),
+        promptText: finalPrompt,
+        completionText: acc,
+      });
       // Emit completed tool calls AFTER the text (args are only whole at end).
       const finalized: ParsedToolCall[] = finalizeToolCalls(toolAcc);
       for (const tc of finalized) {
@@ -710,91 +1208,212 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
 
     // Stream tool calls from a Gemini model via native function calling. Gemini
     // returns function calls as structured parts (not streamed text), so we
-    // collect the full response then yield any text + tool calls. This is the
-    // fallback when the OpenAI-compatible providers are quota-limited.
+    // collect the full response then yield any text + tool calls. Used when the
+    // selected model is a Gemini one.
     const streamGeminiTools = async function* (
       this: AIServiceManager,
-      modelName: string,
+      modelName: string
     ): AsyncGenerator<ChatStreamEvent> {
-      const client = preferences.googleAiStudioKey ? new GoogleGenerativeAI(preferences.googleAiStudioKey) : this.genAI;
+      const client = preferences.googleAiStudioKey
+        ? new GoogleGenerativeAI(preferences.googleAiStudioKey)
+        : this.genAI;
       // Convert OpenAI-style tools → Gemini functionDeclarations.
-      const functionDeclarations = tools.map((t) => ({
+      const functionDeclarations = tools.map(t => ({
         name: t.function.name,
         description: t.function.description,
         parameters: sanitizeSchemaForGemini(t.function.parameters),
       }));
-      const model = client.getGenerativeModel({
-        model: modelName,
-        generationConfig: { temperature: creativityLevel },
-        safetySettings: this.getSafetySettings((preferences as any).contentSafety || 'standard'),
-        tools: [{ functionDeclarations } as any],
-      });
-      const result = await this.withTransientRetry(() => model.generateContent(finalPrompt), `Tools ${modelName}`);
-      const resp: any = result.response;
+      // Send the media (image/video/PDF) alongside the prompt so the model can
+      // SEE it AND decide to call a tool. Plain text when nothing is attached.
+      const request: any = geminiMediaParts.length
+        ? {
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: finalPrompt }, ...geminiMediaParts],
+              },
+            ],
+          }
+        : finalPrompt;
+      // Same connect policy as the plain multimodal stream: try each candidate
+      // model, retrying transient 503/429 on the same id and advancing to the
+      // next id on a 404/unavailable, so an overloaded or unlisted model degrades
+      // instead of failing.
+      const primaryTool = resolveLiveGeminiModel(modelName);
+      const toolCandidates = [
+        primaryTool,
+        ...GEMINI_STREAM_FALLBACKS.filter(m => m !== primaryTool),
+      ];
+      let streamRes: any = null;
+      let toolErr: any = null;
+      toolConnect: for (const candidate of toolCandidates) {
+        const model = client.getGenerativeModel({
+          model: candidate,
+          generationConfig: { temperature: creativityLevel },
+          safetySettings: this.getSafetySettings(
+            (preferences as any).contentSafety || 'standard'
+          ),
+          tools: [{ functionDeclarations } as any],
+        });
+        for (let attempt = 0; attempt < GEMINI_STREAM_MAX_ATTEMPTS; attempt++) {
+          if (signal?.aborted) throw new Error('aborted');
+          try {
+            // STREAM (not generateContent): so analysis text appears token-by-token
+            // instead of the whole reply landing at once after a long wait — the
+            // difference between "feels stuck on Thinking…" and ChatGPT-like typing.
+            streamRes = await model.generateContentStream(request);
+            if (candidate !== primaryTool)
+              console.log(
+                `[AIServiceManager] Gemini tools fell back to ${candidate} after ${primaryTool} was unavailable`
+              );
+            break toolConnect;
+          } catch (err: any) {
+            toolErr = err;
+            if (isModelUnavailableError(err)) {
+              console.warn(
+                `[AIServiceManager] Gemini tools ${candidate} unavailable — trying next model: ${String(err?.message || '').slice(0, 140)}`
+              );
+              break;
+            }
+            if (!isTransientGeminiError(err)) throw err;
+            const backoffMs = GEMINI_STREAM_BACKOFF_MS[attempt] ?? 6000;
+            console.warn(
+              `[AIServiceManager] Gemini tools ${candidate} transient error (attempt ${attempt + 1}/${GEMINI_STREAM_MAX_ATTEMPTS}) — retrying in ${backoffMs}ms: ${String(err?.message || '').slice(0, 140)}`
+            );
+            await new Promise(r => setTimeout(r, backoffMs));
+          }
+        }
+      }
+      if (!streamRes) throw toolErr || new Error('Gemini tool call unavailable');
+      // Stream prose chunks LIVE as they arrive.
+      let acc = '';
+      for await (const chunk of streamRes.stream) {
+        let t = '';
+        try {
+          t = chunk.text?.() || '';
+        } catch {
+          /* a function-call chunk carries no text */
+        }
+        if (t) {
+          acc += t;
+          yield { type: 'text', delta: t };
+        }
+      }
+      const resp: any = await streamRes.response;
       // Usage tracking.
-      try { recordAIUsage({ provider: 'gemini', model: modelName, callType: 'stream', usage: fromGeminiUsage(resp?.usageMetadata), promptText: finalPrompt, completionText: resp?.text?.() || '' }); } catch { /* noop */ }
-      // Emit any prose first.
-      let text = '';
-      try { text = resp?.text?.() || ''; } catch { /* function-only response */ }
-      if (text && text.trim()) yield { type: 'text', delta: text };
-      // Then any function calls.
+      try {
+        recordAIUsage({
+          provider: 'gemini',
+          model: modelName,
+          callType: 'stream',
+          usage: fromGeminiUsage(resp?.usageMetadata),
+          promptText: finalPrompt,
+          completionText: acc || resp?.text?.() || '',
+        });
+      } catch {
+        /* noop */
+      }
+      // Then any function calls (only whole at the end of the stream).
       let calls: any[] = [];
-      try { calls = (typeof resp?.functionCalls === 'function' ? resp.functionCalls() : null) || []; } catch { calls = []; }
+      try {
+        calls =
+          (typeof resp?.functionCalls === 'function'
+            ? resp.functionCalls()
+            : null) || [];
+      } catch {
+        calls = [];
+      }
       for (const c of calls) {
-        if (c?.name) yield { type: 'toolCall', name: c.name, args: (c.args && typeof c.args === 'object' ? c.args : {}) as Record<string, unknown> };
+        if (c?.name)
+          yield {
+            type: 'toolCall',
+            name: c.name,
+            args: (c.args && typeof c.args === 'object'
+              ? c.args
+              : {}) as Record<string, unknown>,
+          };
       }
     }.bind(this);
 
-    // Provider order: GitHub model (if configured) → OpenAI gpt-4o-mini.
-    const attempts: Array<{ label: string; gen: () => AsyncGenerator<ChatStreamEvent> }> = [];
-    if (githubModel && this.githubModels) {
-      const gh = this.githubModels;
-      attempts.push({ label: `github ${githubModel} (tools)`, gen: () => streamToolsFrom(gh, githubModel, 'github') });
-    }
-    const openaiClient = preferences.openAiKey ? new OpenAI({ apiKey: preferences.openAiKey }) : this.openai;
-    if (openaiClient) {
-      attempts.push({ label: 'openai gpt-4o-mini (tools)', gen: () => streamToolsFrom(openaiClient, 'gpt-4o-mini', 'openai') });
-    }
-    // Gemini function-calling fallback — so tool calls STILL work when the
-    // OpenAI-compatible providers are rate-limited/quota-exhausted (otherwise we
-    // degraded to plain text and the model would hallucinate "scheduled"). Use
-    // the SAME free-tier-friendly chain that plain chat uses (flash-lite models
-    // have available free quota; gemini-2.0/2.5-flash are often quota-exhausted).
-    if (process.env.GOOGLE_API_KEY || preferences.googleAiStudioKey) {
-      for (const gm of ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']) {
-        attempts.push({ label: `${gm} (tools)`, gen: () => streamGeminiTools(gm) });
-      }
+    // ── SINGLE ATTEMPT ────────────────────────────────────────────────────────
+    // No fallback chain. If the selected model's tool call fails we surface the
+    // error: silently degrading to a plain-text model is worse than failing,
+    // because without tools the model writes the action as PROSE (e.g.
+    // "[schedule_post(...)]" or "your post is scheduled") — leaking internal
+    // syntax AND falsely claiming an action happened.
+    // A video/PDF/HEIC attachment needs a model that can READ it — only Gemini
+    // can. Resolve the capability so the route substitutes to Gemini and the
+    // gateway (which drops non-image media) is bypassed, exactly like the plain
+    // multimodal stream. Image-only and text turns are unchanged ('text').
+    const toolNeed: Capability = hasVideoAttachment
+      ? 'video'
+      : hasPdfAttachment
+        ? 'document'
+        : hasHeicAttachment
+          ? 'heic'
+          : 'text';
+    const route = resolveRoute(aiModel, toolNeed);
+
+    if (liteLLMGateway.isEnabled() && !mustBypassGateway(toolNeed, hasPdfAttachment)) {
+      yield* this.auditedStream(
+        'chat.tools',
+        route,
+        'litellm',
+        toolNeed,
+        () =>
+          liteLLMGateway.chatStreamWithTools(
+            [{ role: 'user', content: userContent }],
+            tools as any,
+            {
+              model: route.appModel,
+              temperature: creativityLevel,
+              reasoningEffort: preferences.reasoningEffort || 'low',
+              showThinking: preferences.showThinking,
+              signal,
+              // Record real provider tokens so metering charges actual cost.
+              // This is the main VeeGPT chat path: without it every turn (even
+              // a costly ultra model like gpt-5.6-sol) recorded zero tokens and
+              // was floored to 1 VGU.
+              onUsage: ({ usage, promptText, completionText }) =>
+                recordAIUsage({
+                  provider: route.provider,
+                  model: route.native,
+                  callType: 'stream',
+                  usage: fromOpenAIUsage(usage),
+                  promptText,
+                  completionText,
+                }),
+            }
+          ) as AsyncGenerator<ChatStreamEvent>
+      );
+      return;
     }
 
-    let lastErr: any = null;
-    for (let i = 0; i < attempts.length; i++) {
-      let yieldedAny = false;
-      try {
-        for await (const ev of attempts[i].gen()) { yieldedAny = true; yield ev; }
-        return; // success
-      } catch (err) {
-        lastErr = err;
-        if (yieldedAny) {
-          console.error(`[AIServiceManager] Tool stream ${attempts[i].label} failed mid-stream:`, (err as Error).message);
-          throw err;
-        }
-        try { const { vlog } = await import('../utils/veegpt-debug-logger'); vlog('toolstream:attempt-failed', { label: attempts[i].label, error: (err as Error).message?.slice(0, 120) }); } catch { /* noop */ }
-        console.warn(`[AIServiceManager] Tool stream ${attempts[i].label} failed, falling back:`, (err as Error).message);
-      }
+    if (route.provider === 'gemini') {
+      yield* this.auditedStream('chat.tools', route, 'native', toolNeed, () =>
+        streamGeminiTools(route.native)
+      );
+      return;
     }
 
-    // FINAL FALLBACK: no tool-capable provider succeeded. We must NOT silently
-    // degrade to a plain-text model here — without the tools, the model can't
-    // emit a real tool call and instead writes the action as PROSE (e.g.
-    // "[schedule_post(...)]" or "your post is scheduled"), which both leaks raw
-    // tool syntax to the user AND falsely claims an action happened. Surface an
-    // honest error instead so the caller shows a real failure, not a fake success.
-    if (attempts.length === 0) {
-      console.warn('[AIServiceManager] No tool-capable provider configured for tool stream.');
-    } else if (lastErr) {
-      console.warn('[AIServiceManager] All tool streams failed:', (lastErr as Error).message);
+    const toolClient =
+      route.provider === 'github'
+        ? this.githubModels
+        : preferences.openAiKey
+          ? new OpenAI({ apiKey: preferences.openAiKey })
+          : this.openai;
+    if (!toolClient) {
+      throw new Error(
+        `The selected model "${route.requested}" is not available: its provider is not configured.`
+      );
     }
-    throw lastErr || new Error('No tool-capable AI provider is currently available.');
+    yield* this.auditedStream('chat.tools', route, 'native', 'text', () =>
+      streamToolsFrom(
+        toolClient,
+        route.native,
+        route.provider === 'github' ? 'github' : 'openai'
+      )
+    );
   }
 
   /**
@@ -802,35 +1421,75 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
    * concise factual description the caption/hashtag generator can use so output
    * is actually grounded in what's shown — not just the text prompt.
    *
-   * Honors the workspace AI config: it leads with the user's configured model
-   * when that model is vision-capable, otherwise falls back across vision
-   * models (Gemini handles both images and video via inlineData; OpenAI vision
-   * handles images only). Best-effort: returns undefined if it can't analyze
-   * (so callers degrade gracefully to text-only).
+   * Honors the workspace AI config: it runs the user's configured model, and
+   * substitutes Gemini ONLY when that model cannot read this media type at all
+   * (Gemini handles images, PDFs and video via inlineData; OpenAI vision handles
+   * images only; GitHub Models has no vision). Best-effort: returns undefined if
+   * it can't analyze, so callers degrade gracefully to text-only.
    */
   public async analyzeMedia(
     mediaUrl: string,
     mediaType: 'image' | 'video' | 'auto' = 'auto',
-    preferences: UserAIPreferences = {},
+    preferences: UserAIPreferences = {}
   ): Promise<string | undefined> {
     if (!mediaUrl) return undefined;
     try {
-      // 1) Download the media bytes.
-      const resp = await fetch(mediaUrl);
-      if (!resp.ok) {
-        console.warn('[AIServiceManager] analyzeMedia: fetch failed', resp.status, mediaUrl);
-        return undefined;
+      let buf: Buffer;
+      let mimeType = '';
+
+      // Server-side shortcut: if the URL is an authenticated chat-attachment proxy
+      // path, read the bytes directly from storage instead of making an HTTP
+      // round-trip to the same server (which would require a session cookie).
+      const proxyMatch = mediaUrl.match(/\/api\/chat\/attachment\/(.+)$/);
+      if (proxyMatch) {
+        try {
+          // Dynamically import to avoid circular dep at module level.
+          const { getStorageService } = await import('../features/storage/services/storage.service');
+          const svc = getStorageService();
+          const key = decodeURIComponent(proxyMatch[1]);
+          const file = await svc.downloadFile(key);
+          buf = file.buffer;
+          mimeType = file.contentType || '';
+        } catch (err) {
+          console.warn('[AIServiceManager] analyzeMedia: direct storage read failed, falling back to fetch', err);
+          // Fall through to fetch
+          const resp = await fetch(mediaUrl.startsWith('/') ? `http://127.0.0.1:${process.env.PORT || 3000}${mediaUrl}` : mediaUrl);
+          if (!resp.ok) return undefined;
+          mimeType = resp.headers.get('content-type')?.split(';')[0]?.trim() || '';
+          buf = Buffer.from(await resp.arrayBuffer());
+        }
+      } else {
+        // 1) Download the media bytes.
+        const resp = await fetch(mediaUrl);
+        if (!resp.ok) {
+          console.warn(
+            '[AIServiceManager] analyzeMedia: fetch failed',
+            resp.status,
+            mediaUrl
+          );
+          return undefined;
+        }
+        mimeType = resp.headers.get('content-type')?.split(';')[0]?.trim() || '';
+        buf = Buffer.from(await resp.arrayBuffer());
       }
-      let mimeType = resp.headers.get('content-type')?.split(';')[0]?.trim() || '';
-      const buf = Buffer.from(await resp.arrayBuffer());
       // Infer mime from extension if the server didn't send one.
       if (!mimeType) {
-        const ext = (mediaUrl.split('?')[0].split('.').pop() || '').toLowerCase();
+        const ext = (
+          mediaUrl.split('?')[0].split('.').pop() || ''
+        ).toLowerCase();
         const map: Record<string, string> = {
-          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
-          mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', m4v: 'video/x-m4v',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          png: 'image/png',
+          webp: 'image/webp',
+          gif: 'image/gif',
+          mp4: 'video/mp4',
+          mov: 'video/quicktime',
+          webm: 'video/webm',
+          m4v: 'video/x-m4v',
         };
-        mimeType = map[ext] || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+        mimeType =
+          map[ext] || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
       }
       const isVideo = mediaType === 'video' || mimeType.startsWith('video/');
 
@@ -838,7 +1497,10 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
       // request path). Skip video that's too large rather than erroring.
       const MAX_INLINE_BYTES = 18 * 1024 * 1024;
       if (buf.length > MAX_INLINE_BYTES) {
-        console.warn('[AIServiceManager] analyzeMedia: media too large for inline analysis', buf.length);
+        console.warn(
+          '[AIServiceManager] analyzeMedia: media too large for inline analysis',
+          buf.length
+        );
         return undefined;
       }
 
@@ -847,108 +1509,122 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
         ? 'You are analyzing a short social-media VIDEO. In 2-4 sentences, describe what actually happens: the subject(s), setting, key actions/scenes, mood, colors, and any visible text or branding. Be concrete and factual — this will ground a caption. Do NOT write a caption, only the description.'
         : 'You are analyzing a social-media IMAGE. In 2-4 sentences, describe exactly what is shown: the subject(s), setting, composition, mood, colors, and any visible text or branding. Be concrete and factual — this will ground a caption. Do NOT write a caption, only the description.';
 
-      // 2) Vision call. Prefer the configured model if vision-capable; otherwise
-      //    fall back across vision models. Gemini does images AND video.
+      // 2) Vision call. ONE attempt on the selected model — substituted only when
+      //    that model cannot read this media type at all (see ai-model-routing).
       const tryGeminiVision = async (modelName: string): Promise<string> => {
-        const client = preferences.googleAiStudioKey ? new GoogleGenerativeAI(preferences.googleAiStudioKey) : this.genAI;
+        const client = preferences.googleAiStudioKey
+          ? new GoogleGenerativeAI(preferences.googleAiStudioKey)
+          : this.genAI;
         const model = client.getGenerativeModel({
-          model: modelName,
+          model: resolveLiveGeminiModel(modelName),
           generationConfig: { temperature: 0.4 },
-          safetySettings: this.getSafetySettings((preferences.contentSafety as string) || 'standard'),
+          safetySettings: this.getSafetySettings(
+            (preferences.contentSafety as string) || 'standard'
+          ),
         });
         const result = await model.generateContent([
           { text: instruction },
           { inlineData: { mimeType, data: base64 } },
         ]);
         const vText = result.response.text();
-        recordAIUsage({ provider: 'gemini', model: modelName, callType: 'vision', usage: fromGeminiUsage((result.response as any)?.usageMetadata), promptText: instruction, completionText: vText });
+        recordAIUsage({
+          provider: 'gemini',
+          model: modelName,
+          callType: 'vision',
+          usage: fromGeminiUsage((result.response as any)?.usageMetadata),
+          promptText: instruction,
+          completionText: vText,
+        });
         return vText;
       };
 
       const tryOpenAIVision = async (modelName: string): Promise<string> => {
-        if (isVideo) throw new Error('OpenAI chat vision does not support video');
-        const client = preferences.openAiKey ? new OpenAI({ apiKey: preferences.openAiKey }) : this.openai;
+        if (isVideo)
+          throw new Error('OpenAI chat vision does not support video');
+        const client = preferences.openAiKey
+          ? new OpenAI({ apiKey: preferences.openAiKey })
+          : this.openai;
         if (!client) throw new Error('OpenAI is not configured.');
         const completion = await client.chat.completions.create({
           model: modelName,
           temperature: 0.4,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'text', text: instruction },
-              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-            ] as any,
-          }],
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: instruction },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:${mimeType};base64,${base64}` },
+                },
+              ] as any,
+            },
+          ],
         });
         const ovText = completion.choices[0]?.message?.content || '';
-        recordAIUsage({ provider: 'openai', model: modelName, callType: 'vision', usage: fromOpenAIUsage((completion as any)?.usage), promptText: instruction, completionText: ovText });
+        recordAIUsage({
+          provider: 'openai',
+          model: modelName,
+          callType: 'vision',
+          usage: fromOpenAIUsage((completion as any)?.usage),
+          promptText: instruction,
+          completionText: ovText,
+        });
         return ovText;
       };
 
-      // Build the attempt order from the configured model. Only Gemini can read
-      // video, so video skips straight to the Gemini chain.
-      const geminiChain = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
-      const configured = this.resolveGeminiVisionModel(preferences.aiModel);
-      if (configured) {
-        // Lead with the configured Gemini model, then the rest as fallback.
-        for (const m of [configured, ...geminiChain.filter((x) => x !== configured)]) {
-          try {
-            const text = (await tryGeminiVision(m)).trim();
-            if (text) { console.log(`[AIServiceManager] analyzeMedia via ${m}`); return text; }
-          } catch (err) {
-            console.warn(`[AIServiceManager] analyzeMedia gemini ${m} failed:`, (err as Error).message);
-          }
+      // ── SINGLE ATTEMPT ──────────────────────────────────────────────────────
+      // Capability routing, not fallback: only Gemini reads video, and GitHub's
+      // free tier has no vision at all, so media on those selections is served by
+      // the deterministic media model. One call either way.
+      const route = resolveRoute(
+        preferences.aiModel,
+        isVideo ? 'video' : /^image\/hei(c|f)/i.test(mimeType) ? 'heic' : 'vision'
+      );
+      try {
+        const text = (
+          await this.audited(
+            'vision',
+            route,
+            'native',
+            isVideo ? 'video' : 'vision',
+            () =>
+              route.provider === 'openai'
+                ? tryOpenAIVision(route.native)
+                : tryGeminiVision(route.native)
+          )
+        ).trim();
+        if (text) {
+          console.log(
+            `[AIServiceManager] analyzeMedia via ${route.appModel}${route.overriddenFor ? ` (substituted for ${route.requested}: no ${route.overriddenFor})` : ''}`
+          );
+          return text;
         }
-      } else {
-        for (const m of geminiChain) {
-          try {
-            const text = (await tryGeminiVision(m)).trim();
-            if (text) { console.log(`[AIServiceManager] analyzeMedia via ${m}`); return text; }
-          } catch (err) {
-            console.warn(`[AIServiceManager] analyzeMedia gemini ${m} failed:`, (err as Error).message);
-          }
-        }
-      }
-
-      // Image-only fallback to OpenAI vision.
-      if (!isVideo) {
-        try {
-          const text = (await tryOpenAIVision('gpt-4o-mini')).trim();
-          if (text) { console.log('[AIServiceManager] analyzeMedia via openai gpt-4o-mini'); return text; }
-        } catch (err) {
-          console.warn('[AIServiceManager] analyzeMedia openai failed:', (err as Error).message);
-        }
+      } catch (err) {
+        console.warn(
+          `[AIServiceManager] analyzeMedia ${route.appModel} failed:`,
+          (err as Error).message
+        );
       }
 
       return undefined;
     } catch (err) {
-      console.error('[AIServiceManager] analyzeMedia error:', (err as Error).message);
+      console.error(
+        '[AIServiceManager] analyzeMedia error:',
+        (err as Error).message
+      );
       return undefined;
     }
   }
-
-  /**
-   * Map the workspace aiModel setting to a vision-capable Gemini model name,
-   * or undefined when the configured model isn't a Gemini vision model (caller
-   * then falls back across the default Gemini vision chain).
-   */
-  private resolveGeminiVisionModel(aiModel?: string): string | undefined {
-    switch (aiModel) {
-      case 'gemini-1.5-flash': return 'gemini-1.5-flash';
-      case 'gemini-2.0-flash-exp': return 'gemini-2.0-flash';
-      case 'google-ai-studio': return 'gemini-2.5-flash';
-      case 'veegpt-hybrid': return 'gemini-2.5-flash';
-      default: return undefined;
-    }
-  }
-
-
 
   /**
    * Get voice profile for scoring
    * Returns a default profile if no profile exists
    */
-  private async getVoiceProfileForScoring(userId: string, workspaceId: string): Promise<VoiceProfile> {
+  private async getVoiceProfileForScoring(
+    userId: string,
+    workspaceId: string
+  ): Promise<VoiceProfile> {
     // Return a default voice profile since we don't have direct access to VoiceProfileService
     // The PromptConstructorService will use the actual profile for prompt generation
     // This default profile is sufficient for authenticity scoring baseline
@@ -960,18 +1636,18 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
       sentenceLengthDistribution: {
         short: 30,
         medium: 50,
-        long: 20
+        long: 20,
       },
       paragraphStructure: 'short-breaks',
       emojiUsagePattern: {
         frequency: 'moderate',
         placement: 'inline',
-        topEmojis: []
+        topEmojis: [],
       },
       punctuationStyle: {
         exclamationUsage: 'moderate',
         questionUsage: 'moderate',
-        ellipsisUsage: false
+        ellipsisUsage: false,
       },
       toneMarkers: {
         casual: 0.6,
@@ -979,7 +1655,7 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
         humorous: 0.4,
         inspirational: 0.3,
         educational: 0.3,
-        conversational: 0.7
+        conversational: 0.7,
       },
       hookPatterns: [],
       engagementQuestionStyle: [],
@@ -987,17 +1663,20 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
       sampleSize: 0,
       confidence: 0.5,
       lastUpdated: new Date(),
-      createdAt: new Date()
+      createdAt: new Date(),
     };
   }
 
-  public async generateCaption(topic: string, preferences: UserAIPreferences = {}): Promise<string> {
+  public async generateCaption(
+    topic: string,
+    preferences: UserAIPreferences = {}
+  ): Promise<string> {
     const {
       aiPersona = 'Professional & Authoritative',
       captionStyle = 'Storytelling',
       optimizationGoals = 'Engagement',
       multilingual = 'auto',
-      autoHashtags = true
+      autoHashtags = true,
     } = preferences;
 
     let systemInstruction = `You are a professional social media manager.
@@ -1018,7 +1697,7 @@ Make sure it perfectly embodies the Persona and Style requested.`;
 
   /**
    * Generate authentic Instagram captions with voice matching and viral patterns
-   * 
+   *
    * This method implements the full authentic caption generation workflow:
    * 1. Uses PromptConstructorService to build comprehensive prompts
    * 2. Generates 3 distinct caption variations (viral, authentic, balanced)
@@ -1026,10 +1705,10 @@ Make sure it perfectly embodies the Persona and Style requested.`;
    * 4. Scores each variation with AuthenticityScorer (must be 80+)
    * 5. Predicts engagement for each variation with EngagementPredictor
    * 6. Filters out variations below 80 authenticity threshold
-   * 
+   *
    * Requirements: 1.4, 2.3, 3.2, 7.3, 8.1, 8.2, 4.6
    * Task 11.2: Multi-variation generation with authenticity scoring and engagement prediction
-   * 
+   *
    * @param params - Caption generation parameters
    * @returns Array of caption variations with style information, authenticity scores, and engagement predictions
    */
@@ -1059,26 +1738,32 @@ Make sure it perfectly embodies the Persona and Style requested.`;
       platform = 'Instagram',
       preferences = {},
       singleVariation = false,
-      signal
+      signal,
     } = params;
 
-    console.log('[AIServiceManager] Generating Instagram captions with authenticity scoring', {
-      userId,
-      workspaceId,
-      topic,
-      postType,
-      platform,
-      niche: preferences.contentNiche
-    });
+    console.log(
+      '[AIServiceManager] Generating Instagram captions with authenticity scoring',
+      {
+        userId,
+        workspaceId,
+        topic,
+        postType,
+        platform,
+        niche: preferences.contentNiche,
+      }
+    );
 
     try {
       // Load user's voice profile for authenticity scoring
       // We need to access the internal voice profile loading logic
       // For now, we'll get a default profile if not available
-      const voiceProfile = await this.getVoiceProfileForScoring(userId, workspaceId);
+      const voiceProfile = await this.getVoiceProfileForScoring(
+        userId,
+        workspaceId
+      );
       console.log('[AIServiceManager] Loaded voice profile', {
         sampleSize: voiceProfile.sampleSize,
-        confidence: voiceProfile.confidence
+        confidence: voiceProfile.confidence,
       });
 
       // Build the comprehensive prompt using PromptConstructorService
@@ -1089,13 +1774,15 @@ Make sure it perfectly embodies the Persona and Style requested.`;
         existingCaption,
         postType,
         platform,
-        aiPreferences: preferences
+        aiPreferences: preferences,
       };
 
-      const basePrompt = await promptConstructorService.buildGenerationPrompt(promptParams);
+      const basePrompt =
+        await promptConstructorService.buildGenerationPrompt(promptParams);
 
       // Extract user's content & tone preferences with comprehensive support
-      const userPersona = preferences.aiPersona || 'Professional & Authoritative';
+      const userPersona =
+        preferences.aiPersona || 'Professional & Authoritative';
       const userCaptionStyle = preferences.captionStyle || 'Storytelling';
       const creativityLevel = preferences.creativityLevel || 0.7;
       const optimizationGoals = preferences.optimizationGoals || 'Engagement';
@@ -1103,48 +1790,68 @@ Make sure it perfectly embodies the Persona and Style requested.`;
       const contentSafety = preferences.contentSafety || 'standard';
       const aiModel = preferences.aiModel || 'veegpt-hybrid';
       const responseLength = preferences.responseLength || 'medium';
-      
+
       // Build style-specific instructions that respect user preferences
       const getStyleInstructions = (baseStyle: string) => {
         let lengthGuidance = '';
-        
+
         // Caption style length handling
-        if (userCaptionStyle?.toLowerCase().includes('punchy') || userCaptionStyle?.toLowerCase().includes('short')) {
-          lengthGuidance = '\n- CRITICAL: Keep caption VERY SHORT (1-3 sentences max, 50-100 characters ideal)\n- Every word must count - be extremely concise\n- No fluff or filler words\n- Punchy, impactful, direct';
-        } else if (userCaptionStyle?.toLowerCase().includes('story') || userCaptionStyle?.toLowerCase().includes('detailed')) {
-          lengthGuidance = '\n- Use longer storytelling format (3-5 sentences)\n- Include narrative elements and details';
+        if (
+          userCaptionStyle?.toLowerCase().includes('punchy') ||
+          userCaptionStyle?.toLowerCase().includes('short')
+        ) {
+          lengthGuidance =
+            '\n- CRITICAL: Keep caption VERY SHORT (1-3 sentences max, 50-100 characters ideal)\n- Every word must count - be extremely concise\n- No fluff or filler words\n- Punchy, impactful, direct';
+        } else if (
+          userCaptionStyle?.toLowerCase().includes('story') ||
+          userCaptionStyle?.toLowerCase().includes('detailed')
+        ) {
+          lengthGuidance =
+            '\n- Use longer storytelling format (3-5 sentences)\n- Include narrative elements and details';
         } else if (userCaptionStyle?.toLowerCase().includes('medium')) {
-          lengthGuidance = '\n- Use medium length (2-4 sentences)\n- Balance detail with brevity';
+          lengthGuidance =
+            '\n- Use medium length (2-4 sentences)\n- Balance detail with brevity';
         }
-        
+
         // Persona and style guidance
         const personaGuidance = `\n- Persona/Voice: ${userPersona}\n- Caption Style: ${userCaptionStyle}`;
-        
+
         // Optimization goal guidance
         let optimizationGuidance = '';
         if (optimizationGoals?.toLowerCase().includes('engagement')) {
-          optimizationGuidance = '\n- FOCUS: Maximize likes, comments, shares, and saves\n- Use engagement-driving CTAs and questions';
+          optimizationGuidance =
+            '\n- FOCUS: Maximize likes, comments, shares, and saves\n- Use engagement-driving CTAs and questions';
         } else if (optimizationGoals?.toLowerCase().includes('reach')) {
-          optimizationGuidance = '\n- FOCUS: Maximize impressions and discoverability\n- Use trending topics and broad appeal';
+          optimizationGuidance =
+            '\n- FOCUS: Maximize impressions and discoverability\n- Use trending topics and broad appeal';
         } else if (optimizationGoals?.toLowerCase().includes('conversion')) {
-          optimizationGuidance = '\n- FOCUS: Drive clicks and conversions\n- Include clear CTAs and value propositions';
+          optimizationGuidance =
+            '\n- FOCUS: Drive clicks and conversions\n- Include clear CTAs and value propositions';
         }
-        
+
         // Multilingual handling
         let languageGuidance = '';
         if (multilingual && multilingual !== 'auto') {
           languageGuidance = `\n- Language: Write in ${multilingual}`;
         }
-        
+
         // Content safety guidance
         let safetyGuidance = '';
         if (contentSafety === 'strict') {
-          safetyGuidance = '\n- SAFETY: Avoid all potentially controversial topics\n- Use family-friendly language only';
+          safetyGuidance =
+            '\n- SAFETY: Avoid all potentially controversial topics\n- Use family-friendly language only';
         } else if (contentSafety === 'standard') {
-          safetyGuidance = '\n- SAFETY: Avoid explicit content but allow mild edge\n- Keep it appropriate for general audiences';
+          safetyGuidance =
+            '\n- SAFETY: Avoid explicit content but allow mild edge\n- Keep it appropriate for general audiences';
         }
-        
-        return personaGuidance + lengthGuidance + optimizationGuidance + languageGuidance + safetyGuidance;
+
+        return (
+          personaGuidance +
+          lengthGuidance +
+          optimizationGuidance +
+          languageGuidance +
+          safetyGuidance
+        );
       };
 
       // Log preferences being used
@@ -1156,14 +1863,15 @@ Make sure it perfectly embodies the Persona and Style requested.`;
         userCaptionStyle,
         multilingual,
         contentSafety,
-        responseLength
+        responseLength,
       });
 
       // Generate variations with scoring and filtering
       const variationPrompts = [
         {
           style: 'viral' as const,
-          styleDescription: 'Maximum engagement focus with aggressive hooks and trending patterns',
+          styleDescription:
+            'Maximum engagement focus with aggressive hooks and trending patterns',
           instructions: `GENERATE VARIATION 1: MAXIMUM VIRALITY
 - Use the most aggressive viral hook from the provided list
 - Apply trending patterns that maximize scroll-stopping power
@@ -1172,11 +1880,12 @@ Make sure it perfectly embodies the Persona and Style requested.`;
 - Push the boundaries while staying authentic to the voice profile
 ${getStyleInstructions('viral')}
 
-IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations, or metadata.`
+IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations, or metadata.`,
         },
         {
           style: 'authentic' as const,
-          styleDescription: 'Voice-first approach with personal storytelling and genuine connection',
+          styleDescription:
+            'Voice-first approach with personal storytelling and genuine connection',
           instructions: `GENERATE VARIATION 2: AUTHENTIC STORYTELLING
 - Prioritize matching the user's voice profile above all else
 - Use personal, relatable storytelling techniques
@@ -1185,11 +1894,12 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
 - Make it sound exactly like the user wrote it themselves
 ${getStyleInstructions('authentic')}
 
-IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations, or metadata.`
+IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations, or metadata.`,
         },
         {
           style: 'balanced' as const,
-          styleDescription: 'Strategic blend of viral patterns and authentic voice for sustained engagement',
+          styleDescription:
+            'Strategic blend of viral patterns and authentic voice for sustained engagement',
           instructions: `GENERATE VARIATION 3: BALANCED ENGAGEMENT
 - Blend viral pattern effectiveness with authentic voice
 - Use proven engagement formulas adapted to the user's style
@@ -1198,14 +1908,16 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
 - Optimize for sustainable long-term engagement
 ${getStyleInstructions('balanced')}
 
-IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations, or metadata.`
-        }
+IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations, or metadata.`,
+        },
       ];
 
       // Lightweight flows (singleVariation) generate just ONE caption with no
       // regeneration retries — 1 model call instead of up to 6 — to avoid
       // bursting the provider rate limit. The full flow keeps all 3 variations.
-      const activeVariationPrompts = singleVariation ? variationPrompts.slice(1, 2) : variationPrompts;
+      const activeVariationPrompts = singleVariation
+        ? variationPrompts.slice(1, 2)
+        : variationPrompts;
 
       const scoredVariations: CaptionVariation[] = [];
       const MAX_REGENERATION_ATTEMPTS = singleVariation ? 1 : 2; // Maximum attempts to regenerate if below threshold
@@ -1222,16 +1934,26 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
           // calls for a generation nobody is waiting for.
           signal?.throwIfAborted?.();
           attempt++;
-          
-          console.log(`[AIServiceManager] Generating ${varPrompt.style} variation (attempt ${attempt})...`);
-          
+
+          console.log(
+            `[AIServiceManager] Generating ${varPrompt.style} variation (attempt ${attempt})...`
+          );
+
           const fullPrompt = `${basePrompt}\n\n${varPrompt.instructions}`;
-          const rawCaption = await this.generateText(fullPrompt, preferences, signal);
+          const rawCaption = await this.generateText(
+            fullPrompt,
+            preferences,
+            signal
+          );
           const cleanedCaption = this.cleanCaptionText(rawCaption);
 
           // TASK 22.1: Apply content safety filters BEFORE authenticity scoring
-          console.log(`[AIServiceManager] Checking content safety for ${varPrompt.style} variation...`);
-          const safetyLevel = (preferences.contentSafety as 'off' | 'standard' | 'strict') || 'standard';
+          console.log(
+            `[AIServiceManager] Checking content safety for ${varPrompt.style} variation...`
+          );
+          const safetyLevel =
+            (preferences.contentSafety as 'off' | 'standard' | 'strict') ||
+            'standard';
           const safetyResult = contentSafetyService.filterCaption(
             cleanedCaption,
             safetyLevel,
@@ -1239,19 +1961,25 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
             preferences.prohibitedTopics as string[] | undefined
           );
 
-          console.log(`[AIServiceManager] ${varPrompt.style} safety score: ${safetyResult.safetyScore}`, {
-            isSafe: safetyResult.isSafe,
-            issueCount: safetyResult.issues.length,
-            flags: safetyResult.flags
-          });
+          console.log(
+            `[AIServiceManager] ${varPrompt.style} safety score: ${safetyResult.safetyScore}`,
+            {
+              isSafe: safetyResult.isSafe,
+              issueCount: safetyResult.issues.length,
+              flags: safetyResult.flags,
+            }
+          );
 
           // If caption fails safety check, log violations and skip to next attempt
           if (!safetyResult.isSafe) {
-            console.warn(`[AIServiceManager] ${varPrompt.style} variation failed safety check (score: ${safetyResult.safetyScore}/100)`, {
-              issues: safetyResult.issues,
-              flags: safetyResult.flags
-            });
-            
+            console.warn(
+              `[AIServiceManager] ${varPrompt.style} variation failed safety check (score: ${safetyResult.safetyScore}/100)`,
+              {
+                issues: safetyResult.issues,
+                flags: safetyResult.flags,
+              }
+            );
+
             // Continue to next attempt instead of using unsafe content
             continue;
           }
@@ -1260,31 +1988,39 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
           const captionToScore = safetyResult.filteredCaption;
 
           // Score authenticity
-          console.log(`[AIServiceManager] Scoring authenticity for ${varPrompt.style} variation...`);
+          console.log(
+            `[AIServiceManager] Scoring authenticity for ${varPrompt.style} variation...`
+          );
           const authenticityScore = await this.authenticityScorer.scoreCaption(
             captionToScore,
             voiceProfile,
             platform
           );
 
-          console.log(`[AIServiceManager] ${varPrompt.style} authenticity score: ${authenticityScore.overallScore}`, {
-            passesThreshold: authenticityScore.passesThreshold,
-            aiTellsDetected: authenticityScore.aiTellsDetected.length
-          });
+          console.log(
+            `[AIServiceManager] ${varPrompt.style} authenticity score: ${authenticityScore.overallScore}`,
+            {
+              passesThreshold: authenticityScore.passesThreshold,
+              aiTellsDetected: authenticityScore.aiTellsDetected.length,
+            }
+          );
 
           // Track best variation even if below threshold
           if (authenticityScore.overallScore > bestScore) {
             bestScore = authenticityScore.overallScore;
-            
+
             // Predict engagement
-            console.log(`[AIServiceManager] Predicting engagement for ${varPrompt.style} variation...`);
-            const engagementPrediction = await this.engagementPredictor.predictEngagement(
-              captionToScore,
-              userId,
-              workspaceId,
-              postType,
-              platform
+            console.log(
+              `[AIServiceManager] Predicting engagement for ${varPrompt.style} variation...`
             );
+            const engagementPrediction =
+              await this.engagementPredictor.predictEngagement(
+                captionToScore,
+                userId,
+                workspaceId,
+                postType,
+                platform
+              );
 
             bestVariation = {
               caption: captionToScore,
@@ -1292,15 +2028,19 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
               styleDescription: varPrompt.styleDescription,
               authenticityScore,
               engagementPrediction,
-              safetyResult // Include safety result in variation
+              safetyResult, // Include safety result in variation
             };
 
             // If passes threshold, use this variation
             if (authenticityScore.passesThreshold) {
-              console.log(`[AIServiceManager] ${varPrompt.style} variation passed authenticity threshold`);
+              console.log(
+                `[AIServiceManager] ${varPrompt.style} variation passed authenticity threshold`
+              );
               break;
             } else {
-              console.log(`[AIServiceManager] ${varPrompt.style} variation below threshold (${authenticityScore.overallScore}/100), regenerating...`);
+              console.log(
+                `[AIServiceManager] ${varPrompt.style} variation below threshold (${authenticityScore.overallScore}/100), regenerating...`
+              );
             }
           }
         }
@@ -1312,8 +2052,8 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
       }
 
       // Filter variations that pass the 80 authenticity threshold
-      const filteredVariations = scoredVariations.filter(v => 
-        v.authenticityScore && v.authenticityScore.passesThreshold
+      const filteredVariations = scoredVariations.filter(
+        v => v.authenticityScore && v.authenticityScore.passesThreshold
       );
 
       console.log('[AIServiceManager] Variation filtering complete', {
@@ -1323,14 +2063,16 @@ IMPORTANT: Return ONLY the caption text. Do not include any labels, explanations
           style: v.style,
           authenticityScore: v.authenticityScore?.overallScore,
           safetyScore: v.safetyResult?.safetyScore,
-          passed: v.authenticityScore?.passesThreshold
-        }))
+          passed: v.authenticityScore?.passesThreshold,
+        })),
       });
 
       // TASK 22.1: If all variations fail safety check, regenerate with stricter prompts
       if (scoredVariations.length === 0) {
-        console.warn('[AIServiceManager] WARNING: All variations failed safety checks. Attempting regeneration with stricter safety instructions...');
-        
+        console.warn(
+          '[AIServiceManager] WARNING: All variations failed safety checks. Attempting regeneration with stricter safety instructions...'
+        );
+
         // Add stricter safety instructions to the prompt
         const stricterPrompt = `${basePrompt}\n\n[CRITICAL SAFETY OVERRIDE]
 You MUST generate content that is:
@@ -1345,10 +2087,15 @@ If you cannot generate safe content for this topic, respond with a professional,
 
         // Try one more time with stricter safety instructions
         for (const varPrompt of variationPrompts) {
-          console.log(`[AIServiceManager] Regenerating ${varPrompt.style} variation with stricter safety instructions...`);
-          
+          console.log(
+            `[AIServiceManager] Regenerating ${varPrompt.style} variation with stricter safety instructions...`
+          );
+
           const fullPrompt = `${stricterPrompt}\n\n${varPrompt.instructions}`;
-          const rawCaption = await this.generateText(fullPrompt, { ...preferences, contentSafety: 'strict' });
+          const rawCaption = await this.generateText(fullPrompt, {
+            ...preferences,
+            contentSafety: 'strict',
+          });
           const cleanedCaption = this.cleanCaptionText(rawCaption);
 
           // Check safety again
@@ -1361,20 +2108,22 @@ If you cannot generate safe content for this topic, respond with a professional,
 
           if (safetyResult.isSafe) {
             // Score authenticity
-            const authenticityScore = await this.authenticityScorer.scoreCaption(
-              safetyResult.filteredCaption,
-              voiceProfile,
-              platform
-            );
+            const authenticityScore =
+              await this.authenticityScorer.scoreCaption(
+                safetyResult.filteredCaption,
+                voiceProfile,
+                platform
+              );
 
             // Predict engagement
-            const engagementPrediction = await this.engagementPredictor.predictEngagement(
-              safetyResult.filteredCaption,
-              userId,
-              workspaceId,
-              postType,
-              platform
-            );
+            const engagementPrediction =
+              await this.engagementPredictor.predictEngagement(
+                safetyResult.filteredCaption,
+                userId,
+                workspaceId,
+                postType,
+                platform
+              );
 
             scoredVariations.push({
               caption: safetyResult.filteredCaption,
@@ -1382,67 +2131,102 @@ If you cannot generate safe content for this topic, respond with a professional,
               styleDescription: `${varPrompt.styleDescription} (Regenerated with strict safety)`,
               authenticityScore,
               engagementPrediction,
-              safetyResult
+              safetyResult,
             });
           }
         }
 
         // Re-filter after regeneration
-        const refilteredVariations = scoredVariations.filter(v => 
-          v.authenticityScore && v.authenticityScore.passesThreshold
+        const refilteredVariations = scoredVariations.filter(
+          v => v.authenticityScore && v.authenticityScore.passesThreshold
         );
 
         if (refilteredVariations.length > 0) {
-          console.log('[AIServiceManager] Successfully regenerated safe variations', {
-            count: refilteredVariations.length
-          });
+          console.log(
+            '[AIServiceManager] Successfully regenerated safe variations',
+            {
+              count: refilteredVariations.length,
+            }
+          );
           return refilteredVariations;
         } else if (scoredVariations.length > 0) {
-          console.warn('[AIServiceManager] Regenerated variations exist but none passed authenticity threshold. Returning all variations.');
+          console.warn(
+            '[AIServiceManager] Regenerated variations exist but none passed authenticity threshold. Returning all variations.'
+          );
           return scoredVariations;
         } else {
-          throw new Error('Unable to generate safe caption variations. All attempts failed safety checks.');
+          throw new Error(
+            'Unable to generate safe caption variations. All attempts failed safety checks.'
+          );
         }
       }
 
       // If no variations passed, return all scored variations with a warning
       // This ensures we always return something useful to the user
       if (filteredVariations.length === 0) {
-        console.warn('[AIServiceManager] WARNING: No variations passed authenticity threshold of 80. Returning all variations with scores.');
+        console.warn(
+          '[AIServiceManager] WARNING: No variations passed authenticity threshold of 80. Returning all variations with scores.'
+        );
         return scoredVariations;
       }
 
       // Log safety violations for monitoring
       for (const variation of filteredVariations) {
-        if (variation.safetyResult && variation.safetyResult.issues.length > 0) {
-          console.log('[AIServiceManager] Safety issues logged for monitoring', {
-            style: variation.style,
-            issues: variation.safetyResult.issues,
-            flags: variation.safetyResult.flags,
-            safetyScore: variation.safetyResult.safetyScore
-          });
+        if (
+          variation.safetyResult &&
+          variation.safetyResult.issues.length > 0
+        ) {
+          console.log(
+            '[AIServiceManager] Safety issues logged for monitoring',
+            {
+              style: variation.style,
+              issues: variation.safetyResult.issues,
+              flags: variation.safetyResult.flags,
+              safetyScore: variation.safetyResult.safetyScore,
+            }
+          );
         }
       }
 
       // Return filtered variations with metadata
-      console.log('[AIServiceManager] Successfully generated and scored caption variations', {
-        count: filteredVariations.length,
-        avgAuthenticityScore: filteredVariations.reduce((sum, v) => sum + (v.authenticityScore?.overallScore || 0), 0) / filteredVariations.length,
-        avgSafetyScore: filteredVariations.reduce((sum, v) => sum + (v.safetyResult?.safetyScore || 100), 0) / filteredVariations.length,
-        avgPredictedEngagement: filteredVariations.reduce((sum, v) => sum + (v.engagementPrediction?.predictedLikeRate || 0), 0) / filteredVariations.length
-      });
+      console.log(
+        '[AIServiceManager] Successfully generated and scored caption variations',
+        {
+          count: filteredVariations.length,
+          avgAuthenticityScore:
+            filteredVariations.reduce(
+              (sum, v) => sum + (v.authenticityScore?.overallScore || 0),
+              0
+            ) / filteredVariations.length,
+          avgSafetyScore:
+            filteredVariations.reduce(
+              (sum, v) => sum + (v.safetyResult?.safetyScore || 100),
+              0
+            ) / filteredVariations.length,
+          avgPredictedEngagement:
+            filteredVariations.reduce(
+              (sum, v) =>
+                sum + (v.engagementPrediction?.predictedLikeRate || 0),
+              0
+            ) / filteredVariations.length,
+        }
+      );
 
       return filteredVariations;
-
     } catch (error) {
-      console.error('[AIServiceManager] Error generating Instagram captions:', error);
-      throw new Error(`Failed to generate Instagram captions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(
+        '[AIServiceManager] Error generating Instagram captions:',
+        error
+      );
+      throw new Error(
+        `Failed to generate Instagram captions: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
   /**
    * Clean caption text by removing labels, metadata, and unwanted formatting
-   * 
+   *
    * @param rawCaption - Raw caption text from AI
    * @returns Cleaned caption text
    */
@@ -1450,9 +2234,14 @@ If you cannot generate safe content for this topic, respond with a professional,
     let cleaned = rawCaption.trim();
 
     // Remove common AI response patterns
-    cleaned = cleaned.replace(/^(Variation \d+:|Caption \d+:|Here's the caption:|Caption:)/gi, '').trim();
+    cleaned = cleaned
+      .replace(
+        /^(Variation \d+:|Caption \d+:|Here's the caption:|Caption:)/gi,
+        ''
+      )
+      .trim();
     cleaned = cleaned.replace(/^["']|["']$/g, '').trim(); // Remove surrounding quotes
-    
+
     // Remove explanation sections (anything after "---" or "Note:")
     cleaned = cleaned.split(/\n\s*---\s*\n/)[0].trim();
     cleaned = cleaned.split(/\n\s*Note:/i)[0].trim();
@@ -1499,7 +2288,10 @@ If you cannot generate safe content for this topic, respond with a professional,
       reach?: number;
       type?: string;
       caption?: string;
-    } = {}
+    } = {},
+    /** Workspace AI Configuration. Threaded through so vision routing uses the
+     *  SELECTED model (substituting only when it can't read this media type). */
+    preferences: UserAIPreferences = {}
   ): Promise<{
     visualQuality: 'high' | 'medium' | 'low';
     composition: string;
@@ -1511,18 +2303,26 @@ If you cannot generate safe content for this topic, respond with a professional,
     strengths: string[];
   } | null> {
     if (!mediaUrl || typeof mediaUrl !== 'string') return null;
-    if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) return null;
+    if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://'))
+      return null;
 
     try {
       // Detect whether this is a video (reel) based on URL extension or post type
-      const isVideo = ['reel', 'video', 'REEL', 'VIDEO'].includes(postContext.type || '')
-        || /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl);
+      const isVideo =
+        ['reel', 'video', 'REEL', 'VIDEO'].includes(postContext.type || '') ||
+        /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl);
 
       const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
 
       // Step 1: Get a factual description using the existing vision pipeline
       // (Gemini inlineData handles both images and videos natively)
-      const description = await this.analyzeMedia(mediaUrl, mediaType, {});
+      // Pass preferences through: analyzeMedia routes on the SELECTED model and
+      // only substitutes when it genuinely cannot read this media type.
+      const description = await this.analyzeMedia(
+        mediaUrl,
+        mediaType,
+        preferences || {}
+      );
       if (!description) return null;
 
       const typeLabel = isVideo ? 'Reel/video' : 'Image post';
@@ -1550,22 +2350,38 @@ Respond with ONLY this JSON:
   "strengths": ["specific strength 1", "specific strength 2"]
 }`;
 
-      const result = await this.generateJSON(structuredPrompt, {}, { preferGemini: true });
+      const result = await this.generateJSON(structuredPrompt, {}, {});
       if (!result || typeof result !== 'object') return null;
-      if (!['high', 'medium', 'low'].includes(result.visualQuality)) return null;
+      if (!['high', 'medium', 'low'].includes(result.visualQuality))
+        return null;
 
       return {
         visualQuality: result.visualQuality,
-        composition: typeof result.composition === 'string' ? result.composition : '',
+        composition:
+          typeof result.composition === 'string' ? result.composition : '',
         textOverlay: !!result.textOverlay,
-        colorVibrancy: ['vibrant', 'muted', 'neutral'].includes(result.colorVibrancy) ? result.colorVibrancy : 'neutral',
-        subjects: Array.isArray(result.subjects) ? result.subjects.slice(0, 5) : [],
-        contentTheme: typeof result.contentTheme === 'string' ? result.contentTheme : '',
-        improvements: Array.isArray(result.improvements) ? result.improvements.slice(0, 2) : [],
-        strengths: Array.isArray(result.strengths) ? result.strengths.slice(0, 2) : [],
+        colorVibrancy: ['vibrant', 'muted', 'neutral'].includes(
+          result.colorVibrancy
+        )
+          ? result.colorVibrancy
+          : 'neutral',
+        subjects: Array.isArray(result.subjects)
+          ? result.subjects.slice(0, 5)
+          : [],
+        contentTheme:
+          typeof result.contentTheme === 'string' ? result.contentTheme : '',
+        improvements: Array.isArray(result.improvements)
+          ? result.improvements.slice(0, 2)
+          : [],
+        strengths: Array.isArray(result.strengths)
+          ? result.strengths.slice(0, 2)
+          : [],
       };
     } catch (e: any) {
-      console.warn('[AIServiceManager] analyzeContentImage failed:', e?.message);
+      console.warn(
+        '[AIServiceManager] analyzeContentImage failed:',
+        e?.message
+      );
       return null;
     }
   }
@@ -1583,28 +2399,42 @@ Respond with ONLY this JSON:
       captionStyle = 'Storytelling',
       responseLength = 'medium',
       multilingual = 'auto',
-      aiMemory = 'long-term'
+      aiMemory = 'long-term',
     } = preferences;
 
     const period = metricsData?.period || 'month';
-    const periodLabel = period === 'day' ? 'today' : period === 'week' ? 'this week' : 'this month';
+    const periodLabel =
+      period === 'day'
+        ? 'today'
+        : period === 'week'
+          ? 'this week'
+          : 'this month';
 
     // The Core Intelligence settings (model + creativity) directly drive the
     // analysis: `aiModel` selects the provider/model inside generateJSON and
     // `creativityLevel` becomes the generation temperature. We log them so the
     // chosen configuration is verifiable end-to-end.
-    console.log(`[AIServiceManager] Analytics insight using model=${aiModel}, creativity=${creativityLevel}, goal=${optimizationGoals}`);
+    console.log(
+      `[AIServiceManager] Analytics insight using model=${aiModel}, creativity=${creativityLevel}, goal=${optimizationGoals}`
+    );
 
     // Translate the Primary Optimization Goal into concrete analytical focus so
     // the advice actually changes based on what the user selected in Settings.
     const goalKey = String(optimizationGoals).toLowerCase();
     let goalGuide: string;
     if (goalKey.includes('conversion') || goalKey.includes('click')) {
-      goalGuide = 'Optimise for CLICKS & CONVERSIONS: prioritise CTAs, link-driving content, profile visits and actions that turn reach into conversions.';
-    } else if (goalKey.includes('brand') || goalKey.includes('reach') || goalKey.includes('aware')) {
-      goalGuide = 'Optimise for BROAD REACH & SHAREABILITY: prioritise impressions, shares, saves, discoverability and content that expands the audience.';
+      goalGuide =
+        'Optimise for CLICKS & CONVERSIONS: prioritise CTAs, link-driving content, profile visits and actions that turn reach into conversions.';
+    } else if (
+      goalKey.includes('brand') ||
+      goalKey.includes('reach') ||
+      goalKey.includes('aware')
+    ) {
+      goalGuide =
+        'Optimise for BROAD REACH & SHAREABILITY: prioritise impressions, shares, saves, discoverability and content that expands the audience.';
     } else {
-      goalGuide = 'Optimise for ENGAGEMENT & COMMENTS: prioritise likes, comments, replies, conversation starters and community interaction.';
+      goalGuide =
+        'Optimise for ENGAGEMENT & COMMENTS: prioritise likes, comments, replies, conversation starters and community interaction.';
     }
 
     // Translate the configured response length into a concrete sentence budget
@@ -1613,8 +2443,8 @@ Respond with ONLY this JSON:
       responseLength === 'short'
         ? 'Keep the tip to a single punchy sentence.'
         : responseLength === 'long'
-        ? 'The tip can be 3-4 detailed sentences.'
-        : 'Keep the tip to 2-3 concise sentences.';
+          ? 'The tip can be 3-4 detailed sentences.'
+          : 'Keep the tip to 2-3 concise sentences.';
 
     const languageGuide =
       multilingual && multilingual !== 'auto'
@@ -1659,26 +2489,40 @@ Respond with ONLY a JSON object of this exact shape:
 {"title": string, "emoji": string, "headline": string, "tip": string}`;
 
     try {
-      const result = await this.generateJSON(systemInstruction, preferences, { signal });
-      const headline = typeof result?.headline === 'string' ? result.headline.trim() : '';
+      const result = await this.generateJSON(systemInstruction, preferences, {
+        signal,
+      });
+      const headline =
+        typeof result?.headline === 'string' ? result.headline.trim() : '';
       const tip = typeof result?.tip === 'string' ? result.tip.trim() : '';
       // A banner is only valid if the AI produced a real headline AND tip. If
       // not, throw so the worker records a failure instead of caching a partial
       // result that would force the client to show hardcoded template text.
       if (!headline || !tip) {
-        throw new Error('AI returned an incomplete banner (missing headline or tip)');
+        throw new Error(
+          'AI returned an incomplete banner (missing headline or tip)'
+        );
       }
       return {
-        title: typeof result?.title === 'string' && result.title.trim() ? result.title.trim() : 'Performance Insight',
-        emoji: typeof result?.emoji === 'string' && result.emoji.trim() ? result.emoji.trim() : '📊',
+        title:
+          typeof result?.title === 'string' && result.title.trim()
+            ? result.title.trim()
+            : 'Performance Insight',
+        emoji:
+          typeof result?.emoji === 'string' && result.emoji.trim()
+            ? result.emoji.trim()
+            : '📊',
         headline,
-        tip
+        tip,
       };
     } catch (error: any) {
       // Do NOT fabricate a banner. Propagate the failure so the caller (worker)
       // marks it failed and the UI either keeps the previous cached banner or
       // hides the banner entirely — never shows fake/template numbers.
-      console.error('[AIServiceManager] generateAnalyticsInsight failed:', error?.message);
+      console.error(
+        '[AIServiceManager] generateAnalyticsInsight failed:',
+        error?.message
+      );
       throw error;
     }
   }
@@ -1706,31 +2550,48 @@ Respond with ONLY a JSON object of this exact shape:
     accountData: any,
     preferences: UserAIPreferences = {},
     signal?: AbortSignal
-  ): Promise<Array<{ icon: string; title: string; description: string; priority: 'high' | 'medium' | 'low'; category: string }>> {
+  ): Promise<
+    Array<{
+      icon: string;
+      title: string;
+      description: string;
+      priority: 'high' | 'medium' | 'low';
+      category: string;
+    }>
+  > {
     const {
       aiModel = 'veegpt-hybrid',
       creativityLevel = 0.7,
       aiPersona = 'Professional & Authoritative',
       optimizationGoals = 'Engagement',
       captionStyle = 'Storytelling',
-      multilingual = 'auto'
+      multilingual = 'auto',
     } = preferences;
     const contentNiche = (preferences as any).contentNiche;
     const recommendationLimit = Math.max(
       1,
-      Math.min(5, Number((preferences as any).recommendationLimit) || 5),
+      Math.min(5, Number((preferences as any).recommendationLimit) || 5)
     );
 
-    console.log(`[AIServiceManager] Growth recommendations using model=${aiModel}, creativity=${creativityLevel}, goal=${optimizationGoals}, niche=${contentNiche || 'n/a'}`);
+    console.log(
+      `[AIServiceManager] Growth recommendations using model=${aiModel}, creativity=${creativityLevel}, goal=${optimizationGoals}, niche=${contentNiche || 'n/a'}`
+    );
 
     const goalKey = String(optimizationGoals).toLowerCase();
     let goalGuide: string;
     if (goalKey.includes('conversion') || goalKey.includes('click')) {
-      goalGuide = 'PRIMARY GOAL: maximise clicks & conversions — profile visits, link clicks, and actions that turn reach into outcomes.';
-    } else if (goalKey.includes('brand') || goalKey.includes('reach') || goalKey.includes('aware')) {
-      goalGuide = 'PRIMARY GOAL: maximise reach & shareability — impressions, shares, saves, discoverability and audience expansion.';
+      goalGuide =
+        'PRIMARY GOAL: maximise clicks & conversions — profile visits, link clicks, and actions that turn reach into outcomes.';
+    } else if (
+      goalKey.includes('brand') ||
+      goalKey.includes('reach') ||
+      goalKey.includes('aware')
+    ) {
+      goalGuide =
+        'PRIMARY GOAL: maximise reach & shareability — impressions, shares, saves, discoverability and audience expansion.';
     } else {
-      goalGuide = 'PRIMARY GOAL: maximise engagement & comments — likes, comments, replies, saves and community interaction.';
+      goalGuide =
+        'PRIMARY GOAL: maximise engagement & comments — likes, comments, replies, saves and community interaction.';
     }
 
     const languageGuide =
@@ -1744,22 +2605,23 @@ Respond with ONLY a JSON object of this exact shape:
 
     // Allowed icon keys must match what the frontend can render.
     const allowedIcons = [
-      'clock',        // posting time / cadence
-      'calendar',     // posting frequency / consistency
-      'image',        // visual / format quality
-      'video',        // reels / video strategy
-      'hashtag',      // discoverability / hashtags
-      'search',       // SEO / discoverability
-      'users',        // audience / community
-      'heart',        // engagement
-      'message',      // comments / replies / DMs
-      'trending',     // trending / reach
-      'target',       // CTA / conversion
-      'sparkles'      // content quality / creativity
+      'clock', // posting time / cadence
+      'calendar', // posting frequency / consistency
+      'image', // visual / format quality
+      'video', // reels / video strategy
+      'hashtag', // discoverability / hashtags
+      'search', // SEO / discoverability
+      'users', // audience / community
+      'heart', // engagement
+      'message', // comments / replies / DMs
+      'trending', // trending / reach
+      'target', // CTA / conversion
+      'sparkles', // content quality / creativity
     ];
 
-    const mediaAnalysisSection = accountData?.mediaAnalysis?.allAnalyses?.length > 0
-      ? `\n\nMEDIA VISION ANALYSIS (from AI vision of actual post content):
+    const mediaAnalysisSection =
+      accountData?.mediaAnalysis?.allAnalyses?.length > 0
+        ? `\n\nMEDIA VISION ANALYSIS (from AI vision of actual post content):
 ${accountData.mediaAnalysis.summary}
 
 Top-performing IMAGES analyzed (${accountData.mediaAnalysis.topImages?.length || 0}):
@@ -1779,7 +2641,7 @@ Use these AI vision insights to give concrete, visual content quality recommenda
 - If top videos outperform top images, recommend doubling down on Reels
 - If images have low visual quality or weak composition, give specific improvement actions
 - Reference actual visual patterns found (e.g. "your best reels use text overlays and vibrant colors, while your worst images are muted and lack clear subjects")`
-      : '';
+        : '';
 
     const followerFlowSection = accountData?.followerFlowLast28Days
       ? `\n\nFOLLOWER FLOW (last 28 days from Meta follows_and_unfollows data):\n- Total gained: ${accountData.followerFlowLast28Days.totalGained}\n- Total lost: ${accountData.followerFlowLast28Days.totalLost}\n- Net: ${accountData.followerFlowLast28Days.netChange}\n- Churn rate: ${accountData.followerFlowLast28Days.churnRate}%\nThis is real Meta API data — use churn rate to give specific audience retention advice.`
@@ -1824,26 +2686,51 @@ Respond with ONLY a JSON object of this exact shape:
 {"recommendations": [{"icon": string, "title": string, "description": string, "priority": "high"|"medium"|"low", "category": string}]}`;
 
     try {
-      const result = await this.generateJSON(systemInstruction, preferences, { signal });
-      const list = Array.isArray(result?.recommendations) ? result.recommendations : [];
-      const priorityRank = { high: 0, medium: 1, low: 2 } as Record<string, number>;
+      const result = await this.generateJSON(systemInstruction, preferences, {
+        signal,
+      });
+      const list = Array.isArray(result?.recommendations)
+        ? result.recommendations
+        : [];
+      const priorityRank = { high: 0, medium: 1, low: 2 } as Record<
+        string,
+        number
+      >;
 
       // All tracked metric/capability keys we gate recommendations against.
       const ALL_TRACKED_METRICS = [
-        'followers_total', 'reach_total', 'impressions_total',
-        'total_engagements', 'likes', 'comments', 'shares',
-        'saves', 'video_views', 'profile_visits', 'website_clicks',
-        'published_posts', 'facebook_reactions', 'facebook_page_views',
+        'followers_total',
+        'reach_total',
+        'impressions_total',
+        'total_engagements',
+        'likes',
+        'comments',
+        'shares',
+        'saves',
+        'video_views',
+        'profile_visits',
+        'website_clicks',
+        'published_posts',
+        'facebook_reactions',
+        'facebook_page_views',
       ];
 
       const cleaned = list
-        .filter((r: any) => r && typeof r.title === 'string' && typeof r.description === 'string')
+        .filter(
+          (r: any) =>
+            r &&
+            typeof r.title === 'string' &&
+            typeof r.description === 'string'
+        )
         .map((r: any) => ({
           icon: allowedIcons.includes(r.icon) ? r.icon : 'sparkles',
           title: String(r.title).trim(),
           description: String(r.description).trim(),
-          priority: (['high', 'medium', 'low'].includes(r.priority) ? r.priority : 'medium') as 'high' | 'medium' | 'low',
-          category: typeof r.category === 'string' ? r.category.trim() : 'Growth'
+          priority: (['high', 'medium', 'low'].includes(r.priority)
+            ? r.priority
+            : 'medium') as 'high' | 'medium' | 'low',
+          category:
+            typeof r.category === 'string' ? r.category.trim() : 'Growth',
         }))
         // CapabilityGuard post-filter (Requirement 8.5):
         // If a platformContext is set, drop any recommendation whose description
@@ -1856,12 +2743,15 @@ Respond with ONLY a JSON object of this exact shape:
           const combinedText = `${r.title} ${r.description}`.toLowerCase();
           // If the recommendation text references a NONE-support metric, drop it.
           return !ALL_TRACKED_METRICS.some(
-            (key) =>
+            key =>
               CapabilityGuard.getMetricSupport(platform, key) === 'NONE' &&
-              combinedText.includes(key.replace(/_/g, ' ')),
+              combinedText.includes(key.replace(/_/g, ' '))
           );
         })
-        .sort((a: any, b: any) => (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1))
+        .sort(
+          (a: any, b: any) =>
+            (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1)
+        )
         .slice(0, recommendationLimit);
 
       if (cleaned.length === 0) {
@@ -1869,7 +2759,10 @@ Respond with ONLY a JSON object of this exact shape:
       }
       return cleaned;
     } catch (error: any) {
-      console.error('[AIServiceManager] generateGrowthRecommendations failed:', error?.message);
+      console.error(
+        '[AIServiceManager] generateGrowthRecommendations failed:',
+        error?.message
+      );
       throw error;
     }
   }
@@ -1903,7 +2796,7 @@ Respond with ONLY a JSON object of this exact shape:
    */
   public async generateInsightWithPlatformContext(
     prompt: string,
-    preferences: UserAIPreferences = {},
+    preferences: UserAIPreferences = {}
   ): Promise<string> {
     const { platformContext } = preferences;
 
@@ -1941,19 +2834,30 @@ Respond with ONLY a JSON object of this exact shape:
 
     if (igOk && !fbOk) {
       // Instagram succeeded, Facebook failed.
-      console.warn('[AIServiceManager] generateInsightWithPlatformContext: Facebook block failed:', (fbResult as PromiseRejectedResult).reason?.message);
+      console.warn(
+        '[AIServiceManager] generateInsightWithPlatformContext: Facebook block failed:',
+        (fbResult as PromiseRejectedResult).reason?.message
+      );
       return `## Instagram Insights\n\n${igResult.value}\n\n---\n\n## Facebook Insights\n\n⚠️ Facebook insights are temporarily unavailable. Please try again in a moment.`;
     }
 
     if (!igOk && fbOk) {
       // Facebook succeeded, Instagram failed.
-      console.warn('[AIServiceManager] generateInsightWithPlatformContext: Instagram block failed:', (igResult as PromiseRejectedResult).reason?.message);
+      console.warn(
+        '[AIServiceManager] generateInsightWithPlatformContext: Instagram block failed:',
+        (igResult as PromiseRejectedResult).reason?.message
+      );
       return `## Instagram Insights\n\n⚠️ Instagram insights are temporarily unavailable. Please try again in a moment.\n\n---\n\n## Facebook Insights\n\n${fbResult.value}`;
     }
 
     // Both failed — propagate the Instagram error (arbitrary choice; both are equivalent).
-    console.error('[AIServiceManager] generateInsightWithPlatformContext: both platform blocks failed');
-    throw (igResult as PromiseRejectedResult).reason ?? new Error('AI insight generation failed for all platforms');
+    console.error(
+      '[AIServiceManager] generateInsightWithPlatformContext: both platform blocks failed'
+    );
+    throw (
+      (igResult as PromiseRejectedResult).reason ??
+      new Error('AI insight generation failed for all platforms')
+    );
   }
 
   /**
@@ -1967,36 +2871,56 @@ Respond with ONLY a JSON object of this exact shape:
    *
    * Returns a shallow copy of `preferences` with the filtered list.
    */
-  private _filterCapabilitiesForPlatform(preferences: UserAIPreferences): UserAIPreferences {
+  private _filterCapabilitiesForPlatform(
+    preferences: UserAIPreferences
+  ): UserAIPreferences {
     const { platformContext, availableCapabilities } = preferences;
 
     // Nothing to filter if no platform or no explicit capabilities list.
-    if (!platformContext || platformContext === 'all' || !availableCapabilities?.length) {
+    if (
+      !platformContext ||
+      platformContext === 'all' ||
+      !availableCapabilities?.length
+    ) {
       return preferences;
     }
 
     const platform = platformContext as PlatformId;
     const filtered = availableCapabilities.filter(
-      (key) => CapabilityGuard.getMetricSupport(platform, key) !== 'NONE',
+      key => CapabilityGuard.getMetricSupport(platform, key) !== 'NONE'
     );
 
     return { ...preferences, availableCapabilities: filtered };
   }
 
-
-  public async generateJSON(prompt: string, preferences: UserAIPreferences = {}, options: { preferGemini?: boolean; signal?: AbortSignal } = {}): Promise<any> {
-    const { 
-      aiModel = 'veegpt-hybrid', 
+  public async generateJSON(
+    prompt: string,
+    preferences: UserAIPreferences = {},
+    options: { preferGemini?: boolean; signal?: AbortSignal } = {}
+  ): Promise<any> {
+    // Fall back to the operation's wall-clock signal (published by withVGU) when
+    // the caller has not supplied one. Without this, a timeout would only abandon
+    // the result while the provider call kept running — and kept costing money.
+    // This class is deliberately not behind the provider guard (it records its own
+    // usage, and guarding it would double-count), so it wires the signal itself.
+    options = { ...options, signal: options.signal ?? currentAbortSignal() };
+    const {
+      aiModel = 'veegpt-hybrid',
       creativityLevel = 0.7,
       contentSafety = 'standard',
       aiPersona = 'Professional & Authoritative',
       captionStyle = 'Storytelling',
       responseLength = 'medium',
       multilingual = 'auto',
-      aiMemory = 'long-term'
+      aiMemory = 'long-term',
     } = preferences;
 
-    console.log('[AIServiceManager] Generating JSON using model:', aiModel, 'creativity:', creativityLevel);
+    console.log(
+      '[AIServiceManager] Generating JSON using model:',
+      aiModel,
+      'creativity:',
+      creativityLevel
+    );
 
     const globalSystemContext = `
 [SYSTEM CONFIGURATION OVERRIDE]
@@ -2012,142 +2936,141 @@ ${aiMemory === 'long-term' ? `- Memory Context: Retain continuity with typical b
 
     const tryGemini = async (modelName: string) => {
       options.signal?.throwIfAborted?.();
-      const generationConfig = { temperature: creativityLevel, responseMimeType: "application/json" };
+      const generationConfig = {
+        temperature: creativityLevel,
+        responseMimeType: 'application/json',
+      };
       const safetySettings = this.getSafetySettings(contentSafety);
-      const client = preferences.googleAiStudioKey ? new GoogleGenerativeAI(preferences.googleAiStudioKey) : this.genAI;
-      const model = client.getGenerativeModel({ model: modelName, generationConfig, safetySettings });
-      const result = await this.withTransientRetry(
-        () => model.generateContent(finalPrompt, options.signal ? { signal: options.signal } : undefined),
-        `JSON ${modelName}`,
+      const client = preferences.googleAiStudioKey
+        ? new GoogleGenerativeAI(preferences.googleAiStudioKey)
+        : this.genAI;
+      const model = client.getGenerativeModel({
+        model: resolveLiveGeminiModel(modelName),
+        generationConfig,
+        safetySettings,
+      });
+      const result = await model.generateContent(
+        finalPrompt,
+        options.signal ? { signal: options.signal } : undefined
       );
       const text = result.response.text();
-      recordAIUsage({ provider: 'gemini', model: modelName, callType: 'json', usage: fromGeminiUsage((result.response as any)?.usageMetadata), promptText: finalPrompt, completionText: text });
-      const cleaned = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      recordAIUsage({
+        provider: 'gemini',
+        model: modelName,
+        callType: 'json',
+        usage: fromGeminiUsage((result.response as any)?.usageMetadata),
+        promptText: finalPrompt,
+        completionText: text,
+      });
+      const cleaned = text
+        .replace(/^```(?:json)?\n?/, '')
+        .replace(/\n?```$/, '');
       return JSON.parse(cleaned);
     };
 
     const tryOpenAI = async (modelName: string) => {
-      
-      const client = preferences.openAiKey ? new OpenAI({ apiKey: preferences.openAiKey }) : this.openai;
+      const client = preferences.openAiKey
+        ? new OpenAI({ apiKey: preferences.openAiKey })
+        : this.openai;
       if (!client) throw new Error('OpenAI is not configured.');
-      const completion = await client.chat.completions.create({
-        messages: [{ role: "system", content: "You must respond with valid JSON." }, { role: "user", content: finalPrompt }],
-        model: modelName,
-        temperature: creativityLevel,
-        response_format: { type: "json_object" }
-      }, options.signal ? { signal: options.signal } : undefined);
+      const completion = await client.chat.completions.create(
+        {
+          messages: [
+            { role: 'system', content: 'You must respond with valid JSON.' },
+            { role: 'user', content: finalPrompt },
+          ],
+          model: modelName,
+          ...this.temperatureFor(aiModel, creativityLevel),
+          response_format: { type: 'json_object' },
+        },
+        options.signal ? { signal: options.signal } : undefined
+      );
       const jText = completion.choices[0]?.message?.content || '{}';
-      recordAIUsage({ provider: 'openai', model: modelName, callType: 'json', usage: fromOpenAIUsage((completion as any)?.usage), promptText: finalPrompt, completionText: jText });
+      recordAIUsage({
+        provider: 'openai',
+        model: modelName,
+        callType: 'json',
+        usage: fromOpenAIUsage((completion as any)?.usage),
+        promptText: finalPrompt,
+        completionText: jText,
+      });
       return JSON.parse(jText);
     };
 
     const tryGithub = async (modelName: string) => {
-      if (!this.githubModels) throw new Error('GitHub Models is not configured (GITHUB_TOKEN missing).');
-      const completion = await this.githubModels.chat.completions.create({
-        messages: [{ role: "system", content: "You must respond with valid JSON." }, { role: "user", content: finalPrompt }],
-        model: modelName,
-        temperature: creativityLevel,
-        response_format: { type: "json_object" }
-      }, options.signal ? { signal: options.signal } : undefined);
+      if (!this.githubModels)
+        throw new Error(
+          'GitHub Models is not configured (GITHUB_TOKEN missing).'
+        );
+      const completion = await this.githubModels.chat.completions.create(
+        {
+          messages: [
+            { role: 'system', content: 'You must respond with valid JSON.' },
+            { role: 'user', content: finalPrompt },
+          ],
+          model: modelName,
+          ...this.temperatureFor(aiModel, creativityLevel),
+          response_format: { type: 'json_object' },
+        },
+        options.signal ? { signal: options.signal } : undefined
+      );
       const gjText = completion.choices[0]?.message?.content || '{}';
-      recordAIUsage({ provider: 'github', model: modelName, callType: 'json', usage: fromOpenAIUsage((completion as any)?.usage), promptText: finalPrompt, completionText: gjText });
+      recordAIUsage({
+        provider: 'github',
+        model: modelName,
+        callType: 'json',
+        usage: fromOpenAIUsage((completion as any)?.usage),
+        promptText: finalPrompt,
+        completionText: gjText,
+      });
       return JSON.parse(gjText);
     };
 
-    const githubModel = this.resolveGithubModel(aiModel);
+    // ── SINGLE ATTEMPT ────────────────────────────────────────────────────────
+    // No fallback chain. `options.preferGemini` is retained for source
+    // compatibility but intentionally IGNORED: honouring it would override the
+    // user's AI Configuration selection, which is exactly what this refactor
+    // removes. Callers that genuinely need a specific capability should express
+    // it as a capability (see ai-model-routing.ts), not a provider preference.
+    const route = resolveRoute(aiModel, 'text');
+    return await this.audited('json', route, 'native', 'text', async () => {
+      const attemptOnce = () => {
+        switch (route.provider) {
+          case 'gemini':
+            return tryGemini(route.native);
+          case 'github':
+            return tryGithub(route.native);
+          case 'openai':
+            return tryOpenAI(route.native);
+          default:
+            throw new Error(
+              `No provider configured for model "${route.requested}".`
+            );
+        }
+      };
 
-    // preferGemini: lightweight, latency- and quota-sensitive callers (e.g. the
-    // VeeGPT post-intent parse) lead with the Gemini flash-lite chain, which has
-    // generous free-tier quota and is ISOLATED from the GitHub Models per-minute
-    // rate limit that heavier flows (caption generation) burn through. Falls back
-    // to GitHub then OpenAI only if every Gemini model fails.
-    if (options.preferGemini) {
-      const chain = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-      for (let i = 0; i < chain.length; i++) {
-        try {
-          return await tryGemini(chain[i]);
-        } catch (err) {
-          // Different Gemini models can have SEPARATE quota buckets (e.g.
-          // 2.5-flash-lite exhausted while flash-lite-latest still has quota),
-          // so keep trying the rest of the chain even on a quota error rather
-          // than bailing early.
-          console.warn(`[AIServiceManager] JSON preferGemini ${chain[i]} failed:`, (err as Error).message);
-        }
+      // Bounded retry on the SAME model (spec §37). This is not the error-driven
+      // fallback chain that was deliberately removed: that walked to a DIFFERENT
+      // model and hid the failure. This re-attempts the model the user chose, only
+      // for failures that can actually succeed (429/5xx/timeout/connection), at
+      // most as many times as the paying feature's registry entry allows, with
+      // exponential backoff and jitter. JSON generation is non-streaming, so a
+      // retry cannot re-deliver partial output to a client.
+      //
+      // Every attempt runs inside the caller's existing withVGU scope, so its
+      // tokens land in ONE reservation and count against ONE provider-call
+      // ceiling — which is what makes a retry accounted for rather than free.
+      const feature = currentAIContext()?.feature || 'other';
+      const { result, retry } = await withProviderRetry({ feature }, attemptOnce);
+      if (retry.attempts > 1) {
+        console.log(
+          `[AIServiceManager] generateJSON recovered after ${retry.attempts} attempts`,
+          retry.failures
+        );
       }
-      try {
-        if (githubModel) return await tryGithub(githubModel);
-      } catch (err) {
-        console.warn('[AIServiceManager] JSON preferGemini github fallback failed:', (err as Error).message);
-      }
-      if (this.openai || preferences.openAiKey) return await tryOpenAI('gpt-4o-mini');
-      // Last resort: one more Gemini attempt so we throw a meaningful error.
-      return await tryGemini('gemini-2.5-flash-lite');
-    }
-
-    if (githubModel) {
-      try {
-        return await tryGithub(githubModel);
-      } catch (err) {
-        // Free GitHub Models tier can rate-limit; fall back across the full
-        // Gemini flash-lite chain (which has free-tier quota — the SAME chain
-        // plain chat uses, so research/JSON works whenever chat does), then
-        // OpenAI as a last resort.
-        console.warn(`[AIServiceManager] JSON github (${githubModel}) failed, falling back:`, (err as Error).message);
-        const fallbackChain = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-        for (let i = 0; i < fallbackChain.length; i++) {
-          try {
-            return await tryGemini(fallbackChain[i]);
-          } catch (gemErr) {
-            // Different Gemini models have separate quota buckets — keep trying
-            // the rest of the chain even on a quota error.
-            console.warn(`[AIServiceManager] JSON gemini fallback ${fallbackChain[i]} failed:`, (gemErr as Error).message);
-          }
-        }
-        if (this.openai || preferences.openAiKey) return await tryOpenAI('gpt-4o-mini');
-        throw err;
-      }
-    }
-
-    if (aiModel === 'openai-gpt4o') {
-      return await tryOpenAI('gpt-4o');
-    } else if (aiModel === 'gemini-1.5-flash') {
-      return await tryGemini('gemini-1.5-flash');
-    } else if (aiModel === 'gemini-2.0-flash-exp') {
-      return await tryGemini('gemini-2.0-flash');
-    } else if (aiModel === 'google-ai-studio') {
-      // "Google AI Studio API" → lead with models that have available free-tier
-      // quota. The *-flash-lite models DO have free quota; gemini-2.5-flash /
-      // 2.0-flash / flash-latest are 429 quota-exhausted on current free keys.
-      const chain = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-      for (let i = 0; i < chain.length; i++) {
-        try {
-          return await tryGemini(chain[i]);
-        } catch (err) {
-          // Gemini models can have SEPARATE quota buckets — keep trying the rest
-          // of the chain even on a quota error (a lite model being exhausted
-          // doesn't mean flash-lite-latest is).
-          console.warn(`[AIServiceManager] JSON google-ai-studio: ${chain[i]} failed${i < chain.length - 1 ? `, trying ${chain[i + 1]}` : ''}:`, (err as Error).message);
-        }
-      }
-      return await tryOpenAI('gpt-4o-mini');
-    } else {
-      // veegpt-hybrid: lead with the *-flash-lite models which have available
-      // free-tier quota (2.5-flash / 2.0-flash / pro are 429 quota-exhausted on
-      // current free keys), then fall back to flash/pro, then OpenAI.
-      const hybridChain = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-      for (let i = 0; i < hybridChain.length; i++) {
-        try {
-          return await tryGemini(hybridChain[i]);
-        } catch (err) {
-          // Gemini models can have SEPARATE quota buckets — keep trying the
-          // rest of the chain even on a quota error before falling to OpenAI.
-          console.warn(`[AIServiceManager] JSON hybrid: ${hybridChain[i]} failed${i < hybridChain.length - 1 ? `, trying ${hybridChain[i + 1]}` : ', falling back to OpenAI'}:`, (err as Error).message);
-        }
-      }
-      return await tryOpenAI('gpt-4o-mini');
-    }
+      return result;
+    });
   }
-
 }
 
 export const aiServiceManager = AIServiceManager.getInstance();

@@ -42,7 +42,40 @@ export const getSocialListeningAIWorker = (): Worker | null => {
             undefined,
             String(post.workspaceId)
           );
-          const analysisResult = await AIExtractionService.analyzeContent(content, platform, aiPreferences);
+          // Metered through the single VGU engine like every other AI path. The
+          // workspace owner carries the cost; the post's external id is the
+          // idempotency key so a re-delivered job re-uses its reservation.
+          const { withVGUForUser } = await import('../services/veegpt-metering');
+          // The workspace owner carries the cost — a listening post has no user
+          // of its own, and charging nobody would mean this path spends outside
+          // every budget.
+          const { storage } = await import('../storage');
+          const workspace = await storage
+            .getWorkspace(String(post.workspaceId))
+            .catch(() => undefined);
+          const ownerUserId = (workspace as { userId?: unknown } | undefined)
+            ?.userId;
+          const { result: analysisResult } = await withVGUForUser(
+            {
+              userId: ownerUserId ? String(ownerUserId) : undefined,
+              workspaceId: String(post.workspaceId),
+              feature: 'social_listening.extract',
+              // The workspace's configured model, so the tier estimate is right.
+              model: aiPreferences?.aiModel,
+              // One extraction per post, ever: a re-delivered job re-uses the
+              // same reservation rather than charging again.
+              requestId: `sl_extract_${platform}_${postId}`,
+              // Derived server-side from the post identity, so re-extraction of the
+              // same post is one logical operation however often it is queued.
+              requestIdTrusted: true,
+              meta: {
+                userId: ownerUserId ? String(ownerUserId) : undefined,
+                source: 'social-listening-ai-worker',
+                platform,
+              },
+            },
+            () => AIExtractionService.analyzeContent(content, platform, aiPreferences)
+          );
 
           if (analysisResult) {
             post.aiMetadata = {

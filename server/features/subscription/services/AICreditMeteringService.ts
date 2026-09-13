@@ -7,6 +7,7 @@ import {
   type AICreditFeature,
 } from '../../../config/plan-config'
 import { getRedisClient } from '../../../lib/redis'
+import { providerCostINR } from '../../../config/veegpt-pricing.registry'
 import { collectAIUsage, type AIFeature, type AIUsageSample } from '../../../services/aiUsageTracker'
 import SubscriptionRepository from '../db/repositories/SubscriptionRepository'
 import { AICreditsRepository } from '../db/repositories/AICreditsRepository'
@@ -55,23 +56,6 @@ const AICreditTransaction =
   (mongoose.models.AICreditTransaction as mongoose.Model<CreditTransaction>) ||
   mongoose.model<CreditTransaction>('AICreditTransaction', CreditTransactionSchema)
 
-interface ModelPrice {
-  inputPerMillionInr: number
-  outputPerMillionInr: number
-}
-
-const MODEL_PRICES: Array<{ match: RegExp; price: ModelPrice }> = [
-  { match: /gemini.*flash.*lite/i, price: { inputPerMillionInr: 8.4, outputPerMillionInr: 33.6 } },
-  { match: /gpt-4o-mini|gpt-4\.1-mini/i, price: { inputPerMillionInr: 12.6, outputPerMillionInr: 50.4 } },
-  { match: /gpt-3\.5/i, price: { inputPerMillionInr: 42, outputPerMillionInr: 126 } },
-  { match: /gpt-4o|gpt-4\.1/i, price: { inputPerMillionInr: 210, outputPerMillionInr: 840 } },
-]
-
-const CONSERVATIVE_FALLBACK_PRICE: ModelPrice = {
-  inputPerMillionInr: 210,
-  outputPerMillionInr: 840,
-}
-
 function roundCredits(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
@@ -102,19 +86,30 @@ function abortRejection<T>(signal: AbortSignal): Promise<T> {
   })
 }
 
-function priceForModel(model: string): ModelPrice {
-  return MODEL_PRICES.find(({ match }) => match.test(model))?.price ?? CONSERVATIVE_FALLBACK_PRICE
-}
-
+/**
+ * Provider cost of a set of AI calls, in INR.
+ *
+ * Prices come from the ONE versioned registry
+ * (server/config/veegpt-pricing.registry.ts). This function used to carry its own
+ * regex-matched INR table, which had drifted from the two other copies elsewhere
+ * in the codebase; the registry's USD prices at the default 83 INR/USD reproduce
+ * that table exactly, so credit charges are unchanged (asserted by tests).
+ *
+ * The registry also bills reasoning tokens, which the old table ignored — a real
+ * undercharge on GPT-5 models.
+ */
 export function estimateProviderCostInr(usage: AIUsageSample[]): number {
-  return usage.reduce((sum, sample) => {
-    const price = priceForModel(sample.model)
-    const cached = Math.min(sample.cachedTokens, sample.promptTokens)
-    const uncachedPrompt = Math.max(0, sample.promptTokens - cached)
-    const inputCost = ((uncachedPrompt + cached * 0.1) / 1_000_000) * price.inputPerMillionInr
-    const outputCost = (sample.completionTokens / 1_000_000) * price.outputPerMillionInr
-    return sum + inputCost + outputCost
-  }, 0)
+  return usage.reduce(
+    (sum, sample) =>
+      sum +
+      providerCostINR(sample.model, {
+        inputTokens: sample.promptTokens,
+        outputTokens: sample.completionTokens,
+        cachedTokens: sample.cachedTokens,
+        reasoningTokens: (sample as { reasoningTokens?: number }).reasoningTokens,
+      }),
+    0
+  )
 }
 
 export function computeCreditCharge(

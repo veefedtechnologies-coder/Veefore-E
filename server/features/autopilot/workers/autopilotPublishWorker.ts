@@ -59,6 +59,7 @@ import {
   notificationDispatcher,
   type SessionContext,
 } from '../services/NotificationDispatcher'
+import type { Platform } from '../../../repositories'
 
 const COMPONENT = 'autopilot.autopilotPublishWorker'
 
@@ -97,10 +98,12 @@ export interface AutopilotPublishJobData {
  * atomic claim so the worker never re-reads or re-resolves credentials.
  */
 export interface PublishableContent {
-  /** Connected Instagram account id. */
+  /** Connected account id (Instagram account id or Facebook Page id). */
   accountId: string
   /** Valid access token for the account. */
   accessToken: string
+  /** Target platform (`instagram` | `facebook`) — routes to the right publisher. */
+  platform?: string
   /** Caption text. */
   content: string
   /** Media to publish (URLs + type). */
@@ -120,11 +123,15 @@ export interface PublishResult {
   processing?: boolean
 }
 
-/** The publisher port — satisfied by the existing {@link SimpleInstagramPublisher}. */
+/**
+ * The publisher port — routes to the existing {@link SimpleInstagramPublisher}
+ * for Instagram and to {@link FacebookProvider.publish} for Facebook Pages.
+ */
 export interface Publisher {
   publishPost(data: {
     accountId: string
     accessToken: string
+    platform?: string
     content: string
     mediaFiles: any[]
     hashtags?: string
@@ -165,7 +172,7 @@ export interface PublishEscalationTarget {
 }
 
 /** Resolves the escalation target for a failed publish (optional). */
-export interface EscalationTargetResolver {
+export interface PublishEscalationTargetResolver {
   resolve(data: AutopilotPublishJobData): Promise<PublishEscalationTarget | null>
 }
 
@@ -177,7 +184,7 @@ export interface PublishWorkerDeps {
   auditService: Pick<AutoPilotAuditService, 'record'>
   dispatcher: Pick<NotificationDispatcher, 'dispatch'>
   /** Resolves who to escalate to on exhaustion (R12.5); optional. */
-  escalationTargetResolver?: EscalationTargetResolver
+  escalationTargetResolver?: PublishEscalationTargetResolver
   /** Inter-attempt delays (ms); defaults to {@link DEFAULT_RETRY_DELAYS_MS}. */
   retryDelaysMs?: readonly number[]
   /** Per-attempt publish deadline (ms); defaults to {@link PUBLISH_TIMEOUT_MS}. */
@@ -226,6 +233,7 @@ async function publishWithTimeout(
       return await publisher.publishPost({
         accountId: content.accountId,
         accessToken: content.accessToken,
+        platform: content.platform,
         content: content.content,
         mediaFiles: content.mediaFiles,
         hashtags: content.hashtags,
@@ -309,6 +317,9 @@ export function createPublishJobProcessor(deps: PublishWorkerDeps) {
           postId: result.postId,
           attempt,
         })
+        // Tell the user their post just went live — the "notify, don't ask"
+        // half of Autopilot mode (and a nice heads-up in Copilot too).
+        await notifyPublished(deps, data)
         return { action: 'published', contentId: data.contentId, postId: result.postId, attempts: attempt }
       }
 
@@ -344,6 +355,37 @@ export function createPublishJobProcessor(deps: PublishWorkerDeps) {
     })
 
     return { action: 'failed', contentId: data.contentId, attempts: MAX_ATTEMPTS, escalated, lastError }
+  }
+}
+
+/**
+ * Notify the mission owner that a post just published (best-effort). Resolves
+ * the same workspace-owner target the escalation path uses; a failure to
+ * resolve or dispatch never affects the publish outcome.
+ */
+async function notifyPublished(deps: PublishWorkerDeps, data: AutopilotPublishJobData): Promise<void> {
+  try {
+    const target = deps.escalationTargetResolver
+      ? await deps.escalationTargetResolver.resolve(data)
+      : null
+    if (!target?.userId) return
+    await deps.dispatcher.dispatch({
+      userId: target.userId,
+      workspaceId: data.workspaceId,
+      title: 'Auto Pilot published a post',
+      message: 'Your scheduled post just went live on Instagram.',
+      type: 'info',
+      sessionContext: target.sessionContext,
+      deviceToken: target.deviceToken,
+      email: target.email,
+    })
+  } catch (error) {
+    logger.warn('publish success notification failed', {
+      component: COMPONENT,
+      contentId: data.contentId,
+      slotId: data.slotId,
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 }
 
@@ -428,14 +470,18 @@ const defaultContentStore: PublishContentStore = {
     const { getAccessTokenFromAccount } = await import('../../../storage/converters')
     const account = await socialAccountService.getAccountByPlatform(
       String(claimed.workspaceId),
-      claimed.platform || 'instagram',
+      (claimed.platform || 'instagram') as Platform,
     )
     const accessToken = account ? getAccessTokenFromAccount(account) : undefined
     if (!account || !accessToken) {
       // No credentials — surface as a claim failure so the worker records the
       // attempt failure + escalates rather than calling the publisher blindly.
       await ContentModel.findByIdAndUpdate(contentId, {
-        $set: { status: 'failed', lastError: 'No valid Instagram account/access token', failedAt: new Date() },
+        $set: {
+          status: 'failed',
+          lastError: `No valid ${claimed.platform || 'instagram'} account/access token`,
+          failedAt: new Date(),
+        },
       }).exec()
       return null
     }
@@ -449,6 +495,7 @@ const defaultContentStore: PublishContentStore = {
     return {
       accountId: claimed.accountId || account.accountId || String((account as any)._id),
       accessToken,
+      platform: (claimed.platform || 'instagram') as string,
       content: contentData.text ?? claimed.description ?? claimed.title ?? '',
       mediaFiles: mediaUrls.map((url) => ({ url, type: isVideo ? 'video' : 'photo' })),
       hashtags: Array.isArray(contentData.hashtags)
@@ -488,28 +535,59 @@ const defaultSlotStore: PublishSlotStore = {
   },
 }
 
-/** Default publisher backed by the existing {@link SimpleInstagramPublisher}. */
+/**
+ * Default publisher: routes to {@link FacebookProvider.publish} for Facebook
+ * Pages and to the existing {@link SimpleInstagramPublisher} for Instagram.
+ */
 const defaultPublisher: Publisher = {
   async publishPost(data) {
+    if ((data.platform || '').toLowerCase() === 'facebook') {
+      const { FacebookProvider } = await import('../../facebook/providers/FacebookProvider')
+      const media = Array.isArray(data.mediaFiles) ? data.mediaFiles[0] : undefined
+      const caption = [data.content, data.hashtags].filter(Boolean).join('\n\n')
+      // Facebook (like Instagram) fetches the media URL server-side, so resolve
+      // any private-bucket proxy/S3 reference to a short-lived, publicly-fetchable
+      // CloudFront (or S3 pre-signed) URL first. Non-storage URLs pass through.
+      let fbMediaUrl = media?.url
+      if (fbMediaUrl) {
+        try {
+          const { resolvePublishableMediaUrl } = await import('../../../config/publish-media-url')
+          fbMediaUrl = await resolvePublishableMediaUrl(fbMediaUrl)
+        } catch {
+          /* fall back to the original URL */
+        }
+      }
+      try {
+        const res = await new FacebookProvider().publish({
+          accessToken: data.accessToken,
+          accountId: data.accountId,
+          mediaType: media?.type || data.postType || 'post',
+          mediaUrl: fbMediaUrl,
+          caption,
+        })
+        return { success: !!res.platformPostId, postId: res.platformPostId }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    }
     const { SimpleInstagramPublisher } = await import('../../../simple-instagram-publisher')
     return new SimpleInstagramPublisher().publishPost(data)
   },
 }
 
 /** Default escalation-target resolver: notify the mission's workspace owner. */
-const defaultEscalationTargetResolver: EscalationTargetResolver = {
+const defaultEscalationTargetResolver: PublishEscalationTargetResolver = {
   async resolve(data: AutopilotPublishJobData): Promise<PublishEscalationTarget | null> {
-    try {
-      const { missionRepository } = await import('../db/repositories')
-      const mission = await missionRepository.findById(data.missionId)
-      const userId =
-        (mission as any)?.userId ??
-        (mission as any)?.ownerId ??
-        (mission as any)?.createdBy
-      if (!userId) return null
-      return { userId: String(userId), sessionContext: 'web' }
-    } catch {
-      return null
+    // The Mission model carries no userId/ownerId/createdBy — resolve the
+    // actual notify target via the mission's workspace owner instead.
+    const { resolveMissionNotifyTarget } = await import('../services/MissionNotifyTarget')
+    const target = await resolveMissionNotifyTarget(data.workspaceId)
+    if (!target) return null
+    return {
+      userId: target.userId,
+      sessionContext: target.sessionContext,
+      deviceToken: target.deviceToken,
+      email: target.email,
     }
   },
 }

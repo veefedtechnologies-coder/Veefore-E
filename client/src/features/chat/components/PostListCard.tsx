@@ -17,7 +17,7 @@ export interface PostListCardProps {
 export const PostListCard: React.FC<PostListCardProps> = ({ title, items }) => {
   if (!items?.length) return null
   return (
-    <div className="mt-2 w-full space-y-2">
+    <div className="mt-2 w-full space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-500 ease-out">
       {title && (
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 px-1">
           {title} · {items.length}

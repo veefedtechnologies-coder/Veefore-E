@@ -7,6 +7,7 @@ import { ProfileDropdown } from '../ProfileDropdown'
 import { useUser } from '@/hooks/useUser'
 import { useLocation } from 'wouter'
 import { ThemeSelector } from '@/components/ui/theme-selector'
+import { WorkspaceSelectionModal } from '@/components/workspace/WorkspaceSelectionModal'
 
 interface HeaderProps {
   className?: string
@@ -78,6 +79,11 @@ export function Header({ className, onCreateClick }: HeaderProps) {
         {/* Profile */}
         <ProfileDropdown />
       </div>
+
+      {/* Workspace downgrade selection modal — MANDATORY when the user has more
+          workspaces than their plan allows and hasn't chosen which to keep.
+          Server-driven (survives reloads); the only exit is confirm or upgrade. */}
+      <WorkspaceSelectionModal />
     </header>
   )
 }

@@ -8,9 +8,10 @@ import { createCanvas, loadImage, registerFont } from 'canvas';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
+import { createOpenAI } from './services/ai-provider-guard';
 
 // Initialize OpenAI with API key
-const openai = new OpenAI({
+const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 

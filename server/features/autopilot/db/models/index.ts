@@ -9,6 +9,10 @@
 
 export {
   AutoPilotMissionModel,
+  SUPPORTED_EXECUTION_PLATFORM,
+  SUPPORTED_EXECUTION_PLATFORMS,
+  isInstagramPlatform,
+  isSupportedExecutionPlatform,
   type IAutoPilotMission,
   type IMissionGoal,
   type IMissionGuardrails,

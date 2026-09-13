@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../../../types/express';
 import { storage } from '../../../mongodb-storage';
 import { AICreditService } from '../../../services/AICreditService';
 import { safeParseAIResponse } from '../../../middleware/unsafe-json-replacements';
+import { createOpenAI } from '../../../services/ai-provider-guard';
 
 /**
  * Content Generation Controller
@@ -233,7 +234,7 @@ export class ContentGenerationController {
         return;
       }
 
-      const openai = new OpenAI({
+      const openai = createOpenAI({
         apiKey: process.env.OPENAI_API_KEY
       });
 

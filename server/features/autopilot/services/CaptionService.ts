@@ -54,6 +54,7 @@ import {
 } from '../../../services/AIServiceManager'
 import { withAIFeature } from '../../../services/aiUsageTracker'
 import type { ContentFormat, MediaType } from '../db/models'
+import { toFetchableMediaUrl } from './VisionGroundingService'
 import { GuardrailService, guardrailService } from './GuardrailService'
 import {
   AutoPilotAuditService,
@@ -493,7 +494,12 @@ export class CaptionService {
     for (let attempt = 1; attempt <= totalAttempts; attempt++) {
       try {
         const description = await this.withTimeout(
-          () => this.vision.analyzeMedia(mediaUrl, mediaType, this.preferences(language)),
+          () =>
+            this.vision.analyzeMedia(
+              toFetchableMediaUrl(mediaUrl),
+              mediaType,
+              this.preferences(language),
+            ),
           timeoutMs,
         )
         if (isNonEmptyString(description)) return description.trim()

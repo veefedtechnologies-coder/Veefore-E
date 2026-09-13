@@ -29,6 +29,8 @@ export { AutomationSkeleton } from './AutomationSkeleton'
 
 // Remaining authenticated-route page skeletons (task 7.4)
 export { VideoGeneratorSkeleton } from './VideoGeneratorSkeleton'
+// Video Editor route page skeleton (veefore-ai-video-editor task 23.2)
+export { VideoEditorSkeleton } from './VideoEditorSkeleton'
 export { ProfileSkeleton } from './ProfileSkeleton'
 export { SettingsSkeleton } from './SettingsSkeleton'
 export { SocialListeningSkeleton } from './SocialListeningSkeleton'

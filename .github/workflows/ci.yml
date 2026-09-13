@@ -155,3 +155,27 @@ jobs:
 
       - name: TypeScript type check
         run: npm run typecheck || npx tsc --noEmit --project tsconfig.json 2>&1 | head -20 || true
+
+  # ─────────────────────────────────────────────
+  # Job 4: Mobile VeeGPT Release Guards
+  # Dependency-free static source scans that fail on release-blocking
+  # regressions (obsolete /ai/chat, Copilot/Diagnostic reintroduction, forked
+  # backend routes, duplicate assistant service, secret exposure, unbounded
+  # telemetry, unsafe URIs, workspace leakage, and duplicate actions).
+  # ─────────────────────────────────────────────
+  mobile-veegpt-guards:
+    name: Mobile VeeGPT Release Guards
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run VeeGPT release guards
+        run: npm run guard:veegpt
+        working-directory: mobile-native

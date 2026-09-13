@@ -1,80 +1,154 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { ensureSessionCookie, clearSessionCookie } from '@/lib/session'
 import { setAuthHint, clearAuthHint } from '@/lib/bootstrap'
 import { clearClientSessionState } from '@/lib/session-cleanup'
 
-export const useFirebaseAuth = () => {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const hasInitialized = useRef(false)
-  const sessionRestoreAttempted = useRef(false)
-  const authListenerSet = useRef(false)
-  const wasAuthed = useRef(false)
+/**
+ * useFirebaseAuth — SINGLE, app-wide Firebase auth state.
+ *
+ * IMPORTANT: this hook is backed by ONE module-level store and exactly ONE
+ * `onAuthStateChanged` listener for the whole app. Previously the listener was
+ * created per-hook-instance (guarded only by a `useRef`), so every component
+ * that called `useFirebaseAuth` — App, AuthenticatedApp, useUser, and several
+ * others — attached its own auth listener, its own cross-tab `storage`
+ * listener, and its own `ensureSessionCookie`/restore logic with independent
+ * state. On heavy pages that mount many such consumers at once (e.g. VeeGPT,
+ * which pulls in useUser + subscription + agents + accounts) this produced:
+ *   - bursts of concurrent `/api/auth/session-login` calls, and
+ *   - multiple independent restore/logout state machines racing each other,
+ * where one instance driving a `signInWithCustomToken` restore churns the
+ * global Firebase auth object and ANOTHER instance's listener observes the
+ * transient `null` and trips App.tsx's protected-route redirect to /signin —
+ * i.e. a spurious "auto logout" while the session is actually valid.
+ *
+ * Consolidating to a single store + single listener removes that entire class
+ * of races: there is one source of truth for `user`, one restore path, and one
+ * session-cookie sync, shared by every consumer.
+ */
 
-  useEffect(() => {
-    // Only run once - absolute guard
-    if (authListenerSet.current) {
-      console.log('useFirebaseAuth: Already initialized, skipping')
-      return
-    }
-    
-    authListenerSet.current = true
-    console.log('useFirebaseAuth: Initializing (ONCE)')
+interface AuthSnapshot {
+  user: User | null
+  loading: boolean
+}
 
-    if (!auth) {
-      console.error('useFirebaseAuth: Firebase auth not available')
-      setLoading(false)
-      hasInitialized.current = true
-      return
-    }
+// ── Module-level singleton state ────────────────────────────────────────────
+let snapshot: AuthSnapshot = { user: null, loading: true }
+const listeners = new Set<() => void>()
 
-    // Set up Firebase auth state listener
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+// Single-init guards + restore bookkeeping (module-level = one source of truth).
+let listenerStarted = false
+let hasInitialized = false
+let sessionRestoreAttempted = false
+let wasAuthed = false
+// Timestamp of the last cookie-restore attempt. Throttles re-restores so a
+// genuinely-dead session can't spin in a restore↔null loop, while still
+// allowing recovery from a TRANSIENT Firebase-null after boot.
+let lastRestoreAttempt = 0
+
+function emit() {
+  for (const l of listeners) l()
+}
+
+function setSnapshot(next: Partial<AuthSnapshot>) {
+  const merged = { ...snapshot, ...next }
+  if (merged.user === snapshot.user && merged.loading === snapshot.loading) return
+  snapshot = merged
+  emit()
+}
+
+/**
+ * Cross-tab logout: when ANOTHER tab logs out (lib/auth.ts writes the
+ * `veefore_logout` key), tear down this tab's session and reload to a
+ * signed-out state. Attached exactly once (module scope).
+ */
+function onCrossTabLogout(e: StorageEvent) {
+  if (e.key !== 'veefore_logout' || !e.newValue) return
+  console.log('[useFirebaseAuth] Cross-tab logout detected — signing out this tab')
+  try { clearClientSessionState() } catch { /* ignore */ }
+  auth.signOut().catch(() => {}).finally(() => {
+    window.location.replace('/')
+  })
+}
+
+/**
+ * Start the ONE global auth listener. Idempotent — subsequent calls are no-ops.
+ */
+function startAuthListenerOnce() {
+  if (listenerStarted) return
+  listenerStarted = true
+  console.log('useFirebaseAuth: Initializing global auth listener (ONCE)')
+
+  if (!auth) {
+    console.error('useFirebaseAuth: Firebase auth not available')
+    setSnapshot({ loading: false })
+    hasInitialized = true
+    return
+  }
+
+  onAuthStateChanged(
+    auth,
+    async (firebaseUser) => {
       console.log('useFirebaseAuth: Auth state changed', {
         hasUser: !!firebaseUser,
         uid: firebaseUser?.uid,
-        email: firebaseUser?.email
+        email: firebaseUser?.email,
       })
+
       if (firebaseUser) {
-        // User is authenticated
+        // User is authenticated.
         console.log('useFirebaseAuth: ✅ User authenticated')
-        setUser(firebaseUser)
-        setLoading(false)
-        hasInitialized.current = true
-        wasAuthed.current = true
+        setSnapshot({ user: firebaseUser, loading: false })
+        hasInitialized = true
+        wasAuthed = true
         // Persist an optimistic-auth hint so the next refresh never flashes the
         // public landing on `/` before Firebase restores (anti landing-flash).
         setAuthHint()
-        // Clear any stale cross-tab logout flag now that we're authenticated again
-        // — otherwise recentlyLoggedOut() would block session-cookie creation and
-        // 401-recovery for up to 15s after a logout→login-again within the window.
+        // Clear any stale cross-tab logout flag now that we're authenticated.
         try { localStorage.removeItem('veefore_logout') } catch { /* ignore */ }
 
-        // Phase 1: ensure a server session cookie exists so the next HTML load
-        // can render the dashboard data on the first byte. Fire-and-forget.
+        // Ensure a server session cookie exists (fire-and-forget; throttled in
+        // lib/session so concurrent callers don't storm the endpoint).
         firebaseUser
           .getIdToken()
-          .then((idToken) => ensureSessionCookie(idToken))
+          .then(idToken => ensureSessionCookie(idToken))
           .catch(() => { /* non-fatal */ })
-      } else if (!sessionRestoreAttempted.current) {
-        // Try to restore session from cookie (OAuth flow)
-        sessionRestoreAttempted.current = true
+        return
+      }
+
+      // firebaseUser is null — genuine logout OR a TRANSIENT loss of the
+      // Firebase client session while the server `__session` cookie is valid.
+      const loggedOutRecently = (() => {
+        try {
+          const raw = localStorage.getItem('veefore_logout')
+          if (!raw) return false
+          const ts = Number(raw)
+          return Number.isFinite(ts) && Date.now() - ts < 15 * 1000
+        } catch { return false }
+      })()
+
+      const now = Date.now()
+      const throttleOk = now - lastRestoreAttempt > 10_000
+      const shouldRestore =
+        !loggedOutRecently &&
+        (!sessionRestoreAttempted || (wasAuthed && throttleOk))
+
+      if (shouldRestore) {
+        sessionRestoreAttempted = true
+        lastRestoreAttempt = now
         console.log('useFirebaseAuth: Attempting session restore from cookie...')
 
         try {
           const response = await fetch('/api/auth/session', {
             method: 'GET',
             credentials: 'include',
-            headers: {
-              'Accept': 'application/json',
-            }
+            headers: { Accept: 'application/json' },
           })
 
           console.log('useFirebaseAuth: Session API response:', {
             status: response.status,
-            ok: response.ok
+            ok: response.ok,
           })
 
           if (response.ok) {
@@ -85,42 +159,34 @@ export const useFirebaseAuth = () => {
               console.log('useFirebaseAuth: Got custom token, signing in...')
               const userCredential = await signInWithCustomToken(auth, customToken)
               console.log('useFirebaseAuth: ✅ Signed in with custom token')
-              
-              // Get the ID token from Firebase after signing in
-              const idToken = await userCredential.user.getIdToken()
-              console.log('useFirebaseAuth: Got ID token, updating server cookie...')
-              
-              // Send the ID token back to server to update the cookie
+
+              // Keep the server cookie in sync (best-effort, non-fatal).
               try {
+                const idToken = await userCredential.user.getIdToken()
                 await fetch('/api/auth/update-token', {
                   method: 'POST',
                   credentials: 'include',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ idToken })
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ idToken }),
                 })
-                console.log('useFirebaseAuth: ✅ Server cookie updated with ID token')
               } catch (error) {
                 console.error('useFirebaseAuth: Failed to update server cookie:', error)
-                // Continue anyway - the session is still valid on client side
               }
-              
-              console.log('useFirebaseAuth: ✅ Session restored successfully')
-              // onAuthStateChanged will fire again with the user
-              return // Don't set loading=false yet, wait for onAuthStateChanged
-            } else {
-              console.log('useFirebaseAuth: No custom token in response')
+
+              // onAuthStateChanged will refire with the restored user. Keep the
+              // current `user` in the snapshot (don't flip to null) so the UI
+              // never flashes the signed-out view during recovery.
+              return
             }
+            console.log('useFirebaseAuth: No custom token in response')
           } else {
-            // Handle stale/invalid session — clear state and redirect to sign-in
+            // Genuinely stale/invalid session — clear state and go to sign-in.
             try {
               const errData = await response.json().catch(() => ({}))
               if (errData?.requiresReauth || errData?.error === 'user_not_found') {
-                console.warn('useFirebaseAuth: Stale session detected (user_not_found) — clearing cookies and redirecting to sign-in')
+                console.warn('useFirebaseAuth: Stale session (user_not_found) — clearing cookies and redirecting to sign-in')
                 try { clearClientSessionState() } catch { /* ignore */ }
                 try { clearAuthHint() } catch { /* ignore */ }
-                // Hard redirect to sign-in so user gets a clean session
                 window.location.href = '/signin'
                 return
               }
@@ -130,76 +196,61 @@ export const useFirebaseAuth = () => {
         } catch (error) {
           console.error('useFirebaseAuth: Session restore error:', error)
         }
-
-        // If we reach here, session restore failed or no session exists
-        if (wasAuthed.current) {
-          wasAuthed.current = false
-          void clearSessionCookie()
-        }
-        clearAuthHint()
-        try { localStorage.removeItem('isOnboarded') } catch { /* ignore */ }
-        setUser(null)
-        setLoading(false)
-        hasInitialized.current = true
-      } else {
-        // User is logged out
-        console.log('useFirebaseAuth: User logged out')
-        if (wasAuthed.current) {
-          wasAuthed.current = false
-          void clearSessionCookie()
-        }
-        clearAuthHint()
-        try { localStorage.removeItem('isOnboarded') } catch { /* ignore */ }
-        setUser(null)
-        setLoading(false)
-        hasInitialized.current = true
+        // Restore did not succeed → fall through to the signed-out state.
+      } else if (!loggedOutRecently && wasAuthed) {
+        // A second rapid null within the throttle window. Hold the current
+        // state instead of logging out on a transient; a real logout sets the
+        // guard and the next auth event resolves it cleanly.
+        console.warn('useFirebaseAuth: Transient null within throttle window — holding session, not logging out')
+        return
       }
-    }, (error) => {
+
+      // No (or failed) restore, or a genuine logout: declare signed out.
+      console.log('useFirebaseAuth: User logged out')
+      if (wasAuthed) {
+        wasAuthed = false
+        void clearSessionCookie()
+      }
+      clearAuthHint()
+      try { localStorage.removeItem('isOnboarded') } catch { /* ignore */ }
+      setSnapshot({ user: null, loading: false })
+      hasInitialized = true
+    },
+    (error) => {
       console.error('useFirebaseAuth: onAuthStateChanged error:', error)
-      setUser(null)
-      setLoading(false)
-      hasInitialized.current = true
-    })
-
-    // Timeout fallback
-    const timeout = setTimeout(() => {
-      if (!hasInitialized.current) {
-        console.warn('useFirebaseAuth: Timeout - forcing initialization complete')
-        setLoading(false)
-        hasInitialized.current = true
-      }
-    }, 10000)
-
-    // CROSS-TAB LOGOUT: when ANOTHER tab logs out (lib/auth.ts writes the
-    // `veefore_logout` key), immediately tear down this tab's session and reload
-    // to a signed-out state. Otherwise this tab keeps a live Firebase session and
-    // re-mints auth cookies via /api/auth/update-token on its next 401, logging
-    // everyone back in. `storage` events only fire in OTHER tabs, which is exactly
-    // what we want.
-    const onCrossTabLogout = (e: StorageEvent) => {
-      if (e.key !== 'veefore_logout' || !e.newValue) return
-      console.log('[useFirebaseAuth] Cross-tab logout detected — signing out this tab')
-      try { clearClientSessionState() } catch { /* ignore */ }
-      // Sign out locally, then hard-redirect so the tab re-initializes with no
-      // Firebase user and no cookies (cleared browser-wide by the other tab).
-      auth.signOut().catch(() => {}).finally(() => {
-        window.location.replace('/')
-      })
+      setSnapshot({ user: null, loading: false })
+      hasInitialized = true
     }
-    window.addEventListener('storage', onCrossTabLogout)
+  )
 
-    // Cleanup
+  // Timeout fallback: never leave the app stuck on the boot skeleton.
+  setTimeout(() => {
+    if (!hasInitialized) {
+      console.warn('useFirebaseAuth: Timeout - forcing initialization complete')
+      setSnapshot({ loading: false })
+      hasInitialized = true
+    }
+  }, 10000)
+
+  window.addEventListener('storage', onCrossTabLogout)
+}
+
+export const useFirebaseAuth = () => {
+  // Subscribe this component to the singleton store.
+  const [, forceRender] = useState(0)
+
+  useEffect(() => {
+    startAuthListenerOnce()
+    const listener = () => forceRender(x => x + 1)
+    listeners.add(listener)
     return () => {
-      console.log('useFirebaseAuth: Cleanup called')
-      clearTimeout(timeout)
-      window.removeEventListener('storage', onCrossTabLogout)
-      unsubscribe()
+      listeners.delete(listener)
     }
-  }, []) // Empty deps - run once
+  }, [])
 
   return {
-    user,
-    loading,
-    isAuthenticated: !!user
+    user: snapshot.user,
+    loading: snapshot.loading,
+    isAuthenticated: !!snapshot.user,
   }
 }

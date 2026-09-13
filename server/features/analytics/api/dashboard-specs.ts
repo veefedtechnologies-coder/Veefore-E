@@ -152,6 +152,27 @@ export const ANALYTICS_DASHBOARD_SPECS: Record<string, DashboardSpec> = {
     audienceWidget: true,
     topContentWidget: true,
   },
+
+  // Mobile app home dashboard KPI strip. Same canonical metrics as `overview`
+  // for the 3 shared cards (reach / engagement rate / published posts) PLUS the
+  // follower-FLOW metrics (new_followers, lost_followers, net_followers) so the
+  // mobile "Follower Growth" card can show followers gained/lost in the window
+  // for BOTH Instagram (follows_and_unfollows) and Facebook
+  // (page_daily_follows / page_daily_unfollows_unique). Kept as a separate spec
+  // so the web Overview strip is unchanged. No widgets — the mobile screen only
+  // consumes the KPI values (it fetches its chart via a separate endpoint).
+  'mobile-overview': {
+    title: 'Mobile Overview',
+    kpiKeys: [
+      'followers_total',
+      'new_followers',
+      'lost_followers',
+      'net_followers',
+      'reach_total',
+      'engagement_rate_by_impressions',
+      'published_posts',
+    ],
+  },
 }
 
 /** Get a dashboard spec by id, or undefined if unknown. */

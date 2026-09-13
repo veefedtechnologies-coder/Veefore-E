@@ -752,6 +752,43 @@ export class InstagramApiService {
   }
 
   /**
+   * Fetch the account's COMPLETE media set by following Graph API pagination
+   * (`paging.next`) until exhausted or `hardLimit` is reached. Used for a full
+   * import/backfill so every feed post is stored as Content — the single-page
+   * `getUserMedia` only returned the first page (which under-counted the
+   * dashboard "Posts" metric for accounts with more media than one page).
+   */
+  static async getAllUserMedia(
+    token: string,
+    accountId?: string,
+    hardLimit: number = 200
+  ): Promise<InstagramMediaItem[]> {
+    const all: InstagramMediaItem[] = [];
+    try {
+      let resp: { data: InstagramMediaItem[]; paging?: any } | undefined = await this.getUserMedia(
+        token,
+        100,
+        accountId
+      );
+      while (resp && Array.isArray(resp.data) && resp.data.length > 0) {
+        all.push(...resp.data);
+        if (all.length >= hardLimit) break;
+        const next: string | undefined = resp.paging?.next;
+        if (!next) break;
+        try {
+          resp = await this.makeApiRequest<{ data: InstagramMediaItem[]; paging?: any }>(next, token);
+        } catch (err) {
+          console.warn('[INSTAGRAM API] getAllUserMedia pagination stopped early:', err);
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn('[INSTAGRAM API] getAllUserMedia failed:', err);
+    }
+    return all.slice(0, hardLimit);
+  }
+
+  /**
    * Get user's stories
    */
   static async getUserStories(

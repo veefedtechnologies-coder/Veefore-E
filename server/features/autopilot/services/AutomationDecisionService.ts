@@ -188,6 +188,15 @@ export interface AutomationDecisionMissionInput {
   workspaceId: unknown
   /** Account local language; the reply/DM text is authored in it (R9), else English. */
   localLanguage?: string
+  /** Target platform (`instagram` | `facebook`); the drafted rule inherits it. */
+  platform?: string
+  /**
+   * The workspace's configured AI settings (model, BYO keys, persona,
+   * creativity, content-safety, memory), loaded once per tick by the loop so
+   * the automation decision honors the same "AI Models" settings the rest of
+   * the app's AI features do. Optional — omitted defaults to `{}`.
+   */
+  workspaceAIPreferences?: UserAIPreferences
 }
 
 /** The minimal shape of the Content_Slot the decision is made for. */
@@ -200,12 +209,26 @@ export interface AutomationDecisionSlotInput {
   theme?: string
 }
 
+/**
+ * Media grounding for a decision: what the media actually shows (vision) and the
+ * user's per-item intent + explicit trigger keyword. When present, the model
+ * reasons over the real media + user intent, and an explicit user keyword
+ * overrides any AI-derived keyword (R3.3, R4).
+ */
+export interface DecisionGrounding {
+  description?: string
+  userIntent?: string
+  userKeyword?: string
+}
+
 /** Per-call options for {@link AutomationDecisionService.decide}. */
 export interface DecideOptions {
   /** User to attribute the AI spend to via `withAIFeature` (R14.2). */
   userId?: string
   /** Override the 30s deadline (R10.1). Defaults to {@link AUTOMATION_TIMEOUT_MS}. */
   timeoutMs?: number
+  /** Media grounding (vision description + user intent/keyword). */
+  grounding?: DecisionGrounding
 }
 
 /**
@@ -297,7 +320,7 @@ export class AutomationDecisionService {
 
     let raw: unknown
     try {
-      const prompt = this.buildPrompt(mission, slot, caption)
+      const prompt = this.buildPrompt(mission, slot, caption, options.grounding)
       // R14.2: attribute the spend to the mission's workspace/user.
       raw = await withAIFeature(
         AUTOMATION_AI_FEATURE,
@@ -320,7 +343,20 @@ export class AutomationDecisionService {
       return noAutomation(`decision failed: ${message}`)
     }
 
-    const decision = this.parseDecision(raw)
+    let decision = this.parseDecision(raw)
+
+    // R3.3/R4.2: an explicit user keyword is authoritative — override the
+    // AI-derived trigger keyword (normalized) whenever the post needs automation.
+    const userKeyword = options.grounding?.userKeyword
+    if (decision.needsAutomation && isNonEmptyString(userKeyword)) {
+      const normalized = userKeyword.trim()
+      // Only keyword-driven types carry a trigger keyword; leave comment-only as-is.
+      if (decision.type === 'comment-to-dm' || decision.type === 'dm-only') {
+        decision = { ...decision, triggerKeyword: normalized }
+      } else if (decision.type === 'comment-only' && decision.triggerKeyword) {
+        decision = { ...decision, triggerKeyword: normalized }
+      }
+    }
 
     logger.info('AUTOMATION: made automation decision', {
       component: COMPONENT,
@@ -380,7 +416,7 @@ export class AutomationDecisionService {
       description: decision.reason,
       isActive: false,
       type,
-      platform: AUTOPILOT_PLATFORM,
+      platform: this.normalizePlatform(mission.platform),
       postInteraction: true,
       keywords,
       matchMode,
@@ -439,6 +475,16 @@ export class AutomationDecisionService {
       })
     }
     return out
+  }
+
+  /**
+   * Normalise the mission platform onto a rule platform the automation stack
+   * understands (`instagram` | `facebook`), defaulting to the v1 platform when
+   * absent/unrecognised so a drafted rule always has a valid platform.
+   */
+  private normalizePlatform(platform?: string): string {
+    const p = (platform ?? '').trim().toLowerCase()
+    return p === 'facebook' ? 'facebook' : AUTOPILOT_PLATFORM
   }
 
   /** A concise, human-readable draft rule name for the activity log / UI. */
@@ -579,7 +625,7 @@ export class AutomationDecisionService {
    * public reply + DM text are authored in it (R9); English applies by default.
    */
   private preferences(mission: AutomationDecisionMissionInput): UserAIPreferences {
-    const preferences: UserAIPreferences = {}
+    const preferences: UserAIPreferences = { ...(mission.workspaceAIPreferences ?? {}) }
     if (isNonEmptyString(mission.localLanguage)) {
       preferences.multilingual = mission.localLanguage
     }
@@ -598,8 +644,10 @@ export class AutomationDecisionService {
     mission: AutomationDecisionMissionInput,
     slot: AutomationDecisionSlotInput,
     caption: string,
+    grounding?: DecisionGrounding,
   ): string {
     const language = isNonEmptyString(mission.localLanguage) ? mission.localLanguage : 'English'
+    const hasUserKeyword = isNonEmptyString(grounding?.userKeyword)
     return [
       'You are the engagement-automation brain for an autonomous Instagram growth agent.',
       'You wrote the caption below, so you know its call-to-action (CTA) exactly.',
@@ -610,6 +658,14 @@ export class AutomationDecisionService {
       '',
       `POST FORMAT: ${slot.format}`,
       slot.theme ? `THEME: ${slot.theme}` : '',
+      // Ground the decision in what the media actually shows + the user's intent.
+      isNonEmptyString(grounding?.description) ? `WHAT THE MEDIA SHOWS: ${grounding!.description}` : '',
+      isNonEmptyString(grounding?.userIntent)
+        ? `USER INTENT for this post (honor it): ${grounding!.userIntent}`
+        : '',
+      hasUserKeyword
+        ? `USER-SPECIFIED TRIGGER KEYWORD (use EXACTLY this as the keyword): ${grounding!.userKeyword}`
+        : '',
       `OUTPUT LANGUAGE for reply and DM text: ${language}`,
       '',
       'CAPTION:',

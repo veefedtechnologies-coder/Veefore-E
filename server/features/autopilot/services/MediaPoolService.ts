@@ -78,6 +78,10 @@ export interface MediaUploadInput {
   format?: string
   /** Origin of the item; defaults to `user-upload`. */
   origin?: MediaOrigin
+  /** Optional free-text purpose the user attached to this item. */
+  userIntent?: string
+  /** Optional explicit automation trigger keyword for this item. */
+  userKeyword?: string
 }
 
 /** The result of validating a candidate upload (R6.5). Pure, no side effects. */
@@ -209,6 +213,8 @@ export class MediaPoolService {
       mediaType: validation.mediaType,
       format: input.format,
       sizeBytes: input.sizeBytes,
+      ...(input.userIntent ? { userIntent: input.userIntent } : {}),
+      ...(input.userKeyword ? { userKeyword: input.userKeyword } : {}),
       // R6.1: available for assignment to future Content_Slots.
       available: true,
       usedInSlots: [],
@@ -301,6 +307,18 @@ export class MediaPoolService {
   /** List the reusable (available) items for a workspace — resolver read. */
   async listAvailable(workspaceId: unknown): Promise<IMediaPoolItem[]> {
     return this.repository.findAvailableByWorkspace(workspaceId)
+  }
+
+  /**
+   * List the reusable (available) items scoped to a single mission. Each mission
+   * owns its own media, so a new mission starts empty rather than inheriting
+   * another mission's uploads/generated media.
+   */
+  async listAvailableByMission(
+    workspaceId: unknown,
+    missionId: string,
+  ): Promise<IMediaPoolItem[]> {
+    return this.repository.findAvailableByMission(workspaceId, missionId)
   }
 
   /** Map a normalised MIME type to its pool `mediaType`, or `null` if unsupported. */

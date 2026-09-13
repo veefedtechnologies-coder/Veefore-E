@@ -11,10 +11,14 @@ vite.config.ts.*
 /server/.env
 /client/.env
 
+# LiteLLM proxy secrets (contains provider API keys + master key)
+/litellm/.env.litellm
+
 # Do not ignore example env files
 !.env.example
 !/server/.env.example
 !/client/.env.example
+!/litellm/.env.litellm.example
 
 # ===== BUILD & CACHE =====
 .cache
@@ -144,6 +148,12 @@ vercel-set-vars.sh
 *_ENV_VARIABLES.txt
 *-set-vars.sh
 
+# Per-platform env files generated for deployment (contain real secrets —
+# upload their contents to the Vercel/Railway dashboards, never commit them).
+.env.vercel
+.env.railway
+.env.*.local
+
 # ===== Optional binaries/tools =====
 cloudflared/
 cloudflared.exe
@@ -156,3 +166,14 @@ cloudflared.exe
 veefore-*-firebase-adminsdk-*.json
 
 testsprite_tests/tmp/config.json
+
+# Perf harness build output (scripts/perf-stream.mjs)
+client/perf/build/
+
+# AI model usage audit log (scripts/ai-model-report.mjs)
+logs/
+
+# CloudFront signing keys — private key is a SECRET, never commit
+cloudfront_private_key.pem
+cloudfront_public_key.pem
+*.pem

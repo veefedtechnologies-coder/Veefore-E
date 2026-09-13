@@ -30,7 +30,9 @@ function getRazorpayClient(): Razorpay {
     throw new Error('Missing required environment variable: RAZORPAY_KEY_ID');
   }
   if (!keySecret) {
-    throw new Error('Missing required environment variable: RAZORPAY_KEY_SECRET');
+    throw new Error(
+      'Missing required environment variable: RAZORPAY_KEY_SECRET'
+    );
   }
 
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
@@ -111,7 +113,7 @@ export class RazorpaySubscriptionService {
     userId: string,
     email: string,
     phone: string,
-    name?: string,
+    name?: string
   ): Promise<RazorpayCustomerResult> {
     try {
       const customer = await this.client.customers.create({
@@ -135,7 +137,7 @@ export class RazorpaySubscriptionService {
       if (isAlreadyExists) {
         logger.warn(
           'Razorpay reported customer already exists despite fail_existing flag — looking up existing customer by email',
-          { module: 'subscription', userId, email },
+          { module: 'subscription', userId, email }
         );
 
         const existing = await this.findCustomerByEmail(email);
@@ -146,14 +148,14 @@ export class RazorpaySubscriptionService {
         logger.error(
           'Razorpay customer lookup by email found no match after "already exists" error',
           new Error(description || 'Customer lookup failed'),
-          { module: 'subscription', userId, email },
+          { module: 'subscription', userId, email }
         );
       }
 
       logger.error(
         'Razorpay createCustomer failed',
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', userId, email },
+        { module: 'subscription', userId, email }
       );
       throw err;
     }
@@ -168,16 +170,25 @@ export class RazorpaySubscriptionService {
    * relatively few customers (typical for this feature's usage); pages up
    * to 5 times (500 customers) as a safety bound.
    */
-  private async findCustomerByEmail(email: string): Promise<RazorpayCustomerResult | null> {
+  private async findCustomerByEmail(
+    email: string
+  ): Promise<RazorpayCustomerResult | null> {
     const PAGE_SIZE = 100;
     const MAX_PAGES = 5;
 
     for (let page = 0; page < MAX_PAGES; page++) {
-      const result = await this.client.customers.all({ count: PAGE_SIZE, skip: page * PAGE_SIZE } as any);
-      const items = (result as unknown as { items?: Array<Record<string, unknown>> }).items ?? [];
+      const result = await this.client.customers.all({
+        count: PAGE_SIZE,
+        skip: page * PAGE_SIZE,
+      } as any);
+      const items =
+        (result as unknown as { items?: Array<Record<string, unknown>> })
+          .items ?? [];
 
       const match = items.find(
-        (c) => typeof c.email === 'string' && c.email.toLowerCase() === email.toLowerCase(),
+        c =>
+          typeof c.email === 'string' &&
+          c.email.toLowerCase() === email.toLowerCase()
       );
 
       if (match) {
@@ -231,7 +242,7 @@ export class RazorpaySubscriptionService {
       logger.error(
         'Razorpay createPlan failed',
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', params: JSON.stringify(params) },
+        { module: 'subscription', params: JSON.stringify(params) }
       );
       throw err;
     }
@@ -255,12 +266,16 @@ export class RazorpaySubscriptionService {
    * never on subscription creation alone.
    */
   async createSubscription(
-    params: CreateSubscriptionParams,
+    params: CreateSubscriptionParams
   ): Promise<RazorpaySubscriptionResult> {
     try {
       const subscription = await this.client.subscriptions.create({
         plan_id: params.planId,
-        customer_notify: 1,
+        // customer_notify: 0 — Veefore sends its own branded invoice/receipt
+        // emails via Resend (see webhook.controller sendInvoiceEmailForSubscription).
+        // Leaving this at 1 made Razorpay ALSO email the customer its own
+        // receipt, so the user received a duplicate third invoice.
+        customer_notify: 0,
         total_count: params.totalCount,
         notes: params.notes ?? {},
       } as any);
@@ -274,15 +289,20 @@ export class RazorpaySubscriptionService {
       logger.error(
         'Razorpay createSubscription failed',
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', params: JSON.stringify(params) },
+        { module: 'subscription', params: JSON.stringify(params) }
       );
       throw err;
     }
   }
 
   /** Fetch a subscription's current state directly from Razorpay (used by reconciliation). */
-  async getSubscription(subscriptionId: string): Promise<Record<string, unknown>> {
-    return this.client.subscriptions.fetch(subscriptionId) as unknown as Record<string, unknown>;
+  async getSubscription(
+    subscriptionId: string
+  ): Promise<Record<string, unknown>> {
+    return this.client.subscriptions.fetch(subscriptionId) as unknown as Record<
+      string,
+      unknown
+    >;
   }
 
   /**
@@ -292,27 +312,47 @@ export class RazorpaySubscriptionService {
    *   keep access until period end" product requirement). If false,
    *   cancels immediately.
    */
-  async cancelSubscription(subscriptionId: string, cancelAtCycleEnd: boolean): Promise<void> {
+  async cancelSubscription(
+    subscriptionId: string,
+    cancelAtCycleEnd: boolean
+  ): Promise<Record<string, unknown>> {
     try {
-      await this.client.subscriptions.cancel(subscriptionId, cancelAtCycleEnd);
+      const result = await this.client.subscriptions.cancel(
+        subscriptionId,
+        cancelAtCycleEnd
+      );
+      return result as unknown as Record<string, unknown>;
     } catch (err) {
       logger.error(
         'Razorpay cancelSubscription failed',
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', subscriptionId, cancelAtCycleEnd },
+        { module: 'subscription', subscriptionId, cancelAtCycleEnd }
       );
       throw err;
     }
   }
 
+  /** Remove a pending end-of-cycle change and keep auto-renew enabled. */
+  async cancelScheduledChanges(
+    subscriptionId: string
+  ): Promise<Record<string, unknown>> {
+    const result =
+      await this.client.subscriptions.cancelScheduledChanges(subscriptionId);
+    return result as unknown as Record<string, unknown>;
+  }
+
   /** Pause an active subscription (no charges occur while paused). */
   async pauseSubscription(subscriptionId: string): Promise<void> {
-    await this.client.subscriptions.pause(subscriptionId, { pause_at: 'now' } as any);
+    await this.client.subscriptions.pause(subscriptionId, {
+      pause_at: 'now',
+    } as any);
   }
 
   /** Resume a paused subscription. */
   async resumeSubscription(subscriptionId: string): Promise<void> {
-    await this.client.subscriptions.resume(subscriptionId, { resume_at: 'now' } as any);
+    await this.client.subscriptions.resume(subscriptionId, {
+      resume_at: 'now',
+    } as any);
   }
 
   // -------------------------------------------------------------------------
@@ -331,7 +371,7 @@ export class RazorpaySubscriptionService {
   async createRefund(
     paymentId: string,
     amountRupees?: number,
-    notes?: Record<string, string>,
+    notes?: Record<string, string>
   ): Promise<RazorpayRefundResult> {
     try {
       const payload: Record<string, unknown> = { notes: notes ?? {} };
@@ -350,7 +390,7 @@ export class RazorpaySubscriptionService {
       logger.error(
         'Razorpay createRefund failed',
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', paymentId, amountRupees },
+        { module: 'subscription', paymentId, amountRupees }
       );
       throw err;
     }
@@ -358,7 +398,75 @@ export class RazorpaySubscriptionService {
 
   /** Fetch a payment's current state directly from Razorpay. */
   async getPayment(paymentId: string): Promise<Record<string, unknown>> {
-    return this.client.payments.fetch(paymentId) as unknown as Record<string, unknown>;
+    return this.client.payments.fetch(paymentId) as unknown as Record<
+      string,
+      unknown
+    >;
+  }
+
+  // -------------------------------------------------------------------------
+  // Orders (one-time purchases — e.g. prepaid AI credit packs)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Create a one-time Razorpay Order.
+   *
+   * Used for prepaid purchases that must NOT register a recurring mandate —
+   * currently the one-time AI credit packs. Subscriptions (plans and recurring
+   * add-ons) must keep using `createSubscription` so auto-renew works.
+   *
+   * The caller is responsible for deriving `amountPaise` from server-side
+   * config (never from the client) and for putting enough context in `notes`
+   * that the webhook can identify what was bought and for whom — the webhook is
+   * the only place entitlement is granted.
+   *
+   * @param amountPaise - Amount in paise. Must be a positive integer.
+   * @param receipt     - Short caller-side reference (Razorpay caps this at 40 chars).
+   * @param notes       - Metadata echoed back on the order; read by the webhook.
+   */
+  async createOrder(
+    amountPaise: number,
+    receipt: string,
+    notes: Record<string, string>
+  ): Promise<{ orderId: string; amountPaise: number; currency: string }> {
+    if (!Number.isInteger(amountPaise) || amountPaise <= 0) {
+      throw new Error(
+        `createOrder: amountPaise must be a positive integer, got ${amountPaise}`
+      );
+    }
+
+    try {
+      const order = await this.client.orders.create({
+        amount: amountPaise,
+        currency: 'INR',
+        // Razorpay rejects receipts longer than 40 characters.
+        receipt: receipt.slice(0, 40),
+        notes,
+      });
+
+      return {
+        orderId: String((order as { id: string }).id),
+        amountPaise: Number(
+          (order as { amount: number }).amount ?? amountPaise
+        ),
+        currency: String((order as { currency?: string }).currency ?? 'INR'),
+      };
+    } catch (err) {
+      logger.error(
+        'Razorpay createOrder failed',
+        err instanceof Error ? err : new Error(String(err)),
+        { module: 'subscription', amountPaise, receipt }
+      );
+      throw err;
+    }
+  }
+
+  /** Fetch an order's current state (authoritative amount/status/notes). */
+  async getOrder(orderId: string): Promise<Record<string, unknown>> {
+    return this.client.orders.fetch(orderId) as unknown as Record<
+      string,
+      unknown
+    >;
   }
 }
 

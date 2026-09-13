@@ -59,7 +59,13 @@ export interface GuardrailMissionInput {
   brandVoice?: string
   guardrails: {
     postingFrequency: FrequencyCapGuardrail
-    bannedTopics: string[]
+    /**
+     * Topics the mission forbids in generated content (R13.3). Optional so a
+     * caller with a partially-specified mission (e.g. the PLAN stage, which only
+     * needs the posting-frequency cap) can pass its guardrails directly; `check`
+     * treats an absent list as "no banned topics" via `bannedTopics ?? []`.
+     */
+    bannedTopics?: string[]
     /**
      * Maximum AI credit spend authorised for the mission (R14.6). Optional here
      * so the pure frequency/banned-topic helpers can be exercised with a minimal

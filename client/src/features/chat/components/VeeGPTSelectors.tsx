@@ -95,12 +95,12 @@ function Dropdown({
         type="button"
         onClick={() => setOpen((v) => !v)}
         title={title}
-        className={`flex items-center gap-1.5 rounded-full border transition-colors ${
+        className={`flex items-center gap-1.5 rounded-full border shadow-sm transition-colors ${
           compact ? 'px-2.5 py-1 text-xs' : 'px-3 py-1.5 text-[13px]'
         } ${
           active
-            ? 'border-blue-300 dark:border-blue-400/40 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300'
-            : 'border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800/60 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/70'
+            ? 'border-blue-400 dark:border-blue-400/50 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20'
+            : 'border-gray-300 dark:border-white/15 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700'
         }`}
       >
         {icon}

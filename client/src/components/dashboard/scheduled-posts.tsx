@@ -2,7 +2,8 @@ import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Calendar, Eye, Image as ImageIcon, Trash2, Video, RotateCcw } from 'lucide-react'
+import { Calendar, Eye, Image as ImageIcon, Trash2, Video, RotateCcw, Layers, CircleDot } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useLocation } from 'wouter'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '@/lib/queryClient'
@@ -35,26 +36,172 @@ export const useSocialAccountsMap = (workspaceId: string | undefined) => {
   }, [accounts])
 }
 
-const isVideoUrl = (url: string) => {
+export const isVideoUrl = (url: string) => {
   if (!url) return false
   const videoExtensions = ['.mp4', '.mov', '.webm', '.ogg']
   const cleanUrl = url.split('?')[0].toLowerCase()
   return videoExtensions.some(ext => cleanUrl.endsWith(ext)) || url.includes('/video/')
 }
 
-const getPostMediaUrl = (post: any) => {
+export const getPostMediaUrl = (post: any) => {
   if (!post) return ''
-  const urls = post.mediaUrls || post.contentData?.mediaUrls
-  if (urls && urls.length > 0) return urls[0]
-  
-  const media = post.media || post.contentData?.media
-  if (media && media.length > 0) return media[0]
-  
-  return post.thumbnailUrl || post.contentData?.thumbnailUrl || 
-         post.mediaUrl || post.contentData?.mediaUrl || ''
+  const cd = post.contentData || {}
+  const firstOf = (v: any) => (Array.isArray(v) && v.length > 0 ? v[0] : null)
+
+  return (
+    firstOf(post.mediaUrls) || firstOf(cd.mediaUrls) ||
+    firstOf(post.media) || firstOf(cd.media) ||
+    post.thumbnailUrl || cd.thumbnailUrl ||
+    post.mediaUrl || cd.mediaUrl ||
+    post.thumbnail || cd.thumbnail ||
+    post.imageUrl || cd.imageUrl ||
+    // snake_case variants used by some published/imported records
+    post.thumbnail_url || cd.thumbnail_url ||
+    post.media_url || cd.media_url ||
+    post.image_url || cd.image_url ||
+    ''
+  )
 }
 
-const MediaPreview = ({ url }: { url: string | null }) => {
+// ── Post type (Post / Reel / Story / Carousel) ─────────────────────────────
+
+export type PostKind = 'post' | 'reel' | 'story' | 'carousel'
+
+/** Normalize a post's media type into one of the four Instagram kinds. */
+export const getPostKind = (post: any): PostKind => {
+  const t = String(post?.type || post?.contentData?.type || post?.mediaType || 'post').toLowerCase()
+  if (t === 'reel' || t === 'reels' || t === 'video') return 'reel'
+  if (t === 'story' || t === 'stories') return 'story'
+  if (t === 'carousel' || t === 'album') return 'carousel'
+  return 'post'
+}
+
+/** Human label for a post's kind. */
+export const getPostTypeLabel = (post: any): string => {
+  const kind = getPostKind(post)
+  return kind === 'reel' ? 'Reel' : kind === 'story' ? 'Story' : kind === 'carousel' ? 'Carousel' : 'Post'
+}
+
+// Titles auto-generated at create time when there's no caption (e.g. Stories,
+// which don't support captions). We never want to surface these to the user.
+const GENERIC_TITLES = new Set(['', 'new post', 'new draft', 'untitled', 'untitled post', 'untitled draft'])
+
+/**
+ * Best display title for a post card. Prefers the real caption text; when a
+ * post has no meaningful caption (Stories, or an empty draft) it falls back to
+ * a type-based label like "Instagram Story" instead of the stored "New Post".
+ */
+export const getPostDisplayTitle = (post: any): string => {
+  const cd = post?.contentData || {}
+  const raw = String(cd.text || cd.caption || post?.title || post?.description || '').trim()
+  if (raw && !GENERIC_TITLES.has(raw.toLowerCase())) return raw
+  return `Instagram ${getPostTypeLabel(post)}`
+}
+
+const POST_KIND_STYLE: Record<PostKind, { label: string; Icon: any; cls: string }> = {
+  post:     { label: 'Post',     Icon: ImageIcon, cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  reel:     { label: 'Reel',     Icon: Video,     cls: 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+  story:    { label: 'Story',    Icon: CircleDot, cls: 'bg-pink-50 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300' },
+  carousel: { label: 'Carousel', Icon: Layers,    cls: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+}
+
+/** Small pill showing the media type (Post / Reel / Story / Carousel). */
+export const PostTypeBadge = ({ post, className }: { post: any; className?: string }) => {
+  const kind = getPostKind(post)
+  const { label, Icon, cls } = POST_KIND_STYLE[kind]
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide', cls, className)}>
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  )
+}
+
+// Instagram / Facebook CDN hosts hand out short-lived signed URLs that expire
+// and then 403 for everyone. When a post's media points at one of these, we
+// route it through our server proxy which serves a permanent cached copy (and
+// transparently re-fetches a fresh URL from the Graph API when needed).
+const META_CDN_RE = /cdninstagram|fbcdn|lookaside|fbsbx|scontent/i
+
+/** The proxy URL that serves a durable, self-healing copy of a post's media. */
+export const getPostProxyMediaUrl = (post: any): string | null => {
+  const id = post?._id || post?.id
+  return id ? `/api/image-proxy/post-media?contentId=${id}` : null
+}
+
+/**
+ * Resilient media thumbnail for a post. Renders image or video, routes expiring
+ * Meta CDN URLs through the durable caching proxy, and self-heals: if the
+ * direct URL fails to load it retries via the proxy before showing a placeholder.
+ */
+export const PostMedia = ({ post }: { post: any }) => {
+  const raw = getPostMediaUrl(post)
+  const proxyUrl = getPostProxyMediaUrl(post)
+  const kind = getPostKind(post)
+  const rawIsVideo = !!raw && isVideoUrl(raw)
+  // Instagram media id present ⇒ this is a synced/published post whose stored
+  // URL (if any) is an expiring Meta CDN link — serve it through the proxy.
+  const hasIgMediaId = !!post?.contentData?.id
+  const startOnProxy = !!(proxyUrl && ((raw && META_CDN_RE.test(raw)) || (!raw && hasIgMediaId)))
+  // Meta CDN media (and video posters) are served as images by the proxy.
+  const initialSrc = startOnProxy ? proxyUrl! : raw
+
+  const [src, setSrc] = React.useState<string>(initialSrc)
+  const [failed, setFailed] = React.useState(false)
+  const usedProxy = React.useRef<boolean>(startOnProxy)
+
+  React.useEffect(() => {
+    setSrc(initialSrc)
+    setFailed(false)
+    usedProxy.current = startOnProxy
+  }, [initialSrc, startOnProxy])
+
+  const Placeholder = (
+    <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+      <ImageIcon className="w-6 h-6 text-gray-400" />
+    </div>
+  )
+
+  if (!src || failed) return Placeholder
+
+  const overlay = (
+    <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+      <Video className="w-6 h-6 text-white" />
+    </div>
+  )
+
+  // Direct (our own) video URLs render as <video>; proxied media is always an image.
+  if (rawIsVideo && src === raw) {
+    return (
+      <div className="w-full h-full relative bg-gray-100 dark:bg-gray-800">
+        <video src={src} className="w-full h-full object-cover" muted playsInline
+          onError={() => {
+            if (proxyUrl && !usedProxy.current) { usedProxy.current = true; setSrc(proxyUrl) }
+            else setFailed(true)
+          }}
+        />
+        {overlay}
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full h-full relative">
+      <img
+        src={src}
+        alt=""
+        className="w-full h-full object-cover"
+        onError={() => {
+          if (proxyUrl && !usedProxy.current) { usedProxy.current = true; setSrc(proxyUrl) }
+          else setFailed(true)
+        }}
+      />
+      {kind === 'reel' && overlay}
+    </div>
+  )
+}
+
+export const MediaPreview = ({ url }: { url: string | null }) => {
   if (!url) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">

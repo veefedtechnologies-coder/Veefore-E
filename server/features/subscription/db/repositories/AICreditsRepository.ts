@@ -15,7 +15,7 @@
  *    instantiated as a singleton by the service layer.
  */
 
-import AICreditsModel, { type IAICredits } from '../models/AICreditsModel'
+import AICreditsModel, { type IAICredits } from '../models/AICreditsModel';
 
 // ---------------------------------------------------------------------------
 // Exported types
@@ -29,9 +29,9 @@ import AICreditsModel, { type IAICredits } from '../models/AICreditsModel'
  * Concurrency → throws `Error('CONCURRENCY_CONFLICT')` after all retries
  */
 export interface DeductResult {
-  success: boolean
-  reason?: string
-  remaining: number
+  success: boolean;
+  reason?: string;
+  remaining: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ export interface DeductResult {
 
 /** Promise-based sleep — used for exponential back-off between retry attempts. */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ export class AICreditsRepository {
    * @param userId - The user whose credits document should be retrieved.
    */
   async findByUserId(userId: string): Promise<IAICredits | null> {
-    return AICreditsModel.findOne({ userId }).lean<IAICredits>()
+    return AICreditsModel.findOne({ userId }).lean<IAICredits>();
   }
 
   // -------------------------------------------------------------------------
@@ -70,7 +70,7 @@ export class AICreditsRepository {
     monthlyCredits: number,
     nextResetAt: Date
   ): Promise<IAICredits> {
-    const now = new Date()
+    const now = new Date();
     const doc = await AICreditsModel.findOneAndUpdate(
       { userId },
       {
@@ -88,8 +88,8 @@ export class AICreditsRepository {
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
-    )
-    return doc as IAICredits
+    );
+    return doc as IAICredits;
   }
 
   /**
@@ -117,7 +117,7 @@ export class AICreditsRepository {
     monthlyCredits: number,
     nextResetAt: Date
   ): Promise<IAICredits> {
-    const now = new Date()
+    const now = new Date();
 
     const doc = await AICreditsModel.findOneAndUpdate(
       { userId },
@@ -126,9 +126,19 @@ export class AICreditsRepository {
           $set: {
             userId,
             monthlyCredits,
-            // Preserve existing purchasedCredits — add to monthly for remaining
+            // Purchased (add-on) credits are PERMANENT and never reset by a plan
+            // change or renewal. We only normalise them to a whole integer here
+            // so a stray sub-credit refund residue can never persist and surface
+            // as e.g. "5500.3" after an upgrade. Their value is otherwise
+            // preserved exactly.
+            purchasedCredits: {
+              $round: [{ $ifNull: ['$purchasedCredits', 0] }, 0],
+            },
             remainingCredits: {
-              $add: [monthlyCredits, { $ifNull: ['$purchasedCredits', 0] }],
+              $add: [
+                monthlyCredits,
+                { $round: [{ $ifNull: ['$purchasedCredits', 0] }, 0] },
+              ],
             },
             rolloverCredits: 0,
             usedThisCycle: 0,
@@ -143,10 +153,10 @@ export class AICreditsRepository {
         // Ensure purchasedCredits defaults to 0 on insert
         setDefaultsOnInsert: true,
       }
-    )
+    );
 
     // findOneAndUpdate with upsert + aggregation pipeline always returns the doc
-    return doc as IAICredits
+    return doc as IAICredits;
   }
 
   /**
@@ -173,12 +183,12 @@ export class AICreditsRepository {
     nextResetAt: Date,
     dueBefore?: Date
   ): Promise<IAICredits | null> {
-    const now = new Date()
-    const filter: Record<string, unknown> = { userId }
+    const now = new Date();
+    const filter: Record<string, unknown> = { userId };
     // Lazy resets use a compare-and-set condition so two concurrent reads
     // cannot both replenish the same cycle. Billing lifecycle resets omit this
     // argument and remain explicit/unconditional.
-    if (dueBefore) filter.nextResetAt = { $lte: dueBefore }
+    if (dueBefore) filter.nextResetAt = { $lte: dueBefore };
 
     return AICreditsModel.findOneAndUpdate(
       filter,
@@ -188,9 +198,18 @@ export class AICreditsRepository {
             monthlyCredits,
             rolloverCredits: 0,
             usedThisCycle: 0,
+            // Purchased (add-on) credits are PERMANENT — preserved across the
+            // reset, normalised to a whole integer so no sub-credit residue can
+            // persist. Only the monthly allocation is refreshed here.
+            purchasedCredits: {
+              $round: [{ $ifNull: ['$purchasedCredits', 0] }, 0],
+            },
             // Recalculate: monthly fresh allocation + any unconsumed purchased credits
             remainingCredits: {
-              $add: [monthlyCredits, { $ifNull: ['$purchasedCredits', 0] }],
+              $add: [
+                monthlyCredits,
+                { $round: [{ $ifNull: ['$purchasedCredits', 0] }, 0] },
+              ],
             },
             lastResetAt: now,
             nextResetAt,
@@ -198,7 +217,7 @@ export class AICreditsRepository {
         },
       ],
       { new: true }
-    ).lean<IAICredits>()
+    ).lean<IAICredits>();
   }
 
   /**
@@ -244,13 +263,16 @@ export class AICreditsRepository {
     userId: string,
     amount: number,
     maxRetries = 3,
-    debitKey?: string,
+    debitKey?: string
   ): Promise<DeductResult> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       // Atomic conditional update: only succeeds when remaining >= amount and
       // an idempotent reservation key has not already been applied.
-      const filter: Record<string, unknown> = { userId, remainingCredits: { $gte: amount } }
-      if (debitKey) filter.appliedDebitKeys = { $ne: debitKey }
+      const filter: Record<string, unknown> = {
+        userId,
+        remainingCredits: { $gte: amount },
+      };
+      if (debitKey) filter.appliedDebitKeys = { $ne: debitKey };
       // Aggregation pipeline update computes the monthly-first split inside
       // MongoDB so both credit-type fields and remainingCredits are updated
       // atomically in a single round-trip.
@@ -278,7 +300,17 @@ export class AICreditsRepository {
                           {
                             $subtract: [
                               amount,
-                              { $max: [0, { $subtract: ['$monthlyCredits', '$usedThisCycle'] }] },
+                              {
+                                $max: [
+                                  0,
+                                  {
+                                    $subtract: [
+                                      '$monthlyCredits',
+                                      '$usedThisCycle',
+                                    ],
+                                  },
+                                ],
+                              },
                             ],
                           },
                         ],
@@ -306,7 +338,17 @@ export class AICreditsRepository {
                                   {
                                     $subtract: [
                                       amount,
-                                      { $max: [0, { $subtract: ['$monthlyCredits', '$usedThisCycle'] }] },
+                                      {
+                                        $max: [
+                                          0,
+                                          {
+                                            $subtract: [
+                                              '$monthlyCredits',
+                                              '$usedThisCycle',
+                                            ],
+                                          },
+                                        ],
+                                      },
                                     ],
                                   },
                                 ],
@@ -320,34 +362,43 @@ export class AICreditsRepository {
                   },
                 ],
               },
-              remainingCredits: { $round: [{ $subtract: ['$remainingCredits', amount] }, 2] },
-              usedThisCycle: { $round: [{ $add: ['$usedThisCycle', amount] }, 2] },
+              remainingCredits: {
+                $round: [{ $subtract: ['$remainingCredits', amount] }, 2],
+              },
+              usedThisCycle: {
+                $round: [{ $add: ['$usedThisCycle', amount] }, 2],
+              },
               appliedDebitKeys: debitKey
-                ? { $concatArrays: [{ $ifNull: ['$appliedDebitKeys', []] }, [debitKey]] }
+                ? {
+                    $concatArrays: [
+                      { $ifNull: ['$appliedDebitKeys', []] },
+                      [debitKey],
+                    ],
+                  }
                 : { $ifNull: ['$appliedDebitKeys', []] },
             },
           },
         ],
         { new: true }
-      ).lean<IAICredits>()
+      ).lean<IAICredits>();
 
       if (updated !== null) {
         // Deduction succeeded
-        return { success: true, remaining: updated.remainingCredits }
+        return { success: true, remaining: updated.remainingCredits };
       }
 
       // Update returned null — determine why
       const current = await AICreditsModel.findOne({ userId })
         .select('remainingCredits appliedDebitKeys')
-        .lean<Pick<IAICredits, 'remainingCredits' | 'appliedDebitKeys'>>()
+        .lean<Pick<IAICredits, 'remainingCredits' | 'appliedDebitKeys'>>();
 
-      const currentRemaining = current?.remainingCredits ?? 0
+      const currentRemaining = current?.remainingCredits ?? 0;
 
       if (debitKey && current?.appliedDebitKeys?.includes(debitKey)) {
         // Retry after an uncertain database response: the debit committed on
         // the prior attempt, so report its current balance without charging it
         // a second time.
-        return { success: true, remaining: currentRemaining }
+        return { success: true, remaining: currentRemaining };
       }
 
       if (currentRemaining < amount) {
@@ -356,17 +407,17 @@ export class AICreditsRepository {
           success: false,
           reason: 'insufficient_credits',
           remaining: currentRemaining,
-        }
+        };
       }
 
       // Case (b): concurrency conflict — back off and retry
       if (attempt < maxRetries - 1) {
-        await sleep(Math.pow(2, attempt) * 50) // 50 → 100 → 200 ms
+        await sleep(Math.pow(2, attempt) * 50); // 50 → 100 → 200 ms
       }
     }
 
     // All retries exhausted; caller should return HTTP 409
-    throw new Error('CONCURRENCY_CONFLICT')
+    throw new Error('CONCURRENCY_CONFLICT');
   }
 
   /**
@@ -388,9 +439,11 @@ export class AICreditsRepository {
    * @returns   The canonical available balance derived from its components.
    */
   computeRemainingFromDoc(doc: IAICredits): number {
-    return Math.max(0, doc.monthlyCredits - doc.usedThisCycle)
-      + doc.purchasedCredits
-      + doc.rolloverCredits
+    return (
+      Math.max(0, doc.monthlyCredits - doc.usedThisCycle) +
+      doc.purchasedCredits +
+      doc.rolloverCredits
+    );
   }
 
   /**
@@ -409,6 +462,10 @@ export class AICreditsRepository {
         {
           $set: {
             monthlyCredits,
+            // Keep the permanent purchased bucket a whole integer.
+            purchasedCredits: {
+              $round: [{ $ifNull: ['$purchasedCredits', 0] }, 0],
+            },
             remainingCredits: {
               $round: [
                 {
@@ -424,7 +481,7 @@ export class AICreditsRepository {
                         },
                       ],
                     },
-                    { $ifNull: ['$purchasedCredits', 0] },
+                    { $round: [{ $ifNull: ['$purchasedCredits', 0] }, 0] },
                     { $ifNull: ['$rolloverCredits', 0] },
                   ],
                 },
@@ -435,7 +492,7 @@ export class AICreditsRepository {
         },
       ],
       { new: true }
-    ).lean<IAICredits>()
+    ).lean<IAICredits>();
   }
 
   /**
@@ -448,14 +505,14 @@ export class AICreditsRepository {
     userId: string,
     amount: number,
     refundKey?: string,
-    debitAt?: Date,
+    debitAt?: Date
   ): Promise<IAICredits | null> {
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new Error('Credit refund amount must be a positive finite number')
+      throw new Error('Credit refund amount must be a positive finite number');
     }
-    const normalizedAmount = Math.round((amount + Number.EPSILON) * 100) / 100
-    const filter: Record<string, unknown> = { userId }
-    if (refundKey) filter.appliedRefundKeys = { $ne: refundKey }
+    const normalizedAmount = Math.round((amount + Number.EPSILON) * 100) / 100;
+    const filter: Record<string, unknown> = { userId };
+    if (refundKey) filter.appliedRefundKeys = { $ne: refundKey };
 
     const updated = await AICreditsModel.findOneAndUpdate(
       filter,
@@ -470,7 +527,12 @@ export class AICreditsRepository {
                     // The debit belongs to an earlier cycle. Preserve the
                     // recovered value as purchased credit without changing the
                     // current cycle's usage counter.
-                    { $add: [{ $ifNull: ['$purchasedCredits', 0] }, normalizedAmount] },
+                    {
+                      $add: [
+                        { $ifNull: ['$purchasedCredits', 0] },
+                        normalizedAmount,
+                      ],
+                    },
                     {
                       $add: [
                         { $ifNull: ['$purchasedCredits', 0] },
@@ -478,7 +540,17 @@ export class AICreditsRepository {
                         // the current cycle.
                         {
                           $subtract: [
-                            { $max: [0, { $subtract: ['$usedThisCycle', '$monthlyCredits'] }] },
+                            {
+                              $max: [
+                                0,
+                                {
+                                  $subtract: [
+                                    '$usedThisCycle',
+                                    '$monthlyCredits',
+                                  ],
+                                },
+                              ],
+                            },
                             {
                               $max: [
                                 0,
@@ -487,7 +559,12 @@ export class AICreditsRepository {
                                     {
                                       $subtract: [
                                         '$usedThisCycle',
-                                        { $min: [normalizedAmount, '$usedThisCycle'] },
+                                        {
+                                          $min: [
+                                            normalizedAmount,
+                                            '$usedThisCycle',
+                                          ],
+                                        },
                                       ],
                                     },
                                     '$monthlyCredits',
@@ -499,7 +576,12 @@ export class AICreditsRepository {
                         },
                         // Defensive carry for legacy accounts whose usage was
                         // reset without a usable debit timestamp.
-                        { $max: [0, { $subtract: [normalizedAmount, '$usedThisCycle'] }] },
+                        {
+                          $max: [
+                            0,
+                            { $subtract: [normalizedAmount, '$usedThisCycle'] },
+                          ],
+                        },
                       ],
                     },
                   ],
@@ -507,41 +589,63 @@ export class AICreditsRepository {
                 2,
               ],
             },
-            remainingCredits: { $round: [{ $add: ['$remainingCredits', normalizedAmount] }, 2] },
+            remainingCredits: {
+              $round: [{ $add: ['$remainingCredits', normalizedAmount] }, 2],
+            },
             usedThisCycle: {
               $round: [
                 {
                   $cond: [
                     debitAt ? { $gt: ['$lastResetAt', debitAt] } : false,
                     '$usedThisCycle',
-                    { $max: [0, { $subtract: ['$usedThisCycle', normalizedAmount] }] },
+                    {
+                      $max: [
+                        0,
+                        { $subtract: ['$usedThisCycle', normalizedAmount] },
+                      ],
+                    },
                   ],
                 },
                 2,
               ],
             },
             appliedRefundKeys: refundKey
-              ? { $concatArrays: [{ $ifNull: ['$appliedRefundKeys', []] }, [refundKey]] }
+              ? {
+                  $concatArrays: [
+                    { $ifNull: ['$appliedRefundKeys', []] },
+                    [refundKey],
+                  ],
+                }
               : { $ifNull: ['$appliedRefundKeys', []] },
           },
         },
       ],
       { new: true }
-    ).lean<IAICredits>()
+    ).lean<IAICredits>();
 
-    if (updated || !refundKey) return updated
+    if (updated || !refundKey) return updated;
     // A retry after an uncertain network response must not apply the refund
     // twice. If the key is already present, return the current account as a
     // successful idempotent replay.
-    return AICreditsModel.findOne({ userId, appliedRefundKeys: refundKey }).lean<IAICredits>()
+    return AICreditsModel.findOne({
+      userId,
+      appliedRefundKeys: refundKey,
+    }).lean<IAICredits>();
   }
 
   async hasAppliedDebitKey(userId: string, debitKey: string): Promise<boolean> {
-    return Boolean(await AICreditsModel.exists({ userId, appliedDebitKeys: debitKey }))
+    return Boolean(
+      await AICreditsModel.exists({ userId, appliedDebitKeys: debitKey })
+    );
   }
 
-  async hasAppliedRefundKey(userId: string, refundKey: string): Promise<boolean> {
-    return Boolean(await AICreditsModel.exists({ userId, appliedRefundKeys: refundKey }))
+  async hasAppliedRefundKey(
+    userId: string,
+    refundKey: string
+  ): Promise<boolean> {
+    return Boolean(
+      await AICreditsModel.exists({ userId, appliedRefundKeys: refundKey })
+    );
   }
 
   /**
@@ -559,18 +663,60 @@ export class AICreditsRepository {
     amount: number
   ): Promise<IAICredits | null> {
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new Error('Purchased credit amount must be a positive finite number')
+      throw new Error(
+        'Purchased credit amount must be a positive finite number'
+      );
     }
-    const normalizedAmount = Math.round((amount + Number.EPSILON) * 100) / 100
+    // Add-on packs are always whole credits. Round to an integer so the
+    // permanent purchased bucket can never hold a fraction.
+    const wholeAmount = Math.round(amount);
+    // Use an aggregation pipeline (not $inc) so we can (a) normalise any legacy
+    // fractional residue already sitting in purchasedCredits to a whole integer
+    // and (b) recompute remainingCredits from the canonical invariant
+    //   remaining = max(0, monthly - used) + purchased + rollover
+    // which self-heals any prior sub-credit drift. Only the monthly portion may
+    // stay fractional (from in-cycle metered usage); it resets each cycle.
     return AICreditsModel.findOneAndUpdate(
       { userId },
-      {
-        $inc: {
-          purchasedCredits: normalizedAmount,
-          remainingCredits: normalizedAmount,
+      [
+        {
+          $set: {
+            purchasedCredits: {
+              $add: [
+                { $round: [{ $ifNull: ['$purchasedCredits', 0] }, 0] },
+                wholeAmount,
+              ],
+            },
+          },
         },
-      },
+        {
+          $set: {
+            remainingCredits: {
+              $round: [
+                {
+                  $add: [
+                    {
+                      $max: [
+                        0,
+                        {
+                          $subtract: [
+                            { $ifNull: ['$monthlyCredits', 0] },
+                            { $ifNull: ['$usedThisCycle', 0] },
+                          ],
+                        },
+                      ],
+                    },
+                    '$purchasedCredits',
+                    { $ifNull: ['$rolloverCredits', 0] },
+                  ],
+                },
+                2,
+              ],
+            },
+          },
+        },
+      ],
       { new: true }
-    ).lean<IAICredits>()
+    ).lean<IAICredits>();
   }
 }

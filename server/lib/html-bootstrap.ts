@@ -309,17 +309,42 @@ export async function invalidateBootstrapCache(uid: string | undefined | null): 
 
 /** Fetch user + workspaces + per-workspace accounts from the DB (the slow part). */
 async function buildBootstrapFromDb(uid: string): Promise<BootstrapData | null> {
-  const { userService, workspaceService } = await import('../services');
+  const { userService } = await import('../services');
   const user = await userService.getUserById(uid).catch(() => null);
   if (!user) return null;
 
   let workspaces: unknown = undefined;
   let workspaceList: any[] = [];
   try {
-    const ws = await workspaceService.getWorkspacesByUserId(uid);
+    // BUG FIX: Previously used `workspaceService.getWorkspacesByUserId` (the V2
+    // workspace-meta-connection service). That service reads from `workspaces_v2`
+    // which has NO `aiConfiguration` field. When this bootstrap data seeds React
+    // Query on page load, `currentWorkspace.aiConfiguration` was always `undefined`,
+    // so the AI Settings form showed placeholder/defaults on every page load, even
+    // though the settings were correctly saved in the DB. By using the legacy
+    // `storage.getWorkspacesByUserId` (the same path the real `/api/workspaces`
+    // GET endpoint uses), the bootstrap now seeds the cache with full workspace
+    // documents including `aiConfiguration`, so the form shows correct values
+    // immediately without needing a second network round-trip.
+    const { storage } = await import('../mongodb-storage');
+    const ws = await storage.getWorkspacesByUserId(user.id);
     if (ws != null) {
-      workspaces = { success: true, data: ws };
-      workspaceList = Array.isArray(ws) ? ws : [];
+      const rawList = Array.isArray(ws) ? ws : [];
+      // CRITICAL: annotate with plan-based `locked` flags using the SAME shared
+      // helper the live /api/workspaces endpoint uses. Without this, the SSR
+      // bootstrap seeds the React Query cache with UNLOCKED workspaces, and the
+      // 5-minute staleTime means the switcher shows over-limit workspaces as
+      // accessible on first load — the exact plan-enforcement bypass this fixes.
+      // Also carry `requiresWorkspaceSelection` so the mandatory selection modal
+      // shows correctly on the very first paint (before any API round-trip).
+      const { computeWorkspaceLockState } = await import('./workspace-lock');
+      const lockState = await computeWorkspaceLockState(user.id, rawList);
+      workspaces = {
+        success: true,
+        data: lockState.annotated,
+        requiresWorkspaceSelection: lockState.requiresSelection,
+      };
+      workspaceList = lockState.annotated;
     }
   } catch {
     /* workspaces are optional for the bootstrap */
@@ -793,7 +818,7 @@ function buildShellChrome(state: BootstrapData, req: Request): unknown {
 
   if (hasCookie) {
     veegpt = veegpt || { hasConversations: vg.length >= 2 && vg[1] === '1' };
-    veegpt.variant = vg[0] === 'c' ? 'chat' : 'welcome';
+    veegpt.variant = vg[0] === 'c' ? 'chat' : vg[0] === 'a' ? 'album' : 'welcome';
     if (vg.length >= 2) veegpt.showSidebar = vg[1] === '1';
   }
 

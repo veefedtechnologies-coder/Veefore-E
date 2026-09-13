@@ -12,8 +12,12 @@ import {
   Sparkles,
   Clock,
   PenSquare,
+  FileText,
 } from 'lucide-react'
-import { COMPOSER_TOOLS } from '../composerTools'
+import { Lock } from 'lucide-react'
+import { COMPOSER_TOOLS, canUseComposerTool, TIER_MIN_PLAN } from '../composerTools'
+import { ACCEPT_MEDIA, ACCEPT_DOCUMENTS } from '@shared/attachment-support'
+import useSubscription from '@/hooks/useSubscription'
 
 const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Globe, TrendingUp, Telescope, BarChart3, Sparkles, Clock, PenSquare,
@@ -40,6 +44,12 @@ export function ComposerPlusMenu({ onAddFiles, selectedTool, onSelectTool, compa
   const [toolsOpen, setToolsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
+  // VeeGPT tier drives which composer tools are usable (Free=basic, Creator=
+  // full, Pro/Business=advanced). Locked tools route to billing; the server
+  // enforces this too, so this is purely UX.
+  const { limits } = useSubscription()
+  const veeGPTTier = limits?.features?.veeGPTLevel
 
   useEffect(() => {
     if (!open) return
@@ -68,11 +78,23 @@ export function ComposerPlusMenu({ onAddFiles, selectedTool, onSelectTool, compa
         <Plus className={size} style={{ transform: open ? 'rotate(45deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </button>
 
-      {/* Single hidden input accepting BOTH images and videos. */}
+      {/* Hidden input accepting BOTH images and videos. */}
       <input
         ref={mediaInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm,video/x-m4v"
+        accept={ACCEPT_MEDIA}
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; close() }}
+      />
+
+      {/* Documents. Kept as a SEPARATE input so the media picker still opens the
+          photo library rather than a generic file browser. Gemini reads PDFs
+          natively via inlineData; the server routes documents to it. */}
+      <input
+        ref={docInputRef}
+        type="file"
+        accept={ACCEPT_DOCUMENTS}
         multiple
         style={{ display: 'none' }}
         onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; close() }}
@@ -87,6 +109,15 @@ export function ComposerPlusMenu({ onAddFiles, selectedTool, onSelectTool, compa
           >
             <ImageIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" />
             <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">Upload photo or video</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => docInputRef.current?.click()}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700/70 transition-colors"
+          >
+            <FileText className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+            <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">Upload PDF</span>
           </button>
 
           <div className="my-1 border-t border-gray-100 dark:border-white/10" />
@@ -117,19 +148,34 @@ export function ComposerPlusMenu({ onAddFiles, selectedTool, onSelectTool, compa
               {COMPOSER_TOOLS.map((t) => {
                 const Icon = TOOL_ICONS[t.icon] || Wrench
                 const active = selectedTool === t.id
+                const locked = !canUseComposerTool(t, veeGPTTier)
                 return (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => { onSelectTool(active ? null : t.id); close() }}
-                    className="w-full flex items-start gap-2.5 pl-5 pr-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700/70 transition-colors"
+                    onClick={() => {
+                      if (locked) { window.location.href = '/settings/billing'; close(); return }
+                      onSelectTool(active ? null : t.id)
+                      close()
+                    }}
+                    title={locked ? `Available on the ${TIER_MIN_PLAN[t.minTier]} plan and above` : undefined}
+                    className={`w-full flex items-start gap-2.5 pl-5 pr-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700/70 transition-colors ${locked ? 'opacity-60' : ''}`}
                   >
                     <Icon className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                     <span className="flex-1 min-w-0">
-                      <span className="block text-[13px] font-medium text-gray-900 dark:text-gray-100">{t.label}</span>
+                      <span className="flex items-center gap-1.5 text-[13px] font-medium text-gray-900 dark:text-gray-100">
+                        {t.label}
+                        {locked && (
+                          <span className="text-[9px] font-bold uppercase tracking-wide text-amber-600 bg-amber-50 dark:bg-amber-900/30 rounded px-1 py-0.5">
+                            {TIER_MIN_PLAN[t.minTier]}
+                          </span>
+                        )}
+                      </span>
                       <span className="block text-[11px] text-gray-500 dark:text-gray-400 leading-snug">{t.description}</span>
                     </span>
-                    {active && <Check className="w-4 h-4 flex-shrink-0 text-blue-500 dark:text-blue-400" />}
+                    {locked
+                      ? <Lock className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
+                      : active && <Check className="w-4 h-4 flex-shrink-0 text-blue-500 dark:text-blue-400" />}
                   </button>
                 )
               })}

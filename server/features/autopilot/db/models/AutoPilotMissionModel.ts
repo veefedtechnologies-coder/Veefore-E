@@ -14,6 +14,50 @@
 
 import mongoose, { Schema, type Document } from 'mongoose'
 
+/**
+ * The only platform Auto Pilot executes autonomously in v1 (R18.6/R18.7). The
+ * Mission model may *represent* other platforms for future extension, but
+ * autonomous execution is limited to Instagram — activation of a non-Instagram
+ * mission is declined at the controller and side-effecting loop stages are
+ * suppressed defensively in the orchestrator.
+ */
+export const SUPPORTED_EXECUTION_PLATFORM = 'instagram'
+
+/**
+ * The platforms Auto Pilot can execute autonomously. Instagram was the v1
+ * platform; Facebook Pages are now supported too (publishing rides
+ * `FacebookProvider.publish`, and the loop's SENSE/PLAN/GATE/ACT/MEASURE stages
+ * are platform-agnostic). Other platforms remain representable in the Mission
+ * model for future extension but are not yet executed.
+ */
+export const SUPPORTED_EXECUTION_PLATFORMS = ['instagram', 'facebook'] as const
+
+/**
+ * True when `platform` is the v1 autonomously-executable platform (Instagram).
+ * Comparison is case-insensitive and trims surrounding whitespace. A
+ * missing/empty platform is treated as Instagram since the model defaults to it
+ * (R18.6): the mission is representable for any platform, but only Instagram is
+ * executed.
+ */
+export function isInstagramPlatform(platform?: string | null): boolean {
+  if (platform == null) return true
+  const normalized = platform.trim().toLowerCase()
+  return normalized === '' || normalized === SUPPORTED_EXECUTION_PLATFORM
+}
+
+/**
+ * True when Auto Pilot can autonomously execute a mission on `platform`
+ * (currently Instagram or Facebook). Case-insensitive and whitespace-trimmed; a
+ * missing/empty platform defaults to Instagram (the model default). Non-executed
+ * platforms return false so activation is declined and side-effecting loop
+ * stages are suppressed.
+ */
+export function isSupportedExecutionPlatform(platform?: string | null): boolean {
+  if (platform == null) return true
+  const normalized = platform.trim().toLowerCase()
+  return normalized === '' || (SUPPORTED_EXECUTION_PLATFORMS as readonly string[]).includes(normalized)
+}
+
 export type MissionMetric = 'followers' | 'engagement' | 'reach'
 export type OperatingMode = 'copilot' | 'autopilot'
 export type ContentSourcePreference = 'user-first' | 'ai-first'
@@ -55,6 +99,30 @@ export interface IAutoPilotMission extends Document {
   progress: IMissionProgressPoint[]
   status: MissionStatus
   lastIterationAt?: Date
+  /**
+   * Consecutive Operating-Loop iterations in which a required backing service was
+   * unreachable (R18.4/R18.5). Incremented on each outage tick, reset to 0 on a
+   * successful iteration. When it reaches the escalation threshold (3), the loop
+   * pauses the Mission and surfaces the failure without discarding state.
+   */
+  consecutiveOutageStreak: number
+  /**
+   * Persistent memory log for the Auto Pilot agent — stores a compact history of
+   * key autonomous decisions, published posts, and user instructions so the loop
+   * can reference past context across restarts and build on prior actions rather
+   * than repeating itself. Each entry is a timestamped summary (role + content).
+   *
+   * This is the Auto Pilot's equivalent of VeeGPT's chat memory: it lets the
+   * agent know what it has already done, what worked, what the user asked, and
+   * what was approved/rejected, so it can make better decisions on every tick.
+   * Capped at the last 100 entries to bound document size.
+   */
+  agentMemory: Array<{
+    role: 'agent' | 'user' | 'system'
+    content: string
+    at: Date
+    type?: 'published' | 'automation' | 'decision' | 'instruction' | 'approval' | 'rejection'
+  }>
   createdAt: Date
   updatedAt: Date
 }
@@ -106,7 +174,11 @@ const AutoPilotMissionSchema = new Schema<IAutoPilotMission>(
     },
     guardrails: { type: MissionGuardrailsSchema, required: true },
     strategy: { type: Schema.Types.Mixed, required: false },
-    strategyMemory: { type: [Schema.Types.Mixed], default: [] },
+    // LEARN insights are arbitrary JSON objects. Mongoose's generic typings do
+    // not reconcile an array of `Mixed` against a typed `Record<string,unknown>[]`
+    // field, so the element type is declared as a Mixed subdocument option — the
+    // supported way to model "array of arbitrary objects" that also type-checks.
+    strategyMemory: { type: [{ type: Schema.Types.Mixed }], default: [] },
     progress: {
       type: [
         new Schema<IMissionProgressPoint>(
@@ -124,6 +196,30 @@ const AutoPilotMissionSchema = new Schema<IAutoPilotMission>(
       index: true,
     },
     lastIterationAt: { type: Date, required: false },
+    // R18.4/R18.5: consecutive backing-service outage iterations (see interface).
+    consecutiveOutageStreak: { type: Number, default: 0, min: 0 },
+    // Agent memory: persistent log of key autopilot decisions, published posts,
+    // and user instructions. Lets the agent know what it already did and build
+    // on prior context across restarts (the autopilot's "long-term memory").
+    // Capped at 100 entries at the application layer (see MissionRepository).
+    agentMemory: {
+      type: [
+        new Schema(
+          {
+            role: { type: String, enum: ['agent', 'user', 'system'], required: true },
+            content: { type: String, required: true },
+            at: { type: Date, required: true, default: () => new Date() },
+            type: {
+              type: String,
+              enum: ['published', 'automation', 'decision', 'instruction', 'approval', 'rejection'],
+              required: false,
+            },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 )

@@ -57,6 +57,8 @@ export interface IUser extends Document {
   refreshTokenKeyVersion?: string;      // Key version for graceful SESSION_SECRET rotation
   refreshTokenCreatedAt?: Date;         // Token creation timestamp
   sessionVersion: number;               // Session version for emergency session invalidation
+  /** User-chosen preferred workspace IDs (used to decide which stay accessible on downgrade) */
+  preferredWorkspaceIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -118,6 +120,8 @@ export const UserSchema = new Schema<IUser>({
   refreshTokenKeyVersion: { type: String }, // Key version for graceful SESSION_SECRET rotation
   refreshTokenCreatedAt: { type: Date },
   sessionVersion: { type: Number, default: 1 }, // Session version for emergency session invalidation
+  /** User-chosen preferred workspace IDs — used by the downgrade locking logic */
+  preferredWorkspaceIds: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

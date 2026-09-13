@@ -22,6 +22,17 @@ export interface IContent extends Document {
   creditsUsed: number;
   prompt?: string;
   isImported?: boolean;
+  /**
+   * Durable media cache. Instagram/Facebook CDN URLs (in contentData.media_url
+   * etc.) expire and then 403. On first display we download the bytes to our
+   * own permanent storage and record the key here — kept at the TOP level (not
+   * inside contentData) so periodic sync upserts, which replace contentData
+   * wholesale, never wipe the cache pointer.
+   */
+  cachedMediaKey?: string;
+  cachedMediaUrl?: string;
+  cachedMediaContentType?: string;
+  cachedMediaAt?: Date;
   metrics?: {
     likes?: number;
     comments?: number;
@@ -64,6 +75,12 @@ const ContentSchema = new Schema<IContent>({
   creditsUsed: { type: Number, default: 0 },
   prompt: String,
   isImported: { type: Boolean, default: false },
+  // Durable media cache pointer (see IContent docs). Top-level so sync upserts
+  // that replace contentData don't wipe it.
+  cachedMediaKey: { type: String, default: null },
+  cachedMediaUrl: { type: String, default: null },
+  cachedMediaContentType: { type: String, default: null },
+  cachedMediaAt: { type: Date, default: null },
   metrics: {
     likes: { type: Number, default: 0 },
     comments: { type: Number, default: 0 },

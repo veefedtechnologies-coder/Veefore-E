@@ -108,6 +108,81 @@ export class MissionRepository extends BaseRepository<IAutoPilotMission> {
   ): Promise<IAutoPilotMission | null> {
     return this.updateById(missionId, { lastIterationAt: at } as any)
   }
+
+  /**
+   * Persist the consecutive backing-service outage streak (R18.4/R18.5). The
+   * Operating-Loop orchestrator increments this on each outage iteration and
+   * resets it to 0 after a successful one.
+   */
+  async updateOutageStreak(
+    missionId: string,
+    streak: number
+  ): Promise<IAutoPilotMission | null> {
+    return this.updateById(missionId, {
+      consecutiveOutageStreak: Math.max(0, Math.floor(streak)),
+    } as any)
+  }
+
+  /**
+   * Append an agent memory entry to the mission's persistent memory log.
+   * This is the Auto Pilot's long-term memory — it records key autonomous
+   * decisions (posts published, automations activated), user instructions
+   * received, and approval/rejection events so the agent can reference what
+   * it has already done across restarts and build on prior context.
+   *
+   * Capped at the last 100 entries via a $push + $slice so the document size
+   * stays bounded regardless of mission longevity.
+   */
+  async appendAgentMemory(
+    missionId: string,
+    entry: {
+      role: 'agent' | 'user' | 'system'
+      content: string
+      at?: Date
+      type?: 'published' | 'automation' | 'decision' | 'instruction' | 'approval' | 'rejection'
+    }
+  ): Promise<void> {
+    try {
+      const memEntry = { ...entry, at: entry.at ?? new Date() }
+      await this.model
+        .findByIdAndUpdate(
+          missionId,
+          {
+            // $push with $each + $slice keeps only the last 100 entries.
+            $push: {
+              agentMemory: {
+                $each: [memEntry],
+                $slice: -100,
+              },
+            },
+            $set: { updatedAt: new Date() },
+          },
+          { new: false }
+        )
+        .exec()
+    } catch {
+      /* best-effort — memory write failure must never break the loop */
+    }
+  }
+
+  /**
+   * Load the last N agent memory entries for a mission. Used to build the
+   * agent's context when it needs to recall what it has done previously.
+   * Returns an empty array when the mission has no memory yet.
+   */
+  async getAgentMemory(
+    missionId: string,
+    limit = 20
+  ): Promise<IAutoPilotMission['agentMemory']> {
+    try {
+      const mission = await this.model
+        .findById(missionId, { agentMemory: { $slice: -limit } })
+        .exec()
+      return (mission?.agentMemory ?? []) as IAutoPilotMission['agentMemory']
+    } catch {
+      return []
+    }
+  }
 }
 
 export const missionRepository = new MissionRepository()

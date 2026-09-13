@@ -17,6 +17,7 @@ import healthRoutes from './health.routes';
 import activityRoutes from './activity.routes';
 import socialAuthRoutes from './social-auth.routes';
 import voiceProfileRoutes from './voice-profile.routes';
+import { autopilotRouter } from '../../features/autopilot/routes/autopilot.routes';
 // NOTE: googleAuthRoutes (./google-auth.routes) removed — it was an orphaned
 // duplicate of the live OAuth implementation in server/routes/auth.ts
 // (mounted at /api/auth/google/*). Nothing called /api/(v1/)google-auth/*.
@@ -40,7 +41,10 @@ import { default as earlyAccessRoutes } from './early-access.routes';
 export { default as activityRoutes } from './activity.routes';
 export { default as voiceProfileRoutes } from './voice-profile.routes';
 
-export function mountV1Routes(app: Application, basePath: string = '/api/v1'): void {
+export function mountV1Routes(
+  app: Application,
+  basePath: string = '/api/v1'
+): void {
   app.use(`${basePath}/auth`, authRoutes);
   app.use(`${basePath}/user`, userRoutes);
   app.use(`${basePath}/workspaces`, workspaceRoutes);
@@ -55,10 +59,39 @@ export function mountV1Routes(app: Application, basePath: string = '/api/v1'): v
   app.use(`${basePath}/thumbnails`, thumbnailsRoutes);
   app.use(`${basePath}/trends`, trendsRoutes);
   app.use(`${basePath}/automation`, automationRoutes);
-  app.use(`${basePath}/billing`, billingRoutes);
+  // NOTE: `billingRoutes` is deliberately NOT mounted here.
+  //
+  // `mountV1Routes` is called twice (once with '/api', once with '/api/v1')
+  // because the client genuinely uses both prefixes for most resources. For
+  // billing that produced two independent copies of every money-handling
+  // endpoint — two rate limiters, two audit-middleware chains, and two paths any
+  // future auth fix would have to be applied to consistently.
+  //
+  // Billing is now mounted exactly once, from `registerRoutes` in server/routes.ts.
+  // See `mountBillingRoutes` below.
   app.use(`${basePath}/activity`, activityRoutes);
+  app.use(`${basePath}/autopilot`, autopilotRouter);
   app.use('/webhook', webhooksRoutes);
   app.use('/api', healthRoutes);
+}
+
+/**
+ * Mount the billing router exactly once, at a single canonical path.
+ *
+ * Billing endpoints move money, so having them reachable at two prefixes is a
+ * liability rather than a convenience: every guard has to be kept in sync across
+ * both, and a fix applied to one silently leaves the other exposed.
+ *
+ * `/api/billing` is chosen as the canonical path because no client code
+ * references `/api/v1/billing`. Note that the primary subscription API is
+ * `/api/v2/subscription/*`; this legacy router now only serves the one-time
+ * credit/add-on order endpoints.
+ */
+export function mountBillingRoutes(
+  app: Application,
+  basePath: string = '/api/billing'
+): void {
+  app.use(basePath, billingRoutes);
 }
 
 const v1Router = Router();
@@ -76,7 +109,11 @@ v1Router.use('/voice-profile', voiceProfileRoutes);
 v1Router.use('/thumbnails', thumbnailsRoutes);
 v1Router.use('/trends', trendsRoutes);
 v1Router.use('/automation', automationRoutes);
+// This standalone `v1Router` is currently unused (server/routes.ts mounts via
+// mountV1Routes instead). If it is ever wired up, drop this billing line —
+// billing must stay mounted exactly once, via mountBillingRoutes.
 v1Router.use('/billing', billingRoutes);
 v1Router.use('/activity', activityRoutes);
+v1Router.use('/autopilot', autopilotRouter);
 
 export default v1Router;

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createGemini } from './services/ai-provider-guard';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+const genAI = createGemini(process.env.GOOGLE_API_KEY!);
 
 interface SuggestionData {
   type: 'trending' | 'hashtag' | 'audio' | 'timing' | 'engagement' | 'growth';

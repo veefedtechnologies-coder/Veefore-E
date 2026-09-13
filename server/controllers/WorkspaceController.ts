@@ -38,6 +38,8 @@ const UpdateWorkspaceSchema = z.object({
   aiConfiguration: z.object({
     aiModel: z.string().optional(),
     creativityLevel: z.number().min(0).max(1).optional(),
+    reasoningEffort: z.enum(['minimal', 'low', 'medium', 'high']).optional(),
+    showThinking: z.boolean().optional(),
     optimizationGoals: z.string().optional(),
     aiPersona: z.string().optional(),
     captionStyle: z.string().optional(),
@@ -64,7 +66,20 @@ export class WorkspaceController extends BaseController {
     res: Response
   ) => {
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
-    const workspace = await workspaceService.getWorkspaceById(workspaceId);
+
+    // BUG FIX: this previously called `workspaceService.getWorkspaceById(...)`
+    // (server/services/WorkspaceService.ts — the workspace-meta-connection
+    // spec's V2 service). Its `WorkspaceModel` (`workspaces_v2` collection)
+    // has NO `aiConfiguration` field at all, so even after fixing the PUT
+    // save (see updateWorkspace below) to persist to the legacy `Workspace`
+    // model, this GET kept serving the V2 projection — which never has
+    // aiConfiguration — making the save look like it silently did nothing.
+    // Read from the same legacy `storage` layer every AI feature (and
+    // getMembers/getInvitations/inviteMember below) already use.
+    const workspace = await storage.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new NotFoundError('Workspace not found');
+    }
     this.sendSuccess(res, workspace);
   });
 
@@ -72,21 +87,25 @@ export class WorkspaceController extends BaseController {
     req: TypedRequest,
     res: Response
   ) => {
-    // WorkspaceModel stores ownerId as Firebase UID (set by importAuthorizedBrand
-    // and workspace.routes.ts). Use firebaseUid preferentially so newly imported
-    // workspaces are returned. Fall back to MongoDB id for legacy workspaces.
-    const firebaseUid: string = (req.user as any).firebaseUid || req.user!.id;
-    const mongoId: string = req.user!.id;
+    const userId: string = req.user!.id;
+    const workspaces = await storage.getWorkspacesByUserId(userId);
 
-    let workspaces = await workspaceService.getWorkspacesByUserId(firebaseUid);
+    // PLAN ENFORCEMENT: annotate each workspace with `locked: true` when it is
+    // beyond the user's current plan limit so the frontend can block switching.
+    // Data is NEVER deleted — workspaces stay visible but inaccessible without
+    // upgrading. Uses the SHARED helper so this list, the /api/workspaces-v2
+    // list, and the SSR bootstrap all produce IDENTICAL locked flags.
+    const { computeWorkspaceLockState } = await import('../lib/workspace-lock');
+    const lockState = await computeWorkspaceLockState(userId, workspaces as any[]);
 
-    // If the Firebase UID lookup returns nothing, try the MongoDB _id as a fallback
-    // (covers users who still have workspaces keyed by mongoId from before the spec).
-    if (!workspaces || workspaces.length === 0) {
-      workspaces = await workspaceService.getWorkspacesByUserId(mongoId);
-    }
-
-    this.sendSuccess(res, workspaces);
+    // Include `requiresWorkspaceSelection` so the client can force the mandatory
+    // workspace-selection modal until the user explicitly chooses which
+    // workspace(s) to keep active after a downgrade.
+    res.json({
+      success: true,
+      data: lockState.annotated,
+      requiresWorkspaceSelection: lockState.requiresSelection,
+    });
   });
 
   createWorkspace = this.wrapAsync(async (
@@ -147,10 +166,44 @@ export class WorkspaceController extends BaseController {
     req: TypedRequest<{ workspaceId: string }, z.infer<typeof UpdateWorkspaceSchema>>,
     res: Response
   ) => {
-    const userId = req.user!.id;
+    const user = req.user!;
+    const userId = user.id;
     const { workspaceId } = WorkspaceIdParams.parse(req.params);
     const input = UpdateWorkspaceSchema.parse(req.body);
-    const workspace = await workspaceService.updateWorkspace(workspaceId, userId, input);
+
+    console.log('[WorkspaceController.updateWorkspace] hit', { workspaceId, userId, hasAiConfig: !!input.aiConfiguration });
+
+    // BUG FIX: this previously called `workspaceService.updateWorkspace(...)`
+    // (server/services/WorkspaceService.ts), the workspace-meta-connection
+    // spec's V2 service. That service (a) has no `updateWorkspace` method at
+    // all — every save threw a TypeError and returned 500 — and (b) even if
+    // it did, it writes to the WorkspaceV2 model (`workspaces_v2` collection,
+    // keyed by Firebase UID `ownerId`), which has NO `aiConfiguration` field
+    // in its schema. Every AI feature that reads workspace settings (VeeGPT
+    // chat, Auto Pilot, caption/text generation, analytics) reads
+    // `aiConfiguration` from the LEGACY `storage`/`Workspace` model (the
+    // `workspaces` collection, keyed by `userId`) via `storage.getWorkspace()`.
+    // Route the update to that same legacy store so a save actually persists
+    // and is visible to AI generation immediately.
+    const existing = await storage.getWorkspace(workspaceId);
+    if (!existing) {
+      throw new NotFoundError('Workspace not found');
+    }
+    const ownerMatches =
+      existing.userId?.toString() === userId?.toString() ||
+      existing.userId === user.firebaseUid;
+    if (!ownerMatches) {
+      throw new ForbiddenError('Access denied to workspace');
+    }
+
+    const workspace = await storage.updateWorkspace(workspaceId, input as any);
+    console.log('[WorkspaceController.updateWorkspace] saved OK', { workspaceId, aiModel: (workspace as any)?.aiConfiguration?.aiModel });
+
+    // Workspace data changed — invalidate the per-user bootstrap cache so the
+    // NEXT HTML load (reload / new tab) seeds React Query with the updated
+    // workspace data (including the new aiConfiguration), instead of serving
+    // the 60-second Redis-cached bootstrap that predates this save.
+    void invalidateBootstrapCache(userId);
 
     // Workspace data changed → refresh VeeGPT's cached context snapshot so chat
     // reflects new profile / AI configuration immediately (background worker).

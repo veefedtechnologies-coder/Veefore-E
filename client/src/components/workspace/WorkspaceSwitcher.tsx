@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Plus } from 'lucide-react'
+import { ChevronDown, Plus, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useLocation } from 'wouter'
@@ -36,7 +36,11 @@ export function WorkspaceSwitcher() {
 
   const visibleWorkspaces = workspaces.filter((w) => w.status !== 'DELETED')
 
-  const handleSwitch = async (id: string) => {
+  const handleSwitch = async (id: string, locked?: boolean) => {
+    if (locked) {
+      // Don't switch — the UI already shows the upgrade prompt
+      return
+    }
     if (id === activeWorkspace?.id) {
       setOpen(false)
       return
@@ -50,6 +54,8 @@ export function WorkspaceSwitcher() {
     setOpen(false)
     setLocation('/settings/add-workspace')
   }
+
+  const lockedCount = visibleWorkspaces.filter((w: any) => w.locked).length
 
   return (
     <div
@@ -107,53 +113,105 @@ export function WorkspaceSwitcher() {
             aria-label="Switch workspace"
             className={cn(
               'absolute left-full top-0 ml-2 z-50',
-              'w-56 rounded-xl shadow-xl border',
+              'w-64 rounded-xl shadow-xl border',
               'bg-white dark:bg-slate-800',
               'border-gray-200 dark:border-slate-600',
               'py-1 overflow-hidden',
             )}
           >
-            {visibleWorkspaces.map((ws) => {
+            {/* Header label */}
+            <div className="px-3 pt-2 pb-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                Switch Workspace
+              </span>
+              {lockedCount > 0 && (
+                <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">
+                  · {visibleWorkspaces.length - lockedCount}/{visibleWorkspaces.length} available
+                </span>
+              )}
+            </div>
+
+            {visibleWorkspaces.map((ws: any) => {
               const isActive = ws.id === activeWorkspace?.id
               const isSuspended = ws.status === 'SUSPENDED'
+              const isLocked = !!ws.locked
+
               return (
-                <button
-                  key={ws.id}
-                  role="option"
-                  aria-selected={isActive}
-                  onClick={() => handleSwitch(ws.id)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150',
-                    isActive
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700',
-                  )}
-                >
-                  {/* Avatar */}
-                  <div
+                <div key={ws.id} className="relative group/ws">
+                  <button
+                    role="option"
+                    aria-selected={isActive}
+                    aria-disabled={isLocked}
+                    onClick={() => handleSwitch(ws.id, isLocked)}
                     className={cn(
-                      'w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0',
-                      `bg-gradient-to-br ${getAvatarGradient(ws.name)}`,
+                      'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150',
+                      isLocked
+                        ? 'opacity-50 cursor-not-allowed text-gray-500 dark:text-gray-400'
+                        : isActive
+                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700',
                     )}
                   >
-                    {getInitial(ws.name)}
-                  </div>
+                    {/* Avatar */}
+                    <div
+                      className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0',
+                        isLocked
+                          ? 'bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700'
+                          : `bg-gradient-to-br ${getAvatarGradient(ws.name)}`,
+                      )}
+                    >
+                      {isLocked ? (
+                        <Lock className="w-3.5 h-3.5 text-white/80" />
+                      ) : (
+                        getInitial(ws.name)
+                      )}
+                    </div>
 
-                  {/* Name + suspended badge */}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium truncate block">{ws.name}</span>
-                    {isSuspended && (
-                      <span className="text-xs font-medium text-amber-600 dark:text-amber-400 leading-tight">
-                        Suspended
-                      </span>
+                    {/* Name + badge */}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium truncate block">{ws.name}</span>
+                      {isLocked ? (
+                        <span className="text-[10px] font-medium text-amber-500 dark:text-amber-400 leading-tight">
+                          Upgrade to access
+                        </span>
+                      ) : isSuspended ? (
+                        <span className="text-xs font-medium text-amber-600 dark:text-amber-400 leading-tight">
+                          Suspended
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Active checkmark (only for unlocked) */}
+                    {isActive && !isLocked && (
+                      <div className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
                     )}
-                  </div>
+                  </button>
 
-                  {/* Active checkmark */}
-                  {isActive && (
-                    <div className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
+                  {/* Upgrade tooltip for locked workspaces */}
+                  {isLocked && (
+                    <div
+                      className={cn(
+                        'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50',
+                        'hidden group-hover/ws:block',
+                        'px-3 py-2 rounded-lg text-xs text-white text-center',
+                        'bg-gray-900 shadow-lg w-52',
+                      )}
+                    >
+                      <div className="font-semibold mb-0.5">Workspace locked</div>
+                      <div className="text-gray-300 text-[11px]">
+                        {ws.lockedReason ?? 'Upgrade your plan to access this workspace. Your data is safe.'}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpen(false); setLocation('/settings/billing') }}
+                        className="mt-1.5 px-2.5 py-1 rounded-md bg-blue-500 hover:bg-blue-600 text-white text-[11px] font-medium transition-colors"
+                      >
+                        Upgrade plan
+                      </button>
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                    </div>
                   )}
-                </button>
+                </div>
               )
             })}
 
@@ -175,7 +233,9 @@ export function WorkspaceSwitcher() {
                 <div className="w-8 h-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-500 flex items-center justify-center flex-shrink-0">
                   <Plus className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 </div>
-                <span className="text-sm font-medium">Add Workspace</span>
+                <span className="text-sm font-medium">
+                  {isAtLimit ? `${visibleWorkspaces.filter((w: any) => !w.locked).length}/${visibleWorkspaces.length} used — upgrade to add more` : 'Create New Workspace'}
+                </span>
               </button>
 
               {/* Tooltip shown when at limit */}

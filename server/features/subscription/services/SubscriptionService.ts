@@ -22,22 +22,22 @@
  * never on subscription creation alone.
  */
 
-import { type Redis } from 'ioredis'
-import { razorpaySubscriptionService } from './RazorpaySubscriptionService'
-import { quotaNotifier } from './QuotaNotifier'
-import { AICreditsRepository } from '../db/repositories/AICreditsRepository'
-import { SubscriptionEventModel } from '../db/models/SubscriptionEventModel'
-import RazorpayPlanModel from '../db/models/RazorpayPlanModel'
+import { type Redis } from 'ioredis';
+import { razorpaySubscriptionService } from './RazorpaySubscriptionService';
+import { quotaNotifier } from './QuotaNotifier';
+import { AICreditsRepository } from '../db/repositories/AICreditsRepository';
+import { SubscriptionEventModel } from '../db/models/SubscriptionEventModel';
+import RazorpayPlanModel from '../db/models/RazorpayPlanModel';
 import {
   PLAN_CONFIG,
   isValidPlan,
   getPlanOrder,
   type PlanId,
   type BillingCycle,
-} from '../../../config/plan-config'
-import logger from '../../../config/logger'
-import type SubscriptionRepository from '../db/repositories/SubscriptionRepository'
-import type EntitlementService from './EntitlementService'
+} from '../../../config/plan-config';
+import logger from '../../../config/logger';
+import type SubscriptionRepository from '../db/repositories/SubscriptionRepository';
+import type EntitlementService from './EntitlementService';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -45,7 +45,7 @@ import type EntitlementService from './EntitlementService'
 
 /** Returns a Date that is exactly `days` calendar days from now. */
 function daysFromNow(days: number): Date {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
 /**
@@ -57,8 +57,8 @@ function daysFromNow(days: number): Date {
  */
 const TOTAL_BILLING_CYCLES: Record<BillingCycle, number> = {
   monthly: 120, // 10 years of monthly cycles
-  yearly: 10,   // 10 years of yearly cycles
-}
+  yearly: 10, // 10 years of yearly cycles
+};
 
 // ---------------------------------------------------------------------------
 // SubscriptionService
@@ -66,17 +66,17 @@ const TOTAL_BILLING_CYCLES: Record<BillingCycle, number> = {
 
 // Must match SUB_ME_CACHE_PREFIX in subscription.controller.ts — the Redis key
 // prefix for the cached GET /api/v2/subscription/me response.
-const SUB_ME_CACHE_PREFIX = 'sub:me:'
+const SUB_ME_CACHE_PREFIX = 'sub:me:';
 
 export class SubscriptionService {
-  private readonly aiCreditsRepo: AICreditsRepository
+  private readonly aiCreditsRepo: AICreditsRepository;
 
   constructor(
     private readonly subscriptionRepo: SubscriptionRepository,
     private readonly entitlementService: EntitlementService,
-    private readonly redis: Redis,
+    private readonly redis: Redis
   ) {
-    this.aiCreditsRepo = new AICreditsRepository()
+    this.aiCreditsRepo = new AICreditsRepository();
   }
 
   /**
@@ -97,15 +97,38 @@ export class SubscriptionService {
    * Only downgradeToFree (in the controller) previously cleared this cache.
    */
   private async invalidateAllCaches(userId: string): Promise<void> {
-    await this.entitlementService.invalidateCache(userId)
+    await this.entitlementService.invalidateCache(userId);
     try {
-      await this.redis.del(`${SUB_ME_CACHE_PREFIX}${userId}`)
+      await this.redis.del(`${SUB_ME_CACHE_PREFIX}${userId}`);
     } catch (err) {
       logger.warn('Failed to invalidate sub:me cache (non-fatal)', {
         userId,
         err: (err as Error)?.message,
         module: 'SubscriptionService',
-      })
+      });
+    }
+    // Any plan change alters which workspaces are accessible (per-plan
+    // maxWorkspaces). Drop the SSR bootstrap cache so the next load re-seeds the
+    // workspace list with fresh `locked` flags and `requiresWorkspaceSelection`,
+    // instead of the pre-change (all-accessible) snapshot.
+    try {
+      const { invalidateBootstrapCache } =
+        await import('../../../lib/html-bootstrap');
+      void invalidateBootstrapCache(userId);
+    } catch {
+      /* non-fatal */
+    }
+    // VeeGPT keeps its OWN 60s plan cache (veegpt:rl:plan:{userId}) read on every
+    // AI request AND by the usage panel (GET /api/chat/limits). Without clearing
+    // it here, a plan change left the VeeGPT usage panel and quota gate showing
+    // the OLD plan's VGU limits for up to 60s — e.g. a downgrade to Creator still
+    // displaying Business's caps. Drop it so the new plan's limits apply at once.
+    try {
+      const { invalidateVeegptPlanCache } =
+        await import('../../../services/veegpt-plan');
+      await invalidateVeegptPlanCache(userId);
+    } catch {
+      /* non-fatal — the cache self-expires within 60s */
     }
   }
 
@@ -119,29 +142,44 @@ export class SubscriptionService {
    * points, so this cache prevents creating a duplicate plan on every
    * checkout for the same price.
    */
-  private async getOrCreateRazorpayPlanId(planType: PlanId, billingCycle: BillingCycle): Promise<string> {
-    const planConfig = PLAN_CONFIG[planType]
-    const amountPaise = planConfig.pricing[billingCycle]
+  private async getOrCreateRazorpayPlanId(
+    planType: PlanId,
+    billingCycle: BillingCycle
+  ): Promise<string> {
+    const planConfig = PLAN_CONFIG[planType];
+    const amountPaise = planConfig.pricing[billingCycle];
 
-    const existing = await RazorpayPlanModel.findOne({ planType, billingCycle, amountPaise }).lean()
+    const existing = await RazorpayPlanModel.findOne({
+      planType,
+      billingCycle,
+      amountPaise,
+    }).lean();
     if (existing) {
-      return existing.razorpayPlanId
+      return existing.razorpayPlanId;
     }
 
     const razorpayPlanId = await razorpaySubscriptionService.createPlan({
       planType,
       billingCycle,
       amountRupees: amountPaise / 100,
-    })
+    });
 
-    await RazorpayPlanModel.create({ planType, billingCycle, amountPaise, razorpayPlanId })
+    await RazorpayPlanModel.create({
+      planType,
+      billingCycle,
+      amountPaise,
+      razorpayPlanId,
+    });
 
-    logger.info(
-      'Created new Razorpay plan',
-      { planType, billingCycle, amountPaise, razorpayPlanId, module: 'SubscriptionService' },
-    )
+    logger.info('Created new Razorpay plan', {
+      planType,
+      billingCycle,
+      amountPaise,
+      razorpayPlanId,
+      module: 'SubscriptionService',
+    });
 
-    return razorpayPlanId
+    return razorpayPlanId;
   }
 
   // -------------------------------------------------------------------------
@@ -181,29 +219,40 @@ export class SubscriptionService {
     planId: string,
     billingCycle: BillingCycle,
     email: string,
-    phone: string,
+    phone: string
   ): Promise<{ subscriptionId: string; checkoutUrl: string }> {
     // Step 1 — validate planId
     if (!isValidPlan(planId)) {
-      logger.warn(
-        'create() called with invalid planId',
-        { userId, planId, module: 'SubscriptionService' },
-      )
-      throw new Error(`Invalid planId: '${planId}'`)
+      logger.warn('create() called with invalid planId', {
+        userId,
+        planId,
+        module: 'SubscriptionService',
+      });
+      throw new Error(`Invalid planId: '${planId}'`);
     }
 
-    const validPlanId = planId as PlanId
+    const validPlanId = planId as PlanId;
 
-    logger.info(
-      'Starting subscription creation',
-      { userId, workspaceId, planId: validPlanId, billingCycle, module: 'SubscriptionService' },
-    )
+    logger.info('Starting subscription creation', {
+      userId,
+      workspaceId,
+      planId: validPlanId,
+      billingCycle,
+      module: 'SubscriptionService',
+    });
 
     // Step 2 — create Razorpay customer
-    const customer = await razorpaySubscriptionService.createCustomer(userId, email, phone)
+    const customer = await razorpaySubscriptionService.createCustomer(
+      userId,
+      email,
+      phone
+    );
 
     // Step 3 — resolve/create the Razorpay plan for this price point
-    const razorpayPlanId = await this.getOrCreateRazorpayPlanId(validPlanId, billingCycle)
+    const razorpayPlanId = await this.getOrCreateRazorpayPlanId(
+      validPlanId,
+      billingCycle
+    );
 
     // Step 4 — create Razorpay subscription
     const razorpaySub = await razorpaySubscriptionService.createSubscription({
@@ -216,28 +265,29 @@ export class SubscriptionService {
         veefore_plan_id: validPlanId,
         veefore_billing_cycle: billingCycle,
       },
-    })
+    });
 
-    logger.info(
-      'Razorpay createSubscription response',
-      {
-        userId,
-        razorpaySubId: razorpaySub.subscriptionId,
-        status: razorpaySub.status,
-        module: 'SubscriptionService',
-      },
-    )
+    logger.info('Razorpay createSubscription response', {
+      userId,
+      razorpaySubId: razorpaySub.subscriptionId,
+      status: razorpaySub.status,
+      module: 'SubscriptionService',
+    });
 
     // Step 5 — upsert local Subscription document
     // NOTE: status is 'pending_payment' — paid plan limits are NOT granted
     // until the webhook confirms the authentication payment was captured.
-    const now = new Date()
-    const placeholderPeriodEnd = billingCycle === 'yearly' ? daysFromNow(365) : daysFromNow(30)
+    const now = new Date();
+    const placeholderPeriodEnd =
+      billingCycle === 'yearly' ? daysFromNow(365) : daysFromNow(30);
 
     const subscription = await this.subscriptionRepo.upsert({
       userId,
       workspaceId,
       plan: validPlanId,
+      // Clear any stale pendingPlan from a previously abandoned upgrade so it
+      // can never be applied to THIS new subscription by the webhook.
+      pendingPlan: null,
       billingCycle,
       status: 'pending_payment',
       razorpaySubscriptionId: razorpaySub.subscriptionId,
@@ -248,13 +298,16 @@ export class SubscriptionService {
       currentPeriodEnd: placeholderPeriodEnd,
       nextBillingDate: placeholderPeriodEnd,
       cancelAtPeriodEnd: false,
-    } as Parameters<typeof this.subscriptionRepo.upsert>[0])
+    } as Parameters<typeof this.subscriptionRepo.upsert>[0]);
 
     // Step 6 — record audit event
     await SubscriptionEventModel.create({
       eventType: 'subscription.created',
       userId,
-      subscriptionId: subscription.subscriptionId ?? (subscription as any)._id?.toString() ?? 'unknown',
+      subscriptionId:
+        subscription.subscriptionId ??
+        (subscription as any)._id?.toString() ??
+        'unknown',
       previousStatus: null,
       newStatus: 'pending_payment',
       previousPlan: null,
@@ -268,29 +321,26 @@ export class SubscriptionService {
         razorpayPlanId,
       },
       timestamp: new Date(),
-    })
+    });
 
-    logger.info(
-      'Subscription created, awaiting Razorpay checkout completion',
-      {
-        userId,
-        planId: validPlanId,
-        razorpaySubscriptionId: razorpaySub.subscriptionId,
-        module: 'SubscriptionService',
-      },
-    )
+    logger.info('Subscription created, awaiting Razorpay checkout completion', {
+      userId,
+      planId: validPlanId,
+      razorpaySubscriptionId: razorpaySub.subscriptionId,
+      module: 'SubscriptionService',
+    });
 
     // Invalidate caches — the new subscription is 'pending_payment'
     // (not yet paid), so any cached paid limits must be flushed to enforce
     // free-tier access.
-    await this.invalidateAllCaches(userId)
+    await this.invalidateAllCaches(userId);
 
     // Step 7 — return subscriptionId (for JS Checkout) and a hosted checkout
     // URL fallback (short_url behaves like a payment link).
     return {
       subscriptionId: razorpaySub.subscriptionId,
       checkoutUrl: razorpaySub.shortUrl ?? '',
-    }
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -313,17 +363,20 @@ export class SubscriptionService {
    * @param userId    - Veefore user ID.
    * @param newPlanId - Must be a valid PlanId that is a higher tier than current.
    */
-  async upgrade(userId: string, newPlanId: string): Promise<void> {
+  async upgrade(
+    userId: string,
+    newPlanId: string
+  ): Promise<{ subscriptionId: string; checkoutUrl: string }> {
     // Step 1 — validate newPlanId
     if (!isValidPlan(newPlanId)) {
-      throw new Error(`Invalid planId: '${newPlanId}'`)
+      throw new Error(`Invalid planId: '${newPlanId}'`);
     }
 
-    const newPlan = newPlanId as PlanId
+    const newPlan = newPlanId as PlanId;
 
-    const subscription = await this.subscriptionRepo.findByUserId(userId)
+    const subscription = await this.subscriptionRepo.findByUserId(userId);
     if (!subscription) {
-      throw new Error(`No subscription found for userId: ${userId}`)
+      throw new Error(`No subscription found for userId: ${userId}`);
     }
 
     // BUG FIX: this method previously only checked plan tier ORDER, never
@@ -339,65 +392,128 @@ export class SubscriptionService {
     if (subscription.status !== 'active') {
       throw new Error(
         `upgrade() requires an active paid subscription. Current status: '${subscription.status}'. ` +
-        `Start a new subscription via create() instead.`,
-      )
+          `Start a new subscription via create() instead.`
+      );
     }
 
-    const currentPlan = subscription.plan as PlanId
+    const currentPlan = subscription.plan as PlanId;
 
     if (getPlanOrder(newPlan) <= getPlanOrder(currentPlan)) {
       throw new Error(
-        `upgrade() requires a higher-tier plan. Current: '${currentPlan}', requested: '${newPlan}'`,
-      )
+        `upgrade() requires a higher-tier plan. Current: '${currentPlan}', requested: '${newPlan}'`
+      );
     }
 
-    logger.info(
-      'Upgrading subscription',
-      { userId, currentPlan, newPlan, module: 'SubscriptionService' },
-    )
+    logger.info('Upgrading subscription', {
+      userId,
+      currentPlan,
+      newPlan,
+      module: 'SubscriptionService',
+    });
 
-    // Step 2 — swap Razorpay subscription if one exists
-    let newRazorpaySubId = subscription.razorpaySubscriptionId ?? null
-    const billingCycle = subscription.billingCycle as BillingCycle
+    // Step 2 — create the NEW Razorpay subscription for the upgraded plan.
+    //
+    // IMPORTANT ORDERING: we intentionally do NOT cancel the old subscription
+    // yet. Cancelling it here (before the local record is repointed) races
+    // with Razorpay's `subscription.cancelled` webhook for the old sub — if
+    // that webhook lands while the record still references the old sub id, the
+    // cancellation handler downgrades the user to 'free' mid-upgrade (the
+    // "shows free for a moment" bug). Instead we create the new sub, repoint +
+    // mark the record pending (step 3), and only THEN cancel the old sub
+    // (step 3b) — by which point the record is already protected by both its
+    // new sub id and its `pendingPlan` flag.
+    let newRazorpaySubId = subscription.razorpaySubscriptionId ?? null;
+    let newCheckoutUrl = '';
+    const oldRazorpaySubId = subscription.razorpaySubscriptionId ?? null;
+    const billingCycle = subscription.billingCycle as BillingCycle;
 
     if (subscription.razorpaySubscriptionId) {
-      // Cancel old Razorpay subscription immediately (no grace period for
-      // the OLD plan — the new plan's authentication charge takes over).
-      await razorpaySubscriptionService.cancelSubscription(subscription.razorpaySubscriptionId, false)
-
       // Resolve/create the Razorpay plan for the upgraded price point
-      const razorpayPlanId = await this.getOrCreateRazorpayPlanId(newPlan, billingCycle)
+      const razorpayPlanId = await this.getOrCreateRazorpayPlanId(
+        newPlan,
+        billingCycle
+      );
 
       // Create new Razorpay subscription for the upgraded plan
-      const newRazorpaySub = await razorpaySubscriptionService.createSubscription({
-        customerId: subscription.razorpayCustomerId ?? userId,
-        planId: razorpayPlanId,
-        totalCount: TOTAL_BILLING_CYCLES[billingCycle],
-        notes: {
-          veefore_user_id: userId,
-          veefore_plan_id: newPlan,
-          veefore_billing_cycle: billingCycle,
-          veefore_upgrade_from: currentPlan,
-        },
-      })
-      newRazorpaySubId = newRazorpaySub.subscriptionId
+      const newRazorpaySub =
+        await razorpaySubscriptionService.createSubscription({
+          customerId: subscription.razorpayCustomerId ?? userId,
+          planId: razorpayPlanId,
+          totalCount: TOTAL_BILLING_CYCLES[billingCycle],
+          notes: {
+            veefore_user_id: userId,
+            veefore_plan_id: newPlan,
+            veefore_billing_cycle: billingCycle,
+            veefore_upgrade_from: currentPlan,
+          },
+        });
+      newRazorpaySubId = newRazorpaySub.subscriptionId;
+      newCheckoutUrl = newRazorpaySub.shortUrl ?? '';
     }
 
-    // Step 3 — update the local Subscription document
+    // Step 3 — record the upgrade as PENDING PAYMENT.
+    //
+    // CRITICAL: we do NOT write `plan: newPlan` or allocate the new plan's AI
+    // credits here. Doing so previously granted the upgraded plan for free,
+    // because entitlement is gated on `status === 'active'` + `plan`, and this
+    // method leaves status 'active'. Instead we:
+    //   • keep `plan` on the current (already-paid) tier so the user retains
+    //     exactly what they paid for during the upgrade window, and
+    //   • store the target tier in `pendingPlan` + point the record at the new
+    //     Razorpay subscription id.
+    // The plan swap + credit allocation happen ONLY when the new subscription's
+    // authentication charge is captured (subscription.activated / .charged
+    // webhook), which reads `pendingPlan` and applies it. See webhook.controller.
+    // Also clear any prior cancellation state: the user is committing to a new
+    // paid subscription, and the old (possibly cancel-at-period-end) sub is
+    // being cancelled immediately below. Leaving these set would make the new
+    // upgraded plan incorrectly show as "cancelled / ends at period close".
     const updatedSubscription = await this.subscriptionRepo.upsert({
       userId,
-      plan: newPlan,
+      pendingPlan: newPlan,
+      cancelAtPeriodEnd: false,
+      cancellationReason: null,
+      cancellationFeedback: null,
+      cancellationRequestedAt: null,
       ...(newRazorpaySubId !== subscription.razorpaySubscriptionId
         ? { razorpaySubscriptionId: newRazorpaySubId }
         : {}),
-    } as Parameters<typeof this.subscriptionRepo.upsert>[0])
+    } as Parameters<typeof this.subscriptionRepo.upsert>[0]);
 
-    // Step 4 — invalidate caches
-    await this.invalidateAllCaches(userId)
+    // Step 3b — NOW cancel the old Razorpay subscription. The local record
+    // already points at the new sub id and carries `pendingPlan`, so the
+    // old sub's `subscription.cancelled` webhook can no longer match/downgrade
+    // this record to free. Non-fatal: a failure here just means the old sub
+    // lingers at Razorpay (reconciliation will catch it) — it must never block
+    // the upgrade.
+    if (oldRazorpaySubId && oldRazorpaySubId !== newRazorpaySubId) {
+      try {
+        await razorpaySubscriptionService.cancelSubscription(
+          oldRazorpaySubId,
+          false
+        );
+      } catch (cancelErr) {
+        logger.warn(
+          'Failed to cancel old Razorpay subscription during upgrade (non-fatal)',
+          {
+            userId,
+            oldRazorpaySubId,
+            err:
+              cancelErr instanceof Error
+                ? cancelErr.message
+                : String(cancelErr),
+            module: 'SubscriptionService',
+          }
+        );
+      }
+    }
 
-    // Step 5 — record audit event
+    // Step 4 — invalidate caches (no entitlement change yet, but keep fresh)
+    await this.invalidateAllCaches(userId);
+
+    // Step 5 — record audit event (upgrade INITIATED, not yet completed)
     await SubscriptionEventModel.create({
-      eventType: 'subscription.upgraded',
+      eventType: 'subscription.upgrade_initiated',
       userId,
       subscriptionId: updatedSubscription.subscriptionId,
       previousStatus: subscription.status,
@@ -409,30 +525,27 @@ export class SubscriptionService {
         previousRazorpaySubscriptionId: subscription.razorpaySubscriptionId,
         newRazorpaySubscriptionId: newRazorpaySubId,
         billingCycle: subscription.billingCycle,
+        pendingPayment: true,
       },
       timestamp: new Date(),
-    })
-
-    // Step 6 — allocate new AI credits for the upgraded plan
-    const newPlanConfig = PLAN_CONFIG[newPlan]
-    const nextBillingDate = subscription.nextBillingDate ?? daysFromNow(30)
-
-    await this.aiCreditsRepo.upsertForUser(
-      userId,
-      newPlanConfig.limits.aiCreditsPerMonth,
-      nextBillingDate,
-    )
+    });
 
     logger.info(
-      'Subscription upgraded successfully',
+      'Subscription upgrade initiated — awaiting payment confirmation',
       {
         userId,
-        previousPlan: currentPlan,
-        newPlan,
-        aiCreditsAllocated: newPlanConfig.limits.aiCreditsPerMonth,
+        currentPlan,
+        pendingPlan: newPlan,
         module: 'SubscriptionService',
-      },
-    )
+      }
+    );
+
+    // Step 6 — return the checkout URL so the client can collect payment for
+    // the new plan. Access is upgraded only after the webhook confirms it.
+    return {
+      subscriptionId: newRazorpaySubId ?? '',
+      checkoutUrl: newCheckoutUrl,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -455,31 +568,106 @@ export class SubscriptionService {
    * @param userId    - Veefore user ID.
    * @param newPlanId - Must be a valid PlanId that is a lower tier than current.
    */
-  async downgrade(userId: string, newPlanId: string): Promise<void> {
+  async downgrade(
+    userId: string,
+    newPlanId: string,
+    opts?: { immediate?: boolean }
+  ): Promise<void> {
     // Step 1 — validate newPlanId
     if (!isValidPlan(newPlanId)) {
-      throw new Error(`Invalid planId: '${newPlanId}'`)
+      throw new Error(`Invalid planId: '${newPlanId}'`);
     }
 
-    const newPlan = newPlanId as PlanId
+    const newPlan = newPlanId as PlanId;
 
-    const subscription = await this.subscriptionRepo.findByUserId(userId)
+    const subscription = await this.subscriptionRepo.findByUserId(userId);
     if (!subscription) {
-      throw new Error(`No subscription found for userId: ${userId}`)
+      throw new Error(`No subscription found for userId: ${userId}`);
     }
 
-    const currentPlan = subscription.plan as PlanId
+    const currentPlan = subscription.plan as PlanId;
 
     if (getPlanOrder(newPlan) >= getPlanOrder(currentPlan)) {
       throw new Error(
-        `downgrade() requires a lower-tier plan. Current: '${currentPlan}', requested: '${newPlan}'`,
-      )
+        `downgrade() requires a lower-tier plan. Current: '${currentPlan}', requested: '${newPlan}'`
+      );
     }
 
-    logger.info(
-      'Scheduling subscription downgrade at period end',
-      { userId, currentPlan, newPlan, module: 'SubscriptionService' },
-    )
+    // Immediate downgrade path — applies the new (lower) tier right now instead
+    // of scheduling it for period end. Off by default; callers must explicitly
+    // opt in. Safe because a downgrade only REDUCES entitlements (no unpaid
+    // access is ever granted) and no refund is issued. Local-state only — it
+    // does not attempt to reprice the Razorpay mandate for a paid→paid change.
+    if (opts?.immediate) {
+      const isFree = newPlan === 'free';
+      const repo = this.subscriptionRepo;
+      await repo.upsert({
+        userId,
+        plan: newPlan,
+        status: 'active',
+        pendingPlan: null,
+        cancelAtPeriodEnd: false,
+        cancellationReason: null,
+        cancellationFeedback: null,
+        cancellationRequestedAt: null,
+        // When dropping to Free, detach the Razorpay mandate refs so a stray
+        // webhook can't reactivate the old paid plan.
+        ...(isFree
+          ? { razorpaySubscriptionId: null, razorpayCustomerId: null }
+          : {}),
+      } as Parameters<typeof repo.upsert>[0]);
+
+      // Re-allocate the monthly AI credit quota to the NEW (lower) plan right
+      // away. Without this the account keeps the old plan's larger monthly
+      // allowance (e.g. Business 5,000) even though it now shows Creator.
+      // reconcileMonthlyAllocation preserves purchased (add-on) credits and the
+      // current cycle's usage — it only rebases the monthly portion.
+      const newAllocation = PLAN_CONFIG[newPlan].limits.aiCreditsPerMonth;
+      try {
+        await this.aiCreditsRepo.reconcileMonthlyAllocation(
+          userId,
+          newAllocation
+        );
+      } catch (creditErr) {
+        logger.warn('Immediate downgrade: credit re-allocation failed', {
+          userId,
+          newPlan,
+          module: 'SubscriptionService',
+        });
+      }
+
+      await SubscriptionEventModel.create({
+        eventType: 'subscription.downgraded',
+        userId,
+        subscriptionId: subscription.subscriptionId,
+        previousStatus: subscription.status,
+        newStatus: 'active',
+        previousPlan: currentPlan,
+        newPlan,
+        triggeredBy: 'user',
+        modalType: 'plan_change_success',
+        modalClaimedAt: null,
+        metadata: { currentPlan, appliedPlan: newPlan, immediate: true },
+        timestamp: new Date(),
+      });
+
+      await this.invalidateAllCaches(userId);
+
+      logger.info('Downgrade applied immediately', {
+        userId,
+        currentPlan,
+        newPlan,
+        module: 'SubscriptionService',
+      });
+      return;
+    }
+
+    logger.info('Scheduling subscription downgrade at period end', {
+      userId,
+      currentPlan,
+      newPlan,
+      module: 'SubscriptionService',
+    });
 
     // Step 2 — mark cancelAtPeriodEnd on the subscription document.
     // The pending downgrade plan is recorded in the SubscriptionEvent below
@@ -489,7 +677,7 @@ export class SubscriptionService {
     await this.subscriptionRepo.upsert({
       userId,
       cancelAtPeriodEnd: true,
-    } as Parameters<typeof this.subscriptionRepo.upsert>[0])
+    } as Parameters<typeof this.subscriptionRepo.upsert>[0]);
 
     // Step 3 — record audit event
     await SubscriptionEventModel.create({
@@ -507,22 +695,19 @@ export class SubscriptionService {
         willApplyAt: subscription.currentPeriodEnd,
       },
       timestamp: new Date(),
-    })
+    });
 
     // Step 4 — invalidate caches so the "cancelAtPeriodEnd" flag change is
     // reflected immediately on the Billing page instead of up to 30s later.
-    await this.invalidateAllCaches(userId)
+    await this.invalidateAllCaches(userId);
 
-    logger.info(
-      'Downgrade scheduled — will apply at period end',
-      {
-        userId,
-        currentPlan,
-        scheduledDowngradePlan: newPlan,
-        willApplyAt: subscription.currentPeriodEnd,
-        module: 'SubscriptionService',
-      },
-    )
+    logger.info('Downgrade scheduled — will apply at period end', {
+      userId,
+      currentPlan,
+      scheduledDowngradePlan: newPlan,
+      willApplyAt: subscription.currentPeriodEnd,
+      module: 'SubscriptionService',
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -533,98 +718,187 @@ export class SubscriptionService {
    * Cancel the user's subscription at the end of the current billing period.
    *
    * Steps:
-   *  1. Set `cancelAtPeriodEnd = true` on the local Subscription document.
-   *  2. If a Razorpay subscription exists, cancel it at cycle end (Razorpay
-   *     supports `cancel_at_cycle_end` natively, so the mandate itself
-   *     keeps the subscription active/charging until the current period
-   *     completes, exactly matching the product requirement).
-   *  3. Send a cancellation confirmation email via QuotaNotifier.
-   *  4. Record a SubscriptionEvent.
-   *  5. Invalidate the entitlement cache.
+   *  1. Ask Razorpay to disable auto-renew at the end of the paid cycle and
+   *     verify the provider's scheduled/terminal state.
+   *  2. Only after provider confirmation, set `cancelAtPeriodEnd = true` locally.
+   *  3. Clear every payment-failure grace field; voluntary cancellation has no grace.
+   *  4. Send confirmation, record the audit event, and invalidate both caches.
    *
-   * Premium access continues until `currentPeriodEnd`.
+   * Premium access continues through `currentPeriodEnd`; no later charge is scheduled.
    *
    * @param userId - Veefore user ID.
    */
-  async cancel(userId: string): Promise<void> {
-    const subscription = await this.subscriptionRepo.findByUserId(userId)
-    if (!subscription) {
-      throw new Error(`No subscription found for userId: ${userId}`)
+  async cancel(
+    userId: string,
+    details?: { reason?: string; feedback?: string }
+  ): Promise<{ accessEndsAt: Date; autoRenew: false }> {
+    const subscription = await this.subscriptionRepo.findByUserId(userId);
+    if (!subscription || subscription.plan === 'free') {
+      const error = new Error('No active paid subscription found') as Error & {
+        statusCode?: number;
+      };
+      error.statusCode = 409;
+      throw error;
     }
 
-    logger.info(
-      'Cancelling subscription',
-      {
-        userId,
-        plan: subscription.plan,
-        currentPeriodEnd: subscription.currentPeriodEnd,
-        module: 'SubscriptionService',
-      },
-    )
+    if (subscription.cancelAtPeriodEnd) {
+      return { accessEndsAt: subscription.currentPeriodEnd, autoRenew: false };
+    }
 
-    // Step 1 — set cancelAtPeriodEnd on the local document
-    await this.subscriptionRepo.upsert({
+    const now = new Date();
+    if (subscription.currentPeriodEnd <= now) {
+      const error = new Error(
+        'This subscription period has already ended'
+      ) as Error & { statusCode?: number };
+      error.statusCode = 409;
+      throw error;
+    }
+
+    logger.info('Scheduling subscription cancellation at paid-through date', {
       userId,
-      cancelAtPeriodEnd: true,
-    } as Parameters<typeof this.subscriptionRepo.upsert>[0])
+      plan: subscription.plan,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+      module: 'SubscriptionService',
+    });
 
-    // Step 2 — cancel on Razorpay if a remote subscription exists.
-    // cancelAtCycleEnd=true: Razorpay keeps the subscription active (and
-    // won't charge again) until the current billing cycle completes.
+    // Provider first: never tell the customer auto-renew is disabled unless
+    // Razorpay has accepted the end-of-cycle cancellation. A local-only flag
+    // could otherwise leave the mandate charging in the background.
+    //
+    // Every Razorpay call is wrapped in a short timeout so a slow/unreachable
+    // provider fails fast with a clean error instead of hanging the request
+    // until the upstream gateway times out (which surfaces as a 502).
+    const PROVIDER_TIMEOUT_MS = 12_000;
+    const withTimeout = <T>(promise: Promise<T>, label: string): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Razorpay ${label} timed out`)),
+            PROVIDER_TIMEOUT_MS
+          )
+        ),
+      ]);
+
+    // A successful (non-throwing) cancel call IS Razorpay's confirmation that
+    // the end-of-cycle cancellation was accepted. For `cancel_at_cycle_end`,
+    // Razorpay intentionally keeps status = 'active' until the period actually
+    // ends and does NOT set `has_scheduled_changes` (that flag only reflects
+    // pending plan/quantity update schedules), so we must NOT require those —
+    // doing so previously rejected valid cancellations with a false 502.
+    const isAlreadyCancelled = (state: Record<string, unknown>): boolean => {
+      const status = String(state.status ?? '').toLowerCase();
+      return ['cancelled', 'completed', 'expired'].includes(status);
+    };
+
+    let providerState: Record<string, unknown> | null = null;
     if (subscription.razorpaySubscriptionId) {
+      const razorpaySubscriptionId = subscription.razorpaySubscriptionId;
       try {
-        await razorpaySubscriptionService.cancelSubscription(subscription.razorpaySubscriptionId, true)
-      } catch (err) {
-        // Log but do not rethrow — the local state is the authoritative record.
-        // The nightly reconciliation cron will detect and sync any divergence.
-        logger.error(
-          'Razorpay cancelSubscription failed; local state still updated',
-          err,
-          {
-            userId,
-            razorpaySubscriptionId: subscription.razorpaySubscriptionId,
-            module: 'SubscriptionService',
-          },
-        )
+        providerState = await withTimeout(
+          razorpaySubscriptionService.cancelSubscription(
+            razorpaySubscriptionId,
+            true
+          ),
+          'cancel'
+        );
+      } catch (cause) {
+        // The cancel call failed. It may be an idempotent retry (subscription
+        // already cancelled) or a transient/interrupted response — do ONE
+        // authoritative fetch and treat an already-terminal subscription as
+        // success. Otherwise surface a clean, retryable error.
+        try {
+          const recoveredState = await withTimeout(
+            razorpaySubscriptionService.getSubscription(razorpaySubscriptionId),
+            'recover'
+          );
+          if (!isAlreadyCancelled(recoveredState)) throw cause;
+          providerState = recoveredState;
+        } catch (verificationCause) {
+          const error = new Error(
+            'We could not disable automatic renewal. Your subscription was not changed. Please try again.',
+            { cause: verificationCause }
+          ) as Error & { statusCode?: number };
+          error.statusCode = 502;
+          throw error;
+        }
       }
     }
 
-    // Step 3 — send cancellation confirmation email
-    await quotaNotifier.sendCancellationConfirmation(
+    await this.subscriptionRepo.upsert({
       userId,
-      subscription.currentPeriodEnd,
-      this.redis,
-    )
+      cancelAtPeriodEnd: true,
+      nextBillingDate: subscription.currentPeriodEnd,
+      gracePeriodEndsAt: null,
+      pastDueGraceEndsAt: null,
+      cancellationReason: details?.reason ?? null,
+      cancellationFeedback: details?.feedback ?? null,
+      cancellationRequestedAt: now,
+    } as Parameters<typeof this.subscriptionRepo.upsert>[0]);
 
-    // Step 4 — record audit event
-    await SubscriptionEventModel.create({
-      eventType: 'subscription.cancelled',
-      userId,
-      subscriptionId: subscription.subscriptionId,
-      previousStatus: subscription.status,
-      newStatus: subscription.status, // status stays the same until period end
-      previousPlan: subscription.plan,
-      newPlan: subscription.plan,
-      triggeredBy: 'user',
-      metadata: {
-        cancelAtPeriodEnd: true,
-        accessEndsAt: subscription.currentPeriodEnd,
-        razorpaySubscriptionId: subscription.razorpaySubscriptionId ?? null,
-      },
-      timestamp: new Date(),
-    })
+    await this.invalidateAllCaches(userId);
 
-    // Step 5 — invalidate caches
-    await this.invalidateAllCaches(userId)
+    try {
+      await quotaNotifier.sendCancellationConfirmation(
+        userId,
+        subscription.currentPeriodEnd,
+        this.redis
+      );
+    } catch (notificationError) {
+      logger.warn('Cancellation confirmed but notification could not be sent', {
+        userId,
+        error:
+          notificationError instanceof Error
+            ? notificationError.message
+            : String(notificationError),
+        module: 'SubscriptionService',
+      });
+    }
+
+    try {
+      await SubscriptionEventModel.create({
+        eventType: 'subscription.cancelled',
+        userId,
+        subscriptionId: subscription.subscriptionId,
+        previousStatus: subscription.status,
+        newStatus: subscription.status,
+        previousPlan: subscription.plan,
+        newPlan: subscription.plan,
+        triggeredBy: 'user',
+        metadata: {
+          cancelAtPeriodEnd: true,
+          accessEndsAt: subscription.currentPeriodEnd,
+          autoRenew: false,
+          providerConfirmed: Boolean(subscription.razorpaySubscriptionId),
+          providerStatus: providerState?.status ?? null,
+          providerHasScheduledChanges:
+            providerState?.has_scheduled_changes ?? null,
+          razorpaySubscriptionId: subscription.razorpaySubscriptionId ?? null,
+          reason: details?.reason ?? null,
+          feedback: details?.feedback ?? null,
+        },
+        timestamp: now,
+      });
+    } catch (auditError) {
+      logger.error(
+        'Cancellation confirmed but audit event could not be recorded',
+        auditError instanceof Error
+          ? auditError
+          : new Error(String(auditError)),
+        { userId, module: 'SubscriptionService' }
+      );
+    }
 
     logger.info(
-      'Subscription cancelled — premium access continues until period end',
+      'Subscription cancellation confirmed — auto-renew disabled and access retained until cutoff',
       {
         userId,
         accessEndsAt: subscription.currentPeriodEnd,
         module: 'SubscriptionService',
-      },
-    )
+      }
+    );
+
+    return { accessEndsAt: subscription.currentPeriodEnd, autoRenew: false };
   }
 
   // -------------------------------------------------------------------------
@@ -646,21 +920,25 @@ export class SubscriptionService {
    * @param userId - Veefore user ID.
    */
   async resume(userId: string): Promise<void> {
-    const subscription = await this.subscriptionRepo.findByUserId(userId)
+    const subscription = await this.subscriptionRepo.findByUserId(userId);
     if (!subscription) {
-      throw new Error(`No subscription found for userId: ${userId}`)
+      throw new Error(`No subscription found for userId: ${userId}`);
     }
 
-    logger.info(
-      'Resuming subscription',
-      { userId, plan: subscription.plan, module: 'SubscriptionService' },
-    )
+    logger.info('Resuming subscription', {
+      userId,
+      plan: subscription.plan,
+      module: 'SubscriptionService',
+    });
 
-    // Step 1 — clear cancelAtPeriodEnd flag
+    // Step 1 — clear cancelAtPeriodEnd flag and any stored cancellation details
     await this.subscriptionRepo.upsert({
       userId,
       cancelAtPeriodEnd: false,
-    } as Parameters<typeof this.subscriptionRepo.upsert>[0])
+      cancellationReason: null,
+      cancellationFeedback: null,
+      cancellationRequestedAt: null,
+    } as Parameters<typeof this.subscriptionRepo.upsert>[0]);
 
     // Step 2 — attempt to reactivate on Razorpay.
     // If the subscription is still within its current cycle (cancellation
@@ -670,33 +948,53 @@ export class SubscriptionService {
     //
     // If the subscription has already ended on Razorpay's side, the
     // customer must complete a fresh authentication transaction.
-    if (subscription.razorpaySubscriptionId && subscription.razorpayCustomerId) {
+    if (
+      subscription.razorpaySubscriptionId &&
+      subscription.razorpayCustomerId
+    ) {
       try {
-        const remoteSub = await razorpaySubscriptionService.getSubscription(subscription.razorpaySubscriptionId)
-        const remoteStatus = String(remoteSub.status ?? '')
+        const remoteSub = await razorpaySubscriptionService.getSubscription(
+          subscription.razorpaySubscriptionId
+        );
+        const remoteStatus = String(remoteSub.status ?? '');
 
-        if (remoteStatus === 'cancelled' || remoteStatus === 'completed' || remoteStatus === 'expired') {
+        if (
+          remoteStatus === 'cancelled' ||
+          remoteStatus === 'completed' ||
+          remoteStatus === 'expired'
+        ) {
           // Subscription has actually ended — create a new one, customer must re-authenticate.
-          const billingCycle = subscription.billingCycle as BillingCycle
-          const razorpayPlanId = await this.getOrCreateRazorpayPlanId(subscription.plan as PlanId, billingCycle)
+          const billingCycle = subscription.billingCycle as BillingCycle;
+          const razorpayPlanId = await this.getOrCreateRazorpayPlanId(
+            subscription.plan as PlanId,
+            billingCycle
+          );
 
-          const reactivated = await razorpaySubscriptionService.createSubscription({
-            customerId: subscription.razorpayCustomerId,
-            planId: razorpayPlanId,
-            totalCount: TOTAL_BILLING_CYCLES[billingCycle],
-            notes: { veefore_user_id: userId, veefore_plan_id: subscription.plan },
-          })
+          const reactivated =
+            await razorpaySubscriptionService.createSubscription({
+              customerId: subscription.razorpayCustomerId,
+              planId: razorpayPlanId,
+              totalCount: TOTAL_BILLING_CYCLES[billingCycle],
+              notes: {
+                veefore_user_id: userId,
+                veefore_plan_id: subscription.plan,
+              },
+            });
 
           await this.subscriptionRepo.upsert({
             userId,
             razorpaySubscriptionId: reactivated.subscriptionId,
             status: 'pending_payment',
-          } as Parameters<typeof this.subscriptionRepo.upsert>[0])
+          } as Parameters<typeof this.subscriptionRepo.upsert>[0]);
 
           logger.info(
             'Previous Razorpay subscription had ended — created new subscription, customer must re-authenticate',
-            { userId, newRazorpaySubscriptionId: reactivated.subscriptionId, module: 'SubscriptionService' },
-          )
+            {
+              userId,
+              newRazorpaySubscriptionId: reactivated.subscriptionId,
+              module: 'SubscriptionService',
+            }
+          );
         }
         // Otherwise the mandate is still live on Razorpay — nothing to do there.
       } catch (err) {
@@ -708,8 +1006,8 @@ export class SubscriptionService {
             userId,
             razorpaySubscriptionId: subscription.razorpaySubscriptionId,
             module: 'SubscriptionService',
-          },
-        )
+          }
+        );
       }
     }
 
@@ -727,15 +1025,16 @@ export class SubscriptionService {
         razorpaySubscriptionId: subscription.razorpaySubscriptionId ?? null,
       },
       timestamp: new Date(),
-    })
+    });
 
     // Step 4 — invalidate caches
-    await this.invalidateAllCaches(userId)
+    await this.invalidateAllCaches(userId);
 
-    logger.info(
-      'Subscription resumed successfully',
-      { userId, plan: subscription.plan, module: 'SubscriptionService' },
-    )
+    logger.info('Subscription resumed successfully', {
+      userId,
+      plan: subscription.plan,
+      module: 'SubscriptionService',
+    });
   }
 }
 
@@ -743,7 +1042,7 @@ export class SubscriptionService {
 // Singleton factory
 // ---------------------------------------------------------------------------
 
-let _instance: SubscriptionService | null = null
+let _instance: SubscriptionService | null = null;
 
 /**
  * Returns the shared SubscriptionService singleton.
@@ -753,12 +1052,16 @@ let _instance: SubscriptionService | null = null
 export function getSubscriptionService(
   subscriptionRepo: SubscriptionRepository,
   entitlementService: EntitlementService,
-  redis: Redis,
+  redis: Redis
 ): SubscriptionService {
   if (!_instance) {
-    _instance = new SubscriptionService(subscriptionRepo, entitlementService, redis)
+    _instance = new SubscriptionService(
+      subscriptionRepo,
+      entitlementService,
+      redis
+    );
   }
-  return _instance
+  return _instance;
 }
 
-export default SubscriptionService
+export default SubscriptionService;

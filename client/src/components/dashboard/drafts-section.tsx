@@ -10,6 +10,7 @@ import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { formatDistanceToNow } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
 import useSubscription from '@/hooks/useSubscription'
+import { useSocialAccountsMap, getPostDisplayTitle, PostTypeBadge, PostMedia } from '@/components/dashboard/scheduled-posts'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function typeIcon(type: string) {
@@ -50,6 +51,7 @@ export function DraftsSection() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
+  const accountMap = useSocialAccountsMap(currentWorkspace?.id)
   const { limits } = useSubscription()
   // Drafts are a Creator+ feature — hide this whole section (and skip its fetch)
   // on plans that don't include it.
@@ -98,7 +100,7 @@ export function DraftsSection() {
           <Button
             variant="outline" size="sm"
             className="text-xs text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:text-purple-600"
-            onClick={() => setLocation('/posts/drafts')}
+            onClick={() => setLocation('/plan?tab=drafts')}
           >
             View all drafts
           </Button>
@@ -132,25 +134,29 @@ export function DraftsSection() {
             <div className={`divide-y divide-gray-100 dark:divide-gray-700/50 ${expanded ? 'max-h-[480px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700' : ''}`}>
               {visiblePosts.map((post: any) => {
                 const id = post._id || post.id
-                const title = post.title || post.contentData?.text || 'Untitled Draft'
+                const title = getPostDisplayTitle(post)
                 const updatedAt = post.updatedAt
                   ? formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })
                   : null
+                const accountId = post.accountId || post.contentData?.accountId
+                const account = accountId ? accountMap.get(accountId) : null
+                const username = post.contentData?.username || account?.username || null
 
                 return (
                   <div key={id} className="flex items-start gap-3 py-3">
-                    {/* Thumbnail / type icon */}
-                    <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 flex items-center justify-center flex-shrink-0 border border-amber-100 dark:border-amber-900/30">
-                      <span className="text-amber-500 dark:text-amber-400">{typeIcon(post.type || 'image')}</span>
+                    {/* Thumbnail (image or video) */}
+                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 relative bg-gray-100 dark:bg-gray-700 border border-gray-100 dark:border-gray-700">
+                      <PostMedia post={post} />
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-tight">{title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
-                          {typeLabel(post.type || 'image')}
-                        </span>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <PostTypeBadge post={post} />
+                        {username && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate max-w-[90px]">@{username}</span>
+                        )}
                         {updatedAt && (
                           <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-0.5">
                             <Clock className="w-3 h-3" />

@@ -5,7 +5,7 @@ import { validateRequest } from '../../middleware/validation';
 import { auditMiddleware } from '../../middleware/audit-middleware';
 import { AuditActions } from '../../utils/audit-logger';
 import { schedulingGuards, scheduleWithQuotaGuards, bulkSchedulingGuards } from '../../middleware/apply-route-guards';
-import { requireDraftPosts, requireFeature } from '../../middleware/entitlement.middleware';
+import { requireDraftPosts, requireFeature, requireWorkspaceAccessible } from '../../middleware/entitlement.middleware';
 import { z } from 'zod';
 
 const router = Router();
@@ -33,6 +33,7 @@ router.get('/debug-counts', contentController.debugCounts);
 
 router.get('/workspace/:workspaceId/drafts',
   requireAuth,
+  requireWorkspaceAccessible(),
   // Drafts are a Creator+ feature. Free users cannot list drafts at all.
   requireFeature('draftPosts'),
   validateRequest({ params: WorkspaceIdParams, query: PaginationQuery }),
@@ -41,18 +42,21 @@ router.get('/workspace/:workspaceId/drafts',
 
 router.get('/workspace/:workspaceId/scheduled',
   requireAuth,
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   contentController.getScheduled
 );
 
 router.get('/workspace/:workspaceId',
   requireAuth,
+  requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams, query: PaginationQuery }),
   contentController.getByWorkspace
 );
 
 router.post('/workspace/:workspaceId',
   requireAuth,
+  requireWorkspaceAccessible(),
   // Saving a post as a draft (status: 'draft') is a Creator+ feature. Publish /
   // schedule flows are untouched (they don't send status: 'draft').
   requireDraftPosts(),

@@ -504,13 +504,21 @@ const defaultDeactivationScheduler: DeactivationScheduler = {
 /** Default escalation-target resolver: notify the mission's workspace owner (R11.5). */
 const defaultEscalationTargetResolver: AutomationEscalationTargetResolver = {
   async resolve(data: AutopilotAutomationJobData) {
+    // The Mission model carries no userId/ownerId/createdBy — resolve the
+    // notify target via the mission's workspace owner instead.
     try {
       const { missionRepository } = await import('../db/repositories')
+      const { resolveMissionNotifyTarget } = await import('../services/MissionNotifyTarget')
       const mission = await missionRepository.findById(data.missionId)
-      const userId =
-        (mission as any)?.userId ?? (mission as any)?.ownerId ?? (mission as any)?.createdBy
-      if (!userId) return null
-      return { userId: String(userId), sessionContext: 'web' as SessionContext }
+      if (!mission) return null
+      const target = await resolveMissionNotifyTarget((mission as { workspaceId?: unknown }).workspaceId)
+      if (!target) return null
+      return {
+        userId: target.userId,
+        sessionContext: target.sessionContext as SessionContext,
+        deviceToken: target.deviceToken,
+        email: target.email,
+      }
     } catch {
       return null
     }

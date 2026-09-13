@@ -17,6 +17,12 @@ import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest } from '@/lib/queryClient'
 import useSubscription from '@/hooks/useSubscription'
+import {
+  useSocialAccountsMap,
+  getPostDisplayTitle,
+  PostTypeBadge,
+  PostMedia,
+} from '@/components/dashboard/scheduled-posts'
 
 // ── Hook: best-time API (the real algorithm) ──────────────────────────────
 // Uses /api/v1/analytics/best-time which returns audience + post-performance grids.
@@ -123,9 +129,8 @@ const STATUS_CONFIG: Record<string, { Icon: any; bg: string; text: string; label
 
 // ── Post card ──────────────────────────────────────────────────────────────
 
-function PostCard({ post, onClick }: { post: any; onClick?: () => void }) {
-  const thumb = post.mediaUrls?.[0] || post.contentData?.thumbnail_url || post.contentData?.media_url || null
-  const caption = post.title || post.contentData?.caption || post.description || ''
+function PostCard({ post, onClick, accountMap }: { post: any; onClick?: () => void; accountMap?: Map<string, any> }) {
+  const caption = getPostDisplayTitle(post)
 
   // Pick the most relevant timestamp for display
   const timeIso = post.scheduledAt || post.publishedAt || post.failedAt || null
@@ -134,35 +139,36 @@ function PostCard({ post, onClick }: { post: any; onClick?: () => void }) {
   const cfg = STATUS_CONFIG[post.status] ?? STATUS_CONFIG.draft
   const { Icon: StatusIcon } = cfg
 
+  const accountId = post.accountId || post.contentData?.accountId
+  const account = accountId ? accountMap?.get(accountId) : null
+  const profilePic = post.contentData?.profilePictureUrl || account?.profilePictureUrl || account?.profileImageUrl || account?.profile_picture_url || null
+
   return (
     <div
       onClick={onClick}
       className="group rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-sm hover:border-gray-200 dark:hover:border-gray-600 hover:shadow-md transition-all cursor-pointer"
     >
-      {/* Thumbnail or placeholder */}
-      {thumb ? (
-        <div className="relative">
-          <img src={thumb} alt="" className="w-full h-[100px] object-cover" />
-          <div className="absolute bottom-2 left-2 h-6 w-6 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 flex items-center justify-center shadow">
+      {/* Thumbnail (image or video) with account avatar overlay */}
+      <div className="relative w-full h-[100px] bg-gray-100 dark:bg-gray-800 overflow-hidden">
+        <PostMedia post={post} />
+        <div className="absolute bottom-2 left-2 h-6 w-6 rounded-full overflow-hidden shadow ring-1 ring-white/60 flex items-center justify-center bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400">
+          {profilePic ? (
+            <img src={profilePic} alt="" className="h-full w-full object-cover" />
+          ) : (
             <Instagram className="h-3 w-3 text-white" />
-          </div>
+          )}
         </div>
-      ) : (
-        <div className="w-full h-[60px] bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-750 flex items-center justify-center">
-          <Instagram className="h-5 w-5 text-gray-200 dark:text-gray-600" />
-        </div>
-      )}
+      </div>
 
       {/* Body */}
       <div className="px-3 py-2.5 space-y-2">
         {/* Caption */}
-        {caption ? (
-          <p className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-snug">
-            {caption}
-          </p>
-        ) : (
-          <p className="text-xs text-gray-400 dark:text-gray-500 italic leading-snug">Untitled post</p>
-        )}
+        {/* Media type */}
+        <PostTypeBadge post={post} />
+
+        <p className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-snug">
+          {caption}
+        </p>
 
         {/* Time */}
         {time && (
@@ -238,6 +244,7 @@ export function CalendarView() {
   const [view, setView] = useState<'list' | 'grid' | 'month'>('grid')
 
   const { currentWorkspaceId } = useCurrentWorkspace()
+  const accountMap = useSocialAccountsMap(currentWorkspaceId ?? undefined)
   const { limits } = useSubscription()
   // Drafts are a Creator+ feature — don't fetch or show them on the calendar for Free.
   const canUseDrafts = limits?.features?.draftPosts === true
@@ -490,9 +497,13 @@ export function CalendarView() {
                   <PostCard
                     key={post._id ?? post.id ?? pi}
                     post={post}
+                    accountMap={accountMap}
                     onClick={() => {
-                      if (post.status === 'draft' || post.status === 'scheduled') {
-                        setLocation(`/create?edit=${post._id ?? post.id}`)
+                      const id = post._id ?? post.id
+                      if (post.status === 'published') {
+                        setLocation(`/analytics/post/${id}`)
+                      } else {
+                        setLocation(`/create?editId=${id}`)
                       }
                     }}
                   />

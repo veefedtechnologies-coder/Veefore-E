@@ -214,7 +214,18 @@ const SignIn = ({ onNavigate }: SignInProps) => {
           // Clear OAuth success state
           clearOAuthSuccess()
           
-          // Don't manually redirect - App.tsx will automatically show AuthenticatedApp
+          // Redirect to the originally-requested page if ?redirect= is present.
+          const urlParams = new URLSearchParams(window.location.search)
+          const redirectTo = urlParams.get('redirect')
+          if (redirectTo) {
+            const decoded = decodeURIComponent(redirectTo)
+            if (decoded.startsWith('/') && !decoded.startsWith('//')) {
+              setLocation(decoded)
+              return
+            }
+          }
+          
+          // No redirect param — App.tsx will automatically show AuthenticatedApp
           // when the useFirebaseAuth hook detects the user change
           console.log('[OAuth] Sign-in complete, auth state will propagate automatically')
           
@@ -348,7 +359,23 @@ const SignIn = ({ onNavigate }: SignInProps) => {
 
         toast({ title: "Success", description: "Signed in successfully!" })
         
-        // Don't manually redirect - App.tsx will automatically show AuthenticatedApp
+        // After login, redirect to the originally-requested page if there's a
+        // ?redirect= param in the URL (set by ProtectedRoute when bouncing an
+        // unauthenticated user). Otherwise App.tsx's auth-state listener will
+        // navigate to the default landing page automatically.
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirectTo = urlParams.get('redirect')
+        if (redirectTo) {
+          // Decode and validate the redirect target: only allow internal paths
+          // (start with '/') so we can't be used as an open-redirect vector.
+          const decoded = decodeURIComponent(redirectTo)
+          if (decoded.startsWith('/') && !decoded.startsWith('//')) {
+            setLocation(decoded)
+            return
+          }
+        }
+        
+        // No redirect param — App.tsx will automatically show AuthenticatedApp
         // when the useFirebaseAuth hook detects the user change
         console.log('[SignIn] Sign-in complete, auth state will propagate automatically')
         

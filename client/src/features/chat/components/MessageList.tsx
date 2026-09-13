@@ -164,11 +164,14 @@ const MessageItem = memo<MessageItemProps>(({
           </div>
         )}
         {message.role === 'assistant' && (
-          <div className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-2 flex items-center justify-between">
-            <div className="flex items-center">
-              <img src="/veefore-logo.png" alt="VeeFore" className="w-4 h-4" />
-              <span className="ml-0.25">
-                {isGenerating ? "eegpt • Analyzing..." : "eegpt • Response Ready"}
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] font-semibold tracking-tight text-gray-900 dark:text-white">
+                VeeGPT
+              </span>
+              <span className="text-gray-300 dark:text-gray-600">·</span>
+              <span className={`text-xs font-medium ${isGenerating ? 'text-blue-600 dark:text-blue-400 animate-pulse' : 'text-gray-400 dark:text-gray-500'}`}>
+                {isGenerating ? 'Analyzing…' : 'Response ready'}
               </span>
             </div>
             {/* Assistant message actions */}

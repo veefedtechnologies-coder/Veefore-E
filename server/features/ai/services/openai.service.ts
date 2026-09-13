@@ -23,6 +23,7 @@ import {
   AIProviderAuthError,
   AIProviderSafetyError,
 } from '../types/ai-provider.types';
+import { createOpenAI } from '../../../services/ai-provider-guard';
 
 /**
  * OpenAI service configuration
@@ -143,7 +144,7 @@ export class OpenAIService implements IAIProvider {
       ...config,
     };
 
-    this.client = new OpenAI({
+    this.client = createOpenAI({
       apiKey: apiKey || '',
       organization: this.config.organization,
       maxRetries: this.config.maxRetries,

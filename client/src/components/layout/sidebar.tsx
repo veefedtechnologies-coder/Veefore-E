@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Home, Calendar, BarChart3, MessageSquare, Settings, Globe, LogOut, Users, Link, Plus, Zap, Video, Shield, Activity, CreditCard, Coins } from 'lucide-react'
+import { Home, Calendar, BarChart3, MessageSquare, Settings, Globe, LogOut, Users, Link, Plus, Zap, Video, Shield, Activity, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CreateDropdown } from './create-dropdown'
 import { logout } from '@/lib/auth'
@@ -8,6 +8,8 @@ import { useLocation } from 'wouter'
 import { useUser } from '@/hooks/useUser'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { ActiveWorkspaceProvider } from '@/contexts/ActiveWorkspaceContext'
+import { useFeatureAccess, type PlanFeatureKey } from '@/hooks/useFeatureAccess'
+import { useVeeGPTTransition } from '@/features/veegpt/VeeGPTTransition'
 
 // Grouped sidebar items for better organization
 const sidebarGroups = [
@@ -17,6 +19,7 @@ const sidebarGroups = [
       { icon: Home, label: 'Home', key: 'home', url: '/' },
       { icon: Calendar, label: 'Plan', key: 'plan', url: '/plan' },
       { icon: Plus, label: 'Create', key: 'create', isCreateButton: true },
+      { icon: Video, label: 'Video Editor', key: 'video-editor', url: '/video-editor' },
     ]
   },
   {
@@ -30,13 +33,13 @@ const sidebarGroups = [
     items: [
       { icon: BarChart3, label: 'Analytics', key: 'analytics', url: '/analytics' },
       ...(import.meta.env.VITE_META_PHASE_1_REVIEW_MODE === 'true' ? [] : [{ icon: Zap, label: 'Automation', key: 'automation', url: '/automation' }]),
-      { icon: Activity, label: 'Listening', key: 'social-listening', url: '/social-listening' },
+      { icon: Activity, label: 'Listening', key: 'social-listening', url: '/social-listening', requiredFeature: 'socialListening' as PlanFeatureKey },
     ]
   },
   {
     title: "Management",
     items: [
-      { icon: Coins, label: 'Credits', key: 'credits', url: '/credits' },
+      { icon: CreditCard, label: 'Billing History', key: 'billing-history', url: '/billing-history' },
       { icon: Shield, label: 'Security Health', key: 'encryption-health', url: '/encryption-health' },
       { icon: Settings, label: 'Test Fixtures', key: 'test-fixtures', url: '/test-fixtures' },
     ]
@@ -58,6 +61,8 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
   const setDropdownOpen = setIsCreateDropdownOpen ?? setLocalDropdownOpen
   const { toast } = useToast()
   const { userData } = useUser()
+  const { hasFeature, isLoading: featuresLoading } = useFeatureAccess()
+  const veegptTransition = useVeeGPTTransition()
 
   // Convert URL to activeView for backwards compatibility
   const getActiveViewFromLocation = (loc: string) => {
@@ -65,6 +70,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
     if (loc === '/plan') return 'plan'
     if (loc === '/create') return 'create'
     if (loc === '/video-generator') return 'video-generator'
+    if (loc === '/video-editor') return 'video-editor'
     if (loc === '/veegpt') return 'veegpt'
     if (loc === '/inbox') return 'inbox'
     if (loc === '/analytics' || loc.startsWith('/analytics/')) return 'analytics'
@@ -75,6 +81,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
     if (loc === '/landing') return 'landing'
     if (loc === '/test-fixtures') return 'test-fixtures'
     if (loc === '/encryption-health') return 'encryption-health'
+    if (loc === '/billing-history') return 'billing-history'
     if (loc === '/credits') return 'credits'
     return 'home'
   }
@@ -129,7 +136,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
   const handleCreateOptionSelect = (option: string) => {
     setDropdownOpen(false)
     console.log('Selected create option:', option)
-    if (option === 'post') setLocation('/posts')
+    if (option === 'post') setLocation('/create')
     if (option === 'automation') setLocation('/automation')
     if (option === 'video') setLocation('/video-generator')
   }
@@ -150,8 +157,19 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
     }
   }
 
+  // PLAN ENFORCEMENT: a nav item can declare a `requiredFeature`. When the
+  // current plan doesn't include it, the item is HIDDEN entirely — users only
+  // see the features their plan supports (no lock badges). While the plan is
+  // still loading we also hide feature-gated items to avoid a show→hide flash.
+  const isItemVisible = (item: any): boolean => {
+    if (!item.requiredFeature) return true
+    if (featuresLoading) return false
+    return hasFeature(item.requiredFeature)
+  }
+
   // Render navigation item
-  const renderNavItem = (item: any) => (
+  const renderNavItem = (item: any) => {
+    return (
     <div
       key={item.label}
       data-testid={item.isCreateButton ? "create-dropdown-trigger" : undefined}
@@ -171,8 +189,8 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
       )}
     >
       <div className={cn(
-        "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 mb-1",
-        activeView === item.key 
+        "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 mb-1 relative",
+        activeView === item.key
           ? "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 shadow-lg border border-blue-200/50 dark:border-blue-600/50" 
           : "hover:bg-gradient-to-br hover:from-blue-50 hover:to-purple-50 dark:hover:from-blue-900/20 dark:hover:to-purple-900/20 hover:shadow-md"
       )}>
@@ -198,7 +216,8 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
       </span>
       
     </div>
-  )
+    )
+  }
 
   return (
     <ActiveWorkspaceProvider>
@@ -216,7 +235,14 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
               : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
           )}
           data-nav="veegpt"
-          onClick={() => setLocation('/veegpt')}
+          onClick={(e) => {
+            if (activeView === 'veegpt') return
+            if (veegptTransition.enabled) {
+              veegptTransition.enterVeeGPT(e)
+            } else {
+              setLocation('/veegpt')
+            }
+          }}
         >
           <div className={cn(
             "w-16 h-16 bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 rounded-2xl flex items-center justify-center transition-all duration-500 mb-2 shadow-lg border border-gray-200/50 dark:border-gray-600/50 backdrop-blur-sm relative overflow-hidden",
@@ -281,7 +307,7 @@ export function Sidebar({ className, isCreateDropdownOpen, setIsCreateDropdownOp
       {/* Main Navigation Section */}
       <div className="flex-1 flex flex-col justify-center bg-white dark:bg-slate-800">
         <nav className="flex flex-col space-y-4">
-          {sidebarGroups.flatMap(group => group.items).map((item) => renderNavItem(item))}
+          {sidebarGroups.flatMap(group => group.items).filter(isItemVisible).map((item) => renderNavItem(item))}
         </nav>
       </div>
 

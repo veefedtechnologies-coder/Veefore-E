@@ -14,6 +14,8 @@ export interface IWorkspace extends Document {
   aiConfiguration?: {
     aiModel?: string;
     creativityLevel?: number;
+    reasoningEffort?: string;
+    showThinking?: boolean;
     optimizationGoals?: string;
     aiPersona?: string;
     captionStyle?: string;
@@ -46,6 +48,8 @@ export const WorkspaceSchema = new Schema<IWorkspace>({
   aiConfiguration: {
     aiModel: String,
     creativityLevel: Number,
+    reasoningEffort: String,
+    showThinking: Boolean,
     optimizationGoals: String,
     aiPersona: String,
     captionStyle: String,

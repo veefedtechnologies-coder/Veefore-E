@@ -39,6 +39,7 @@ export const SCHEDULE_POST_TOOL: ChatTool = {
         schedule: { type: 'boolean', description: 'true to schedule for later, false to post now.' },
         scheduledLocal: { type: ['string', 'null'], description: '"YYYY-MM-DDTHH:mm" in LOCAL time when scheduling, else null.' },
         summary: { type: 'string', description: 'One short human line summarizing the post for the confirm card.' },
+        mediaOrdinal: { type: 'number', description: 'Which image from the conversation to attach, as a 1-based number from the "Media available in this conversation" list (1 = most recent). OMIT this to use the most recent image (the default). Only set it when the user clearly wants a SPECIFIC earlier image (e.g. "post the original one"). Never pass image URLs or paths.' },
         suggestion: { type: 'string', description: 'REQUIRED. One specific, actionable idea to increase reach/engagement that the user did NOT already include — e.g. a stronger hook caption, 3-5 niche hashtags, a clear CTA, trending audio for reels, or a better posting time. Always provide a genuinely useful tip (never empty).' },
       },
       required: ['type', 'schedule', 'suggestion'],
@@ -48,7 +49,39 @@ export const SCHEDULE_POST_TOOL: ChatTool = {
 };
 
 /** All tools exposed to the VeeGPT chat model. */
-export const VEEGPT_CHAT_TOOLS: ChatTool[] = [SCHEDULE_POST_TOOL];
+/**
+ * Show the user a VISUAL picker of the images already in the conversation
+ * (thumbnails), so they can choose which one to schedule/post. Call this when
+ * the user wants to pick among multiple images (e.g. "give me the options",
+ * "which images can I use", "let me choose the image"). It renders the pictures
+ * as tappable thumbnails — NEVER list images to the user as URLs, file paths, or
+ * IDs. After they pick a number, call schedule_post with mediaOrdinal.
+ */
+export const SHOW_MEDIA_OPTIONS_TOOL: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'show_media_options',
+    description:
+      'Display the images already in this conversation as a visual thumbnail picker the user can tap. ' +
+      'You MUST call this (and MUST NOT answer with text) whenever the user asks to see, list, choose, or pick among their images — e.g. "give me the option of images", "give me the image options", "which image should I post", "let me pick", "show my images", "options again". ' +
+      'It renders every conversation image as a picture with a number and a preview button. ' +
+      'NEVER enumerate images as a text/numbered/bulleted list, and never mention image URLs, file paths, or IDs — the user cannot act on those. After the user picks a number, call schedule_post with mediaOrdinal.',
+    parameters: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          description:
+            'A short note on why the picker is being shown (e.g. "user asked to choose an image to schedule"). Optional.',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const VEEGPT_CHAT_TOOLS: ChatTool[] = [SCHEDULE_POST_TOOL, SHOW_MEDIA_OPTIONS_TOOL];
 
 // ─── Content generation tools (caption / hashtags) ──────────────────────────
 
@@ -98,6 +131,238 @@ export const GENERATE_HASHTAGS_TOOL: ChatTool = {
     },
   },
 };
+
+/**
+ * Generate a downloadable DOCUMENT (PDF, Word, Excel, or PowerPoint) from
+ * structured content the model provides here. The system renders a document
+ * card in chat and builds the real, well-formatted file on the client when the
+ * user downloads it — so fill the matching field FULLY with real content, not
+ * placeholders. Pick ONE `type` and populate the field for that type:
+ *   • pdf / docx  → `sections`  (a written document: headings, prose, bullets)
+ *   • xlsx        → `sheets`    (tables: columns + rows of data)
+ *   • pptx        → `slides`    (a deck: slide titles + bullet points)
+ */
+export const GENERATE_DOCUMENT_TOOL: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'generate_document',
+    description:
+      'Create a polished, downloadable DOCUMENT when the user asks for a PDF, Word doc, Excel/spreadsheet, or PowerPoint/slides ' +
+      '(e.g. "make a PDF report", "put this in an excel sheet", "create a slide deck about X", "give me a word document"). ' +
+      'AUTHOR THE FULL, DETAILED CONTENT yourself in the arguments — real headings, thorough multi-sentence prose, complete table rows, substantive slide bullets. Never use placeholders or one-liners; produce a genuinely comprehensive, professional document as an expert would. ' +
+      'Aim for depth: an intro/overview, several well-developed sections, and a closing/summary where appropriate. ' +
+      'Add VISUALS when they help: use `highlights` for a row of key-stat cards, and a section `chart` (bar) to show comparisons or trends — but only when the data is meaningful, never decorative. ' +
+      'Choose the format that best fits the request. The system shows a document card the user can VIEW in-app or download; you do NOT need to repeat the whole content in your text reply — just a one-line intro.',
+    parameters: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['pdf', 'docx', 'xlsx', 'pptx'],
+          description: 'File format: "pdf" or "docx" for written documents, "xlsx" for spreadsheets/tables, "pptx" for slide decks.',
+        },
+        title: { type: 'string', description: 'Document title (also the file name and the heading on the first page/slide).' },
+        subtitle: { type: 'string', description: 'Optional one-line subtitle shown under the title on the cover.' },
+        summary: { type: 'string', description: 'One short sentence describing the document, shown on the chat card.' },
+        highlights: {
+          type: 'array',
+          description: 'Optional row of key-stat cards shown near the top (e.g. metrics, KPIs). Use only when you have real, meaningful numbers/facts. 2-4 works best.',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: 'What the stat measures (e.g. "Avg. engagement").' },
+              value: { type: 'string', description: 'The headline value (e.g. "4.2%", "12k").' },
+              sublabel: { type: 'string', description: 'Optional small caption under the value.' },
+            },
+            required: ['label', 'value'],
+            additionalProperties: false,
+          },
+        },
+        sections: {
+          type: 'array',
+          description: 'For "pdf"/"docx": the document body, in order. Each section is a heading and/or prose and/or a bullet list and/or a chart.',
+          items: {
+            type: 'object',
+            properties: {
+              heading: { type: 'string', description: 'Optional section heading.' },
+              body: { type: 'string', description: 'Optional paragraph text (can be several sentences; use blank lines to separate paragraphs).' },
+              bullets: { type: 'array', items: { type: 'string' }, description: 'Optional bullet points.' },
+              callout: { type: 'string', description: 'Optional highlighted note/quote/tip shown in an accent box.' },
+              chart: {
+                type: 'object',
+                description: 'Optional simple bar chart for this section. Use for real comparisons/trends only.',
+                properties: {
+                  title: { type: 'string', description: 'Chart title.' },
+                  points: {
+                    type: 'array',
+                    description: 'Bars, in order.',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        label: { type: 'string' },
+                        value: { type: 'number' },
+                      },
+                      required: ['label', 'value'],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ['points'],
+                additionalProperties: false,
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        sheets: {
+          type: 'array',
+          description: 'For "xlsx": one or more sheets. Each has a name, column headers, and rows of cell values.',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Sheet/tab name.' },
+              columns: { type: 'array', items: { type: 'string' }, description: 'Column header labels.' },
+              rows: {
+                type: 'array',
+                description: 'Rows of cells; each row is an array of values aligned to columns.',
+                items: { type: 'array', items: { type: ['string', 'number'] } },
+              },
+            },
+            required: ['columns', 'rows'],
+            additionalProperties: false,
+          },
+        },
+        slides: {
+          type: 'array',
+          description: 'For "pptx": the slides in order. Each has a title and bullet points and/or a short body.',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Slide title.' },
+              bullets: { type: 'array', items: { type: 'string' }, description: 'Bullet points on the slide.' },
+              body: { type: 'string', description: 'Optional short body/subtitle text.' },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['type', 'title'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * Gemini NATIVE image GENERATION capability. Call this only when the user wants
+ * a NEW image/creative created (text-to-image): social creatives, thumbnails,
+ * product shots, posters, banners, backgrounds, campaign assets, concepts.
+ * Do NOT call it for captions, analysis, or when the user only wants to
+ * understand/describe an existing image. Author a rich, specific `prompt` — the
+ * quality of the image depends on the direction you give (subject, composition,
+ * lighting, style, mood, background, any on-image text). The system renders a
+ * live generation card and produces the final image.
+ */
+export const GENERATE_IMAGE_TOOL: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'generate_image',
+    description:
+      'Create a NEW image/creative from a text brief using Veefore\'s AI image capability (e.g. "make an Instagram creative for my sneaker launch", "design a YouTube thumbnail", "create a poster"). ' +
+      'Write a detailed, professional creative brief in `prompt`: subject, composition, lighting, style/mood, background, colors, and any on-image text. ' +
+      'Do NOT call this for captions/hashtags/analytics, or when the user only wants to describe/understand an existing image. The system shows the generation card — you only need a one-line intro in your reply.',
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'The full, detailed image/creative brief to render.' },
+        title: { type: 'string', description: 'Optional short title/label for the creative.' },
+        platform: { type: 'string', description: 'Optional target platform (e.g. "instagram", "instagram story", "youtube", "linkedin") to pick the aspect ratio.' },
+        aspectRatio: { type: 'string', enum: ['square', 'portrait', 'story', 'landscape', 'wide'], description: 'Optional explicit aspect ratio. Overrides platform.' },
+        count: { type: 'number', description: 'How many distinct options/variations to create (1-4, default 1). Only set >1 when the user asks for multiple options.' },
+        premium: { type: 'boolean', description: 'Set true ONLY for genuinely complex/professional/high-fidelity work (advanced compositions, precise on-image text/layout, difficult brand consistency). Otherwise omit — the default model is faster and cheaper.' },
+      },
+      required: ['prompt'],
+      additionalProperties: false,
+    },
+  },
+}
+
+/**
+ * Gemini NATIVE image EDITING capability. Call this when the user wants to edit
+ * / transform an image they attached (background change/removal, relight, change
+ * a color, make it ad-ready, expand aspect ratio, add a logo, cinematic
+ * version, etc.). The user's attached image is passed to the model as real
+ * image input. State clearly WHAT changes and WHAT must be preserved.
+ */
+export const EDIT_IMAGE_TOOL: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'edit_image',
+    description:
+      'Edit or transform the image the user attached, using Veefore\'s AI image capability (e.g. "remove the background", "put the product in a luxury studio", "make the lighting warmer", "change the shirt to white", "expand to 9:16", "add my logo"). ' +
+      'Only call this when the user has attached an image (or is continuing to edit one) AND wants it changed — not for describing/understanding it. ' +
+      'In `instruction`, state exactly what to change; in `preserve`, state what must stay identical (important for product/brand shots, e.g. "keep the product shape, logo, proportions and colors unchanged").',
+    parameters: {
+      type: 'object',
+      properties: {
+        instruction: { type: 'string', description: 'The exact change(s) to apply to the attached image.' },
+        preserve: { type: 'string', description: 'What must remain unchanged (product shape, logo, proportions, colors, etc.).' },
+        title: { type: 'string', description: 'Optional short title/label for the result.' },
+        aspectRatio: { type: 'string', enum: ['square', 'portrait', 'story', 'landscape', 'wide'], description: 'Optional target aspect ratio (for expansion/reframing).' },
+        premium: { type: 'boolean', description: 'Set true ONLY for genuinely complex/high-fidelity edits. Otherwise omit.' },
+      },
+      required: ['instruction'],
+      additionalProperties: false,
+    },
+  },
+}
+
+/**
+ * AI Video Editor capability. Call this when the user has attached a VIDEO and
+ * wants it EDITED — trim/cut, remove an object/person, change/remove the
+ * background, add captions/subtitles, apply a colour/cinematic look, reframe or
+ * change aspect ratio, speed changes, reels/shorts export, etc. The attached
+ * video is routed into Veefore's existing AI Video Editor pipeline, which is
+ * ASYNC and multi-stage; the chat renders an inline editor card that streams the
+ * plan/progress and drives the edit conversationally.
+ *
+ * Do NOT call this for images (that is `edit_image`), and do NOT call it when the
+ * user only wants to DESCRIBE / understand a video rather than change it. State
+ * the concrete edit to perform in `instruction`.
+ *
+ * TWO RULES THE DESCRIPTION MAKES EXPLICIT, because both were violated in
+ * production on the message "add a beautiful and animated caption and also apply
+ * color grade":
+ *   • With a video attached, "caption(s)"/"subtitles" is a BURNED-IN timed
+ *     caption edit, never a written social post caption.
+ *   • A multi-part edit request goes into ONE `instruction` naming every part —
+ *     the model must not send half the request to the tool and answer the other
+ *     half in prose.
+ */
+export const VIDEO_EDITOR_TOOL: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'video_editor',
+    description:
+      'Edit the VIDEO the user attached using Veefore\'s AI Video Editor (e.g. "remove the person behind me", "make this cinematic", "cut the first 5 seconds", "add captions", "reframe to 9:16 for a reel", "remove the background", "trim to 15 seconds"). ' +
+      'Only call this when the user attached a VIDEO (or is continuing to edit one) AND wants it changed. ' +
+      'NOT for images (use edit_image) and NOT for merely describing/summarizing a video. ' +
+      'Video editing is asynchronous and multi-stage: the system opens an inline editor card that runs the edit — you only need a one-line intro in your reply. ' +
+      'Put the exact change to perform in `instruction`; put anything that must stay untouched in `preserve`. ' +
+      'CAPTIONS: when a video is attached, "caption"/"captions"/"subtitles" means BURNING TIMED CAPTIONS INTO THE VIDEO — put it in `instruction` (e.g. "add animated burned-in captions"). Do NOT satisfy it by writing a social post caption; that is a different capability and it does not change the video. ' +
+      'ONE CALL, EVERY EDIT: the `instruction` must carry EVERY edit the user asked for in that message. Never drop or split off part of a multi-part request. ' +
+      'WRONG — "add an animated caption and apply a colour grade" answered with instruction "apply a cinematic colour grade" plus a written post caption in your reply. ' +
+      'RIGHT — one call with instruction "add animated burned-in captions and apply a cinematic colour grade".',
+    parameters: {
+      type: 'object',
+      properties: {
+        instruction: { type: 'string', description: 'The exact edit to perform on the attached video.' },
+        preserve: { type: 'string', description: 'What must remain unchanged (subject, framing, audio, branding, etc.).' },
+      },
+      required: ['instruction'],
+      additionalProperties: false,
+    },
+  },
+}
 
 // ─── Analytics / insight / best-time / trends tools ─────────────────────────
 
@@ -219,12 +484,34 @@ export const DEEP_RESEARCH_TOOL: ChatTool = {
 export const VEEGPT_INSIGHT_TOOLS: ChatTool[] = [
   GENERATE_CAPTION_TOOL,
   GENERATE_HASHTAGS_TOOL,
+  GENERATE_DOCUMENT_TOOL,
+  GENERATE_IMAGE_TOOL,
+  EDIT_IMAGE_TOOL,
   GET_ANALYTICS_INSIGHT_TOOL,
   GET_BEST_POSTING_TIME_TOOL,
   RESEARCH_TRENDS_TOOL,
   SEARCH_WEB_TOOL,
   DEEP_RESEARCH_TOOL,
 ];
+
+/**
+ * Native image capability tools (generation + editing). These are a first-class
+ * capability the MODEL always decides on itself, so they must stay available
+ * even on an image-ATTACHMENT turn (uploading an image to edit it). Tier gating
+ * still applies (both are `full`+). Kept as their own set so the chat route can
+ * expose them independently of the account/analytics tools.
+ */
+export const VEEGPT_IMAGE_TOOLS: ChatTool[] = [GENERATE_IMAGE_TOOL, EDIT_IMAGE_TOOL];
+
+/**
+ * Native AI Video Editor capability tools. Like the image tools, this is a
+ * first-class capability the MODEL decides on itself, so it must stay available
+ * on a video-ATTACHMENT turn (uploading a video to edit it). Tier gating still
+ * applies (`video_editor` is `full`+). Kept as its own set so the chat route can
+ * expose it independently of the account/analytics tools and re-add it on a
+ * video-attachment turn (mirroring `VEEGPT_IMAGE_TOOLS`).
+ */
+export const VEEGPT_VIDEO_TOOLS: ChatTool[] = [VIDEO_EDITOR_TOOL];
 
 /**
  * Memory tool: lets the model save a durable, user-specific fact/preference to

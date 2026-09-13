@@ -1,7 +1,14 @@
 import mongoose from 'mongoose';
-import { WorkspacePlan, IWorkspace, WorkspaceModel } from '../models/Workspace/WorkspaceModel';
+import {
+  WorkspacePlan,
+  IWorkspace,
+  WorkspaceModel,
+} from '../models/Workspace/WorkspaceModel';
 import { WorkspaceMemberModel } from '../models/Workspace/WorkspaceMemberModel';
-import { AuthorizedBrandModel, IAuthorizedBrand } from '../models/AuthorizedBrand/AuthorizedBrandModel';
+import {
+  AuthorizedBrandModel,
+  IAuthorizedBrand,
+} from '../models/AuthorizedBrand/AuthorizedBrandModel';
 import { User } from '../models/User/User';
 
 // ─── Regex Helper ─────────────────────────────────────────────────────────────
@@ -123,16 +130,18 @@ export class WorkspaceService {
     try {
       return await session.withTransaction(async () => {
         // 1. Validate owner exists — look up by firebaseUid
-        const user = await User.findOne({ firebaseUid: ownerId }).session(session).lean();
+        const user = await User.findOne({ firebaseUid: ownerId })
+          .session(session)
+          .lean();
         if (!user) {
           throw new WorkspaceError('USER_NOT_FOUND', 'Owner does not exist');
         }
 
         // 2. Resolve plan limit (user.plan may be 'Free', 'Pro', etc. — normalise to uppercase)
-        const userPlan = (String(user.plan).toUpperCase()) as WorkspacePlan;
+        const userPlan = String(user.plan).toUpperCase() as WorkspacePlan;
         const limit = this.resolveLimit(
           userPlan,
-          (user as any).customWorkspaceLimit ?? null,
+          (user as any).customWorkspaceLimit ?? null
         );
 
         // 3. Atomic count + limit check within the session
@@ -144,43 +153,50 @@ export class WorkspaceService {
         if (limit !== null && currentCount >= limit) {
           throw new WorkspaceError(
             'WORKSPACE_LIMIT_REACHED',
-            `Plan ${userPlan} allows a maximum of ${limit} workspace(s). Current count: ${currentCount}.`,
+            `Plan ${userPlan} allows a maximum of ${limit} workspace(s). Current count: ${currentCount}.`
           );
         }
 
         // 4. Case-insensitive name uniqueness check
         const trimmedName = name.trim();
-        const namePattern = new RegExp('^' + escapeRegExp(trimmedName.toLowerCase()) + '$', 'i');
+        const namePattern = new RegExp(
+          '^' + escapeRegExp(trimmedName.toLowerCase()) + '$',
+          'i'
+        );
         const duplicate = await WorkspaceModel.findOne({
           ownerId,
           status: { $ne: 'DELETED' },
           name: namePattern,
-        }).session(session).lean();
+        })
+          .session(session)
+          .lean();
 
         if (duplicate) {
           throw new WorkspaceError(
             'WORKSPACE_NAME_CONFLICT',
-            'A workspace with this name already exists.',
+            'A workspace with this name already exists.'
           );
         }
 
         // 5. Create the workspace document
         const [workspace] = await WorkspaceModel.create(
           [{ ownerId, name: trimmedName, plan, status: 'ACTIVE' }],
-          { session },
+          { session }
         );
 
         // 6. Bootstrap OWNER WorkspaceMember record
         await WorkspaceMemberModel.create(
-          [{
-            workspaceId: workspace._id,
-            userId: ownerId,
-            role: 'OWNER',
-            status: 'ACTIVE',
-            invitedAt: workspace.createdAt,
-            joinedAt: workspace.createdAt,
-          }],
-          { session },
+          [
+            {
+              workspaceId: workspace._id,
+              userId: ownerId,
+              role: 'OWNER',
+              status: 'ACTIVE',
+              invitedAt: workspace.createdAt,
+              joinedAt: workspace.createdAt,
+            },
+          ],
+          { session }
         );
 
         // 7. Return workspace
@@ -203,20 +219,30 @@ export class WorkspaceService {
     // document) rather than the legacy User.plan field, which the Razorpay
     // subscription system never writes to and always reads back as its
     // schema default ("Free") for any paying user.
-    const { getEntitlementService } = await import('../features/subscription/services/EntitlementService');
+    const { getEntitlementService } =
+      await import('../features/subscription/services/EntitlementService');
     const { getRedisClient } = await import('../lib/redis');
-    const SubscriptionRepository = (await import('../features/subscription/db/repositories/SubscriptionRepository')).default;
-    const entitlementService = getEntitlementService(getRedisClient(), new SubscriptionRepository());
+    const SubscriptionRepository = (
+      await import('../features/subscription/db/repositories/SubscriptionRepository')
+    ).default;
+    const entitlementService = getEntitlementService(
+      getRedisClient(),
+      new SubscriptionRepository()
+    );
 
     const mongoUserId = String((user as any)._id);
-    const rawLimit = await entitlementService.getLimit(mongoUserId, 'maxWorkspaces');
+    const rawLimit = await entitlementService.getLimit(
+      mongoUserId,
+      'maxWorkspaces'
+    );
     const planLimit = rawLimit === Infinity ? null : rawLimit;
 
     const currentCount = await WorkspaceModel.countDocuments({
       ownerId: userId,
       status: { $ne: 'DELETED' },
     });
-    const remainingCapacity = planLimit === null ? null : Math.max(0, planLimit - currentCount);
+    const remainingCapacity =
+      planLimit === null ? null : Math.max(0, planLimit - currentCount);
     return { currentCount, planLimit, remainingCapacity };
   }
 
@@ -227,15 +253,34 @@ export class WorkspaceService {
   async getActiveWorkspace(userId: string): Promise<IWorkspace | null> {
     const user = await User.findOne({ firebaseUid: userId }).lean();
     if (!user) return null;
+    const { WorkspaceMemberModel } =
+      await import('../models/Workspace/WorkspaceMemberModel');
+
+    // Resolve the ACCESSIBLE (non-locked) workspace set for the user's current
+    // plan so the active workspace can never be one that's over the plan limit.
+    // A locked active workspace is what made the app appear "inside" a locked
+    // workspace after a downgrade — every data call for it 403s
+    // (WORKSPACE_OVER_LIMIT), producing the broken dashboard / empty analytics.
+    let accessibleSet: Set<string> | null = null;
+    try {
+      const all = await this.getUserWorkspaces(userId);
+      const { resolveAccessibleWorkspaceIds } =
+        await import('../lib/workspace-lock');
+      accessibleSet = await resolveAccessibleWorkspaceIds(userId, all as any[]);
+    } catch {
+      accessibleSet = null; // fail open — never trap the user out of their data
+    }
+    const isAccessible = (id: unknown): boolean =>
+      accessibleSet === null || accessibleSet.has(String(id));
+
     const activeId = (user as any).activeWorkspaceId;
     if (activeId) {
       const workspace = await WorkspaceModel.findOne({
         _id: activeId,
         status: { $ne: 'DELETED' },
       });
-      // Validate user is a member
-      if (workspace) {
-        const { WorkspaceMemberModel } = await import('../models/Workspace/WorkspaceMemberModel');
+      // Validate user is a member AND the workspace is accessible on this plan.
+      if (workspace && isAccessible(workspace._id)) {
         const member = await WorkspaceMemberModel.findOne({
           workspaceId: workspace._id,
           userId,
@@ -244,8 +289,28 @@ export class WorkspaceService {
         if (member) return workspace;
       }
     }
-    // Fall back to oldest ACTIVE workspace owned by the user
-    return WorkspaceModel.findOne({ ownerId: userId, status: 'ACTIVE' }).sort({ createdAt: 1 });
+
+    // The stored active workspace is missing, not a member, or LOCKED. Re-point
+    // to the first ACCESSIBLE workspace (oldest-first, matching the lock helper)
+    // and persist it so the pill/cookie and every subsequent request agree.
+    const candidates = await WorkspaceModel.find({
+      ownerId: userId,
+      status: 'ACTIVE',
+    }).sort({ createdAt: 1 });
+    const firstAccessible =
+      candidates.find(w => isAccessible(w._id)) ?? candidates[0] ?? null;
+
+    if (firstAccessible && String(firstAccessible._id) !== String(activeId)) {
+      try {
+        await User.updateOne(
+          { firebaseUid: userId },
+          { activeWorkspaceId: firstAccessible._id }
+        );
+      } catch {
+        /* non-fatal — returned workspace is still correct for this request */
+      }
+    }
+    return firstAccessible;
   }
 
   /**
@@ -253,10 +318,47 @@ export class WorkspaceService {
    * Satisfies Requirements 6.1, 6.2, 7.4
    */
   async switchWorkspace(userId: string, workspaceId: string): Promise<void> {
-    const { WorkspaceMemberModel } = await import('../models/Workspace/WorkspaceMemberModel');
-    const member = await WorkspaceMemberModel.findOne({ workspaceId, userId, status: 'ACTIVE' });
-    if (!member) throw new WorkspaceError('WORKSPACE_ACCESS_DENIED', 'You are not a member of this workspace.');
-    await User.updateOne({ firebaseUid: userId }, { activeWorkspaceId: workspaceId });
+    const { WorkspaceMemberModel } =
+      await import('../models/Workspace/WorkspaceMemberModel');
+    const member = await WorkspaceMemberModel.findOne({
+      workspaceId,
+      userId,
+      status: 'ACTIVE',
+    });
+    if (!member)
+      throw new WorkspaceError(
+        'WORKSPACE_ACCESS_DENIED',
+        'You are not a member of this workspace.'
+      );
+
+    // PLAN ENFORCEMENT (defence-in-depth): never allow switching INTO a
+    // workspace that is locked (over the current plan's limit). The client
+    // already blocks this, and the mandatory selection modal drives legitimate
+    // re-selection through preferredWorkspaceIds (which is reflected here), so a
+    // locked target can only come from a stale/forged request.
+    try {
+      const all = await this.getUserWorkspaces(userId);
+      const { resolveAccessibleWorkspaceIds } =
+        await import('../lib/workspace-lock');
+      const accessibleSet = await resolveAccessibleWorkspaceIds(
+        userId,
+        all as any[]
+      );
+      if (accessibleSet !== null && !accessibleSet.has(String(workspaceId))) {
+        throw new WorkspaceError(
+          'WORKSPACE_ACCESS_DENIED',
+          'This workspace is locked on your current plan. Upgrade to access it — your data is preserved.'
+        );
+      }
+    } catch (err) {
+      if (err instanceof WorkspaceError) throw err;
+      // Any other error → fail open so an entitlement hiccup can't trap a user.
+    }
+
+    await User.updateOne(
+      { firebaseUid: userId },
+      { activeWorkspaceId: workspaceId }
+    );
   }
 
   /**
@@ -266,11 +368,15 @@ export class WorkspaceService {
    */
   async importAuthorizedBrand(input: ImportBrandInput): Promise<IWorkspace> {
     // 1. Fetch the AuthorizedBrand record
-    const brand = await AuthorizedBrandModel.findOne(
-      { userId: input.userId, pageId: input.pageId }
-    );
+    const brand = await AuthorizedBrandModel.findOne({
+      userId: input.userId,
+      pageId: input.pageId,
+    });
     if (!brand) {
-      throw new WorkspaceError('BRAND_NOT_FOUND', 'Authorized brand not found.');
+      throw new WorkspaceError(
+        'BRAND_NOT_FOUND',
+        'Authorized brand not found.'
+      );
     }
 
     // 2. Check token expiry
@@ -279,18 +385,23 @@ export class WorkspaceService {
         { _id: brand._id },
         { status: 'EXPIRED' }
       );
-      throw new WorkspaceError('TOKEN_EXPIRED', 'Authorization expired. Please reconnect Meta.');
+      throw new WorkspaceError(
+        'TOKEN_EXPIRED',
+        'Authorization expired. Please reconnect Meta.'
+      );
     }
 
     // 3. Create or use existing workspace
     let workspace: IWorkspace;
     if (input.workspaceId) {
       const existing = await WorkspaceModel.findById(input.workspaceId);
-      if (!existing) throw new WorkspaceError('WORKSPACE_NOT_FOUND', 'Workspace not found.');
+      if (!existing)
+        throw new WorkspaceError('WORKSPACE_NOT_FOUND', 'Workspace not found.');
       workspace = existing;
 
       // HARD RULE: One brand per workspace — check if workspace already has social accounts
-      const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+      const { SocialAccountModel } =
+        await import('../models/Social/SocialAccount');
       const existingAccounts = await SocialAccountModel.countDocuments({
         workspaceId: input.workspaceId.toString(),
         connectionStatus: 'ACTIVE',
@@ -315,16 +426,27 @@ export class WorkspaceService {
       // input.userId here is the caller's Firebase UID (see
       // authorized-brands.routes.ts), but EntitlementService keys Subscription
       // documents by the Mongo _id — resolve that first.
-      const userDoc = await User.findOne({ firebaseUid: input.userId }).select('_id').lean();
+      const userDoc = await User.findOne({ firebaseUid: input.userId })
+        .select('_id')
+        .lean();
       const mongoUserId = userDoc ? String((userDoc as any)._id) : input.userId;
 
-      const { getEntitlementService } = await import('../features/subscription/services/EntitlementService');
+      const { getEntitlementService } =
+        await import('../features/subscription/services/EntitlementService');
       const { getRedisClient } = await import('../lib/redis');
-      const SubscriptionRepository = (await import('../features/subscription/db/repositories/SubscriptionRepository')).default;
-      const entitlementService = getEntitlementService(getRedisClient(), new SubscriptionRepository());
+      const SubscriptionRepository = (
+        await import('../features/subscription/db/repositories/SubscriptionRepository')
+      ).default;
+      const entitlementService = getEntitlementService(
+        getRedisClient(),
+        new SubscriptionRepository()
+      );
 
       const effectivePlan = await entitlementService.getPlan(mongoUserId);
-      const limit = await entitlementService.getLimit(mongoUserId, 'maxWorkspaces');
+      const limit = await entitlementService.getLimit(
+        mongoUserId,
+        'maxWorkspaces'
+      );
       const currentCount = await WorkspaceModel.countDocuments({
         ownerId: input.userId,
         status: { $ne: 'DELETED' },
@@ -335,25 +457,32 @@ export class WorkspaceService {
           `Your ${effectivePlan} plan allows a maximum of ${limit} workspace(s). You currently have ${currentCount}.`
         );
       }
-      const [createdWs] = await WorkspaceModel.create([{
-        ownerId: input.userId,
-        name: brand.pageName.trim(),
-        plan: 'FREE',
-        status: 'ACTIVE',
-      }]);
+      const [createdWs] = await WorkspaceModel.create([
+        {
+          ownerId: input.userId,
+          name: brand.pageName.trim(),
+          plan: 'FREE',
+          status: 'ACTIVE',
+        },
+      ]);
       workspace = createdWs;
       // Create workspace member record
       try {
-        await WorkspaceMemberModel.create([{
-          workspaceId: workspace._id,
-          userId: input.userId,
-          role: 'OWNER',
-          status: 'ACTIVE',
-          invitedAt: workspace.createdAt ?? new Date(),
-          joinedAt: workspace.createdAt ?? new Date(),
-        }]);
+        await WorkspaceMemberModel.create([
+          {
+            workspaceId: workspace._id,
+            userId: input.userId,
+            role: 'OWNER',
+            status: 'ACTIVE',
+            invitedAt: workspace.createdAt ?? new Date(),
+            joinedAt: workspace.createdAt ?? new Date(),
+          },
+        ]);
       } catch (memberErr: any) {
-        console.warn('[importAuthorizedBrand] WorkspaceMember creation failed (non-fatal):', memberErr?.message);
+        console.warn(
+          '[importAuthorizedBrand] WorkspaceMember creation failed (non-fatal):',
+          memberErr?.message
+        );
       }
     }
 
@@ -378,7 +507,10 @@ export class WorkspaceService {
         profilePictureUrl: brand.pageProfilePictureUrl,
         workspaceId: workspace._id,
         userId: input.userId,
-        accessToken: (brand as any).userAccessToken || (brand as any).accessToken || undefined,
+        accessToken:
+          (brand as any).userAccessToken ||
+          (brand as any).accessToken ||
+          undefined,
         linkedFacebookPageId: brand.pageId,
       });
     }
@@ -405,10 +537,12 @@ export class WorkspaceService {
           // one: the new workspace WAS created and the brand WAS imported into
           // it, but the user was bounced back to their original workspace
           // before ever seeing it, making it look like nothing happened.
-          const hasExistingDefault = await conn.db.collection('workspaces').findOne({
-            userId: input.userId,
-            isDefault: true,
-          });
+          const hasExistingDefault = await conn.db
+            .collection('workspaces')
+            .findOne({
+              userId: input.userId,
+              isDefault: true,
+            });
 
           await conn.db.collection('workspaces').insertOne({
             _id: workspace._id,
@@ -418,17 +552,28 @@ export class WorkspaceService {
             isDefault: !hasExistingDefault,
             plan: 'free',
             credits: 50,
-            members: [{ userId: input.userId, role: 'owner', joinedAt: workspace.createdAt ?? new Date() }],
+            members: [
+              {
+                userId: input.userId,
+                role: 'owner',
+                joinedAt: workspace.createdAt ?? new Date(),
+              },
+            ],
             settings: { autoSync: true, notifications: true, timezone: 'UTC' },
             addons: [],
             createdAt: workspace.createdAt ?? new Date(),
             updatedAt: new Date(),
           });
-          console.log(`[importAuthorizedBrand] Created legacy workspace mirror: ${workspace._id} (isDefault=${!hasExistingDefault})`);
+          console.log(
+            `[importAuthorizedBrand] Created legacy workspace mirror: ${workspace._id} (isDefault=${!hasExistingDefault})`
+          );
         }
       }
     } catch (legacyErr: any) {
-      console.warn('[importAuthorizedBrand] Legacy workspace mirror failed (non-fatal):', legacyErr?.message);
+      console.warn(
+        '[importAuthorizedBrand] Legacy workspace mirror failed (non-fatal):',
+        legacyErr?.message
+      );
     }
 
     // 6. Mark brand as IMPORTED
@@ -441,16 +586,23 @@ export class WorkspaceService {
     // isOnboarded=true even if the client-side complete-onboarding call fails.
     try {
       const { storage } = await import('../mongodb-storage');
-      const user = await storage.getUserByFirebaseUid(input.userId).catch(() => null);
+      const user = await storage
+        .getUserByFirebaseUid(input.userId)
+        .catch(() => null);
       if (user && !user.isOnboarded) {
         await storage.updateUser(user.id, {
           isOnboarded: true,
           onboardingCompletedAt: new Date(),
         });
-        console.log(`[importAuthorizedBrand] Marked user ${user.id} as onboarded`);
+        console.log(
+          `[importAuthorizedBrand] Marked user ${user.id} as onboarded`
+        );
       }
     } catch (onboardErr: any) {
-      console.warn('[importAuthorizedBrand] Failed to mark user as onboarded (non-fatal):', onboardErr?.message);
+      console.warn(
+        '[importAuthorizedBrand] Failed to mark user as onboarded (non-fatal):',
+        onboardErr?.message
+      );
     }
 
     // 7. Trigger background metrics sync so data appears immediately on the dashboard
@@ -458,7 +610,8 @@ export class WorkspaceService {
     try {
       const { MetricsQueueManager } = await import('../queues/metricsQueue');
       const fbToken = (brand as any).accessToken;
-      const igToken = (brand as any).userAccessToken || (brand as any).accessToken;
+      const igToken =
+        (brand as any).userAccessToken || (brand as any).accessToken;
 
       // Schedule Facebook Page metrics fetch
       if (fbToken) {
@@ -469,8 +622,15 @@ export class WorkspaceService {
           fbToken,
           'all',
           { forceRefresh: true, priority: 5 }
-        ).catch((err: Error) => console.warn('[importAuthorizedBrand] FB metrics schedule failed:', err.message));
-        console.log(`[importAuthorizedBrand] Scheduled FB Page metrics for ${brand.pageId}`);
+        ).catch((err: Error) =>
+          console.warn(
+            '[importAuthorizedBrand] FB metrics schedule failed:',
+            err.message
+          )
+        );
+        console.log(
+          `[importAuthorizedBrand] Scheduled FB Page metrics for ${brand.pageId}`
+        );
       }
 
       // Schedule Instagram connect-init if instagram account exists
@@ -480,17 +640,31 @@ export class WorkspaceService {
           instagramAccountId: brand.linkedInstagramAccountId,
           token: igToken,
           username: brand.linkedInstagramUsername || brand.pageName,
-        }).catch((err: Error) => console.warn('[importAuthorizedBrand] IG connect-init failed:', err.message));
-        console.log(`[importAuthorizedBrand] Enqueued IG connect-init for ${brand.linkedInstagramAccountId}`);
+        }).catch((err: Error) =>
+          console.warn(
+            '[importAuthorizedBrand] IG connect-init failed:',
+            err.message
+          )
+        );
+        console.log(
+          `[importAuthorizedBrand] Enqueued IG connect-init for ${brand.linkedInstagramAccountId}`
+        );
       }
 
       // Schedule Facebook insights prewarm (24-month history)
-      const { prewarmFacebookInsightsForWorkspace } = await import('../features/facebook/analytics/facebookInsightsHistory');
-      prewarmFacebookInsightsForWorkspace(workspaceIdStr)
-        .catch((err: Error) => console.warn('[importAuthorizedBrand] FB prewarm failed:', err.message));
-      console.log(`[importAuthorizedBrand] Enqueued FB insights prewarm for workspace ${workspaceIdStr}`);
+      const { prewarmFacebookInsightsForWorkspace } =
+        await import('../features/facebook/analytics/facebookInsightsHistory');
+      prewarmFacebookInsightsForWorkspace(workspaceIdStr).catch((err: Error) =>
+        console.warn('[importAuthorizedBrand] FB prewarm failed:', err.message)
+      );
+      console.log(
+        `[importAuthorizedBrand] Enqueued FB insights prewarm for workspace ${workspaceIdStr}`
+      );
     } catch (syncErr: any) {
-      console.warn('[importAuthorizedBrand] Post-import sync failed (non-fatal):', syncErr?.message);
+      console.warn(
+        '[importAuthorizedBrand] Post-import sync failed (non-fatal):',
+        syncErr?.message
+      );
     }
 
     return workspace;
@@ -510,7 +684,8 @@ export class WorkspaceService {
     /** For Instagram: the linked Facebook page ID */
     linkedFacebookPageId?: string;
   }): Promise<void> {
-    const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+    const { SocialAccountModel } =
+      await import('../models/Social/SocialAccount');
     await SocialAccountModel.findOneAndUpdate(
       { platform: params.platform, accountId: params.accountId },
       {
@@ -529,8 +704,12 @@ export class WorkspaceService {
           ...(params.accessToken ? { accessToken: params.accessToken } : {}),
           // Store cross-platform link metadata for grouping in the UI
           platformMetadata: {
-            ...(params.linkedInstagramAccountId ? { linkedInstagramAccountId: params.linkedInstagramAccountId } : {}),
-            ...(params.linkedFacebookPageId ? { linkedFacebookPageId: params.linkedFacebookPageId } : {}),
+            ...(params.linkedInstagramAccountId
+              ? { linkedInstagramAccountId: params.linkedInstagramAccountId }
+              : {}),
+            ...(params.linkedFacebookPageId
+              ? { linkedFacebookPageId: params.linkedFacebookPageId }
+              : {}),
           },
           updatedAt: new Date(),
         },
@@ -545,7 +724,10 @@ export class WorkspaceService {
    * Idempotent — safe to call multiple times for the same user + page.
    * Satisfies Requirements 3.1, 3.4, 8.1, 8.6
    */
-  async upsertAuthorizedBrands(userId: string, pages: MetaPage[]): Promise<IAuthorizedBrand[]> {
+  async upsertAuthorizedBrands(
+    userId: string,
+    pages: MetaPage[]
+  ): Promise<IAuthorizedBrand[]> {
     const results: IAuthorizedBrand[] = [];
     for (const page of pages) {
       const updateFields: Record<string, any> = {
@@ -576,26 +758,44 @@ export class WorkspaceService {
    * Rename a workspace, enforcing uniqueness and length constraints.
    * Satisfies Requirements 9.1, 9.2
    */
-  async renameWorkspace(workspaceId: string, newName: string, userId: string): Promise<IWorkspace> {
+  async renameWorkspace(
+    workspaceId: string,
+    newName: string,
+    userId: string
+  ): Promise<IWorkspace> {
     const trimmed = newName.trim();
     if (!trimmed || trimmed.length < 1 || trimmed.length > 100) {
-      throw new WorkspaceError('INVALID_WORKSPACE_NAME', 'Workspace name must be between 1 and 100 characters.');
+      throw new WorkspaceError(
+        'INVALID_WORKSPACE_NAME',
+        'Workspace name must be between 1 and 100 characters.'
+      );
     }
     // Case-insensitive uniqueness check
-    const namePattern = new RegExp('^' + escapeRegExp(trimmed.toLowerCase()) + '$', 'i');
+    const namePattern = new RegExp(
+      '^' + escapeRegExp(trimmed.toLowerCase()) + '$',
+      'i'
+    );
     const duplicate = await WorkspaceModel.findOne({
       ownerId: userId,
       status: { $ne: 'DELETED' },
       name: namePattern,
       _id: { $ne: workspaceId },
     });
-    if (duplicate) throw new WorkspaceError('WORKSPACE_NAME_CONFLICT', 'A workspace with this name already exists.');
+    if (duplicate)
+      throw new WorkspaceError(
+        'WORKSPACE_NAME_CONFLICT',
+        'A workspace with this name already exists.'
+      );
     const updated = await WorkspaceModel.findOneAndUpdate(
       { _id: workspaceId, ownerId: userId, status: { $ne: 'DELETED' } },
       { name: trimmed, updatedAt: new Date() },
       { new: true }
     );
-    if (!updated) throw new WorkspaceError('NOT_FOUND_OR_UNAUTHORIZED', 'Workspace not found or access denied.');
+    if (!updated)
+      throw new WorkspaceError(
+        'NOT_FOUND_OR_UNAUTHORIZED',
+        'Workspace not found or access denied.'
+      );
     return updated;
   }
 
@@ -609,9 +809,13 @@ export class WorkspaceService {
     try {
       await session.withTransaction(async () => {
         // 1. Load workspace and verify ownership
-        const workspace = await WorkspaceModel.findById(workspaceId).session(session);
+        const workspace =
+          await WorkspaceModel.findById(workspaceId).session(session);
         if (!workspace || workspace.ownerId !== userId) {
-          throw new WorkspaceError('NOT_FOUND_OR_UNAUTHORIZED', 'Workspace not found or access denied.');
+          throw new WorkspaceError(
+            'NOT_FOUND_OR_UNAUTHORIZED',
+            'Workspace not found or access denied.'
+          );
         }
 
         // 2. Prevent deletion of last ACTIVE workspace
@@ -620,11 +824,18 @@ export class WorkspaceService {
           status: 'ACTIVE',
         }).session(session);
         if (activeCount <= 1) {
-          throw new WorkspaceError('CANNOT_DELETE_LAST_WORKSPACE', 'Cannot delete your only active workspace.');
+          throw new WorkspaceError(
+            'CANNOT_DELETE_LAST_WORKSPACE',
+            'Cannot delete your only active workspace.'
+          );
         }
 
         // 3. Soft-delete workspace
-        await WorkspaceModel.updateOne({ _id: workspaceId }, { status: 'DELETED' }, { session });
+        await WorkspaceModel.updateOne(
+          { _id: workspaceId },
+          { status: 'DELETED' },
+          { session }
+        );
 
         // 4. Cascade: mark all WorkspaceMember records as DELETED
         await WorkspaceMemberModel.updateMany(
@@ -634,7 +845,8 @@ export class WorkspaceService {
         );
 
         // 5. Cascade: mark all SocialAccounts as DISCONNECTED (import model lazily)
-        const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+        const { SocialAccountModel } =
+          await import('../models/Social/SocialAccount');
         await SocialAccountModel.updateMany(
           { workspaceId },
           { connectionStatus: 'DISCONNECTED' },
@@ -646,7 +858,9 @@ export class WorkspaceService {
           ownerId: userId,
           status: 'ACTIVE',
           _id: { $ne: workspaceId },
-        }).sort({ createdAt: 1 }).session(session);
+        })
+          .sort({ createdAt: 1 })
+          .session(session);
 
         await User.updateOne(
           { firebaseUid: userId },
@@ -664,7 +878,10 @@ export class WorkspaceService {
    * Satisfies Requirement 7.3
    */
   async getUserWorkspaces(userId: string): Promise<IWorkspace[]> {
-    return WorkspaceModel.find({ ownerId: userId, status: { $ne: 'DELETED' } }).sort({ createdAt: 1 });
+    return WorkspaceModel.find({
+      ownerId: userId,
+      status: { $ne: 'DELETED' },
+    }).sort({ createdAt: 1 });
   }
 
   /**
@@ -681,11 +898,22 @@ export class WorkspaceService {
    * Returns null if not found or user is not a member.
    * Satisfies Requirement 6.4
    */
-  async getWorkspaceById(workspaceId: string, userId: string): Promise<IWorkspace | null> {
-    const { WorkspaceMemberModel } = await import('../models/Workspace/WorkspaceMemberModel');
-    const member = await WorkspaceMemberModel.findOne({ workspaceId, userId, status: 'ACTIVE' });
+  async getWorkspaceById(
+    workspaceId: string,
+    userId: string
+  ): Promise<IWorkspace | null> {
+    const { WorkspaceMemberModel } =
+      await import('../models/Workspace/WorkspaceMemberModel');
+    const member = await WorkspaceMemberModel.findOne({
+      workspaceId,
+      userId,
+      status: 'ACTIVE',
+    });
     if (!member) return null;
-    return WorkspaceModel.findOne({ _id: workspaceId, status: { $ne: 'DELETED' } });
+    return WorkspaceModel.findOne({
+      _id: workspaceId,
+      status: { $ne: 'DELETED' },
+    });
   }
 
   /**
@@ -695,7 +923,11 @@ export class WorkspaceService {
    * The oldest M workspaces remain ACTIVE, where M = new plan limit.
    * Satisfies Requirement 2.4
    */
-  async handlePlanDowngrade(userId: string, newPlan: WorkspacePlan, customLimit?: number | null): Promise<{
+  async handlePlanDowngrade(
+    userId: string,
+    newPlan: WorkspacePlan,
+    customLimit?: number | null
+  ): Promise<{
     suspendedCount: number;
     suspendedWorkspaceIds: string[];
   }> {
@@ -735,7 +967,10 @@ export class WorkspaceService {
    * Enterprise-only custom override.
    * Satisfies Requirement 2.5
    */
-  private resolveLimit(plan: WorkspacePlan, customLimit?: number | null): number | null {
+  private resolveLimit(
+    plan: WorkspacePlan,
+    customLimit?: number | null
+  ): number | null {
     if (plan === 'ENTERPRISE') {
       return customLimit ?? null;
     }
@@ -747,7 +982,10 @@ export class WorkspaceService {
    * when performing an upsert. Returns true if the brand has not yet been imported.
    * Satisfies Requirement 3.4
    */
-  private async shouldResetStatus(userId: string, pageId: string): Promise<boolean> {
+  private async shouldResetStatus(
+    userId: string,
+    pageId: string
+  ): Promise<boolean> {
     const brand = await AuthorizedBrandModel.findOne({ userId, pageId }).lean();
     return !brand || brand.status !== 'IMPORTED';
   }
@@ -776,18 +1014,27 @@ export class WorkspaceService {
     }
     const createOptions = session ? { session } : {};
     const [workspace] = await WorkspaceModel.create(
-      [{ ownerId: input.ownerId, name: input.name.trim(), plan: input.plan, status: 'ACTIVE' }],
+      [
+        {
+          ownerId: input.ownerId,
+          name: input.name.trim(),
+          plan: input.plan,
+          status: 'ACTIVE',
+        },
+      ],
       createOptions
     );
     await WorkspaceMemberModel.create(
-      [{
-        workspaceId: workspace._id,
-        userId: input.ownerId,
-        role: 'OWNER',
-        status: 'ACTIVE',
-        invitedAt: workspace.createdAt,
-        joinedAt: workspace.createdAt,
-      }],
+      [
+        {
+          workspaceId: workspace._id,
+          userId: input.ownerId,
+          role: 'OWNER',
+          status: 'ACTIVE',
+          invitedAt: workspace.createdAt,
+          joinedAt: workspace.createdAt,
+        },
+      ],
       createOptions
     );
     return workspace;
@@ -810,7 +1057,8 @@ export class WorkspaceService {
     },
     session: mongoose.ClientSession
   ): Promise<void> {
-    const { SocialAccountModel } = await import('../models/Social/SocialAccount');
+    const { SocialAccountModel } =
+      await import('../models/Social/SocialAccount');
     try {
       // Use upsert so that if the Settings OAuth flow already created this record,
       // we update it to point to the new workspace instead of throwing a duplicate error.

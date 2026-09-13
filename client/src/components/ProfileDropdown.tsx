@@ -77,7 +77,7 @@ export function ProfileDropdown() {
             <p className="text-xs leading-none text-muted-foreground">{userData?.email}</p>
             <div className="flex items-center space-x-2 mt-2">
               <div className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 px-2 py-1 rounded-full font-medium">
-                {plan || userData?.plan || 'Free'} Plan
+                {(plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Free')} Plan
               </div>
               <div className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 px-2 py-1 rounded-full font-medium">
                 {creditLabel} Credits

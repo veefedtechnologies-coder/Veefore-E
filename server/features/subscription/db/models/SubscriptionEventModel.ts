@@ -10,6 +10,25 @@
 
 import mongoose, { Schema, type Document } from 'mongoose';
 
+export const SUBSCRIPTION_MODAL_TYPES = [
+  'premium_welcome',
+  'plan_change_success',
+  'credit_purchase_success',
+] as const;
+
+export type SubscriptionModalType = (typeof SUBSCRIPTION_MODAL_TYPES)[number];
+
+/**
+ * How long a modal-event lease (modalClaimedAt) is considered valid before it
+ * can be re-claimed. A client claims an event to render it and acknowledges it
+ * once shown; if it never acknowledges (tab crash, network timeout, hard
+ * reload during a Razorpay redirect), the lease expires after this window and
+ * the event is offered again. Long enough that a normally-open modal is never
+ * stolen by another visible tab, short enough that a genuine crash recovers
+ * quickly on the next visit.
+ */
+export const MODAL_CLAIM_LEASE_MS = 3 * 60 * 1000; // 3 minutes
+
 // ---------------------------------------------------------------------------
 // Interface
 // ---------------------------------------------------------------------------
@@ -33,7 +52,22 @@ export interface ISubscriptionEvent extends Document {
   triggeredBy: 'webhook' | 'admin' | 'user' | 'cron';
   /** Admin user ID when triggeredBy is 'admin'; undefined otherwise. */
   adminUserId?: string;
-  /** Arbitrary contextual data (e.g. Cashfree event payload, diff details). */
+  /** Optional future-only UI experience attached to completed events. */
+  modalType: SubscriptionModalType | null;
+  /**
+   * Lease timestamp — set when a client claims (leases) the modal event to
+   * render it. This is NOT a permanent consume: if the client crashes or times
+   * out before acknowledging, the lease expires (see MODAL_CLAIM_LEASE_MS) and
+   * the event becomes claimable again so it is never silently lost.
+   */
+  modalClaimedAt: Date | null;
+  /**
+   * Permanent consume marker — set only after the client confirms the modal was
+   * actually shown (acknowledged). Once set, the event can never be claimed
+   * again, guaranteeing exactly-once display in the normal path.
+   */
+  modalAckedAt: Date | null;
+  /** Arbitrary contextual data (e.g. provider payload, diff details). */
   metadata: Record<string, unknown>;
   /** When this event occurred. Defaults to the current date at insert time. */
   timestamp: Date;
@@ -80,6 +114,19 @@ const SubscriptionEventSchema = new Schema<ISubscriptionEvent>({
   adminUserId: {
     type: String,
   },
+  modalType: {
+    type: String,
+    enum: [...SUBSCRIPTION_MODAL_TYPES, null],
+    default: null,
+  },
+  modalClaimedAt: {
+    type: Date,
+    default: null,
+  },
+  modalAckedAt: {
+    type: Date,
+    default: null,
+  },
   metadata: {
     type: Schema.Types.Mixed,
     default: {},
@@ -93,6 +140,16 @@ const SubscriptionEventSchema = new Schema<ISubscriptionEvent>({
 
 // Read pattern: fetch a user's event history ordered newest-first.
 SubscriptionEventSchema.index({ userId: 1, timestamp: -1 });
+// Atomically lease the oldest un-acknowledged future modal event for one
+// account. modalAckedAt gates permanent consume; modalClaimedAt is the
+// (expirable) lease used to recover crashed/timed-out claims.
+SubscriptionEventSchema.index({
+  userId: 1,
+  modalType: 1,
+  modalAckedAt: 1,
+  modalClaimedAt: 1,
+  timestamp: 1,
+});
 // Look up all events for a specific subscription document.
 SubscriptionEventSchema.index({ subscriptionId: 1 });
 
@@ -102,4 +159,7 @@ SubscriptionEventSchema.index({ subscriptionId: 1 });
 
 export const SubscriptionEventModel =
   (mongoose.models.SubscriptionEvent as mongoose.Model<ISubscriptionEvent>) ||
-  mongoose.model<ISubscriptionEvent>('SubscriptionEvent', SubscriptionEventSchema);
+  mongoose.model<ISubscriptionEvent>(
+    'SubscriptionEvent',
+    SubscriptionEventSchema
+  );

@@ -7,6 +7,7 @@ import {
   InsufficientAICreditsError,
 } from '../../subscription/services/AICreditMeteringService';
 import { fromOpenAIUsage, recordAIUsage } from '../../../services/aiUsageTracker';
+import { createOpenAI } from '../../../services/ai-provider-guard';
 
 /**
  * Image Generation Controller
@@ -36,7 +37,7 @@ export class ImageGenerationController {
       }
 
       try {
-        const openai = new OpenAI({ apiKey: openaiApiKey });
+        const openai = createOpenAI({ apiKey: openaiApiKey });
         const requestIdHeader = req.headers['idempotency-key'] ?? req.headers['x-request-id'];
         const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
         const idempotencyKey = requestId

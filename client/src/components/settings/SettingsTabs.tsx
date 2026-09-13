@@ -32,6 +32,136 @@ import {
   FacebookReconnectBanner,
 } from '@/features/social-accounts/components'
 import { BrandSelectionModal } from '@/features/social-accounts/components/BrandSelectionModal'
+import useSubscription from '@/hooks/useSubscription'
+import {
+  TIER_BLURB as CLASS_BLURB,
+  TIER_LABEL as CLASS_LABEL,
+  TIER_MIN_PLAN_LABEL as CLASS_MIN_PLAN_LABEL,
+  modelTierOf as modelClassOf,
+  baseTierFor,
+  tierAccessFor,
+  type ModelTier as ModelClass,
+} from '@shared/veegpt-model-tiers'
+
+/** Badge colours per model tier (Light → Standard → Premium → Ultra). */
+const CLASS_BADGE: Record<ModelClass, string> = {
+  cheap:
+    'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300',
+  medium:
+    'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300',
+  premium:
+    'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/40 dark:bg-purple-500/10 dark:text-purple-300',
+  ultra:
+    'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300',
+}
+
+/** One window of the VeeGPT allowance, as returned by GET /api/chat/limits. */
+interface VeegptUsageWindowView {
+  used: number
+  /** null = unlimited. */
+  limit: number | null
+  remaining: number | null
+  /** Epoch seconds. */
+  resetAt: number
+}
+
+interface VeegptLimitsView {
+  plan: string | null
+  session: VeegptUsageWindowView | null
+  monthly: VeegptUsageWindowView | null
+  premium: VeegptUsageWindowView | null
+  maxClass?: ModelClass
+}
+
+/** "in 3h", "in 12 days" — when this window refills. */
+function formatResetIn(resetAt?: number): string {
+  if (!resetAt) return ''
+  const secs = Math.max(0, resetAt - Math.floor(Date.now() / 1000))
+  if (secs >= 36 * 3600) return `in ${Math.round(secs / 86400)} days`
+  if (secs >= 3600) return `in ${Math.round(secs / 3600)}h`
+  return `in ${Math.max(1, Math.round(secs / 60))} min`
+}
+
+/**
+ * A single allowance meter. Shows the real numbers (this is the Settings page —
+ * the chat composer intentionally stays vague) and turns amber/red as the window
+ * empties so the state is readable at a glance.
+ */
+function UsageMeter({
+  label,
+  window: w,
+  unit,
+}: {
+  label: string
+  window: VeegptUsageWindowView | null
+  unit: string
+}) {
+  if (!w) return null
+  if (w.limit == null) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
+        <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{label}</p>
+        <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">Unlimited</p>
+      </div>
+    )
+  }
+  const remaining = w.remaining ?? 0
+  const pct = w.limit > 0 ? Math.min(100, Math.round((w.used / w.limit) * 100)) : 0
+  const critical = remaining <= Math.max(1, Math.ceil(w.limit * 0.05))
+  const low = !critical && remaining <= Math.max(3, Math.ceil(w.limit * 0.2))
+  const bar = critical ? 'bg-red-500' : low ? 'bg-amber-500' : 'bg-blue-500'
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
+      <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+        {remaining} <span className="font-normal text-gray-500 dark:text-gray-400">{unit} of {w.limit}</span>
+      </p>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+        <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">Refills {formatResetIn(w.resetAt)}</p>
+    </div>
+  )
+}
+
+/**
+ * AI models that do NOT support a custom temperature (creativity slider).
+ * OpenAI's GPT-5 family is reasoning-based and only accepts the default
+ * temperature, so the creativity control is hidden in AI Configuration when one
+ * of these is selected. Keep in sync with litellm/config.yaml model_name ids.
+ */
+const MODELS_WITHOUT_CREATIVITY: string[] = [
+  'openai-gpt-5-nano',
+  'openai-gpt-5-mini',
+  'openai-gpt-5',
+  'openai-gpt-5.5',
+  'openai-gpt-5.6-sol',
+  'openai-gpt-5.6-luna',
+  'openai-gpt-5.6-terra',
+];
+
+/**
+ * Gemini models that stream real thinking (reasoning summaries). Unlike GPT-5
+ * these ALSO support the creativity slider. For these we show BOTH a Reasoning
+ * Effort selector and a "Show detailed thinking" toggle. Keep in sync with
+ * GEMINI_THINKING_MODELS in server/services/litellm/LiteLLMGateway.ts.
+ */
+const GEMINI_THINKING_MODELS: string[] = [
+  'gemini-3.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.1-pro',
+  'gemini-pro-latest',
+];
+
+/**
+ * All models that accept a Reasoning Effort setting: the GPT-5 family plus the
+ * Gemini thinking models. The Reasoning Effort control is shown for any of
+ * these.
+ */
+const REASONING_EFFORT_MODELS: string[] = [
+  ...MODELS_WITHOUT_CREATIVITY,
+  ...GEMINI_THINKING_MODELS,
+];
 
 /**
  * WorkspaceCardSkeleton — placeholder mirroring a single workspace `Card`
@@ -784,6 +914,30 @@ export function WorkspaceSettings() {
 
   const handleWorkspaceSwitch = async (workspaceId: string) => {
     if (!workspaceId) return;
+
+    // PLAN ENFORCEMENT: block switching to a locked (over-limit) workspace.
+    // The server annotates each workspace with `locked: true` when it exceeds
+    // the user's plan limit. Data is preserved — the user just can't switch to
+    // it without upgrading. This mirrors the WorkspaceSwitcher guard so the
+    // Settings page can't be used as a bypass.
+    const target = workspaces.find((w: any) => w.id === workspaceId) as any
+    if (target?.locked) {
+      toast({
+        title: 'Workspace locked',
+        description: target.lockedReason ?? 'Upgrade your plan to access this workspace. Your data is safe.',
+        variant: 'default',
+        action: (
+          <a
+            href="/settings/billing"
+            className="inline-flex items-center justify-center rounded-md text-xs font-medium bg-blue-600 text-white px-3 py-1.5 hover:bg-blue-700"
+          >
+            Upgrade plan
+          </a>
+        ) as any,
+      })
+      return
+    }
+
     localStorage.setItem('currentWorkspaceId', workspaceId)
     window.dispatchEvent(new Event('workspace-changed'))
     
@@ -871,9 +1025,10 @@ export function WorkspaceSettings() {
           </>
         ) : workspaces.map((workspace: Workspace) => {
           const isActive = workspace.id === currentWorkspaceId;
+          const isLocked = !!(workspace as any).locked;
           
           return (
-            <Card key={workspace.id} className={`overflow-hidden border transition-all duration-300 ${isActive ? 'border-blue-500 shadow-md ring-1 ring-blue-500/20' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 shadow-sm'}`}>
+            <Card key={workspace.id} className={`overflow-hidden border transition-all duration-300 ${isActive ? 'border-blue-500 shadow-md ring-1 ring-blue-500/20' : isLocked ? 'border-amber-200 dark:border-amber-800/50 opacity-75' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 shadow-sm'}`}>
               <div className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-4">
@@ -888,6 +1043,11 @@ export function WorkspaceSettings() {
                         )}
                         {isActive && (
                           <span className="px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-md">Active</span>
+                        )}
+                        {isLocked && (
+                          <span className="px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-md flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Locked
+                          </span>
                         )}
                       </div>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
@@ -945,15 +1105,27 @@ export function WorkspaceSettings() {
                   </div>
                   
                   {!isActive && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleWorkspaceSwitch(workspace.id)}
-                      className="text-xs h-8 px-3 font-medium bg-white dark:bg-transparent border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-500 dark:hover:text-blue-400 shadow-sm transition-all"
-                    >
-                      <ArrowRightLeft className="w-3 h-3 mr-2" />
-                      Set Active
-                    </Button>
+                    isLocked ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { window.location.href = '/settings/billing' }}
+                        className="text-xs h-8 px-3 font-medium bg-white dark:bg-transparent border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 shadow-sm transition-all"
+                      >
+                        <Lock className="w-3 h-3 mr-2" />
+                        Upgrade to access
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleWorkspaceSwitch(workspace.id)}
+                        className="text-xs h-8 px-3 font-medium bg-white dark:bg-transparent border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-500 dark:hover:text-blue-400 shadow-sm transition-all"
+                      >
+                        <ArrowRightLeft className="w-3 h-3 mr-2" />
+                        Set Active
+                      </Button>
+                    )
                   )}
                 </div>
               </div>
@@ -1361,7 +1533,20 @@ export function AISettings() {
   const { userData } = useUser()
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  
+
+  // Plan drives which model classes are usable. Defaults to the most
+  // restrictive class while the subscription is still loading, so a premium
+  // model is never shown as freely available and then reclassified a moment
+  // later. The server is authoritative either way.
+  const { plan: currentPlan } = useSubscription()
+  const planMaxClass: ModelClass = baseTierFor(currentPlan || 'free')
+
+  // Live allowance meter. Read-only endpoint — it never mutates counters.
+  const { data: veegptUsage } = useQuery<VeegptLimitsView>({
+    queryKey: ['/api/chat/limits'],
+    staleTime: 60_000,
+  })
+
   // Get current workspace context and workspaceId
   const { currentWorkspaceId, currentWorkspace, isLoading: workspaceLoading } = useCurrentWorkspace()
   
@@ -1370,10 +1555,20 @@ export function AISettings() {
   const workspace = currentWorkspace
   const workspaceDataLoading = workspaceLoading
   const workspaceError = null
+
+  // Track whether we've loaded workspace data into the form.
+  // Radix UI Select caches the selected-item label on mount; if we render the
+  // selects with the hardcoded defaults and then update via setFormData in
+  // useEffect, the label stays stale (shows placeholder or old value). By
+  // deferring the form render until we've loaded the real workspace data, we
+  // ensure every Select mounts with the correct value from the start.
+  const [formDataLoaded, setFormDataLoaded] = useState(false)
   
   const [formData, setFormData] = useState({
     aiModel: 'veegpt-hybrid',
     creativityLevel: 0.7,
+    reasoningEffort: 'low',
+    showThinking: true,
     optimizationGoals: 'Engagement',
     aiPersona: 'Professional & Authoritative',
     captionStyle: 'Storytelling',
@@ -1391,15 +1586,13 @@ export function AISettings() {
 
   // Sync state when workspace loads - Task 5.2: Update form initialization to read from workspace.aiConfiguration
   useEffect(() => {
-    console.log('[AISettings] Workspace data loaded:', workspace);
-    console.log('[AISettings] aiConfiguration:', workspace?.aiConfiguration);
-    
     if (workspace?.aiConfiguration) {
-      console.log('[AISettings] Loading AI configuration from workspace');
       setFormData(prev => ({
         ...prev,
         aiModel: workspace.aiConfiguration.aiModel || 'veegpt-hybrid',
         creativityLevel: workspace.aiConfiguration.creativityLevel ?? 0.7,
+        reasoningEffort: workspace.aiConfiguration.reasoningEffort || 'low',
+        showThinking: workspace.aiConfiguration.showThinking ?? true,
         optimizationGoals: workspace.aiConfiguration.optimizationGoals || 'Engagement',
         aiPersona: workspace.aiConfiguration.aiPersona || 'Professional & Authoritative',
         captionStyle: workspace.aiConfiguration.captionStyle || 'Storytelling',
@@ -1414,10 +1607,12 @@ export function AISettings() {
         googleAiStudioKey: workspace.aiConfiguration.googleAiStudioKey || '',
         openAiKey: workspace.aiConfiguration.openAiKey || ''
       }))
-    } else {
-      console.log('[AISettings] No aiConfiguration in workspace, using defaults');
+      setFormDataLoaded(true)
+    } else if (!workspaceLoading) {
+      // No workspace config — use defaults and show form anyway
+      setFormDataLoaded(true)
     }
-  }, [workspace])
+  }, [workspace, workspaceLoading])
 
   // Task 5.3: Create new mutation for workspace AI config update
   const updateAIConfigMutation = useMutation({
@@ -1430,13 +1625,17 @@ export function AISettings() {
         body: JSON.stringify({ aiConfiguration: data }) 
       })
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // CRITICAL: Await the refetch so the workspace data is FULLY UPDATED
+      // before we show the success toast. This ensures that when the form's
+      // useEffect([workspace]) triggers, it sees the NEW workspace data, not stale.
+      await queryClient.refetchQueries({ queryKey: ['/api/workspaces'] })
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] })
+      
       toast({ 
         title: "AI Configuration Saved", 
         description: "Your workspace AI settings have been updated successfully." 
       })
-      queryClient.invalidateQueries({ queryKey: ['/api/workspaces', currentWorkspaceId] })
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] })
     },
     onError: (error: any) => {
       toast({ 
@@ -1503,8 +1702,13 @@ export function AISettings() {
     )
   }
 
-  // Show loading state while workspace is being fetched
-  if (workspaceLoading || workspaceDataLoading) {
+  // Show loading state while workspace is being fetched OR while formData hasn't been
+  // initialized yet from workspace data. This is critical: Radix UI Select caches the
+  // displayed label on mount. If the selects render with default values (before
+  // workspace data arrives) and then setFormData updates them, the Select labels stay
+  // stale. By holding the skeleton until formDataLoaded=true, every Select mounts
+  // with the correct saved value the very first time it renders.
+  if (workspaceLoading || workspaceDataLoading || !formDataLoaded) {
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div>
@@ -1541,7 +1745,7 @@ export function AISettings() {
                 {workspaceError instanceof Error ? workspaceError.message : 'Unable to load workspace data. Please try again.'}
               </p>
               <Button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/workspaces', currentWorkspaceId] })}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] })}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -1579,26 +1783,117 @@ export function AISettings() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {[
                 { id: 'veegpt-hybrid', name: 'VeeGPT Hybrid (Recommended)', desc: 'Advanced reasoning with auto-fallback' },
+                // GPT-4o / GPT-4.1 — support the creativity (temperature) slider.
+                { id: 'openai-gpt-4.1-nano', name: 'OpenAI GPT-4.1 nano (Cheapest)', desc: 'Lowest cost & fastest — great for high-volume tasks' },
+                { id: 'openai-gpt-4o-mini', name: 'OpenAI GPT-4o mini (Cheap)', desc: 'Low cost, reliable general-purpose' },
+                { id: 'openai-gpt-4.1-mini', name: 'OpenAI GPT-4.1 mini (Balanced)', desc: 'Stronger reasoning, still affordable' },
+                { id: 'openai-gpt-4.1', name: 'OpenAI GPT-4.1 (Best · adjustable creativity)', desc: 'Top-tier 4.x reasoning, supports creativity control' },
                 { id: 'openai-gpt4o', name: 'OpenAI GPT-4o', desc: 'Industry leading context understanding' },
-                { id: 'github-gpt-4o-mini', name: 'GitHub Models — GPT-4o mini (Free)', desc: 'Free GitHub AI inference, fast & efficient' },
-                { id: 'github-gpt-4.1-mini', name: 'GitHub Models — GPT-4.1 mini (Free)', desc: 'Free GitHub AI inference, improved reasoning' },
+                // GPT-5 family — newest & most capable, but fixed creativity
+                // (the slider hides automatically when selected).
+                { id: 'openai-gpt-5-nano', name: 'OpenAI GPT-5 nano (Cheapest GPT-5)', desc: 'Newest generation, lowest cost — fixed creativity' },
+                { id: 'openai-gpt-5-mini', name: 'OpenAI GPT-5 mini (Cheap GPT-5)', desc: 'Newest generation, low cost — fixed creativity' },
+                { id: 'openai-gpt-5', name: 'OpenAI GPT-5', desc: 'Flagship reasoning — fixed creativity' },
+                { id: 'openai-gpt-5.5', name: 'OpenAI GPT-5.5 (Best)', desc: 'Most capable flagship — fixed creativity' },
+                { id: 'openai-gpt-5.6-sol', name: 'OpenAI GPT-5.6 Sol (Newest)', desc: 'Latest GPT-5.6 — fixed creativity' },
+                { id: 'openai-gpt-5.6-luna', name: 'OpenAI GPT-5.6 Luna (Newest)', desc: 'Latest GPT-5.6 — fixed creativity' },
+                { id: 'openai-gpt-5.6-terra', name: 'OpenAI GPT-5.6 Terra (Newest)', desc: 'Latest GPT-5.6 — fixed creativity' },
+                // GitHub Models options removed: the service is retired and now
+                // answers every request with HTTP 410
+                // (github_models_retirement_brownout). Workspaces that already
+                // stored a `github-*` id keep working — the server maps it to the
+                // same model on OpenAI (see server/services/ai-model-routing.ts).
                 { id: 'google-ai-studio', name: 'Google AI Studio API', desc: 'Custom key advanced reasoning' },
+                // Google Gemini — all support the creativity (temperature) slider.
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Fast & capable, low cost' },
+                { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', desc: 'Latest Gemini flash — fast & strong' },
+                { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Newest)', desc: 'Newest Gemini flash generation' },
+                { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro (Premium)', desc: 'Most capable Gemini, shows live thinking — paid tier' },
+                { id: 'gemini-pro-latest', name: 'Gemini Pro (Latest, Premium)', desc: 'Always the newest pro Gemini, live thinking — paid tier' },
                 { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash Exp', desc: 'Highest capability, Google experimental' },
                 { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'Faster response, lower token usage' }
               ].map((model) => {
                 const isSelected = formData.aiModel === model.id;
+                // Cost class comes from the SAME shared map the server prices
+                // turns with, so the badge can never disagree with the charge.
+                const cls = modelClassOf(model.id);
+                const tierAccess = tierAccessFor(currentPlan || 'free', cls);
+                // Only a tier with NO access is treated as unavailable. A
+                // "limited" tier is genuinely selectable — Free really can use
+                // premium 5 times a month, and hiding that would hide the
+                // preview that exists to show off the best model.
+                const allowed = tierAccess.access === 'full';
+                const previewOnly = tierAccess.access === 'limited';
                 return (
-                  <label key={model.id} className={`relative flex flex-col p-5 border rounded-xl cursor-pointer transition-all ${isSelected ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 shadow-sm ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'}`}>
+                  <label
+                    key={model.id}
+                    title={allowed ? CLASS_BLURB[cls] : undefined}
+                    className={`relative flex flex-col p-5 border rounded-xl cursor-pointer transition-all ${isSelected ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 shadow-sm ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'}`}
+                  >
                     <input type="radio" name="ai_model" value={model.id} checked={isSelected} onChange={(e) => updateField('aiModel', e.target.value)} className="sr-only" />
-                    <span className={`font-semibold ${isSelected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>{model.name}</span>
+                    <div className="flex items-start justify-between gap-2 pr-6">
+                      <span className={`font-semibold ${isSelected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>{model.name}</span>
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${CLASS_BADGE[cls]}`}>
+                        {CLASS_LABEL[cls]}
+                      </span>
+                    </div>
                     <span className={`text-sm mt-1.5 ${isSelected ? 'text-blue-600 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'}`}>{model.desc}</span>
+                    {/* Usage cost, and — for models above the plan — what
+                        actually happens if it stays selected. Selection is never
+                        blocked: the pick is remembered and activates the moment
+                        the plan is upgraded. */}
+                    <span className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      {allowed ? (
+                        CLASS_BLURB[cls]
+                      ) : previewOnly ? (
+                        <span className="text-blue-600 dark:text-blue-400">
+                          {tierAccess.maxRequests !== undefined
+                            ? `${tierAccess.maxRequests} ${CLASS_LABEL[cls]} replies included each month on your plan.`
+                            : `${CLASS_LABEL[cls]} replies have a monthly allowance on your plan.`}
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          {CLASS_LABEL[cls]} models need the {CLASS_MIN_PLAN_LABEL[cls]} plan — replies
+                          will use your {CLASS_LABEL[planMaxClass]} model instead.
+                        </span>
+                      )}
+                    </span>
                     {isSelected && <div className="absolute top-5 right-5 text-blue-500"><Check className="w-5 h-5" /></div>}
                   </label>
                 )
               })}
             </div>
 
+            {/* How the allowance works + the precise meter.
+                In chat we deliberately stay vague ("running low") so casual use
+                never feels metered; here — where someone has come to inspect
+                their configuration — we show the real numbers. */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-800/40">
+              <p className="mb-1 text-xs font-semibold text-gray-800 dark:text-gray-100">How your VeeGPT allowance works</p>
+              <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+                Every VeeGPT reply uses part of your allowance. A{' '}
+                <span className="font-medium">Light</span> reply uses 1, a{' '}
+                <span className="font-medium">Standard</span> reply uses 3, and a{' '}
+                <span className="font-medium">Premium</span> reply uses 12 — because
+                premium models cost roughly 17× more to run. Deep research uses 40
+                and a web search uses 4. Your allowance refreshes on a rolling
+                5-hour window, and again at the start of each month.
+              </p>
+
+              {veegptUsage?.plan && (
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <UsageMeter label="Right now (5h)" window={veegptUsage.session} unit="left" />
+                  <UsageMeter label="This month" window={veegptUsage.monthly} unit="left" />
+                  <UsageMeter label="Premium replies" window={veegptUsage.premium} unit="left" />
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Creativity (temperature) is only shown for models that support
+                  a custom temperature. GPT-5 family models are temperature-locked
+                  by OpenAI, so the slider is hidden when one is selected. */}
+              {!MODELS_WITHOUT_CREATIVITY.includes(formData.aiModel) && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Creativity Level (Temperature)</label>
@@ -1610,6 +1905,40 @@ export function AISettings() {
                   <span>Creative / Dynamic</span>
                 </div>
               </div>
+              )}
+
+              {/* Reasoning Effort — for reasoning models (GPT-5 family AND the
+                  Gemini thinking models). Lower = faster, higher = deeper. */}
+              {REASONING_EFFORT_MODELS.includes(formData.aiModel) && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Reasoning Effort</label>
+                </div>
+                <Select value={formData.reasoningEffort} onValueChange={(val) => updateField('reasoningEffort', val)}>
+                  <SelectTrigger className="w-full h-11"><SelectValue placeholder="Select effort" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minimal">Minimal — fastest, lightest reasoning</SelectItem>
+                    <SelectItem value="low">Low — quick, good default</SelectItem>
+                    <SelectItem value="medium">Medium — balanced (slower)</SelectItem>
+                    <SelectItem value="high">High — deepest reasoning (slowest)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">Controls how much the model reasons before answering. Lower effort responds faster.</p>
+                {/* Gemini thinking models also stream their reasoning — let the
+                    user choose whether to display it. */}
+                {GEMINI_THINKING_MODELS.includes(formData.aiModel) && (
+                  <label className="flex items-center justify-between gap-3 pt-1 cursor-pointer">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Show detailed thinking</span>
+                    <input
+                      type="checkbox"
+                      checked={formData.showThinking}
+                      onChange={(e) => updateField('showThinking', e.target.checked)}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                  </label>
+                )}
+              </div>
+              )}
 
               <div className="space-y-3">
                 <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Primary Optimization Goal</label>

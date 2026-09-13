@@ -30,9 +30,42 @@ export class SubscriptionRepository {
   /**
    * Find the subscription document for a given user.
    * Returns null if no subscription exists yet.
+   *
+   * ID-FORMAT ROBUSTNESS: subscriptions are created with the Veefore user's
+   * Mongo `_id` (from `req.user.id`), but some callers pass the Firebase UID
+   * instead (e.g. workspace routes that resolve `req.user.firebaseUid`). A
+   * plain `findOne({ userId })` silently missed in those cases, causing the
+   * user to be treated as free (wrong plan/limits). We now try the id as-is
+   * first, then fall back to resolving the Mongo `_id` from the Firebase UID
+   * (and vice-versa) so the lookup succeeds regardless of which id shape the
+   * caller passed.
    */
   async findByUserId(userId: string): Promise<ISubscription | null> {
-    return SubscriptionModel.findOne({ userId }).lean<ISubscription>()
+    const direct = await SubscriptionModel.findOne({ userId }).lean<ISubscription>()
+    if (direct) return direct
+
+    // Fall back: resolve the alternate id form (mongo _id ↔ firebaseUid).
+    try {
+      const { User } = await import('../../../../models/User/User')
+      const isObjectId = /^[a-f0-9]{24}$/i.test(userId)
+      const user = await User.findOne(
+        isObjectId ? { _id: userId } : { firebaseUid: userId },
+      )
+        .select('_id firebaseUid')
+        .lean()
+        .catch(() => null)
+      if (!user) return null
+
+      // Try both alternate ids the user might have been stored under.
+      const candidates = [String((user as any)._id), (user as any).firebaseUid].filter(
+        (v): v is string => Boolean(v) && v !== userId,
+      )
+      if (candidates.length === 0) return null
+
+      return SubscriptionModel.findOne({ userId: { $in: candidates } }).lean<ISubscription>()
+    } catch {
+      return null
+    }
   }
 
   /**

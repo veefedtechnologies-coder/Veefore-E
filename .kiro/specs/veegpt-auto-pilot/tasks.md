@@ -174,76 +174,76 @@ reimplementing them.
     escalate on failure; audit activate/deactivate.
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.8_
 
-- [ ] 16. MEASURE and LEARN
+- [x] 16. MEASURE and LEARN
 - [x] 16.1 `MeasureService.measure`
   - Record current goal-metric value + per-slot performance into mission
     `progress` history.
   - _Requirements: 3.4_
-- [ ] 16.2 `LearnService.learn`
+- [x] 16.2 `LearnService.learn`
   - Update `strategyMemory` insights from measured results (pure over inputs).
   - _Requirements: 2.6_
 
-- [ ] 17. Orchestrator + loop queue
-- [ ] 17.1 `AutoPilotOrchestrator.runIteration`
+- [x] 17. Orchestrator + loop queue
+- [x] 17.1 `AutoPilotOrchestrator.runIteration`
   - Run stages in order, idempotent, Redis-lock per mission; convert failures to
     audit + escalation, never crash the loop; preserve state.
   - Unit-test stage ordering + failure-recovery scenarios.
   - _Requirements: 3.1, 2.4, 18.3, 18.4 (Property 9)_
-- [ ] 17.2 `autopilot-loop` repeatable queue + worker
+- [x] 17.2 `autopilot-loop` repeatable queue + worker
   - Repeatable job per active mission (≤60 min cadence); removed on pause/stop;
     null-safe without Redis.
   - _Requirements: 3.2, 3.5, 3.6_
-- [ ] 17.3 Backing-service outage handling
+- [x] 17.3 Backing-service outage handling
   - Preserve state on single-iteration outage; pause mission + surface failure
     after 3 consecutive outages.
   - _Requirements: 18.4, 18.5_
 
-- [ ] 18. Mission REST API + controller
-- [ ] 18.1 `AutoPilotController` + `autopilot.routes.ts`
+- [x] 18. Mission REST API + controller
+- [x] 18.1 `AutoPilotController` + `autopilot.routes.ts`
   - Missions CRUD, activate/pause/resume, slots, activity log, budget raise,
     undo; zod validation; workspace/account ownership checks; mount in
     `server/routes/v1/index.ts`.
   - _Requirements: 1.1, 1.5, 1.6, 1.7, 1.8, 3.5, 14.5, 16.1_
-- [ ] 18.2 Mission activation validation
+- [x] 18.2 Mission activation validation
   - Reject missing target metric, past target date, no connected IG account.
   - _Requirements: 1.3, 1.4, 1.6_
-- [ ] 18.3 Non-Instagram guard
+- [x] 18.3 Non-Instagram guard
   - Allow non-IG platform in mission model but decline autonomous execution.
   - _Requirements: 18.6, 18.7_
 
-- [ ] 19. VeeGPT chat bridge + Mission Control view
-- [ ] 19.1 `AutoPilotChatBridge`
+- [x] 19. VeeGPT chat bridge + Mission Control view
+- [x] 19.1 `AutoPilotChatBridge`
   - Ensure per-mission Auto Pilot conversation; append `ChatMessage` with
     `autopilotCard`; live-broadcast via `RealtimeService`.
   - _Requirements: 16.2, 16.3_
-- [ ] 19.2 Client: wire sidebar button + `/autopilot` route
+- [x] 19.2 Client: wire sidebar button + `/autopilot` route
   - Replace the mock Auto Pilot button in `ConversationSidebar.tsx` to navigate
     to the new `AutoPilotPage`.
   - _Requirements: 16.1_
-- [ ] 19.3 Client: `MissionSetupWizard`
+- [x] 19.3 Client: `MissionSetupWizard`
   - Form for goal/niche/brand voice/mode/guardrails with validation + retained
     values on error.
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
-- [ ] 19.4 Client: `MissionControlDashboard`
+- [x] 19.4 Client: `MissionControlDashboard`
   - Goal progress widget, pending approvals (count + contents), activity log;
     live updates over the WebSocket channel.
   - _Requirements: 16.4, 16.5_
-- [ ] 19.5 Client: `ApprovalCard` + `ContentBriefCard` + `MediaPoolPanel`
+- [x] 19.5 Client: `ApprovalCard` + `ContentBriefCard` + `MediaPoolPanel`
   - Render in VeeGPT chat via `renderMessageCard`; approve/edit/reject actions;
     media upload + brief delivery.
   - _Requirements: 4.3, 4.5, 6.1, 7.8_
 
-- [ ] 20. Integration + end-to-end verification
-- [ ] 20.1 Wiring integration tests
+- [x] 20. Integration + end-to-end verification
+- [x] 20.1 Wiring integration tests
   - Queues null-safe without Redis; publish writes `ContentModel` + calls
     publisher; approval endpoints transition state; automation go-live toggles
     the rule.
   - _Requirements: 11.2, 12.1, 12.2_
-- [ ] 20.2 Full-cycle orchestrator scenarios
+- [x] 20.2 Full-cycle orchestrator scenarios
   - Copilot cycle, Autopilot cycle, brief→AI-backup, brief→reschedule,
     publish-retry-exhaustion, budget-exceeded, pause-suspends-ACT.
   - _Requirements: 3, 4, 5, 7, 12, 14_
-- [ ] 20.3 Run diagnostics, typecheck, and the full test suite; fix failures
+- [x] 20.3 Run diagnostics, typecheck, and the full test suite; fix failures
   - _Requirements: all_
 
 ## Task Dependency Graph

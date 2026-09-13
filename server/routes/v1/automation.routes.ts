@@ -5,7 +5,7 @@ import { validateRequest } from '../../middleware/validation';
 import { automationRateLimiter } from '../../middleware/rate-limiting-working';
 import { storage } from '../../storage';
 import { AutomationSystem } from '../../automation-system';
-import { automationGuards } from '../../middleware/ai-route-guards';
+import { automationGuards, automationToggleGuards } from '../../middleware/ai-route-guards';
 
 const router = Router();
 
@@ -197,6 +197,7 @@ router.post('/rules/:ruleId/toggle',
   requireAuth,
   phase1ReviewGuard,
   automationRateLimiter,
+  ...automationToggleGuards,
   validateRequest({ params: RuleIdParamsSchema }),
   async (req: Request, res: Response) => {
     try {

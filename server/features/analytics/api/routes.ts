@@ -63,6 +63,7 @@ export function createDashboardRouter(deps: DashboardRouterDeps = {}): Router {
         if (cached) return res.json(cached)
 
         const response = await service.buildDashboard(dashboardId, query)
+
         await cache.set(cacheKey, response, DASHBOARD_CACHE_TTL_MS)
         return res.json(response)
       } catch (err) {

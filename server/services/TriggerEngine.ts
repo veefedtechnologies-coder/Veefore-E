@@ -1,8 +1,9 @@
 import { IAutomationRule, AutomationRuleModel } from '../models/Automation/AutomationRule';
 import { VariableProcessor } from './VariableProcessor';
 import OpenAI from 'openai';
+import { createOpenAI } from './ai-provider-guard';
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const openai = process.env.OPENAI_API_KEY ? createOpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export interface TriggerEvaluationResult {
   matched: boolean;
@@ -30,7 +31,17 @@ export class TriggerEngine {
   /**
    * Evaluate a comment against an array of rules
    */
-  static async evaluate(commentText: string, rules: IAutomationRule[]): Promise<TriggerEvaluationResult> {
+  /**
+   * @param allowAI  When false, the AI intent classifier is skipped and only
+   *                 deterministic keyword matching runs. Used when the
+   *                 workspace's AI allowance is spent, so automations keep
+   *                 working instead of failing.
+   */
+  static async evaluate(
+    commentText: string,
+    rules: IAutomationRule[],
+    allowAI = true
+  ): Promise<TriggerEvaluationResult> {
     const normalizedComment = this.normalizeText(commentText);
     const rawCommentLower = commentText.toLowerCase().trim();
 
@@ -50,7 +61,7 @@ export class TriggerEngine {
     }
     
     const uniqueIntents = Array.from(allIntentsSet);
-    if (uniqueIntents.length > 0 && openai) {
+    if (uniqueIntents.length > 0 && openai && allowAI) {
       didGlobalIntentCheck = true;
       try {
         const prompt = `You are a social media comment intent classifier. 
@@ -145,6 +156,63 @@ Does the comment match any of these intents? If yes, respond ONLY with the exact
     return { matched: false };
   }
 
+
+  /**
+   * Run rule evaluation inside a VGU scope so the AI intent classifier is
+   * accounted for and bounded. Falls back to keyword-only matching when the
+   * workspace has no AI allowance left, or when there is no owner to charge.
+   */
+  private static async evaluateMetered(
+    data: any,
+    rules: IAutomationRule[]
+  ): Promise<TriggerEvaluationResult> {
+    const workspaceId = data?.workspaceId ? String(data.workspaceId) : undefined;
+    let ownerUserId: string | undefined;
+    try {
+      const { storage } = await import('../storage');
+      const ws = workspaceId ? await storage.getWorkspace(workspaceId) : undefined;
+      const owner = (ws as { userId?: unknown } | undefined)?.userId;
+      if (owner) ownerUserId = String(owner);
+    } catch {
+      /* fall through — handled below */
+    }
+
+    // Nobody to charge → never spend. Keyword matching still works.
+    if (!ownerUserId) {
+      return this.evaluate(data.commentText, rules, false);
+    }
+
+    try {
+      const { withVGUForUser } = await import('./veegpt-metering');
+      const { AUTOMATION_INTENT_FEATURE } = await import(
+        '../config/veegpt-vgu.config'
+      );
+      const { result } = await withVGUForUser(
+        {
+          userId: ownerUserId,
+          workspaceId,
+          feature: AUTOMATION_INTENT_FEATURE,
+          model: 'openai-gpt-4o-mini',
+          modelChosenBy: 'platform',
+          meta: {
+            userId: ownerUserId,
+            source: 'trigger-engine',
+            mediaId: data?.mediaId,
+          },
+        },
+        () => this.evaluate(data.commentText, rules, true)
+      );
+      return result;
+    } catch (err) {
+      const refused = (err as { name?: string })?.name === 'VGUQuotaError';
+      if (!refused) throw err;
+      console.log(
+        '[TRIGGER_ENGINE] AI intent allowance spent — using keyword matching only.'
+      );
+      return this.evaluate(data.commentText, rules, false);
+    }
+  }
+
   /**
    * Fetches active rules from the database and evaluates them against the incoming webhook data.
    */
@@ -181,7 +249,11 @@ Does the comment match any of these intents? If yes, respond ONLY with the exact
       }
 
       console.log(`[TRIGGER_ENGINE] Found ${rules.length} active rules. Evaluating...`);
-      const result = await this.evaluate(data.commentText, rules);
+      // Intent matching calls a provider on every incoming comment, so it runs
+      // under the SAME VGU engine as everything else, charged to the workspace
+      // owner. If the allowance is spent we degrade to keyword matching rather
+      // than either failing the automation or quietly continuing to spend.
+      const result = await this.evaluateMetered(data, rules);
 
       if (result.matched && result.rule) {
         console.log(`[TRIGGER_ENGINE] 🎯 Match found! Rule: "${result.rule.name}" via ${result.matchType} matching.`);

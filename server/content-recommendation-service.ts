@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ContentRecommendation, InsertContentRecommendation, User, Workspace } from '@shared/schema';
+import { createGemini } from './services/ai-provider-guard';
 
 interface UserGeoLocation {
   country: string;
@@ -41,7 +42,7 @@ class ContentRecommendationService {
     if (!process.env.GOOGLE_API_KEY) {
       throw new Error('GOOGLE_API_KEY is required for content recommendations');
     }
-    this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    this.genAI = createGemini(process.env.GOOGLE_API_KEY);
   }
 
   async detectUserLocation(ip: string): Promise<UserGeoLocation> {

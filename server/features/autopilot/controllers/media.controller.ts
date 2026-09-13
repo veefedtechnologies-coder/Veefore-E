@@ -49,6 +49,8 @@ function serializeItem(item: IMediaPoolItem) {
     mediaType: item.mediaType,
     format: item.format ?? null,
     sizeBytes: item.sizeBytes,
+    userIntent: item.userIntent ?? null,
+    userKeyword: item.userKeyword ?? null,
     available: item.available,
     usedInSlots: (item.usedInSlots ?? []).map(String),
     createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : item.createdAt,
@@ -171,6 +173,15 @@ export class MediaController {
         folder: `autopilot/media/${String(mission.workspaceId)}`,
       })
 
+      // Optional per-item intent + trigger keyword (multipart text fields).
+      const body = (req.body ?? {}) as { userIntent?: unknown; userKeyword?: unknown }
+      const userIntent =
+        typeof body.userIntent === 'string' && body.userIntent.trim() ? body.userIntent.trim().slice(0, 500) : undefined
+      const userKeyword =
+        typeof body.userKeyword === 'string' && body.userKeyword.trim()
+          ? body.userKeyword.trim().slice(0, 60)
+          : undefined
+
       // R6.1: add to the pool marked available for assignment to future slots.
       const result = await this.mediaPool.addUpload({
         workspaceId: mission.workspaceId,
@@ -180,6 +191,8 @@ export class MediaController {
         sizeBytes: file.size,
         format: file.mimetype.split('/')[1],
         origin: 'user-upload',
+        ...(userIntent ? { userIntent } : {}),
+        ...(userKeyword ? { userKeyword } : {}),
       })
 
       if (!result.added) {
@@ -196,8 +209,10 @@ export class MediaController {
   }
 
   /**
-   * GET /missions/:id/media — list the reusable (available) pool items for the
-   * mission's workspace (R6). Removed items (available=false) are excluded.
+   * GET /missions/:id/media — list the reusable (available) pool items for THIS
+   * mission (R6). Media is per-mission: a new mission starts empty rather than
+   * inheriting another mission's uploads. Removed items (available=false) are
+   * excluded.
    */
   async listMedia(req: Request, res: Response): Promise<void> {
     const userId = this.resolveUserId(req, res)
@@ -207,7 +222,10 @@ export class MediaController {
       const mission = await this.resolveOwnedMission(req, res, userId)
       if (!mission) return
 
-      const items = await this.mediaPool.listAvailable(mission.workspaceId)
+      const items = await this.mediaPool.listAvailableByMission(
+        mission.workspaceId,
+        String(mission._id),
+      )
       res.status(200).json({ success: true, items: items.map(serializeItem) })
     } catch (err) {
       const error = err as Error

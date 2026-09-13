@@ -12,7 +12,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { AutoPilotMissionModel } from './AutoPilotMissionModel'
+import {
+  AutoPilotMissionModel,
+  SUPPORTED_EXECUTION_PLATFORM,
+  isInstagramPlatform,
+} from './AutoPilotMissionModel'
 
 /** A fully-valid mission document; individual tests override single fields. */
 function validMission(overrides: Record<string, unknown> = {}) {
@@ -49,6 +53,32 @@ function errorPaths(doc: Record<string, unknown>): string[] {
 describe('AutoPilotMissionModel — baseline', () => {
   it('accepts a fully-valid mission', () => {
     expect(errorPaths(validMission())).toEqual([])
+  })
+})
+
+describe('AutoPilotMissionModel — platform representability + Instagram-only execution (R18.6/R18.7)', () => {
+  it('accepts a non-Instagram platform in the model (R18.6: representable for future extension)', () => {
+    // The model must allow representing another platform even though v1 only
+    // *executes* Instagram (the execution guard lives in the controller/loop).
+    expect(errorPaths(validMission({ platform: 'facebook' }))).toEqual([])
+  })
+
+  it('defaults platform to instagram when omitted', () => {
+    const doc = new AutoPilotMissionModel(validMission({ platform: undefined }))
+    expect(doc.platform).toBe(SUPPORTED_EXECUTION_PLATFORM)
+  })
+
+  it('isInstagramPlatform recognises Instagram (case/whitespace-insensitive) and rejects other platforms', () => {
+    expect(isInstagramPlatform('instagram')).toBe(true)
+    expect(isInstagramPlatform('Instagram')).toBe(true)
+    expect(isInstagramPlatform('  instagram  ')).toBe(true)
+    // Missing/empty defaults to the supported platform (model default is instagram).
+    expect(isInstagramPlatform(undefined)).toBe(true)
+    expect(isInstagramPlatform('')).toBe(true)
+    // Non-Instagram platforms are not autonomously executable in v1 (R18.7).
+    expect(isInstagramPlatform('facebook')).toBe(false)
+    expect(isInstagramPlatform('tiktok')).toBe(false)
+    expect(isInstagramPlatform('youtube')).toBe(false)
   })
 })
 

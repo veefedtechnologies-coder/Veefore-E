@@ -20,7 +20,8 @@ export class AutomationWorker {
     if (!this.idempotencyGuard) {
       const { getSharedRedisConnection } = await import('../lib/redis');
       const { IdempotencyGuard } = await import('../services/IdempotencyGuard');
-      const { MongoCompletionStore } = await import('../models/Automation/IdempotencyCompletion');
+      const { MongoCompletionStore } =
+        await import('../models/Automation/IdempotencyCompletion');
       this.idempotencyGuard = new IdempotencyGuard(
         getSharedRedisConnection(),
         new MongoCompletionStore()
@@ -35,7 +36,8 @@ export class AutomationWorker {
    */
   private static async getAuditTrail(): Promise<AuditTrailServiceType> {
     if (!this.auditTrail) {
-      const { AuditTrailService } = await import('../services/AuditTrailService');
+      const { AuditTrailService } =
+        await import('../services/AuditTrailService');
       this.auditTrail = new AuditTrailService();
     }
     return this.auditTrail;
@@ -47,13 +49,18 @@ export class AutomationWorker {
     console.log('[AUTOMATION_WORKER] Starting comment automation worker...');
 
     if (!process.env.REDIS_URL && !process.env.KV_URL) {
-      console.log('[AUTOMATION_WORKER] No REDIS_URL configured. Worker permanently disabled.');
+      console.log(
+        '[AUTOMATION_WORKER] No REDIS_URL configured. Worker permanently disabled.'
+      );
       return;
     }
 
     try {
       const { getRedisOptions } = await import('../lib/redis');
-      const redisUrl = process.env.REDIS_URL || process.env.KV_URL || process.env.STORAGE_REDIS_URL;
+      const redisUrl =
+        process.env.REDIS_URL ||
+        process.env.KV_URL ||
+        process.env.STORAGE_REDIS_URL;
 
       if (!redisUrl) {
         throw new Error('Redis URL not configured');
@@ -82,7 +89,9 @@ export class AutomationWorker {
       );
 
       this.setupEventHandlers();
-      console.log('[AUTOMATION_WORKER] ✅ Automation worker started successfully');
+      console.log(
+        '[AUTOMATION_WORKER] ✅ Automation worker started successfully'
+      );
     } catch (error) {
       console.error('[AUTOMATION_WORKER] Failed to start worker:', error);
     }
@@ -129,7 +138,11 @@ export class AutomationWorker {
     userId?: string;
     contentSent: string;
     perform: () => Promise<boolean>;
-  }): Promise<{ sent: boolean }> {
+    // `performed` is true ONLY when this call actually executed the send (a
+    // fresh idempotency reservation), false when the send was already completed
+    // on a prior attempt. Callers use it to count usage exactly once per real
+    // send and never double-count an idempotent BullMQ retry.
+  }): Promise<{ sent: boolean; performed: boolean }> {
     const { IdempotencyGuard } = await import('../services/IdempotencyGuard');
     const guard = await this.getIdempotencyGuard();
     const auditTrail = await this.getAuditTrail();
@@ -152,8 +165,10 @@ export class AutomationWorker {
     if (reservation.status === 'already_completed') {
       // Side-effect already performed on a previous attempt — do not re-send
       // and do not record a duplicate audit entry (Req 10.3, 10.6).
-      console.log(`[AUTOMATION_WORKER] ↩️ ${opts.actionType} already completed for ${key}, skipping re-send`);
-      return { sent: true };
+      console.log(
+        `[AUTOMATION_WORKER] ↩️ ${opts.actionType} already completed for ${key}, skipping re-send`
+      );
+      return { sent: true, performed: false };
     }
 
     if (reservation.status === 'unavailable') {
@@ -185,7 +200,10 @@ export class AutomationWorker {
       try {
         await guard.recordCompletion(key);
       } catch (error) {
-        console.error(`[AUTOMATION_WORKER] ${opts.actionType} sent but completion bookkeeping failed for ${key}:`, error);
+        console.error(
+          `[AUTOMATION_WORKER] ${opts.actionType} sent but completion bookkeeping failed for ${key}:`,
+          error
+        );
       }
     }
 
@@ -203,13 +221,22 @@ export class AutomationWorker {
         failureReason: success ? undefined : failureReason,
       });
     } catch (error) {
-      console.error(`[AUTOMATION_WORKER] ${opts.actionType} audit write failed for ${key}:`, error);
+      console.error(
+        `[AUTOMATION_WORKER] ${opts.actionType} audit write failed for ${key}:`,
+        error
+      );
     }
 
-    return { sent: success };
+    // `performed` mirrors success here because we only reach this point on a
+    // fresh reservation (already_completed returned earlier), so a true success
+    // means the send was genuinely executed this attempt.
+    return { sent: success, performed: success };
   }
 
-  private static async logActionBestEffort(autoSystem: any, ...args: any[]): Promise<void> {
+  private static async logActionBestEffort(
+    autoSystem: any,
+    ...args: any[]
+  ): Promise<void> {
     try {
       await autoSystem.logAction(...args);
     } catch (error) {
@@ -219,12 +246,16 @@ export class AutomationWorker {
     }
   }
 
-  private static async processAutomationJob(job: Job<AutomationJobData>): Promise<any> {
+  private static async processAutomationJob(
+    job: Job<AutomationJobData>
+  ): Promise<any> {
     const data = job.data;
     // userId is optional on the job payload; normalize to a string for the
     // logAction calls below which require a defined targetUserId.
     const userId = data.userId ?? '';
-    console.log(`[AUTOMATION_WORKER] Processing comment ${data.commentId} for account ${data.instagramAccountId}`);
+    console.log(
+      `[AUTOMATION_WORKER] Processing comment ${data.commentId} for account ${data.instagramAccountId}`
+    );
 
     try {
       if (!this.storage) {
@@ -233,45 +264,73 @@ export class AutomationWorker {
 
       // Hand off to TriggerEngine
       const { TriggerEngine } = await import('../services/TriggerEngine');
-      
-      console.log(`[AUTOMATION_WORKER] Initiating TriggerEngine evaluation for comment: "${data.commentText}" by user: ${data.username}`);
+
+      console.log(
+        `[AUTOMATION_WORKER] Initiating TriggerEngine evaluation for comment: "${data.commentText}" by user: ${data.username}`
+      );
       const result = await TriggerEngine.evaluateAndTrigger(data);
-      
+
       if (result.matched) {
-        console.log(`[AUTOMATION_WORKER] ✅ Comment matched rule: "${result.ruleName}" with intent: "${result.intent || result.matchedKeyword || 'any'}"`);
-        
+        console.log(
+          `[AUTOMATION_WORKER] ✅ Comment matched rule: "${result.ruleName}" with intent: "${result.intent || result.matchedKeyword || 'any'}"`
+        );
+
         // Fetch accessToken for this account
         const { SocialAccountModel } = await import('../models/Social');
-        let account = await SocialAccountModel.findOne({ accountId: data.instagramAccountId });
-        
+        let account = await SocialAccountModel.findOne({
+          accountId: data.instagramAccountId,
+        });
+
         let accessToken = account?.accessToken;
 
         // Decrypt if needed
         if (!accessToken && account?.encryptedAccessToken) {
           try {
-            const { tokenEncryption } = await import('../security/token-encryption');
-            accessToken = tokenEncryption.decryptToken(account.encryptedAccessToken);
+            const { tokenEncryption } =
+              await import('../security/token-encryption');
+            accessToken = tokenEncryption.decryptToken(
+              account.encryptedAccessToken
+            );
           } catch (e) {
             console.error('[AUTOMATION_WORKER] Failed to decrypt token', e);
           }
         }
 
         if (!accessToken) {
-           console.error(`[AUTOMATION_WORKER] ❌ No access token found for account ${data.instagramAccountId}`);
-           throw new Error('No access token available to send automation messages');
+          console.error(
+            `[AUTOMATION_WORKER] ❌ No access token found for account ${data.instagramAccountId}`
+          );
+          throw new Error(
+            'No access token available to send automation messages'
+          );
         }
 
         const { AutomationSystem } = await import('../automation-system');
         const autoSystem = new AutomationSystem(this.storage);
         const workspace = await this.storage.getWorkspace(data.workspaceId);
         const creditUserId = workspace?.userId ? String(workspace.userId) : '';
-        const { aiCreditMeteringService } = await import('../features/subscription/services/AICreditMeteringService');
+        // Entitlement service — used to enforce and record the per-cycle
+        // conversation caps (keyword / AI / follow-campaign) against the same
+        // workspace-owner userId the credit metering keys on.
+        const { getEntitlementService } =
+          await import('../features/subscription/services/EntitlementService');
+        const { getRedisClient } = await import('../lib/redis');
+        const SubscriptionRepository = (
+          await import('../features/subscription/db/repositories/SubscriptionRepository')
+        ).default;
+        const entitlementService = getEntitlementService(
+          getRedisClient(),
+          new SubscriptionRepository()
+        );
+        const { aiCreditMeteringService } =
+          await import('../features/subscription/services/AICreditMeteringService');
         const reserveAICharge = async (
           feature: 'automationComment' | 'automationDm',
-          actionId: string,
+          actionId: string
         ): Promise<string | undefined> => {
           if (!result.aiAssisted) return undefined;
-          if (!creditUserId) throw new Error('Workspace owner unavailable for AI credit charge');
+          if (!creditUserId)
+            throw new Error('Workspace owner unavailable for AI credit charge');
           const idempotencyKey = `automation:${data.commentId}:${actionId}`;
           // Reserve/deduct the fixed 0.3 before the irreversible Instagram
           // side-effect. A failed send is refunded exactly once below.
@@ -290,204 +349,374 @@ export class AutomationWorker {
         // 1. Send public comment reply if present
         let commentReplySent = false;
         if (result.finalCommentReply) {
-           const finalCommentReply = result.finalCommentReply;
-           const commentCreditReservation = await reserveAICharge('automationComment', 'comment');
-           let sent: boolean;
-           try {
-             ({ sent } = await this.runReplyWithGuards({
-                accountId: data.instagramAccountId,
-                ruleId: result.ruleId || 'unknown',
-                ruleName: result.ruleName,
-                sourceSuffix: 'comment',
-                actionType: 'comment_reply',
-                commentId: data.commentId,
-                commentText: data.commentText,
-                username: data.username,
-                userId: data.userId,
-                contentSent: finalCommentReply,
-                perform: () => autoSystem.sendCommentReply(data.commentId, finalCommentReply, accessToken),
-             }));
-           } catch (error) {
-             await refundAICharge(commentCreditReservation);
-             throw error;
-           }
-           if (sent) {
-              commentReplySent = true;
-              await this.logActionBestEffort(autoSystem, result.ruleId || 'unknown', data.workspaceId, 'comment', data.commentText, finalCommentReply, userId, data.username, 'sent');
-           } else {
-              await refundAICharge(commentCreditReservation);
-              await this.logActionBestEffort(autoSystem, result.ruleId || 'unknown', data.workspaceId, 'comment', data.commentText, finalCommentReply, userId, data.username, 'failed');
-           }
+          const finalCommentReply = result.finalCommentReply;
+          const commentCreditReservation = await reserveAICharge(
+            'automationComment',
+            'comment'
+          );
+          let sent: boolean;
+          try {
+            ({ sent } = await this.runReplyWithGuards({
+              accountId: data.instagramAccountId,
+              ruleId: result.ruleId || 'unknown',
+              ruleName: result.ruleName,
+              sourceSuffix: 'comment',
+              actionType: 'comment_reply',
+              commentId: data.commentId,
+              commentText: data.commentText,
+              username: data.username,
+              userId: data.userId,
+              contentSent: finalCommentReply,
+              perform: () =>
+                autoSystem.sendCommentReply(
+                  data.commentId,
+                  finalCommentReply,
+                  accessToken
+                ),
+            }));
+          } catch (error) {
+            await refundAICharge(commentCreditReservation);
+            throw error;
+          }
+          if (sent) {
+            commentReplySent = true;
+            await this.logActionBestEffort(
+              autoSystem,
+              result.ruleId || 'unknown',
+              data.workspaceId,
+              'comment',
+              data.commentText,
+              finalCommentReply,
+              userId,
+              data.username,
+              'sent'
+            );
+          } else {
+            await refundAICharge(commentCreditReservation);
+            await this.logActionBestEffort(
+              autoSystem,
+              result.ruleId || 'unknown',
+              data.workspaceId,
+              'comment',
+              data.commentText,
+              finalCommentReply,
+              userId,
+              data.username,
+              'failed'
+            );
+          }
         }
 
         // 2. Send private DM if present
         if (result.finalDM) {
-           const finalDM = result.finalDM;
-           if (commentReplySent) {
-              // Instagram sometimes needs a moment between commenting and DMing to register the interaction
-              await new Promise(resolve => setTimeout(resolve, 2000));
-           }
-           
-           let requireFollowerGate = false;
+          const finalDM = result.finalDM;
+          if (commentReplySent) {
+            // Instagram sometimes needs a moment between commenting and DMing to register the interaction
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
 
-           if (result.followerGate && result.followerGate.enabled) {
-              console.log(`[AUTOMATION_WORKER] 🔒 Follower Gate is ENABLED. Checking if user ${data.userId} already follows...`);
-              
-              let isFollower = false;
-              try {
-                const url = `https://graph.facebook.com/v19.0/${data.userId}?fields=is_user_follow_business&access_token=${accessToken}`;
-                const res = await fetch(url);
-                if (res.ok) {
-                  const apiData = await res.json();
-                  if (apiData && typeof apiData.is_user_follow_business === 'boolean') {
-                    isFollower = apiData.is_user_follow_business;
-                  }
+          let requireFollowerGate = false;
+
+          if (result.followerGate && result.followerGate.enabled) {
+            console.log(
+              `[AUTOMATION_WORKER] 🔒 Follower Gate is ENABLED. Checking if user ${data.userId} already follows...`
+            );
+
+            let isFollower = false;
+            try {
+              const url = `https://graph.facebook.com/v19.0/${data.userId}?fields=is_user_follow_business&access_token=${accessToken}`;
+              const res = await fetch(url);
+              if (res.ok) {
+                const apiData = await res.json();
+                if (
+                  apiData &&
+                  typeof apiData.is_user_follow_business === 'boolean'
+                ) {
+                  isFollower = apiData.is_user_follow_business;
                 }
-              } catch (err) {
-                console.error(`[AUTOMATION_WORKER] Error checking follower status:`, err);
               }
-
-              if (isFollower) {
-                 console.log(`[AUTOMATION_WORKER] ✅ User is already a follower! Bypassing Follower Gate.`);
-                 requireFollowerGate = false;
-              } else {
-                 requireFollowerGate = true;
-              }
-           }
-
-           const context = {
-              username: data.username,
-              first_name: data.username,
-              full_name: data.username,
-              comment: data.commentText,
-              platform: 'Instagram'
-           };
-           
-           if (requireFollowerGate) {
-              console.log(`[AUTOMATION_WORKER] Sending gated message.`);
-              const { AutomationFunnelStateModel } = await import('../models/Automation/AutomationFunnelState');
-              
-              // Upsert the funnel state
-              await AutomationFunnelStateModel.findOneAndUpdate(
-                 { commentId: data.commentId },
-                 {
-                    workspaceId: data.workspaceId,
-                    accountId: data.instagramAccountId,
-                    participantId: userId, // Commenter's user ID
-                    ruleId: result.ruleId,
-                    state: 'pending_follow',
-                    retryCount: 0,
-                    finalMessage: result.finalDM,
-                    finalButtons: result.dmButtons,
-                    username: data.username,
-                    variables: context
-                 },
-                 { upsert: true, new: true }
+            } catch (err) {
+              console.error(
+                `[AUTOMATION_WORKER] Error checking follower status:`,
+                err
               );
+            }
 
-              // Construct Gated Message Buttons
-              const gatedButtons: { text: string; url?: string; payload?: string }[] = [];
-              if (result.followerGate!.visitProfileLabel) {
-                 gatedButtons.push({
-                    text: result.followerGate!.visitProfileLabel,
-                    url: `https://instagram.com/${account?.username || 'instagram'}`
-                 });
+            if (isFollower) {
+              console.log(
+                `[AUTOMATION_WORKER] ✅ User is already a follower! Bypassing Follower Gate.`
+              );
+              requireFollowerGate = false;
+            } else {
+              requireFollowerGate = true;
+            }
+          }
+
+          const context = {
+            username: data.username,
+            first_name: data.username,
+            full_name: data.username,
+            comment: data.commentText,
+            platform: 'Instagram',
+          };
+
+          // Resolve which monthly conversation cap this DM consumes and enforce
+          // it. A follower-gated DM starts a follow-to-unlock funnel
+          // (followCampaignConversations); otherwise an AI-drafted reply counts
+          // as aiConversations and a plain keyword reply as keywordConversations.
+          // The cap fails OPEN (allowed) if entitlement can't be resolved, so a
+          // transient error never halts a paying customer's automations.
+          const conversationType:
+            | 'followCampaignConversations'
+            | 'aiConversations'
+            | 'keywordConversations' = requireFollowerGate
+            ? 'followCampaignConversations'
+            : result.aiAssisted
+              ? 'aiConversations'
+              : 'keywordConversations';
+          const conversationAllowed = creditUserId
+            ? await entitlementService.canConsumeAutomation(
+                creditUserId,
+                conversationType
+              )
+            : true;
+          const recordConversationUsage = async (
+            performed: boolean
+          ): Promise<void> => {
+            if (performed && creditUserId) {
+              try {
+                await entitlementService.recordAutomationUsage(
+                  creditUserId,
+                  conversationType
+                );
+              } catch (usageErr) {
+                console.error(
+                  '[AUTOMATION_WORKER] Failed to record conversation usage:',
+                  usageErr
+                );
               }
-              
+            }
+          };
+
+          if (!conversationAllowed) {
+            console.log(
+              `[AUTOMATION_WORKER] 🚫 Monthly ${conversationType} limit reached for workspace ${data.workspaceId} — skipping DM`
+            );
+            await this.logActionBestEffort(
+              autoSystem,
+              result.ruleId || 'unknown',
+              data.workspaceId,
+              'dm',
+              data.commentText,
+              finalDM,
+              userId,
+              data.username,
+              'failed'
+            );
+          } else if (requireFollowerGate) {
+            console.log(`[AUTOMATION_WORKER] Sending gated message.`);
+            const { AutomationFunnelStateModel } =
+              await import('../models/Automation/AutomationFunnelState');
+
+            // Upsert the funnel state
+            await AutomationFunnelStateModel.findOneAndUpdate(
+              { commentId: data.commentId },
+              {
+                workspaceId: data.workspaceId,
+                accountId: data.instagramAccountId,
+                participantId: userId, // Commenter's user ID
+                ruleId: result.ruleId,
+                state: 'pending_follow',
+                retryCount: 0,
+                finalMessage: result.finalDM,
+                finalButtons: result.dmButtons,
+                username: data.username,
+                variables: context,
+              },
+              { upsert: true, new: true }
+            );
+
+            // Construct Gated Message Buttons
+            const gatedButtons: {
+              text: string;
+              url?: string;
+              payload?: string;
+            }[] = [];
+            if (result.followerGate!.visitProfileLabel) {
               gatedButtons.push({
-                 text: result.followerGate!.confirmLabel || "I'm Following ✅",
-                 payload: `FOLLOW_CHECK_${data.commentId}` // Special payload to resume funnel
+                text: result.followerGate!.visitProfileLabel,
+                url: `https://instagram.com/${account?.username || 'instagram'}`,
               });
+            }
 
-              const rawGatedMessage = result.followerGate!.lockedMessage || "Please follow the page first to unlock the link 🔓";
-              const { VariableProcessor } = await import('../services/VariableProcessor');
-              const gatedMessage = VariableProcessor.processTemplate(rawGatedMessage, context);
-              const dmCreditReservation = await reserveAICharge('automationDm', 'dm');
-              let sent: boolean;
-              try {
-                ({ sent } = await this.runReplyWithGuards({
-                   accountId: data.instagramAccountId,
-                   ruleId: result.ruleId || 'unknown',
-                   ruleName: result.ruleName,
-                   sourceSuffix: 'dm',
-                   actionType: 'dm_reply',
-                   commentId: data.commentId,
-                   commentText: data.commentText,
-                   username: data.username,
-                   userId: data.userId,
-                   contentSent: gatedMessage,
-                   perform: () => autoSystem.sendPrivateReply(data.commentId, gatedMessage, accessToken, gatedButtons),
-                }));
-              } catch (error) {
-                await refundAICharge(dmCreditReservation);
-                throw error;
-              }
+            gatedButtons.push({
+              text: result.followerGate!.confirmLabel || "I'm Following ✅",
+              payload: `FOLLOW_CHECK_${data.commentId}`, // Special payload to resume funnel
+            });
 
-              if (sent) {
-                 await this.logActionBestEffort(autoSystem, result.ruleId || 'unknown', data.workspaceId, 'dm', data.commentText, gatedMessage, userId, data.username, 'sent');
-              } else {
-                 await refundAICharge(dmCreditReservation);
-                 await this.logActionBestEffort(autoSystem, result.ruleId || 'unknown', data.workspaceId, 'dm', data.commentText, gatedMessage, userId, data.username, 'failed');
-                 throw new Error("Failed to send private reply for follower gate");
-              }
-           } else {
-              // Normal Flow
-              
-              // Custom Funnel Follow-up Check
-              if (result.dmButtons && result.dmButtons.length > 0) {
-                 const { registerCustomFunnelStates } = await import('../utils/funnelHelper');
-                 
-                 await registerCustomFunnelStates({
-                    commentId: data.commentId,
-                    workspaceId: data.workspaceId,
-                    instagramAccountId: data.instagramAccountId,
-                    userId: userId,
-                    ruleId: result.ruleId || 'unknown',
-                    buttons: result.dmButtons,
-                    username: data.username,
-                    variables: context
-                 });
-              }
-              
-              const dmCreditReservation = await reserveAICharge('automationDm', 'dm');
-              let sent: boolean;
-              try {
-                ({ sent } = await this.runReplyWithGuards({
-                   accountId: data.instagramAccountId,
-                   ruleId: result.ruleId || 'unknown',
-                   ruleName: result.ruleName,
-                   sourceSuffix: 'dm',
-                   actionType: 'dm_reply',
-                   commentId: data.commentId,
-                   commentText: data.commentText,
-                   username: data.username,
-                   userId: data.userId,
-                   contentSent: finalDM,
-                   perform: () => autoSystem.sendPrivateReply(data.commentId, finalDM, accessToken, result.dmButtons),
-                }));
-              } catch (error) {
-                await refundAICharge(dmCreditReservation);
-                throw error;
-              }
-              if (sent) {
-                 await this.logActionBestEffort(autoSystem, result.ruleId || 'unknown', data.workspaceId, 'dm', data.commentText, finalDM, userId, data.username, 'sent');
-              } else {
-                 await refundAICharge(dmCreditReservation);
-                 await this.logActionBestEffort(autoSystem, result.ruleId || 'unknown', data.workspaceId, 'dm', data.commentText, finalDM, userId, data.username, 'failed');
-                 throw new Error("Failed to send private reply for normal flow");
-              }
-           }
+            const rawGatedMessage =
+              result.followerGate!.lockedMessage ||
+              'Please follow the page first to unlock the link 🔓';
+            const { VariableProcessor } =
+              await import('../services/VariableProcessor');
+            const gatedMessage = VariableProcessor.processTemplate(
+              rawGatedMessage,
+              context
+            );
+            const dmCreditReservation = await reserveAICharge(
+              'automationDm',
+              'dm'
+            );
+            let sent = false;
+            let performed = false;
+            try {
+              ({ sent, performed } = await this.runReplyWithGuards({
+                accountId: data.instagramAccountId,
+                ruleId: result.ruleId || 'unknown',
+                ruleName: result.ruleName,
+                sourceSuffix: 'dm',
+                actionType: 'dm_reply',
+                commentId: data.commentId,
+                commentText: data.commentText,
+                username: data.username,
+                userId: data.userId,
+                contentSent: gatedMessage,
+                perform: () =>
+                  autoSystem.sendPrivateReply(
+                    data.commentId,
+                    gatedMessage,
+                    accessToken,
+                    gatedButtons
+                  ),
+              }));
+            } catch (error) {
+              await refundAICharge(dmCreditReservation);
+              throw error;
+            }
+
+            if (sent) {
+              await recordConversationUsage(performed);
+              await this.logActionBestEffort(
+                autoSystem,
+                result.ruleId || 'unknown',
+                data.workspaceId,
+                'dm',
+                data.commentText,
+                gatedMessage,
+                userId,
+                data.username,
+                'sent'
+              );
+            } else {
+              await refundAICharge(dmCreditReservation);
+              await this.logActionBestEffort(
+                autoSystem,
+                result.ruleId || 'unknown',
+                data.workspaceId,
+                'dm',
+                data.commentText,
+                gatedMessage,
+                userId,
+                data.username,
+                'failed'
+              );
+              throw new Error('Failed to send private reply for follower gate');
+            }
+          } else {
+            // Normal Flow
+
+            // Custom Funnel Follow-up Check
+            if (result.dmButtons && result.dmButtons.length > 0) {
+              const { registerCustomFunnelStates } =
+                await import('../utils/funnelHelper');
+
+              await registerCustomFunnelStates({
+                commentId: data.commentId,
+                workspaceId: data.workspaceId,
+                instagramAccountId: data.instagramAccountId,
+                userId: userId,
+                ruleId: result.ruleId || 'unknown',
+                buttons: result.dmButtons,
+                username: data.username,
+                variables: context,
+              });
+            }
+
+            const dmCreditReservation = await reserveAICharge(
+              'automationDm',
+              'dm'
+            );
+            let sent = false;
+            let performed = false;
+            try {
+              ({ sent, performed } = await this.runReplyWithGuards({
+                accountId: data.instagramAccountId,
+                ruleId: result.ruleId || 'unknown',
+                ruleName: result.ruleName,
+                sourceSuffix: 'dm',
+                actionType: 'dm_reply',
+                commentId: data.commentId,
+                commentText: data.commentText,
+                username: data.username,
+                userId: data.userId,
+                contentSent: finalDM,
+                perform: () =>
+                  autoSystem.sendPrivateReply(
+                    data.commentId,
+                    finalDM,
+                    accessToken,
+                    result.dmButtons
+                  ),
+              }));
+            } catch (error) {
+              await refundAICharge(dmCreditReservation);
+              throw error;
+            }
+            if (sent) {
+              await recordConversationUsage(performed);
+              await this.logActionBestEffort(
+                autoSystem,
+                result.ruleId || 'unknown',
+                data.workspaceId,
+                'dm',
+                data.commentText,
+                finalDM,
+                userId,
+                data.username,
+                'sent'
+              );
+            } else {
+              await refundAICharge(dmCreditReservation);
+              await this.logActionBestEffort(
+                autoSystem,
+                result.ruleId || 'unknown',
+                data.workspaceId,
+                'dm',
+                data.commentText,
+                finalDM,
+                userId,
+                data.username,
+                'failed'
+              );
+              throw new Error('Failed to send private reply for normal flow');
+            }
+          }
         }
-
       } else {
-        console.log(`[AUTOMATION_WORKER] ⏭️ Comment did not match any active automation rules.`);
+        console.log(
+          `[AUTOMATION_WORKER] ⏭️ Comment did not match any active automation rules.`
+        );
       }
-      
-      console.log(`[AUTOMATION_WORKER] Successfully processed comment ${data.commentId}`);
-      return { status: 'success', processed: true };
 
+      console.log(
+        `[AUTOMATION_WORKER] Successfully processed comment ${data.commentId}`
+      );
+      return { status: 'success', processed: true };
     } catch (error: any) {
-      console.error(`[AUTOMATION_WORKER] Error processing comment ${data.commentId}:`, error);
+      console.error(
+        `[AUTOMATION_WORKER] Error processing comment ${data.commentId}:`,
+        error
+      );
       throw error;
     }
   }
@@ -495,15 +724,18 @@ export class AutomationWorker {
   private static setupEventHandlers(): void {
     if (!this.worker) return;
 
-    this.worker.on('completed', (job) => {
+    this.worker.on('completed', job => {
       // console.log(`[AUTOMATION_WORKER] Job ${job.id} completed`);
     });
 
     this.worker.on('failed', (job, err) => {
-      console.error(`[AUTOMATION_WORKER] ❌ Job ${job?.id} failed:`, err.message);
+      console.error(
+        `[AUTOMATION_WORKER] ❌ Job ${job?.id} failed:`,
+        err.message
+      );
     });
 
-    this.worker.on('error', (err) => {
+    this.worker.on('error', err => {
       console.error('[AUTOMATION_WORKER] Worker error:', err);
     });
   }

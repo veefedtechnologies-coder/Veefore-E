@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 import type { InsertCreativeBrief } from "@shared/schema";
+import { createOpenAI } from './services/ai-provider-guard';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export interface CreativeBriefInput {
   title: string;

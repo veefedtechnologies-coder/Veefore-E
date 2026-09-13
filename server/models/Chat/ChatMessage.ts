@@ -6,6 +6,10 @@ export interface IChatMessageAttachment {
   /** Hosted URL for media that lives on the server (e.g. a scheduled-post image),
    *  so the thumbnail can be re-rendered from chat history after refresh. */
   url?: string;
+  /** Storage key for a file the user uploaded to VeeGPT. Served through the
+   *  authenticated `/veegpt/attachment/:key` proxy so the thumbnail renders in
+   *  chat history (and the mobile client can fetch it with its session token). */
+  deliveryId?: string;
 }
 
 export interface IChatMessage extends Document {
@@ -64,9 +68,22 @@ export interface IChatMessage extends Document {
     title?: string;
     [key: string]: any;
   }>;
+  /** Persisted Auto Pilot card (Approval_Card / Content_Brief_Card / etc.) that
+   *  the Auto Pilot Operating Loop pushes into its per-mission conversation, so
+   *  the card survives refresh and renders in the VeeGPT chat (R16.2/R16.3). */
+  autopilotCard?: {
+    kind: string; // e.g. 'approval' | 'content-brief'
+    [key: string]: any;
+  };
   /** True when this assistant message is an error placeholder the user can retry
    *  (e.g. the AI provider was rate-limited and produced no real answer). */
   retryable?: boolean;
+  /** How this assistant turn ended when it did NOT complete normally:
+   *  'failed'  → the model/provider errored while generating.
+   *  'stopped' → the user hit Stop before it finished.
+   *  Persisted so the chat header shows the real state (not "Response ready")
+   *  and it survives a refresh. Absent means a normal, complete response. */
+  deliveryStatus?: 'failed' | 'stopped';
   /** Regenerated alternatives of this assistant reply (ChatGPT-style 1/2, 2/2).
    *  Each entry is a full response snapshot. `content`/cards at the top level
    *  always mirror `variants[activeVariant]` so reads and history stay simple. */
@@ -80,6 +97,10 @@ export interface IChatMessage extends Document {
   }>;
   /** Index into `variants` that is currently shown / used for history. */
   activeVariant?: number;
+  /** The model's streamed "thinking"/reasoning summary (Gemini et al.). Persisted
+   *  so the collapsible Thoughts panel survives refresh AND survives a stop/abort
+   *  mid-generation — the reasoning the user saw is never lost. */
+  reasoning?: string;
   tokensUsed: number;
   createdAt: Date;
 }
@@ -90,7 +111,7 @@ export const ChatMessageSchema = new Schema<IChatMessage>({
   role: { type: String, required: true, enum: ['user', 'assistant'] },
   content: { type: String, required: true },
   attachments: {
-    type: [new Schema<IChatMessageAttachment>({ name: String, mimeType: String, url: String }, { _id: false })],
+    type: [new Schema<IChatMessageAttachment>({ name: String, mimeType: String, url: String, deliveryId: String }, { _id: false })],
     default: undefined,
   },
   postCard: { type: Schema.Types.Mixed, default: undefined },
@@ -98,9 +119,12 @@ export const ChatMessageSchema = new Schema<IChatMessage>({
   editCard: { type: Schema.Types.Mixed, default: undefined },
   editCards: { type: Schema.Types.Mixed, default: undefined },
   infoCards: { type: Schema.Types.Mixed, default: undefined },
+  autopilotCard: { type: Schema.Types.Mixed, default: undefined },
   retryable: { type: Boolean, default: undefined },
+  deliveryStatus: { type: String, enum: ['failed', 'stopped'], default: undefined },
   variants: { type: Schema.Types.Mixed, default: undefined },
   activeVariant: { type: Number, default: undefined },
+  reasoning: { type: String, default: undefined },
   tokensUsed: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });

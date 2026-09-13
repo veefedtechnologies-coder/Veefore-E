@@ -28,13 +28,41 @@ export const getResearchWorker = (): Worker | null => {
       try {
         const { research } = await import('../services/research/webResearch.service');
         const mode = kind === 'competitors' ? 'competitors' : kind === 'trends' ? 'trends' : 'search';
-        const result = await research(query, { mode: mode as any, preferences: preferences || {}, userId, workspaceId });
+        // Background work goes through the SAME quota engine as user traffic.
+        // Research hits paid LLM and search APIs, so enqueuing must never be a
+        // way to spend outside the user's budget. The BullMQ job id is reused as
+        // the idempotency key, so a re-delivered job re-uses its reservation
+        // instead of charging twice.
+        const { withVGUForUser } = await import('../services/veegpt-metering');
+        const { result } = await withVGUForUser(
+          {
+            userId,
+            workspaceId,
+            feature: kind === 'competitors' ? 'competitor.analysis' : 'trend.intelligence',
+            requestId: job.id ? `research_${job.id}` : undefined,
+            // Server-generated id: a re-delivery is the same job, not a new one.
+            requestIdTrusted: true,
+            meta: { userId, source: 'research-worker', kind },
+          },
+          () =>
+            research(query, {
+              mode: mode as any,
+              preferences: preferences || {},
+              userId,
+              workspaceId,
+            })
+        );
         console.log(`[RESEARCH WORKER] ✅ ${kind} refreshed for ${workspaceId} — ${result.sources.length} sources`);
         return { ok: true, sources: result.sources.length };
       } catch (err: any) {
-        console.error(`[RESEARCH WORKER] ❌ ${kind} failed for ${workspaceId}:`, err?.message);
-        // Single attempt — leave previous cached/persisted result in place.
-        return { ok: false };
+        // A quota refusal is a normal outcome for a background refresh, not an
+        // incident: the previously cached result simply stays in place.
+        const refused = err?.name === 'VGUQuotaError';
+        console[refused ? 'log' : 'error'](
+          `[RESEARCH WORKER] ${refused ? '⏭️ skipped (quota)' : '❌ failed'} ${kind} for ${workspaceId}:`,
+          err?.message
+        );
+        return { ok: false, ...(refused ? { skipped: 'quota' } : {}) };
       }
     },
     { connection, concurrency: 2 },

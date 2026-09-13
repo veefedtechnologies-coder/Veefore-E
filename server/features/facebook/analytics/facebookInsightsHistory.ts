@@ -292,8 +292,10 @@ export async function getFacebookInsightsRange(
   accountId: string,
   token: string,
   from: Date,
-  to: Date
+  to: Date,
+  options?: { allowPartial?: boolean }
 ): Promise<Record<string, number> | null> {
+  const allowPartial = options?.allowPartial === true
   try {
     const now = new Date()
     const toC = clampToNow(to, now)
@@ -386,8 +388,11 @@ export async function getFacebookInsightsRange(
           toIso: now.toISOString(),
         })
 
-        if (!enqueued) {
-          // Inline fallback when BullMQ/Redis unavailable
+        if (!enqueued && !allowPartial) {
+          // Inline fallback when BullMQ/Redis unavailable.
+          // Skipped in allowPartial mode: the dashboard READ path must never
+          // hit Meta (DATA_ARCHITECTURE.md — reads are DB/Redis only). The
+          // background backfill enqueue above still self-heals coverage.
           inlineMetaFetch = true
           await fetchAndPersistFacebookInsightsDaily(workspaceId, accountId, token, from, toC)
           rows = (await AnalyticsDailyMetricModel.find({
@@ -402,8 +407,15 @@ export async function getFacebookInsightsRange(
       } catch { /* non-fatal */ }
     }
 
-    // 4. Return null when not fully covered (caller uses live API as fallback)
-    if (!evalResult.covered) return null
+    // 4. Coverage gate.
+    if (!evalResult.covered) {
+      // In allowPartial mode, return whatever per-day data IS stored (summed)
+      // rather than null, so the caller can serve the dashboard from the DB
+      // instead of falling back to a live Meta call. The background backfill
+      // enqueued above fills the gaps for the next load. Not cached (partial).
+      if (allowPartial) return evalResult.sums
+      return null
+    }
 
     // 5. Cache in Redis and return
     const totals = evalResult.sums

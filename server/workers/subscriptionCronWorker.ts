@@ -18,15 +18,22 @@
  */
 
 import { Worker, type Job } from 'bullmq';
-import { getSharedRedisConnection } from '../lib/redis';
-import { type CronJobType, type SubscriptionCronJobData } from '../queues/subscriptionCronQueue';
+import { getSharedRedisConnection, getRedisClient } from '../lib/redis';
+import {
+  type CronJobType,
+  type SubscriptionCronJobData,
+} from '../queues/subscriptionCronQueue';
 import SubscriptionRepository from '../features/subscription/db/repositories/SubscriptionRepository';
 import { AICreditsRepository } from '../features/subscription/db/repositories/AICreditsRepository';
+import { getEntitlementService } from '../features/subscription/services/EntitlementService';
 import { SubscriptionEventModel } from '../features/subscription/db/models/SubscriptionEventModel';
 import SubscriptionModel from '../features/subscription/db/models/SubscriptionModel';
-import { PLAN_CONFIG } from '../config/plan-config';
+import { PLAN_CONFIG, isValidPlan } from '../config/plan-config';
+import type { PlanId } from '../config/plan-config';
 import { razorpaySubscriptionService } from '../features/subscription/services/RazorpaySubscriptionService';
 import { quotaNotifier } from '../features/subscription/services/QuotaNotifier';
+import { User } from '../models/User/User';
+import { sendCancellationEmail } from '../services/resend.service';
 import logger from '../config/logger';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +42,10 @@ import logger from '../config/logger';
 
 const subscriptionRepo = new SubscriptionRepository();
 const aiCreditsRepo = new AICreditsRepository();
+const entitlementService = getEntitlementService(
+  getRedisClient(),
+  subscriptionRepo
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,7 +55,10 @@ const aiCreditsRepo = new AICreditsRepository();
  * Compute the next billing date by advancing one month or one year from the
  * supplied base date, matching the subscription's billingCycle.
  */
-function computeNextBillingDate(from: Date, billingCycle: 'monthly' | 'yearly'): Date {
+function computeNextBillingDate(
+  from: Date,
+  billingCycle: 'monthly' | 'yearly'
+): Date {
   const next = new Date(from);
   if (billingCycle === 'yearly') {
     next.setFullYear(next.getFullYear() + 1);
@@ -52,6 +66,46 @@ function computeNextBillingDate(from: Date, billingCycle: 'monthly' | 'yearly'):
     next.setMonth(next.getMonth() + 1);
   }
   return next;
+}
+
+/** Invalidate BOTH subscription caches (entitlement + /me response) immediately. */
+async function invalidateBothCaches(userId: string): Promise<void> {
+  try {
+    const redis = getSharedRedisConnection();
+    if (redis) await redis.del(`sub:entitlement:${userId}`, `sub:me:${userId}`);
+  } catch (err) {
+    logger.warn(
+      `[subscription-cron] cache invalidation failed for userId=${userId}`,
+      {
+        err: err instanceof Error ? err.message : String(err),
+      }
+    );
+  }
+}
+
+/** Send the branded cancellation email (non-fatal). */
+async function sendCancellationNotification(
+  userId: string,
+  planId: string
+): Promise<void> {
+  try {
+    const user = await User.findById(userId).select('email displayName').lean<{
+      email?: string;
+      displayName?: string;
+    }>();
+    if (user?.email && isValidPlan(planId)) {
+      const firstName = (user.displayName ?? '').split(' ')[0] || 'User';
+      const planName = PLAN_CONFIG[planId as PlanId].name;
+      await sendCancellationEmail(user.email, firstName, planName, new Date());
+    }
+  } catch (err) {
+    logger.warn(
+      `[subscription-cron] cancellation email failed for userId=${userId}`,
+      {
+        err: err instanceof Error ? err.message : String(err),
+      }
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -67,45 +121,91 @@ function computeNextBillingDate(from: Date, billingCycle: 'monthly' | 'yearly'):
  */
 async function handleDailyExpiryCheck(): Promise<void> {
   const redis = getSharedRedisConnection();
-  const expired = await subscriptionRepo.findExpired();
+  // Provider-managed subscriptions normally follow webhooks, except voluntary
+  // cancellations: currentPeriodEnd is the hard paid-through cutoff and must be
+  // finalized even if Razorpay's terminal webhook is delayed or missing.
+  const expired = await SubscriptionModel.find({
+    currentPeriodEnd: { $lt: new Date() },
+    $or: [
+      { cancelAtPeriodEnd: true },
+      {
+        status: 'active',
+        $or: [
+          { razorpaySubscriptionId: null },
+          { razorpaySubscriptionId: '' },
+          { razorpaySubscriptionId: { $exists: false } },
+        ],
+      },
+    ],
+  }).lean();
 
-  logger.info(`[subscription-cron] daily_expiry_check: found ${expired.length} subscription(s) to expire`);
+  logger.info(
+    `[subscription-cron] daily_expiry_check: found ${expired.length} subscription(s) to finalize`
+  );
 
   for (const sub of expired) {
     try {
+      const finalStatus = sub.cancelAtPeriodEnd ? 'cancelled' : 'expired';
       await SubscriptionModel.findOneAndUpdate(
         { userId: sub.userId },
-        { $set: { status: 'expired', plan: 'free' } },
+        {
+          $set: {
+            status: finalStatus,
+            plan: 'free',
+            pendingPlan: null,
+            cancelAtPeriodEnd: false,
+            gracePeriodEndsAt: null,
+            pastDueGraceEndsAt: null,
+            renewalRetryCount: 0,
+            lastRenewalRetryAt: null,
+          },
+        }
       );
 
       await SubscriptionEventModel.create({
-        eventType: 'subscription.expired',
+        eventType: sub.cancelAtPeriodEnd
+          ? 'subscription.cancelled'
+          : 'subscription.expired',
         userId: sub.userId,
         subscriptionId: sub.subscriptionId,
         previousStatus: sub.status,
-        newStatus: 'expired',
+        newStatus: finalStatus,
         previousPlan: sub.plan,
         newPlan: 'free',
         triggeredBy: 'cron',
-        metadata: { reason: 'daily_expiry_check', currentPeriodEnd: sub.currentPeriodEnd },
+        metadata: {
+          reason: sub.cancelAtPeriodEnd
+            ? 'scheduled_cancellation_cutoff_reached'
+            : 'daily_expiry_check',
+          currentPeriodEnd: sub.currentPeriodEnd,
+          graceApplied: false,
+        },
         timestamp: new Date(),
       });
 
-      // Invalidate entitlement cache
-      await redis.del(`sub:entitlement:${sub.userId}`);
+      await invalidateBothCaches(sub.userId);
+      await sendCancellationNotification(sub.userId, sub.plan);
 
-      logger.info(`[subscription-cron] daily_expiry_check: expired userId=${sub.userId}`, {
-        module: 'subscription',
-        action: 'daily_expiry_check',
-        userId: sub.userId,
-        previousPlan: sub.plan,
-        currentPeriodEnd: sub.currentPeriodEnd,
-      });
+      logger.info(
+        `[subscription-cron] daily_expiry_check: finalized userId=${sub.userId}`,
+        {
+          module: 'subscription',
+          action: 'daily_expiry_check',
+          userId: sub.userId,
+          finalStatus,
+          previousPlan: sub.plan,
+          currentPeriodEnd: sub.currentPeriodEnd,
+        }
+      );
     } catch (err) {
       logger.error(
         `[subscription-cron] daily_expiry_check: error processing userId=${sub.userId}`,
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', action: 'daily_expiry_check', userId: sub.userId },
+        {
+          module: 'subscription',
+          action: 'daily_expiry_check',
+          userId: sub.userId,
+        }
       );
     }
   }
@@ -123,7 +223,9 @@ async function handleGracePeriodCheck(): Promise<void> {
   const redis = getSharedRedisConnection();
   const pastGrace = await subscriptionRepo.findPastDuePastGrace(3);
 
-  logger.info(`[subscription-cron] grace_period_check: found ${pastGrace.length} subscription(s) past grace`);
+  logger.info(
+    `[subscription-cron] grace_period_check: found ${pastGrace.length} subscription(s) past grace`
+  );
 
   for (const sub of pastGrace) {
     try {
@@ -133,29 +235,40 @@ async function handleGracePeriodCheck(): Promise<void> {
           $set: {
             status: 'cancelled',
             plan: 'free',
+            pendingPlan: null,
             cancelAtPeriodEnd: false,
             pastDueGraceEndsAt: null,
             renewalRetryCount: 0,
             lastRenewalRetryAt: null,
           },
-        },
+        }
       );
 
-      // Invalidate entitlement cache
-      await redis.del(`sub:entitlement:${sub.userId}`);
+      // FIX: invalidate BOTH caches so the billing UI updates immediately.
+      await invalidateBothCaches(sub.userId);
 
-      logger.info(`[subscription-cron] grace_period_check: downgraded userId=${sub.userId} to free`, {
-        module: 'subscription',
-        action: 'grace_period_check',
-        userId: sub.userId,
-        previousPlan: sub.plan,
-        pastDueGraceEndsAt: sub.pastDueGraceEndsAt,
-      });
+      // FIX: send the branded cancellation email.
+      await sendCancellationNotification(sub.userId, sub.plan);
+
+      logger.info(
+        `[subscription-cron] grace_period_check: downgraded userId=${sub.userId} to free`,
+        {
+          module: 'subscription',
+          action: 'grace_period_check',
+          userId: sub.userId,
+          previousPlan: sub.plan,
+          pastDueGraceEndsAt: sub.pastDueGraceEndsAt,
+        }
+      );
     } catch (err) {
       logger.error(
         `[subscription-cron] grace_period_check: error processing userId=${sub.userId}`,
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', action: 'grace_period_check', userId: sub.userId },
+        {
+          module: 'subscription',
+          action: 'grace_period_check',
+          userId: sub.userId,
+        }
       );
     }
   }
@@ -173,66 +286,102 @@ async function handleGracePeriodCheck(): Promise<void> {
  */
 async function handleReconciliation(): Promise<void> {
   const redis = getSharedRedisConnection();
-  // Find active subscriptions on paid plans
   const activeSubs = await subscriptionRepo.findByStatus('active');
-  const paidSubs = activeSubs.filter((s) => s.plan !== 'free');
+  // FIX: only reconcile Razorpay-managed paid subs (non-Razorpay subs have no remote state to check)
+  const paidSubs = activeSubs.filter(
+    s => s.plan !== 'free' && s.razorpaySubscriptionId
+  );
 
-  logger.info(`[subscription-cron] reconciliation: checking ${paidSubs.length} active paid subscription(s)`);
+  logger.info(
+    `[subscription-cron] reconciliation: checking ${paidSubs.length} Razorpay-managed paid subscription(s)`
+  );
 
   for (const sub of paidSubs) {
-    if (!sub.razorpaySubscriptionId) {
-      // No Razorpay reference — nothing to reconcile
-      continue;
-    }
-
     try {
-      const razorpaySub = await razorpaySubscriptionService.getSubscription(sub.razorpaySubscriptionId);
+      const razorpaySub = await razorpaySubscriptionService.getSubscription(
+        sub.razorpaySubscriptionId!
+      );
       const razorpayStatus = String(razorpaySub.status ?? '').toLowerCase();
 
-      if (razorpayStatus === 'cancelled' || razorpayStatus === 'completed' || razorpayStatus === 'expired' || razorpayStatus === 'halted') {
-        logger.warn(`[subscription-cron] reconciliation: discrepancy for userId=${sub.userId}`, {
+      if (
+        !['cancelled', 'completed', 'expired', 'halted'].includes(
+          razorpayStatus
+        )
+      ) {
+        continue; // still active at Razorpay — no correction needed
+      }
+
+      logger.warn(
+        `[subscription-cron] reconciliation: discrepancy for userId=${sub.userId}`,
+        {
           module: 'subscription',
           action: 'reconciliation',
           userId: sub.userId,
           razorpaySubscriptionId: sub.razorpaySubscriptionId,
           localStatus: sub.status,
           razorpayStatus,
-        });
+        }
+      );
 
-        const newLocalStatus =
-          razorpayStatus === 'cancelled'
-            ? 'cancelled'
-            : razorpayStatus === 'halted'
-              ? 'past_due'
-              : 'expired'; // 'completed' or 'expired'
-
-        await SubscriptionModel.findOneAndUpdate(
-          { userId: sub.userId },
-          { $set: { status: newLocalStatus } },
-        );
-
-        await SubscriptionEventModel.create({
-          eventType: 'subscription.reconciled',
-          userId: sub.userId,
-          subscriptionId: sub.subscriptionId,
-          previousStatus: sub.status,
-          newStatus: newLocalStatus,
-          previousPlan: sub.plan,
-          newPlan: sub.plan,
-          triggeredBy: 'cron',
-          metadata: {
-            reason: 'reconciliation',
+      if (
+        sub.cancelAtPeriodEnd &&
+        sub.currentPeriodEnd != null &&
+        sub.currentPeriodEnd > new Date()
+      ) {
+        logger.info(
+          '[subscription-cron] reconciliation: provider auto-renew is off; preserving paid-through access',
+          {
+            userId: sub.userId,
+            currentPeriodEnd: sub.currentPeriodEnd,
             razorpayStatus,
-            razorpaySubscriptionId: sub.razorpaySubscriptionId,
-          },
-          timestamp: new Date(),
-        });
+          }
+        );
+        continue;
+      }
 
-        // Invalidate entitlement cache after status correction
-        await redis.del(`sub:entitlement:${sub.userId}`);
+      const newLocalStatus: string =
+        razorpayStatus === 'halted'
+          ? 'past_due'
+          : razorpayStatus === 'cancelled'
+            ? 'cancelled'
+            : 'expired'; // completed or expired
+
+      // FIX: for terminal states also reset plan to free (previously only updated status).
+      const isTerminal = ['cancelled', 'expired', 'completed'].includes(
+        razorpayStatus
+      );
+      const planFields = isTerminal ? { plan: 'free', pendingPlan: null } : {};
+
+      await SubscriptionModel.findOneAndUpdate(
+        { userId: sub.userId },
+        { $set: { status: newLocalStatus, ...planFields } }
+      );
+
+      await SubscriptionEventModel.create({
+        eventType: 'subscription.reconciled',
+        userId: sub.userId,
+        subscriptionId: sub.subscriptionId,
+        previousStatus: sub.status,
+        newStatus: newLocalStatus,
+        previousPlan: sub.plan,
+        newPlan: isTerminal ? 'free' : sub.plan,
+        triggeredBy: 'cron',
+        metadata: {
+          reason: 'reconciliation',
+          razorpayStatus,
+          razorpaySubscriptionId: sub.razorpaySubscriptionId,
+        },
+        timestamp: new Date(),
+      });
+
+      // FIX: invalidate BOTH caches.
+      await invalidateBothCaches(sub.userId);
+
+      // FIX: send cancellation email for terminal states.
+      if (isTerminal) {
+        await sendCancellationNotification(sub.userId, sub.plan);
       }
     } catch (err) {
-      // Per-subscription error: log and continue batch
       logger.error(
         `[subscription-cron] reconciliation: error checking userId=${sub.userId}`,
         err instanceof Error ? err : new Error(String(err)),
@@ -241,7 +390,7 @@ async function handleReconciliation(): Promise<void> {
           action: 'reconciliation',
           userId: sub.userId,
           razorpaySubscriptionId: sub.razorpaySubscriptionId,
-        },
+        }
       );
     }
   }
@@ -258,43 +407,69 @@ async function handleMonthlyQuotaReset(): Promise<void> {
   // findDueForRenewal(0) returns subscriptions where nextBillingDate <= now
   const dueToday = await subscriptionRepo.findDueForRenewal(0);
 
-  logger.info(`[subscription-cron] monthly_quota_reset: found ${dueToday.length} subscription(s) due for renewal`);
+  // FIX: only reset NON-Razorpay subscriptions. Razorpay-managed ones have their
+  // credits reset by the subscription.charged webhook on each real charge — running
+  // this cron on them would double-reset credits without a confirmed payment.
+  const nonRazorpay = dueToday.filter(
+    s => !s.razorpaySubscriptionId && s.plan !== 'free'
+  );
 
-  for (const sub of dueToday) {
+  logger.info(
+    `[subscription-cron] monthly_quota_reset: ${nonRazorpay.length} non-Razorpay subscription(s) due` +
+      ` (skipped ${dueToday.length - nonRazorpay.length} Razorpay-managed)`
+  );
+
+  for (const sub of nonRazorpay) {
     try {
-      const planConfig = PLAN_CONFIG[sub.plan];
+      const planConfig = PLAN_CONFIG[sub.plan as PlanId];
       const planCredits = planConfig?.limits?.aiCreditsPerMonth ?? 0;
-      const nextNextBillingDate = computeNextBillingDate(sub.nextBillingDate, sub.billingCycle);
+      const nextNextBillingDate = computeNextBillingDate(
+        sub.nextBillingDate,
+        sub.billingCycle
+      );
 
-      // Read credits before reset for logging
       const beforeCredits = await aiCreditsRepo.findByUserId(sub.userId);
+      await aiCreditsRepo.resetMonthly(
+        sub.userId,
+        planCredits,
+        nextNextBillingDate
+      );
 
-      await aiCreditsRepo.resetMonthly(sub.userId, planCredits, nextNextBillingDate);
+      // Reset the per-cycle automation conversation counters in lock-step with
+      // the monthly AI-credit reset so the keyword/AI/follow-campaign caps
+      // refresh on the same billing boundary.
+      await entitlementService.resetAutomationCounters(sub.userId);
 
-      // Advance nextBillingDate on the subscription
       await SubscriptionModel.findOneAndUpdate(
         { userId: sub.userId },
-        { $set: { nextBillingDate: nextNextBillingDate } },
+        { $set: { nextBillingDate: nextNextBillingDate } }
       );
 
       const afterCredits = await aiCreditsRepo.findByUserId(sub.userId);
 
-      logger.info(`[subscription-cron] monthly_quota_reset: reset userId=${sub.userId}`, {
-        module: 'subscription',
-        action: 'monthly_quota_reset',
-        userId: sub.userId,
-        plan: sub.plan,
-        planCredits,
-        previousNextBillingDate: sub.nextBillingDate,
-        nextNextBillingDate,
-        creditsBefore: beforeCredits?.remainingCredits ?? 'unknown',
-        creditsAfter: afterCredits?.remainingCredits ?? 'unknown',
-      });
+      logger.info(
+        `[subscription-cron] monthly_quota_reset: reset userId=${sub.userId}`,
+        {
+          module: 'subscription',
+          action: 'monthly_quota_reset',
+          userId: sub.userId,
+          plan: sub.plan,
+          planCredits,
+          previousNextBillingDate: sub.nextBillingDate,
+          nextNextBillingDate,
+          creditsBefore: beforeCredits?.remainingCredits ?? 'unknown',
+          creditsAfter: afterCredits?.remainingCredits ?? 'unknown',
+        }
+      );
     } catch (err) {
       logger.error(
         `[subscription-cron] monthly_quota_reset: error processing userId=${sub.userId}`,
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', action: 'monthly_quota_reset', userId: sub.userId },
+        {
+          module: 'subscription',
+          action: 'monthly_quota_reset',
+          userId: sub.userId,
+        }
       );
     }
   }
@@ -317,7 +492,7 @@ async function handlePreRenewalNotifications(): Promise<void> {
   const threeDaysFromNow = new Date(now);
   threeDaysFromNow.setUTCDate(threeDaysFromNow.getUTCDate() + 3);
 
-  const dueInExactlyThreeDays = candidates.filter((sub) => {
+  const dueInExactlyThreeDays = candidates.filter(sub => {
     const bd = sub.nextBillingDate;
     return (
       bd.getUTCFullYear() === threeDaysFromNow.getUTCFullYear() &&
@@ -327,24 +502,31 @@ async function handlePreRenewalNotifications(): Promise<void> {
   });
 
   logger.info(
-    `[subscription-cron] pre_renewal_notifications: sending to ${dueInExactlyThreeDays.length} subscription(s)`,
+    `[subscription-cron] pre_renewal_notifications: sending to ${dueInExactlyThreeDays.length} subscription(s)`
   );
 
   for (const sub of dueInExactlyThreeDays) {
     try {
       await quotaNotifier.sendPreRenewalNotification(sub, redis);
 
-      logger.info(`[subscription-cron] pre_renewal_notifications: sent for userId=${sub.userId}`, {
-        module: 'subscription',
-        action: 'pre_renewal_notifications',
-        userId: sub.userId,
-        nextBillingDate: sub.nextBillingDate,
-      });
+      logger.info(
+        `[subscription-cron] pre_renewal_notifications: sent for userId=${sub.userId}`,
+        {
+          module: 'subscription',
+          action: 'pre_renewal_notifications',
+          userId: sub.userId,
+          nextBillingDate: sub.nextBillingDate,
+        }
+      );
     } catch (err) {
       logger.error(
         `[subscription-cron] pre_renewal_notifications: error for userId=${sub.userId}`,
         err instanceof Error ? err : new Error(String(err)),
-        { module: 'subscription', action: 'pre_renewal_notifications', userId: sub.userId },
+        {
+          module: 'subscription',
+          action: 'pre_renewal_notifications',
+          userId: sub.userId,
+        }
       );
     }
   }
@@ -383,24 +565,31 @@ export function getSubscriptionCronWorker(): Worker | null {
 
   const connection = getSharedRedisConnection();
   if (!connection) {
-    logger.warn('[subscription-cron] Redis unavailable — SubscriptionCronWorker cannot be initialized');
+    logger.warn(
+      '[subscription-cron] Redis unavailable — SubscriptionCronWorker cannot be initialized'
+    );
     return null;
   }
 
-  logger.info('[subscription-cron] Lazy-initializing SubscriptionCronWorker...');
+  logger.info(
+    '[subscription-cron] Lazy-initializing SubscriptionCronWorker...'
+  );
 
   subscriptionCronWorker = new Worker<SubscriptionCronJobData>(
     'subscription-cron-queue',
     async (job: Job<SubscriptionCronJobData>) => {
       const { type, triggeredAt } = job.data;
 
-      logger.info(`[subscription-cron] Processing job type=${type} triggeredAt=${triggeredAt}`, {
-        module: 'subscription',
-        action: 'cron_job_start',
-        jobType: type,
-        jobId: job.id,
-        triggeredAt,
-      });
+      logger.info(
+        `[subscription-cron] Processing job type=${type} triggeredAt=${triggeredAt}`,
+        {
+          module: 'subscription',
+          action: 'cron_job_start',
+          jobType: type,
+          jobId: job.id,
+          triggeredAt,
+        }
+      );
 
       const handler = JOB_HANDLERS[type];
       if (!handler) {
@@ -420,14 +609,19 @@ export function getSubscriptionCronWorker(): Worker | null {
     {
       concurrency: 1,
       connection,
-    },
+    }
   );
 
   subscriptionCronWorker.on('failed', (job, err) => {
     logger.error(
       `[subscription-cron] Job failed: id=${job?.id} type=${job?.data?.type}`,
       err,
-      { module: 'subscription', action: 'cron_job_failed', jobId: job?.id, jobType: job?.data?.type },
+      {
+        module: 'subscription',
+        action: 'cron_job_failed',
+        jobId: job?.id,
+        jobType: job?.data?.type,
+      }
     );
   });
 

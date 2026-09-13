@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentWorkspace } from '@/components/WorkspaceSwitcher';
 import { apiRequest } from '@/lib/queryClient';
+import { FeatureLockedGate } from '@/components/FeatureLockedGate';
 import {
   Activity, TrendingUp, AlertTriangle, Lightbulb, MessageSquare,
   Search, Bot, Zap, ArrowUpRight, ExternalLink, Heart, MessageCircle,
@@ -278,7 +279,7 @@ function FormattedMessage({ text }: { text: string }) {
   );
 }
 
-export default function SocialListeningPage() {
+function SocialListeningPageInner() {
   const queryClient = useQueryClient();
   const { currentWorkspace } = useCurrentWorkspace();
   const [chatMessage, setChatMessage] = useState('');
@@ -1405,4 +1406,21 @@ export default function SocialListeningPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * Plan-gated wrapper. Social Listening is a Creator+ feature (`socialListening`).
+ * Free users see a locked upgrade screen; the server also 403s every data call.
+ */
+export default function SocialListeningPage() {
+  return (
+    <FeatureLockedGate
+      feature="socialListening"
+      title="Social Listening"
+      requiredPlan="Creator"
+      description="Track brand mentions, trends, sentiment, and audience insights across platforms. Available on Creator and above."
+    >
+      <SocialListeningPageInner />
+    </FeatureLockedGate>
+  )
 }

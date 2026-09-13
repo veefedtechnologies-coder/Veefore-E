@@ -173,9 +173,28 @@ export class SimpleInstagramPublisher {
     
     console.log(`[SIMPLE PUBLISHER] Publishing ${contentType} content`);
     console.log(`[SIMPLE PUBLISHER] Media URL: ${mediaUrl}`);
-    
-    // Clean and optimize URL for Instagram
-    const cleanUrl = this.cleanURLForInstagram(mediaUrl);
+
+    // Media now lives in a PRIVATE S3 bucket served via our auth-gated proxy
+    // (`/api/chat/attachment/<key>`). Instagram fetches the media URL
+    // server-side with no session cookie, so it can't hit our proxy. Convert
+    // any proxy/S3 reference into a short-lived, PUBLICLY-fetchable CloudFront
+    // (or S3 pre-signed) URL here — the single choke point every publish path
+    // funnels through. Non-storage URLs (already-public http, local /uploads in
+    // dev) pass through unchanged.
+    let resolvedUrl = mediaUrl;
+    try {
+      const { resolvePublishableMediaUrl } = await import('./config/publish-media-url');
+      const publishable = await resolvePublishableMediaUrl(mediaUrl);
+      if (publishable && publishable !== mediaUrl) {
+        console.log(`[SIMPLE PUBLISHER] Resolved publishable (signed) media URL for Instagram`);
+        resolvedUrl = publishable;
+      }
+    } catch (err: any) {
+      console.warn(`[SIMPLE PUBLISHER] resolvePublishableMediaUrl failed: ${err?.message}`);
+    }
+
+    // Clean and optimize URL for Instagram (external https signed URLs pass through untouched).
+    const cleanUrl = this.cleanURLForInstagram(resolvedUrl);
     console.log(`[SIMPLE PUBLISHER] Cleaned URL: ${cleanUrl}`);
     
     // For reels, publish as reel content
