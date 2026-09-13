@@ -4,10 +4,57 @@ import Redis from 'ioredis';
 let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
 
-export const getRedisOptions = (url: string | undefined): any => {
+/**
+ * Strip wrapping quotes/whitespace that env editors (Railway raw editor, a
+ * copied `.env` line, etc.) sometimes bake into the value. A value like
+ * `"rediss://…"` otherwise fails ioredis URL parsing and is treated as a unix
+ * socket PATH → `connect ENOENT %22rediss://…%22`. Idempotent + safe on undefined.
+ */
+export const sanitizeRedisUrl = (raw: string | undefined | null): string | undefined => {
+    if (raw == null) return undefined;
+    let s = String(raw).trim();
+    // Remove any number of matching wrapping quote layers ("…", '…', `…`).
+    while (
+        s.length >= 2 &&
+        ((s[0] === '"' && s[s.length - 1] === '"') ||
+            (s[0] === "'" && s[s.length - 1] === "'") ||
+            (s[0] === '`' && s[s.length - 1] === '`'))
+    ) {
+        s = s.slice(1, -1).trim();
+    }
+    return s;
+};
+
+/**
+ * Normalize the Redis URL env vars IN PLACE at module load, so EVERY reader
+ * (this module, cache-service, cache-manager, scripts) gets a clean value
+ * regardless of import order. Runs once when this module is first imported —
+ * which happens during server boot via the queue/worker graph.
+ */
+for (const key of ['REDIS_URL', 'KV_URL', 'STORAGE_REDIS_URL'] as const) {
+    const cleaned = sanitizeRedisUrl(process.env[key]);
+    if (cleaned !== undefined && cleaned !== process.env[key]) {
+        process.env[key] = cleaned;
+    }
+}
+
+/** Resolve the Redis connection URL from the supported env vars, sanitized. */
+export const getRedisUrl = (): string | undefined =>
+    sanitizeRedisUrl(
+        process.env.REDIS_URL || process.env.KV_URL || process.env.STORAGE_REDIS_URL
+    );
+
+export const getRedisOptions = (rawUrl: string | undefined): any => {
+    const url = sanitizeRedisUrl(rawUrl);
     if (!url) return {};
 
-    const isTls = url.startsWith('rediss://') || url.includes(':443');
+    // Upstash / Vercel KV require TLS. Detect it from the scheme, an explicit
+    // TLS port, or the known managed hosts (so a `redis://…upstash.io` URL — no
+    // trailing `s` — is still upgraded to TLS instead of silently failing).
+    const isTls =
+        url.startsWith('rediss://') ||
+        url.includes(':443') ||
+        /\b(upstash\.io|vercel-storage\.com)\b/i.test(url);
 
     // Base options
     const options: any = {
