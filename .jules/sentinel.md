@@ -1,0 +1,4 @@
+## 2024-05-18 - [HIGH] Fix insecure deserialization in OAuth state
+**Vulnerability:** Raw `JSON.parse` was used on base64 decoded data in the OAuth state handling endpoint `server/routes/v1/social-auth.routes.ts` (`JSON.parse(Buffer.from(state, 'base64').toString())`), enabling insecure deserialization vulnerabilities and potential crashes (DoS).
+**Learning:** We had existing secure schemas via zod (`safeParseOAuthState`) defined in `server/middleware/unsafe-json-replacements.ts`, but these safe functions had not been fully adopted across all routes yet, leaving old insecure code paths exposed.
+**Prevention:** Always use centralized schema-validation helpers for untrusted user inputs (like `safeParseOAuthState`), and regularly grep for raw `JSON.parse` coupled with `Buffer.from` to ensure all deserialization happens securely.
