@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { safeParseOAuthState } from '../../middleware/unsafe-json-replacements';
 import { socialAccountService } from '../../services';
 import { InstagramOAuthService } from '../../instagram-oauth';
 import { MongoStorage } from '../../mongodb-storage';
@@ -68,10 +69,14 @@ router.get('/instagram/callback', async (req: Request, res: Response) => {
     try {
       // Check if it's base64 encoded JSON
       if (state.includes('{') === false) {
-        const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
-        workspaceId = decoded.workspaceId;
-        flow = decoded.flow || 'standard';
-        logToFile('Decoded state from callback', { workspaceId, flow });
+        const parseResult = safeParseOAuthState(state);
+        if (parseResult.success) {
+          workspaceId = String(parseResult.data.workspaceId);
+          flow = (parseResult.data as any).flow || 'standard';
+          logToFile('Decoded state from callback', { workspaceId, flow });
+        } else {
+          throw new Error('Invalid state encoding');
+        }
       }
     } catch (e) {
       logToFile('State was not base64/JSON, using as raw workspaceId', { workspaceId });
