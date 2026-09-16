@@ -3,20 +3,25 @@ import crypto from 'crypto';
 export const generateRandomPassword = (length: number = 12): string => {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
   let password = '';
-  
+
   // Ensure at least one character from each category
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
-  password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special character
-  
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[crypto.randomInt(26)]; // Uppercase
+  password += 'abcdefghijklmnopqrstuvwxyz'[crypto.randomInt(26)]; // Lowercase
+  password += '0123456789'[crypto.randomInt(10)]; // Number
+  password += '!@#$%^&*'[crypto.randomInt(8)]; // Special character
+
   // Fill the rest randomly
   for (let i = password.length; i < length; i++) {
-    password += charset[Math.floor(Math.random() * charset.length)];
+    password += charset[crypto.randomInt(charset.length)];
   }
-  
+
   // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  const passwordArray = password.split('');
+  for (let i = passwordArray.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [passwordArray[i], passwordArray[j]] = [passwordArray[j], passwordArray[i]];
+  }
+  return passwordArray.join('');
 };
 
 export const generateDeviceFingerprint = (req: any): string => {
@@ -27,7 +32,7 @@ export const generateDeviceFingerprint = (req: any): string => {
     req.ip || req.connection.remoteAddress || '',
     req.get('X-Forwarded-For') || ''
   ];
-  
+
   const fingerprint = components.join('|');
   return crypto.createHash('sha256').update(fingerprint).digest('hex');
 };
@@ -63,41 +68,41 @@ export const encryptSensitiveData = (data: string): string => {
   const algorithm = 'aes-256-gcm';
   const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key', 'salt', 32);
   const iv = crypto.randomBytes(16);
-  
+
   const cipher = crypto.createCipher(algorithm, key);
   cipher.setAAD(Buffer.from('veefore-admin', 'utf8'));
-  
+
   let encrypted = cipher.update(data, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  
+
   const authTag = cipher.getAuthTag();
-  
+
   return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
 };
 
 export const decryptSensitiveData = (encryptedData: string): string => {
   const algorithm = 'aes-256-gcm';
   const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key', 'salt', 32);
-  
+
   const parts = encryptedData.split(':');
   const iv = Buffer.from(parts[0], 'hex');
   const authTag = Buffer.from(parts[1], 'hex');
   const encrypted = parts[2];
-  
+
   const decipher = crypto.createDecipher(algorithm, key);
   decipher.setAAD(Buffer.from('veefore-admin', 'utf8'));
   decipher.setAuthTag(authTag);
-  
+
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
-  
+
   return decrypted;
 };
 
 export const validateIPAddress = (ip: string): boolean => {
   const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
   const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-  
+
   return ipv4Regex.test(ip) || ipv6Regex.test(ip);
 };
 
@@ -125,7 +130,7 @@ export const generateOTP = (length: number = 6): string => {
   const digits = '0123456789';
   let otp = '';
   for (let i = 0; i < length; i++) {
-    otp += digits[Math.floor(Math.random() * 10)];
+    otp += digits[crypto.randomInt(10)];
   }
   return otp;
 };
