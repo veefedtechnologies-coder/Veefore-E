@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { schedulerController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
+import { validateWorkspaceAccess } from '../../middleware/workspace-validation';
 import { validateRequest } from '../../middleware/validation';
 import { scheduleWithQuotaGuards } from '../../middleware/apply-route-guards';
 import { requireWorkspaceAccessible } from '../../middleware/entitlement.middleware';
@@ -43,8 +44,14 @@ router.get('/list',
   schedulerController.listScheduledContent
 );
 
+// TENANT ISOLATION (Req 13): `/create` and `/list` perform their own inline
+// membership checks in SchedulerController, but `/upcoming` did not — it passed the
+// query workspaceId straight to `getUpcomingScheduled`, exposing another tenant's
+// scheduled posts. requireWorkspaceAccessible() is a plan-limit guard, not a
+// membership check, so it did not cover this.
 router.get('/upcoming',
   requireAuth,
+  validateWorkspaceAccess({ source: 'query' }),
   requireWorkspaceAccessible(),
   validateRequest({ query: z.object({ workspaceId: z.string().min(1) }) }),
   schedulerController.getUpcoming

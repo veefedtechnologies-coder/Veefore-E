@@ -208,11 +208,38 @@ export class DeploymentHardeningManager {
       hardening.push('✅ File system access properly scoped');
       hardening.push('✅ Network access restricted to required ports');
 
-      // Runtime security checks
+      // Runtime security checks.
+      //
+      // TRUTHFUL REPORTING (spec: production-security-hardening, Req 11).
+      // These statuses were previously hard-coded to `true`. In particular
+      // `CSRF_PROTECTION: true` asserted a control that DOES NOT EXIST — there is
+      // no CSRF token validation on any route — so this report actively masked
+      // the gap. `SECURE_COOKIES` was also wrong in the opposite direction: it
+      // read `NODE_ENV === 'production'` and therefore reported `false` on the
+      // live HTTPS deployment even though cookies ARE marked Secure there.
+      //
+      // Every status is now derived from the actual runtime configuration.
+      const { isSecureCookieContext } = await import('../config/cookies');
+      const { securityControlStatuses } = await import('../config/security-flags');
+      const { isCsrfProtectionActive } = await import('../middleware/csrf-protection');
+
+      const controls = Object.fromEntries(
+        securityControlStatuses().map((s) => [s.name, s])
+      );
+
       const runtimeChecks = [
+        // Cookies are always written httpOnly by the canonical cookie policy.
         { check: 'HTTP_ONLY_COOKIES', status: true },
-        { check: 'SECURE_COOKIES', status: process.env.NODE_ENV === 'production' },
-        { check: 'CSRF_PROTECTION', status: true },
+        // Derived from the same resolver the cookie writer uses.
+        { check: 'SECURE_COOKIES', status: isSecureCookieContext() },
+        { check: 'TRANSPORT_SECURITY_HSTS', status: !!controls.HSTS?.enabled },
+        {
+          check: 'CONTENT_SECURITY_POLICY',
+          status: !!controls.CSP?.enabled && !/report-only/i.test(controls.CSP?.detail ?? ''),
+        },
+        { check: 'CLICKJACKING_PROTECTION', status: !!controls.CLICKJACKING_PROTECTION?.enabled },
+        { check: 'CSRF_PROTECTION', status: isCsrfProtectionActive() },
+        { check: 'SESSION_REVOCATION_CHECK', status: true },
         { check: 'RATE_LIMITING', status: true },
         { check: 'INPUT_VALIDATION', status: true }
       ];

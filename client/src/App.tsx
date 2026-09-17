@@ -57,6 +57,20 @@ const SERVER_COOKIED = isBootstrapCookied() || (!isBootstrapExplicitlyLoggedOut(
 // dashboard immediately, before the client Firebase session finishes restoring.
 const SERVER_ONBOARDED = isBootstrapOnboarded();
 
+// Anti landing-flash (last line of defense): a persisted auth hint means THIS
+// browser has an active session, because EVERY logout path clears it
+// (clearClientSessionState wipes it + clearAuthHint + the veefore_logout guard).
+// Unlike SERVER_COOKIED — which suppresses the hint whenever the server bootstrap
+// says "explicitly logged out" — this signal INTENTIONALLY survives that veto.
+// The veto misfires in the exact rare case behind the reported flash: the user
+// IS logged in (valid Firebase session), but the auth cookie didn't reach the
+// server on the document request (cold edge / verification miss / not sent over
+// the tunnel), so the server injects logged-out and the landing would paint for
+// a split second before Firebase restores. Because a real logout always clears
+// the hint first, a present hint can only mean "still logged in" — so holding
+// the shell here can never strand a genuinely logged-out visitor on a skeleton.
+const CLIENT_HAS_AUTH_HINT = hasAuthHint();
+
 // Prefetch the lazy AuthenticatedApp chunk IMMEDIATELY for a server-verified
 // session, in parallel with the main bundle — so by the time React mounts and
 // hits the Suspense boundary the chunk is already loaded and the dashboard
@@ -407,10 +421,13 @@ function App() {
     if (!isPublicRoute) {
       return <AppShellSkeleton pathname={effectiveLocation} />;
     }
-    // A request that carried auth cookies is a logged-in user — show the shell,
-    // never the public landing, on the root entry while Firebase restores.
+    // A request that carried auth cookies — OR a browser that still holds an auth
+    // hint (see CLIENT_HAS_AUTH_HINT) — is a logged-in user: show the shell, never
+    // the public landing, on the root entry while Firebase restores. Including the
+    // hint here closes the rare flash where the server couldn't see the cookie on
+    // this request but the Firebase session is valid and about to restore.
     if (
-      (SERVER_AUTHED || SERVER_COOKIED) &&
+      (SERVER_AUTHED || SERVER_COOKIED || CLIENT_HAS_AUTH_HINT) &&
       (effectiveLocation === '/' || effectiveLocation === '/landing')
     ) {
       return <AppShellSkeleton pathname={effectiveLocation} />;

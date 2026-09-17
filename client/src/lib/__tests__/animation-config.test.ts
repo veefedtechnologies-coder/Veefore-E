@@ -150,7 +150,13 @@ describe('Animation Configuration', () => {
     it('should export GPU acceleration properties', () => {
       expect(gpuAcceleration.transform).toBe('translateZ(0)');
       expect(gpuAcceleration.willChange).toBe('transform, opacity');
-      expect(gpuAcceleration.backfaceVisibility).toBe('hidden');
+
+      // `backfaceVisibility` was DELIBERATELY removed from this shared helper (see
+      // the comment on `gpuAcceleration` in animation-config.ts): it should only be
+      // applied to genuine 3D flips, not to every GPU-accelerated element, where it
+      // can cause text rendering artefacts. This assertion previously demanded
+      // 'hidden' and so failed against the intended behaviour.
+      expect(gpuAcceleration).not.toHaveProperty('backfaceVisibility');
     });
   });
 

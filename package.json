@@ -51,7 +51,10 @@
     "build:parallel": "node -e \"const {execSync} = require('child_process'); const {spawnSync} = require('child_process'); Promise.all([import('child_process').then(cp => new Promise((r,j) => { const p = cp.spawn('npm', ['run','client:build'], {stdio:'inherit',shell:true}); p.on('close', c => c===0?r():j(c)); })), import('child_process').then(cp => new Promise((r,j) => { const p = cp.spawn('npm', ['run','server:build'], {stdio:'inherit',shell:true}); p.on('close', c => c===0?r():j(c)); }))]).catch(process.exit)\"",
     "prepare": "husky || true",
     "ai:report": "node scripts/ai-model-report.mjs",
-    "ai:log:clear": "rm -f logs/ai-model-usage.log && echo \"AI model log cleared\""
+    "ai:log:clear": "rm -f logs/ai-model-usage.log && echo \"AI model log cleared\"",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check:tenant-isolation": "node scripts/check-tenant-isolation.mjs",
+    "check:security": "npm run check:secrets && npm run check:tenant-isolation"
   },
   "lint-staged": {
     "client/src/**/*.{ts,tsx}": [

@@ -42,9 +42,24 @@ export class TextGenerationController {
     const workspaceId = req.body.workspaceId || req.query.workspaceId || req.headers['workspace-id'];
     if (workspaceId) {
       try {
-        const workspace = await storage.getWorkspace(workspaceId as string);
-        if (workspace && workspace.aiConfiguration) {
-          preferences = { ...preferences, ...workspace.aiConfiguration };
+        // TENANT ISOLATION (spec: production-security-hardening, Req 13).
+        // This previously loaded the workspace from a CLIENT-SUPPLIED id and merged
+        // its `aiConfiguration` with no access check, so a caller could read another
+        // tenant's AI settings (brand voice, personality, tone) simply by passing
+        // their workspace id — and then have generation performed under them.
+        // The mutating endpoints in this controller already call
+        // `validateWorkspaceAccess`; this read path was the gap.
+        const hasAccess = await this.validateWorkspaceAccess(String(workspaceId), userId);
+        if (hasAccess) {
+          const workspace = await storage.getWorkspace(workspaceId as string);
+          if (workspace && workspace.aiConfiguration) {
+            preferences = { ...preferences, ...workspace.aiConfiguration };
+          }
+        } else {
+          console.warn('[TextGenerationController] Ignoring workspace preferences — access denied', {
+            userId,
+            workspaceId: String(workspaceId),
+          });
         }
       } catch (e) {
         console.warn('[TextGenerationController] Failed to load workspace AI configuration', e);

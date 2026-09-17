@@ -8662,6 +8662,20 @@ router.post(
 
       const msg = await ChatMessage.findOne({ id: messageId });
       if (!msg) return res.status(404).json({ error: 'Message not found' });
+
+      // IDOR FIX (spec: production-security-hardening, Req 13).
+      // The message was looked up by id ALONE with no ownership check, so any
+      // authenticated user could apply or cancel an edit on ANOTHER user's message.
+      // `ChatMessage` carries no userId, so ownership is verified through the owning
+      // conversation. Found by `npm run check:tenant-isolation`.
+      const owningConversation = await ChatConversation.findOne({
+        id: (msg as any).conversationId,
+        userId: req.user.id,
+      }).lean();
+      if (!owningConversation) {
+        // 404 rather than 403 so this cannot be used to probe which ids exist.
+        return res.status(404).json({ error: 'Message not found' });
+      }
       const editCards: any[] = Array.isArray((msg as any).editCards)
         ? (msg as any).editCards
         : [];

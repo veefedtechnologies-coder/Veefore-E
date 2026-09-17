@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { userCanAccessWorkspace } from '../../lib/workspace-access';
 import { workspaceController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateWorkspaceAccess } from '../../middleware/workspace-validation';
@@ -90,6 +91,40 @@ const InviteMemberSchema = z.object({
 
 router.use(requireAuth);
 router.use(apiRateLimiter);
+
+/**
+ * TENANT ISOLATION (spec: production-security-hardening, Requirement 13).
+ *
+ * Every `/:workspaceId` route here took the id from the URL with no membership check.
+ * `requireWorkspaceAccessible()` appears on some of them but is NOT an isolation
+ * guard — it only enforces the plan's `maxWorkspaces` limit and fails OPEN on error.
+ *
+ * Some handlers were saved by a service-layer check (`WorkspaceService.deleteWorkspace`
+ * verifies `ownerId === userId`), but not all: `getStats` called
+ * `workspaceService.getWorkspaceStats(workspaceId)` with NO user id anywhere in the
+ * chain, leaking any workspace's statistics to any authenticated user. Surfaced by
+ * `npm run check:tenant-isolation --verbose`.
+ *
+ * `router.param` covers every current and future `:workspaceId` route in this file in
+ * one place. It only fires when the param is present, so `GET /` and `POST /`
+ * (list/create) are unaffected. Service-layer checks stay as defence in depth.
+ */
+router.param('workspaceId', async (req, res, next, value) => {
+  const workspaceId = String(value ?? '').trim();
+  if (!workspaceId) {
+    return res.status(400).json({ error: 'Workspace ID is required' });
+  }
+  if (!(await userCanAccessWorkspace(req, workspaceId))) {
+    console.warn('[IDOR PREVENTED] workspace route access denied:', {
+      userId: (req as any).user?.id,
+      workspaceId,
+      path: req.path,
+    });
+    // 404, not 403: do not confirm the workspace exists (Requirement 13.2).
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+  next();
+});
 
 router.get('/', workspaceController.getUserWorkspaces);
 

@@ -15,7 +15,7 @@ import { admin } from '../../firebase-admin';
 import { User } from '../../models/User/User';
 import { AdminModel } from '../../models/Admin/Admin';
 import Workspace from '../../models/Workspace';
-import sessionManager from '../../middleware/sessionManager';
+import { readAuthTokenCookie } from '../../config/cookies';
 
 /**
  * Extended Request interface with authentication data
@@ -76,9 +76,9 @@ export const authenticateUser = async (
       token = authHeader.split(' ')[1];
     }
 
-    // Fall back to cookie-based session token
+    // Fall back to the cookie-based session token. Verified by Firebase below.
     if (!token) {
-      token = sessionManager.getAuthToken(req);
+      token = readAuthTokenCookie(req);
     }
 
     if (!token) {
@@ -382,7 +382,7 @@ export const optionalAuth = async (
     }
 
     if (!token) {
-      token = sessionManager.getAuthToken(req);
+      token = readAuthTokenCookie(req);
     }
 
     // If no token, continue without authentication

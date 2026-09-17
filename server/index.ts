@@ -10,6 +10,19 @@ export const SERVER_STARTUP_TS = Date.now().toString(36);
 import { validateEnv, isProduction as isProd, isDevelopment as isDev } from './config/env';
 const validatedEnv = validateEnv();
 
+// Cookie policy validation: surfaces misconfiguration (https origin without
+// Secure cookies, or a COOKIE_DOMAIN that does not cover the origin host) at boot
+// instead of letting sessions silently fail to persist. Logs only, never throws.
+import { validateCookieConfig, isSecureCookieContext } from './config/cookies';
+validateCookieConfig();
+
+// Security control flags + posture report (spec: production-security-hardening).
+// Controls are configuration-driven rather than NODE_ENV-derived, so the
+// HTTPS-over-tunnel deployment is protected even with NODE_ENV=development.
+import { hstsSettings, frameSettings, reportSecurityPosture } from './config/security-flags';
+import { helmetCspOption } from './config/csp-policy';
+reportSecurityPosture();
+
 // OAuth Environment Validation - Requirement 8.6: Startup validation
 import { validateOAuthEnvironment, validateCookieDomain, validateCORSConfiguration } from './config/oauthEnvValidation';
 const oauthValidation = validateOAuthEnvironment();
@@ -109,6 +122,7 @@ import { z } from 'zod';
 import { initializeSentry } from './monitoring/sentry-init';
 import { requireAuth } from './middleware/require-auth';
 import { validateWorkspaceAccess } from './middleware/workspace-validation';
+import { userCanAccessWorkspace } from './lib/workspace-access';
 
 // Production-safe log function
 let log: (message: string, source?: string) => void;
@@ -266,19 +280,35 @@ app.use(corsSecurityMiddleware({
 //   app.use(corsContentSecurityPolicy);
 // }
 
+// SECURITY HARDENING (spec: production-security-hardening).
+// These controls are now driven by EXPLICIT configuration (server/config/
+// security-flags.ts) instead of `NODE_ENV`. The production host runs
+// NODE_ENV=development behind an HTTPS tunnel, so the previous
+// `isProduction ? ... : false` gates silently disabled HSTS, CSP and
+// clickjacking protection on live traffic. Requirements 1.1, 1.2, 1.5.
+const hsts = hstsSettings();
+const frame = frameSettings();
+
 app.use(helmet({
-  // P1-2: HTTP Strict Transport Security (HSTS) - Production only
-  strictTransportSecurity: isProduction ? {
-    maxAge: 63072000, // 2 years (required for HSTS preload list)
-    includeSubDomains: true,
-    preload: true
-  } : false, // Disable for localhost development
+  // Requirement 2: HSTS whenever the deployment is actually served over HTTPS.
+  // includeSubDomains/preload default OFF because they are effectively
+  // irreversible for the duration of max-age.
+  strictTransportSecurity: hsts.enabled ? {
+    maxAge: hsts.maxAge,
+    includeSubDomains: hsts.includeSubDomains,
+    preload: hsts.preload,
+  } : false,
 
-  // P1-2: Allow iframe embedding in Replit environment
-  frameguard: false, // Disable completely for iframe compatibility
+  // Requirement 4: clickjacking protection. Enforced primarily via the CSP
+  // `frame-ancestors` directive (which modern browsers honour and which
+  // supports an allow-list); X-Frame-Options is emitted alongside it below as a
+  // fallback for older agents. Set SECURITY_FRAME_POLICY=off to restore the
+  // previous permissive behaviour if a genuine embedding need exists.
+  frameguard: frame.policy === 'off' ? false : { action: frame.policy === 'deny' ? 'deny' : 'sameorigin' },
 
-  // P1-2: Enhanced Content Security Policy - Disabled completely for iframe compatibility
-  contentSecurityPolicy: isProduction && process.env.ENABLE_CSP === 'true' ? undefined : false,
+  // Requirement 3: CSP, defaulting to REPORT-ONLY so it cannot break the app
+  // before its violation reports have been reviewed.
+  contentSecurityPolicy: helmetCspOption(),
 
   // P1-2: Enhanced cross-origin policies - Disabled for iframe compatibility
   crossOriginResourcePolicy: false, // Allow all resources for iframe
@@ -304,34 +334,37 @@ app.use(helmet({
   xssFilter: false
 }));
 
-// IFRAME FIX: Official Replit iframe embedding support + Clean Permissions Policy
+// Permissions-Policy + frame-protection reconciliation.
+//
+// SECURITY FIXES APPLIED HERE (spec: production-security-hardening, Req 4):
+//
+//  1. This middleware used to call `res.removeHeader('X-Frame-Options')`
+//     UNCONDITIONALLY, stripping clickjacking protection from every response.
+//     It is now removed only when framing is deliberately enabled.
+//
+//  2. It used to honour an ATTACKER-CONTROLLED query parameter:
+//         if (req.query.embed === 'true')
+//             res.setHeader('Content-Security-Policy', 'frame-ancestors *')
+//     Any third party could therefore defeat clickjacking protection simply by
+//     framing `https://app.veefore.com/?embed=true`. Worse, it OVERWROTE the
+//     entire CSP header with a single directive, destroying script-src,
+//     connect-src and every other protection for that response. A request
+//     parameter must never be able to downgrade a security header, so this
+//     branch is deleted outright. Legitimate embedding is configured via
+//     SECURITY_FRAME_POLICY / SECURITY_FRAME_ANCESTORS instead.
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Remove X-Frame-Options to allow iframe embedding
-  res.removeHeader('X-Frame-Options');
+  // Only drop frame protection when an operator has explicitly opted out.
+  if (frame.policy === 'off') {
+    res.removeHeader('X-Frame-Options');
+  }
 
-  // Set iframe-friendly headers
-  const allowedOrigin = process.env.CORS_ORIGIN || '*';
-  // NOTE: Combined with main corsSecurityMiddleware to prevent header conflicts
-  // if (isProduction && process.env.CORS_ORIGIN) {
-  //   res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN);
-  // } else {
-  //   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  // }
-  // res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  // res.setHeader('Access-Control-Allow-Headers', '*');
-
-  // CRITICAL: Set ONLY valid Permissions-Policy features to eliminate warnings
-  // Remove deprecated/invalid features that cause "Unrecognized feature" warnings
+  // Set ONLY valid Permissions-Policy features; deprecated/invalid ones produce
+  // "Unrecognized feature" console warnings.
   res.setHeader('Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), fullscreen=(), payment=(), ' +
     'accelerometer=(), autoplay=(), display-capture=(), encrypted-media=(), ' +
     'gyroscope=(), magnetometer=(), midi=(), picture-in-picture=(), ' +
     'screen-wake-lock=(), sync-xhr=(), usb=(), xr-spatial-tracking=()');
-
-  // Support for Replit ?embed=true parameter
-  if (req.query.embed === 'true') {
-    res.setHeader('Content-Security-Policy', 'frame-ancestors *');
-  }
 
   next();
 });
@@ -355,6 +388,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// CSRF protection (spec: production-security-hardening, Req 8).
+// Mounted immediately after cookie parsing and BEFORE the routers, so it sees
+// every state-changing request. Defaults to REPORT-ONLY: it logs what
+// enforcement would reject without blocking anything, so the client can be
+// updated to send X-CSRF-Token before SECURITY_CSRF_ENFORCE=true is set.
+import csrfProtection from './middleware/csrf-protection';
+app.use(csrfProtection);
+
 // P2 SECURITY: Session management for OAuth 2.0 flows
 import session from 'express-session';
 app.use(session({
@@ -363,7 +404,10 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: isProduction,
+    // Same NODE_ENV defect as the auth cookies: this read `isProduction`, so the
+    // OAuth session cookie was NOT marked Secure on the live HTTPS deployment.
+    // Resolved from the actual transport instead.
+    secure: isSecureCookieContext(),
     sameSite: 'lax',   // 'lax' required for OAuth: allows cookie on top-level cross-site GET redirects (Google → app)
     maxAge: 600000, // 10 minutes for OAuth flows
   },
@@ -675,7 +719,12 @@ app.use((req, res, next) => {
   // (server/middleware/oauthSecurity.ts), and BOTH limiters bucket under the same
   // Redis key (`oauth_rl:<ip>`), so stacking them double-counted every
   // /google/start and tripped the limit after only a few logins.
-  app.use('/api/auth', authRoutes);
+  // Requirement 9: throttle credential endpoints. `oauthRateLimiter` only covers
+  // `GET …/start`, leaving /signin, /session-login, /update-token and /refresh
+  // unthrottled. Separate buckets per endpoint class so client-driven session
+  // upkeep cannot produce false 429s on sign-in.
+  const { credentialRateLimiter } = await import('./middleware/credential-rate-limit');
+  app.use('/api/auth', credentialRateLimiter, authRoutes);
 
   await registerRoutes(app, storage as any, httpServer, upload);
 
@@ -936,7 +985,10 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/ensure-account', validateRequest({ body: z.object({ instagramAccountId: z.string().min(1), instagramUsername: z.string().min(1), workspaceId: z.string().min(1) }) }), async (req: Request, res: Response) => {
+  // SECURITY FIX (Req 13): was unauthenticated with a client-supplied workspaceId.
+  // The handler is currently a no-op stub, so there was no live data impact, but it
+  // is guarded now so it cannot become an unauthenticated write if implemented.
+  app.post('/api/instagram/ensure-account', requireAuth, validateWorkspaceAccess({ source: 'body' }), validateRequest({ body: z.object({ instagramAccountId: z.string().min(1), instagramUsername: z.string().min(1), workspaceId: z.string().min(1) }) }), async (req: Request, res: Response) => {
     try {
       const { instagramAccountId, instagramUsername, workspaceId } = req.body;
 
@@ -999,7 +1051,17 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/disconnect', validateRequest({ body: z.object({ accountId: z.string().optional(), workspaceId: workspaceIdSchema.shape.workspaceId.optional() }).refine(d => !!d.accountId || !!d.workspaceId, { message: 'accountId or workspaceId is required' }) }), async (req: Request, res: Response) => {
+  // SECURITY FIX (spec: production-security-hardening, Req 13): this endpoint had
+  // NO authentication and NO tenant check. It is DESTRUCTIVE — it nulls the
+  // access/refresh tokens on a social account — so any anonymous caller who knew
+  // or guessed a workspace id could disconnect that tenant's Instagram.
+  //
+  // `requireAuth` alone is not sufficient here: the body accepts EITHER
+  // `accountId` OR `workspaceId`, so `validateWorkspaceAccess({source:'body'})`
+  // would reject the legitimate accountId form. Instead we resolve the target
+  // account first and then verify the caller is a member of the workspace that
+  // OWNS it, which closes both paths (and the IDOR on `accountId`).
+  app.post('/api/instagram/disconnect', requireAuth, validateRequest({ body: z.object({ accountId: z.string().optional(), workspaceId: workspaceIdSchema.shape.workspaceId.optional() }).refine(d => !!d.accountId || !!d.workspaceId, { message: 'accountId or workspaceId is required' }) }), async (req: Request, res: Response) => {
     try {
       const { accountId, workspaceId } = req.body || {};
       const { SocialAccountModel } = await import('./models/Social');
@@ -1011,6 +1073,18 @@ app.use((req, res, next) => {
         raw = await SocialAccountModel.findOne({ workspaceId, platform: 'instagram' });
       }
       if (!raw) return res.status(404).json({ success: false, message: 'Account not found' });
+
+      // TENANT CHECK — must run before any mutation.
+      const ownerWorkspaceId = String(raw.workspaceId ?? '');
+      if (!(await userCanAccessWorkspace(req, ownerWorkspaceId))) {
+        console.warn('[IDOR PREVENTED] instagram/disconnect denied:', {
+          userId: (req as any).user?.id,
+          workspaceId: ownerWorkspaceId,
+        });
+        // 404 rather than 403: do not confirm the account exists.
+        return res.status(404).json({ success: false, message: 'Account not found' });
+      }
+
       await SocialAccountModel.findByIdAndUpdate(raw._id, {
         $set: {
           accessToken: null,
@@ -1027,7 +1101,10 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/reconnect/start', validateRequest({
+  // SECURITY FIX (Req 13): was unauthenticated AND destructive — it nulled the
+  // stored Instagram tokens for a client-supplied workspace before returning an
+  // OAuth URL, so an anonymous caller could disconnect any tenant.
+  app.post('/api/instagram/reconnect/start', requireAuth, validateWorkspaceAccess({ source: 'body' }), validateRequest({
     body: workspaceIdSchema.extend({
       flow: z.enum(['standard', 'advanced']).optional()
     })
@@ -1066,7 +1143,10 @@ app.use((req, res, next) => {
     }
   });
 
-  app.post('/api/instagram/force-sync', validateRequest({
+  // SECURITY FIX (Req 13): was unauthenticated and read
+  // `getSocialAccountsByWorkspace(workspaceId)` for a client-supplied workspace,
+  // then queued sync jobs against it. Now requires auth + workspace membership.
+  app.post('/api/instagram/force-sync', requireAuth, validateWorkspaceAccess({ source: 'body' }), validateRequest({
     body: z.object({
       workspaceId: z.string().min(1, 'Workspace ID is required')
     })

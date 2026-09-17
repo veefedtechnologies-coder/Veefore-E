@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/require-auth';
 import { validateRequest } from '../../middleware/validation';
+import { validateWorkspaceAccess } from '../../middleware/workspace-validation';
+import { requireResourceWorkspaceAccess, automationRuleWorkspace } from '../../lib/workspace-access';
 import { automationRateLimiter } from '../../middleware/rate-limiting-working';
 import { storage } from '../../storage';
 import { AutomationSystem } from '../../automation-system';
@@ -61,8 +63,12 @@ const GetLogsQuerySchema = z.object({
   type: z.string().optional(),
 });
 
+// TENANT ISOLATION (Req 13): `workspaceId` comes from the query string and was
+// passed straight into `automationSystem.getRules`, so any authenticated user
+// could list another tenant's automation rules.
 router.get('/rules',
   requireAuth,
+  validateWorkspaceAccess({ source: 'query' }),
   validateRequest({ query: GetRulesQuerySchema }),
   async (req: Request, res: Response) => {
     try {
@@ -77,8 +83,12 @@ router.get('/rules',
   }
 );
 
+// TENANT ISOLATION (Req 13): creates a LIVE automation rule from a body-supplied
+// workspaceId. Unguarded, an authenticated user could install an automation that
+// acts on another tenant's connected social account.
 router.post('/rules',
   requireAuth,
+  validateWorkspaceAccess({ source: 'body' }),
   phase1ReviewGuard,
   automationRateLimiter,
   ...automationGuards,
@@ -142,6 +152,10 @@ router.post('/rules',
 
 router.put('/rules/:ruleId',
   requireAuth,
+  // TENANT ISOLATION (Req 13): keyed by opaque ruleId, so the workspace is only
+  // knowable by loading the rule. Without this any authenticated user could
+  // modify, disable or delete ANOTHER tenant's live automation rule.
+  requireResourceWorkspaceAccess('ruleId', automationRuleWorkspace, 'automation rule'),
   phase1ReviewGuard,
   validateRequest({ params: UpdateRuleParamsSchema, body: UpdateRuleBodySchema }),
   async (req: Request, res: Response) => {
@@ -178,6 +192,10 @@ router.put('/rules/:ruleId',
 
 router.delete('/rules/:ruleId',
   requireAuth,
+  // TENANT ISOLATION (Req 13): keyed by opaque ruleId, so the workspace is only
+  // knowable by loading the rule. Without this any authenticated user could
+  // modify, disable or delete ANOTHER tenant's live automation rule.
+  requireResourceWorkspaceAccess('ruleId', automationRuleWorkspace, 'automation rule'),
   phase1ReviewGuard,
   validateRequest({ params: RuleIdParamsSchema }),
   async (req: Request, res: Response) => {
@@ -195,6 +213,10 @@ router.delete('/rules/:ruleId',
 
 router.post('/rules/:ruleId/toggle',
   requireAuth,
+  // TENANT ISOLATION (Req 13): keyed by opaque ruleId, so the workspace is only
+  // knowable by loading the rule. Without this any authenticated user could
+  // modify, disable or delete ANOTHER tenant's live automation rule.
+  requireResourceWorkspaceAccess('ruleId', automationRuleWorkspace, 'automation rule'),
   phase1ReviewGuard,
   automationRateLimiter,
   ...automationToggleGuards,
@@ -212,8 +234,10 @@ router.post('/rules/:ruleId/toggle',
   }
 );
 
+// TENANT ISOLATION (Req 13): automation logs contain another tenant's activity.
 router.get('/logs/:workspaceId',
   requireAuth,
+  validateWorkspaceAccess({ source: 'params' }),
   validateRequest({ params: GetLogsParamsSchema, query: GetLogsQuerySchema }),
   async (req: Request, res: Response) => {
     try {

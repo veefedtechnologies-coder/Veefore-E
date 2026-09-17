@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { getAuthorizedWorkspace } from '../../../lib/workspace-access';
 import { AuthenticatedRequest } from '../../../types/express';
 import { AIServiceManager } from '../../../services/AIServiceManager';
 import { AICreditService } from '../../../services/AICreditService';
@@ -46,7 +47,11 @@ export class CaptionAnalysisController {
     const workspaceId = req.body.workspaceId || req.query.workspaceId || req.headers['workspace-id'];
     if (workspaceId) {
       try {
-        const workspace = await storage.getWorkspace(workspaceId as string);
+        // TENANT ISOLATION (spec: production-security-hardening, Req 13):
+        // loads the workspace ONLY if the caller is entitled to it. Previously a
+        // client-supplied workspaceId was read with no access check, exposing
+        // another tenant's AI configuration and generating content under it.
+        const workspace = await getAuthorizedWorkspace(workspaceId as string, userId);
         if (workspace && workspace.aiConfiguration) {
           preferences = { ...preferences, ...workspace.aiConfiguration };
         }

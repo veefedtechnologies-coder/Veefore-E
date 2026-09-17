@@ -47,17 +47,16 @@ vi.mock('../../models/Workspace', () => ({
   },
 }));
 
-vi.mock('../../middleware/sessionManager', () => ({
-  default: {
-    getAuthToken: vi.fn(),
-  },
-}));
-
+// NOTE: the cookie reader (`readAuthTokenCookie`) is intentionally NOT mocked.
+// It is pure, dependency-free logic, so exercising the real implementation
+// verifies the actual cookie→token path instead of a stubbed stand-in.
 import { admin } from '../../firebase-admin';
 import { User } from '../../models/User/User';
 import { AdminModel } from '../../models/Admin/Admin';
 import Workspace from '../../models/Workspace';
-import sessionManager from '../../middleware/sessionManager';
+
+/** A structurally valid (three base64url segment) JWT for cookie tests. */
+const FAKE_JWT_COOKIE = 'eyJhbGciOiJSUzI1NiJ9.eyJ1aWQiOiJ1c2VyNDU2In0.c2lnbmF0dXJl';
 
 describe('Authentication Middleware', () => {
   let mockReq: Partial<AuthenticatedRequest>;
@@ -126,8 +125,11 @@ describe('Authentication Middleware', () => {
       expect(mockNext).toHaveBeenCalled();
     });
 
+    // REGRESSION GUARD: this path was completely broken. `auth_token` is written
+    // as a raw Firebase JWT, but the old HMAC-based reader required exactly two
+    // dot-separated parts, so a three-part JWT always failed and every
+    // cookie-authenticated request 401'd with NO_TOKEN.
     it('should authenticate user with cookie token', async () => {
-      const mockToken = 'cookie-token';
       const mockDecodedToken = {
         uid: 'user456',
         email: 'user2@example.com',
@@ -139,19 +141,32 @@ describe('Authentication Middleware', () => {
         displayName: 'User Two',
       };
 
-      (sessionManager.getAuthToken as any).mockReturnValue(mockToken);
+      mockReq.cookies = { auth_token: FAKE_JWT_COOKIE };
       const mockVerifyIdToken = vi.fn().mockResolvedValue(mockDecodedToken);
       (admin.auth as any).mockReturnValue({ verifyIdToken: mockVerifyIdToken });
       (User.findOne as any).mockResolvedValue(mockUser);
 
       await authenticateUser(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
 
-      expect(sessionManager.getAuthToken).toHaveBeenCalledWith(mockReq);
+      // The cookie value must reach Firebase verification unchanged.
+      expect(mockVerifyIdToken).toHaveBeenCalledWith(FAKE_JWT_COOKIE);
       expect(mockNext).toHaveBeenCalled();
     });
 
+    it('should reject a malformed (non-JWT) cookie without calling Firebase', async () => {
+      mockReq.cookies = { auth_token: 'not-a-jwt' };
+      const mockVerifyIdToken = vi.fn();
+      (admin.auth as any).mockReturnValue({ verifyIdToken: mockVerifyIdToken });
+
+      await authenticateUser(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockVerifyIdToken).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
     it('should reject request with no token', async () => {
-      (sessionManager.getAuthToken as any).mockReturnValue(null);
+      mockReq.cookies = {};
 
       await authenticateUser(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
 
@@ -489,7 +504,7 @@ describe('Authentication Middleware', () => {
     });
 
     it('should continue without auth when no token present', async () => {
-      (sessionManager.getAuthToken as any).mockReturnValue(null);
+      mockReq.cookies = {};
 
       await optionalAuth(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
 

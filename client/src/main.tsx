@@ -1,6 +1,15 @@
 import { memo, Component, ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+
+// CSRF (spec: production-security-hardening, Req 8). Installed BEFORE the app
+// mounts so every subsequent same-origin mutating `fetch` carries the
+// X-CSRF-Token header — including the ~dozen modules that call `fetch` directly
+// instead of going through `apiRequest`. Without this, enabling
+// SECURITY_CSRF_ENFORCE would 403 workspace switching, video-editor actions and
+// the onboarding steps.
+import { installCsrfFetchInterceptor } from './lib/csrf'
+installCsrfFetchInterceptor()
 import AppWrapper from './AppWrapper'
 import { Agentation } from 'agentation'
 

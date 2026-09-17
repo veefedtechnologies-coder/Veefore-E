@@ -164,10 +164,17 @@ describe('rateLimitConfig', () => {
       const { config } = buildRateLimitConfig();
 
       expect(config.bucMultiplier).toBe(RATE_LIMIT_DEFAULTS.bucMultiplier);
+      // Assert on the stable, meaningful parts of the warning (which key was
+      // rejected and that a fallback was used) rather than the exact prose. The
+      // previous assertion hard-coded an older message string ("Invalid numeric
+      // value for …") that no longer matched the implementation, so this test
+      // failed even though the behaviour was correct.
       expect(logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid numeric value for RATE_LIMIT_BUC_MULTIPLIER'),
+        expect.stringContaining('RATE_LIMIT_BUC_MULTIPLIER'),
         expect.objectContaining({ component: 'RateLimitConfig' }),
       );
+      const [warning] = (logger.warn as unknown as { mock: { calls: string[][] } }).mock.calls[0];
+      expect(warning).toMatch(/invalid/i);
     });
 
     it('should log a warning for each invalid env var but still apply valid ones', () => {

@@ -302,4 +302,7 @@ router.get('/api/user/profile', authenticateUser, getUserProfile);
 - `../../models/User/User`: User model
 - `../../models/Admin/Admin`: Admin model
 - `../../models/Workspace`: Workspace model
-- `../../middleware/sessionManager`: Session cookie management
+- `../../config/cookies`: Canonical auth-cookie policy and cookie reader
+  (`readAuthTokenCookie`). Replaces the former `middleware/sessionManager`,
+  whose HMAC cookie-signing layer was unused and prevented the raw Firebase JWT
+  in `auth_token` from ever being read.

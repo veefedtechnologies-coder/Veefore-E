@@ -28,6 +28,17 @@ import {
   firebaseTokenService,
   type OAuthRequest 
 } from '../services/oauth';
+import {
+  AUTH_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  SESSION_COOKIE_MAX_AGE_MS,
+  authCookieOptions,
+  sessionCookieOptions,
+  clearAuthCookieVariants,
+} from '../config/cookies';
+import { invalidateSessionVersionCache } from '../lib/session-revocation';
+import { recordAuthEventFromRequest } from '../lib/auth-audit';
+import { clearSessionActivity } from '../lib/session-lifetime';
 import { refreshTokenStore } from '../services/oauth/RefreshTokenStore';
 import { refreshRateLimiter } from '../services/oauth/RefreshRateLimiter';
 import { oauthSecurityMiddleware } from '../middleware/oauthSecurity';
@@ -100,22 +111,9 @@ async function resolveUidFromToken(token: string): Promise<string | undefined> {
  * given cookie was set, we clear EVERY plausible (domain, secure) variant.
  */
 function clearAuthCookies(res: Response): void {
-  const cookieDomain = process.env.COOKIE_DOMAIN;
-  const base = { httpOnly: true, sameSite: 'lax' as const, path: '/' };
-  const variants: Array<Record<string, unknown>> = [
-    { ...base },
-    { ...base, secure: true },
-    { ...base, secure: false },
-  ];
-  if (cookieDomain) {
-    variants.push({ ...base, domain: cookieDomain });
-    variants.push({ ...base, domain: cookieDomain, secure: true });
-    variants.push({ ...base, domain: cookieDomain, secure: false });
-  }
-  for (const opts of variants) {
-    res.clearCookie('auth_token', opts as any);
-    res.clearCookie('__session', opts as any);
-  }
+  // Delegates to the canonical policy so the set-side and clear-side variant
+  // lists can never drift apart (drift is what let a session survive logout).
+  clearAuthCookieVariants(res);
 }
 
 /**
@@ -513,21 +511,16 @@ router.get('/google/callback', async (req: OAuthRequest, res: Response) => {
       }
     }
     
-    // Requirement 5: Set auth_token cookie with Firebase custom token
-    // Requirement 5.1-5.7: Set all required cookie attributes
-    const isHttpsFrontend = process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production';
-    const cookieOptions = {
-      httpOnly: true,                           // Requirement 5.1: Prevent JavaScript access
-      secure: isHttpsFrontend,                  // Requirement 5.2: HTTPS only in production or if frontend is HTTPS
-      sameSite: 'lax' as const,                 // Use lax for OAuth cross-site redirects
-      path: '/',                                // Requirement 5.4: Available to all routes
-      maxAge: 30 * 24 * 60 * 60 * 1000,         // 30 days (Instagram-style persistent session)
-      domain: isHttpsFrontend
-        ? process.env.COOKIE_DOMAIN
-        : undefined,                            // Requirement 5.6: Set domain when using HTTPS frontend
-    };
-    
-    res.cookie('auth_token', firebaseResult.customToken, cookieOptions);
+    // Requirement 5: Set auth_token cookie with Firebase custom token.
+    // Attributes come from the canonical cookie policy (server/config/cookies.ts)
+    // so this site and /api/auth/signin write the SAME (domain, secure, sameSite,
+    // path) tuple. They previously disagreed on `domain`, which created two
+    // distinct `auth_token` jar entries that logout could not fully clear.
+    const cookieOptions = authCookieOptions();
+
+    // Drop any legacy differently-scoped duplicate before writing the canonical one.
+    clearAuthCookieVariants(res, AUTH_COOKIE_NAME);
+    res.cookie(AUTH_COOKIE_NAME, firebaseResult.customToken, cookieOptions);
     
     console.log('[OAuth] Set auth_token cookie:', {
       correlationId,
@@ -675,14 +668,10 @@ router.post('/refresh', async (req: OAuthRequest, res: Response) => {
           errorCode === 'auth/argument-error') {
         console.warn('[OAuth] Detected old custom token format, clearing cookie:', { correlationId, errorMessage });
         
-        // Clear the old cookie
-        res.clearCookie('auth_token', {
-          httpOnly: true,
-          secure: process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          domain: (process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production') ? process.env.COOKIE_DOMAIN : undefined,
-        });
+        // Clear the old cookie under EVERY scope variant. A single-scope clear
+        // left a differently-scoped duplicate behind, so the stale custom-token
+        // cookie kept coming back and the client re-entered this same failure.
+        clearAuthCookieVariants(res, AUTH_COOKIE_NAME);
         
         // Return special error code so client knows to re-authenticate
         return res.status(401).json({
@@ -918,6 +907,12 @@ router.post('/logout', async (req: Request, res: Response) => {
     if (uid) {
       const { User } = await import('../models/User/User');
       await User.findByIdAndUpdate(uid, { $inc: { sessionVersion: 1 } });
+      // Drop the cached version so the revocation check on the very next request
+      // sees the bump immediately rather than after the cache TTL.
+      await invalidateSessionVersionCache(uid);
+      // Drop the activity marker so a replayed cookie cannot appear freshly active.
+      await clearSessionActivity(uid);
+      recordAuthEventFromRequest(req, { type: 'logout', userId: String(uid) });
       authDebugLog('LOGOUT bumped sessionVersion', { uid });
     }
   } catch (err) {
@@ -1226,19 +1221,8 @@ router.post('/update-token', async (req: OAuthRequest, res: Response) => {
       /* fail-open: a lookup failure must not break a legitimate token update */
     }
     
-    // Update the cookie with the ID token
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      domain: (process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production')
-        ? process.env.COOKIE_DOMAIN
-        : undefined,
-    };
-    
-    res.cookie('auth_token', idToken, cookieOptions);
+    // Update the cookie with the ID token, using the canonical cookie policy.
+    res.cookie(AUTH_COOKIE_NAME, idToken, authCookieOptions());
 
     // SSR instant-load: also mint the durable, server-VERIFIABLE `__session`
     // cookie from this freshly-verified ID token. This is the most reliable place
@@ -1250,16 +1234,13 @@ router.post('/update-token', async (req: OAuthRequest, res: Response) => {
     // Best-effort: a failure here must never break token update.
     try {
       const admin = getFirebaseAdmin();
-      const expiresIn = 14 * 24 * 60 * 60 * 1000; // 14 days
-      const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
-      res.cookie('__session', sessionCookie, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false,
-        sameSite: 'lax' as const,
-        path: '/',
-        maxAge: expiresIn,
-        domain: (process.env.FRONTEND_URL?.startsWith('https') || process.env.NODE_ENV === 'production') ? process.env.COOKIE_DOMAIN : undefined,
-      });
+      const sessionCookie = await admin
+        .auth()
+        .createSessionCookie(idToken, { expiresIn: SESSION_COOKIE_MAX_AGE_MS });
+      // Same scope as /api/auth/session-login writes it. These two sites used to
+      // disagree on `domain`, so `__session` could exist TWICE with different
+      // values; the browser sent both and only the first survived parsing.
+      res.cookie(SESSION_COOKIE_NAME, sessionCookie, sessionCookieOptions());
       console.log('[OAuth] Minted __session cookie alongside auth_token:', { correlationId });
     } catch (sessionErr) {
       console.warn('[OAuth] Could not mint __session cookie (non-fatal):', {
@@ -1340,6 +1321,15 @@ router.post('/invalidate-sessions/:userId', async (req: Request, res: Response) 
       });
     }
     
+    // Drop the cached session version so every in-flight session is rejected on
+    // its next request, rather than after the cache TTL. Without this, a
+    // "revoke all sessions" action could appear to take effect late.
+    await invalidateSessionVersionCache(userId);
+    recordAuthEventFromRequest(req, {
+      type: 'global_logout', userId: String(userId),
+      detail: { newSessionVersion: user.sessionVersion },
+    });
+
     console.log('[OAuth] All sessions invalidated for user:', {
       correlationId,
       userId,

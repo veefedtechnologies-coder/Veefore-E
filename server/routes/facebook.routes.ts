@@ -25,6 +25,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { requireAuth } from '../middleware/require-auth';
+import { validateWorkspaceAccess } from '../middleware/workspace-validation';
 import { FacebookProvider } from '../features/facebook/providers/FacebookProvider';
 import { mapFacebookApiError } from '../features/facebook/providers/error-mapper';
 import {
@@ -193,7 +194,10 @@ router.get('/auth/start', async (req: Request, res: Response) => {
  * The frontend redirects the user's browser to this URL to start the OAuth flow.
  * Requirements: 2.1
  */
-router.get('/auth', requireAuth, (req: Request, res: Response) => {
+// TENANT ISOLATION (Req 13): the workspaceId is embedded in the OAuth state, so
+// without a membership check a user could run a Facebook OAuth flow that attaches
+// the resulting page to ANOTHER tenant's workspace.
+router.get('/auth', requireAuth, validateWorkspaceAccess({ source: 'query' }), (req: Request, res: Response) => {
   try {
     const workspaceId = String(req.query.workspaceId ?? '');
     if (!workspaceId) {
@@ -647,7 +651,10 @@ router.get('/callback', async (req: Request, res: Response) => {
  * Legacy endpoint kept for compatibility — the callback now handles connection
  * automatically. This endpoint can still be used for manual page selection flows.
  */
-router.post('/pages/connect', requireAuth, async (req: Request, res: Response) => {
+// TENANT ISOLATION (Req 13): upserts a SocialAccount row keyed by the
+// body-supplied workspaceId, so an authenticated user could attach a Facebook
+// page they control into ANOTHER tenant's workspace.
+router.post('/pages/connect', requireAuth, validateWorkspaceAccess({ source: 'body' }), async (req: Request, res: Response) => {
   const { sessionToken, pageIds, workspaceId } = req.body;
 
   // ── Body validation ────────────────────────────────────────────────────

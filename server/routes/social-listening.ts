@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/require-auth';
+import { validateWorkspaceAccess } from '../middleware/workspace-validation';
+import { userCanAccessWorkspace } from '../lib/workspace-access';
 import { ListeningSourceModel } from '../models/SocialListening/ListeningSource';
 import { ListeningTrendModel } from '../models/SocialListening/ListeningTrend';
 import { ListeningPostModel } from '../models/SocialListening/ListeningPost';
@@ -28,6 +30,42 @@ const router = Router();
 
 // Ensure user is authenticated for all routes
 router.use(requireAuth);
+
+/**
+ * TENANT ISOLATION (spec: production-security-hardening, Requirement 13).
+ *
+ * Every `/:workspaceId` route in this router previously took the id straight from
+ * the URL and queried the listening collections with it, with no check that the
+ * caller belongs to that workspace — `requireAuth` proved only that SOMEONE was
+ * logged in. Any authenticated user could therefore read another tenant's
+ * sources, trends, posts, insights and alerts, and drive the mutating
+ * `/chat/:workspaceId` and `/fetch-live/:workspaceId` endpoints.
+ *
+ * `router.param` is used deliberately instead of `router.use`: router-level
+ * middleware runs BEFORE route matching, so `req.params.workspaceId` is not yet
+ * populated there and an auto-detecting guard would silently find nothing. A
+ * `param` handler fires for every matched route that declares `:workspaceId`,
+ * which covers all of them in one place and cannot be forgotten on a new route.
+ */
+router.param('workspaceId', async (req, res, next, value) => {
+  const workspaceId = String(value ?? '').trim();
+  if (!workspaceId) {
+    return res.status(400).json({ success: false, error: 'Workspace ID is required' });
+  }
+
+  if (!(await userCanAccessWorkspace(req, workspaceId))) {
+    console.warn('[IDOR PREVENTED] social-listening workspace access denied:', {
+      userId: (req as any).user?.id,
+      workspaceId,
+      path: req.path,
+    });
+    // 404, not 403: do not confirm that the workspace exists (Requirement 13.2).
+    return res.status(404).json({ success: false, error: 'Workspace not found' });
+  }
+
+  (req as any).workspaceId = workspaceId;
+  next();
+});
 
 const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -112,7 +150,11 @@ router.get('/sources/:workspaceId', ...socialListeningGuards, async (req, res) =
 /**
  * Add a new source to track
  */
-router.post('/sources', ...socialListeningGuards, async (req, res) => {
+// TENANT ISOLATION (Req 13): workspaceId arrives in the BODY here, so the
+// `router.param` guard above does not apply. Without this an authenticated user
+// could create a tracked source — and queue ingestion jobs — inside another
+// tenant's workspace.
+router.post('/sources', validateWorkspaceAccess({ source: 'body' }), ...socialListeningGuards, async (req, res) => {
   try {
     const { workspaceId, platform, type, value } = req.body;
     const userNiche = getStrictUserNiche(req);

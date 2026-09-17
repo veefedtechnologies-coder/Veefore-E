@@ -177,3 +177,31 @@ logs/
 cloudfront_private_key.pem
 cloudfront_public_key.pem
 *.pem
+
+# =============================================================================
+# SECRET HYGIENE (spec: production-security-hardening, Requirement 14)
+# =============================================================================
+# The existing rule was `/.env`, which is ROOT-ANCHORED and therefore did not cover
+# nested env files — which is how `admin-panel/.env` came to be tracked with a live
+# MONGODB_URI and JWT_SECRET. These patterns match at any depth.
+#
+# NOTE: .gitignore does NOT untrack a file that is already committed. Run
+# `npm run check:secrets` to see what is still tracked.
+**/.env
+**/.env.local
+**/.env.production
+**/.env.staging
+**/.env.development
+
+# Keys and certificates at any depth.
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/id_rsa
+**/id_ed25519
+**/service-account*.json
+**/credentials.json
+
+# Local dev TLS material should be generated, not committed (Requirement 14.2).
+ssl/

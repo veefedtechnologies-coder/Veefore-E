@@ -339,7 +339,18 @@ describe('OAuth Security Middleware', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('should reject mismatched redirect_uri', () => {
+    // These two cases previously asserted that the middleware rebuilt the
+    // callback URL from the request Host/protocol and rejected a mismatch with
+    // 400 redirect_uri_mismatch. That check was intentionally REMOVED from
+    // `validateRedirectUri` (see its implementation comment): the authorization
+    // code flow's redirect_uri is validated by Google against the URI registered
+    // in the Google Console BEFORE the callback ever reaches this server, so an
+    // attacker cannot steer the redirect to an unregistered host. Meanwhile the
+    // reconstruction produced false 400s whenever the app ran behind a proxy or
+    // on a different internal port than OAUTH_CALLBACK_URL. The tests were never
+    // updated, so they asserted removed behaviour. They now pin the ACTUAL
+    // contract: the callback is passed through to the handler.
+    it('should pass through a callback whose Host does not match the configured URL', () => {
       const req = mockRequest({
         path: '/api/auth/google/callback',
         protocol: 'https',
@@ -349,39 +360,32 @@ describe('OAuth Security Middleware', () => {
         },
       });
       const res = mockResponse();
-      
+
       validateRedirectUri(req, res, mockNext);
-      
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'redirect_uri_mismatch',
-          message: 'OAuth configuration error: redirect URI not authorized',
-        })
-      );
-      expect(mockNext).not.toHaveBeenCalled();
+
+      // Host-based rejection is Google's responsibility, not ours.
+      expect(mockNext).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('should reject protocol mismatch', () => {
+    it('should pass through a callback whose protocol does not match the configured URL', () => {
+      // Same rationale as above: TLS termination at a proxy legitimately makes
+      // `req.protocol` http on the internal hop, so rejecting on it produced
+      // false failures. Google already enforced the registered redirect_uri.
       const req = mockRequest({
         path: '/api/auth/google/callback',
-        protocol: 'http', // Wrong protocol
+        protocol: 'http',
         get: (header: string) => {
           if (header === 'host') return 'api.example.com';
           return undefined;
         },
       });
       const res = mockResponse();
-      
+
       validateRedirectUri(req, res, mockNext);
-      
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'redirect_uri_mismatch',
-        })
-      );
-      expect(mockNext).not.toHaveBeenCalled();
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
     });
 
     it('should return 500 if OAUTH_CALLBACK_URL not configured', () => {
@@ -412,13 +416,18 @@ describe('OAuth Security Middleware', () => {
       initializeOAuthRateLimiting(null);
     });
 
+    // The bucket is 20 OAuth initiations per minute per IP (see
+    // `memoryRateLimiter` in oauthSecurity.ts). These tests previously asserted
+    // 10, the pre-tuning value, so they failed against the real configuration.
+    const OAUTH_RATE_LIMIT = 20;
+
     it('should set rate limit headers on successful request', async () => {
       const req = mockRequest({ ip: '192.168.1.100' });
       const res = mockResponse();
       
       await oauthRateLimiter(req, res, mockNext);
       
-      expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '10');
+      expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', String(OAUTH_RATE_LIMIT));
       expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', expect.any(String));
       expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Reset', expect.any(String));
       expect(mockNext).toHaveBeenCalled();
@@ -428,13 +437,13 @@ describe('OAuth Security Middleware', () => {
       const testIp = '192.168.1.200';
       const req = mockRequest({ ip: testIp });
       const res = mockResponse();
-      
-      // Make 10 successful requests
-      for (let i = 0; i < 10; i++) {
+
+      // Exhaust the bucket.
+      for (let i = 0; i < OAUTH_RATE_LIMIT; i++) {
         await oauthRateLimiter(mockRequest({ ip: testIp }), mockResponse(), vi.fn() as unknown as NextFunction);
       }
-      
-      // 11th request should be blocked
+
+      // The next request must be blocked.
       await oauthRateLimiter(req, res, mockNext);
       
       expect(res.status).toHaveBeenCalledWith(429);
@@ -452,18 +461,25 @@ describe('OAuth Security Middleware', () => {
     it('should track different IPs separately', async () => {
       const ip1 = '192.168.1.1';
       const ip2 = '192.168.1.2';
-      
-      // Make 10 requests from IP1
-      for (let i = 0; i < 10; i++) {
+
+      // Fully EXHAUST ip1's bucket (and one beyond, to confirm it is blocked).
+      // The previous version only sent 10 requests — under the real limit of 20 —
+      // so ip1 was never actually blocked and the test proved nothing about
+      // per-IP isolation.
+      for (let i = 0; i < OAUTH_RATE_LIMIT; i++) {
         await oauthRateLimiter(mockRequest({ ip: ip1 }), mockResponse(), vi.fn() as unknown as NextFunction);
       }
-      
-      // Request from IP2 should still work
+
+      const blockedRes = mockResponse();
+      await oauthRateLimiter(mockRequest({ ip: ip1 }), blockedRes, vi.fn() as unknown as NextFunction);
+      expect(blockedRes.status).toHaveBeenCalledWith(429);
+
+      // A different IP must still be served despite ip1 being blocked.
       const req = mockRequest({ ip: ip2 });
       const res = mockResponse();
-      
+
       await oauthRateLimiter(req, res, mockNext);
-      
+
       expect(mockNext).toHaveBeenCalled();
       expect(res.status).not.toHaveBeenCalledWith(429);
     }, 10000);

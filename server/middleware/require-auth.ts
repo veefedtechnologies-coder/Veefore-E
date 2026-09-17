@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { storage } from '../mongodb-storage';
 import { getFirebaseAdmin } from '../firebase-admin';
+import { checkSessionRevoked } from '../lib/session-revocation';
+import { recordAuthEventFromRequest } from '../lib/auth-audit';
+import { checkSessionLifetime } from '../lib/session-lifetime';
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -34,6 +37,32 @@ async function resolveSessionCookieUser(req: Request): Promise<any | null> {
     const decoded: any = await withTimeout(adminApp.auth().verifySessionCookie(session, false), 4000);
     const uid = decoded?.uid;
     if (!uid) return null;
+
+    // REVOCATION ENFORCEMENT (spec: production-security-hardening, Req 6).
+    // Without this, a `__session` cookie captured outside the browser kept
+    // authorizing requests for up to 14 days after logout or a global
+    // invalidation, because `sessionVersion` was only checked on the
+    // session-maintenance endpoints and `checkRevoked` is false here.
+    const verdict = await checkSessionRevoked(String(uid), decoded?.sessionVersion);
+    if (verdict.revoked) {
+      console.warn('[AUTH] Rejected revoked session cookie:', { uid, reason: verdict.reason });
+      // Requirement 6.8: record the revocation rejection.
+      recordAuthEventFromRequest(req, {
+        type: 'session_revoked', userId: String(uid), reason: verdict.reason,
+      });
+      return null;
+    }
+
+    // SESSION LIFETIME (Req 7): idle + absolute limits. The absolute age comes from
+    // the token's signed auth_time/iat claim, so activity cannot extend it.
+    const lifetime = await checkSessionLifetime(String(uid), decoded?.auth_time ?? decoded?.iat);
+    if (lifetime.expired) {
+      console.warn('[AUTH] Rejected expired session cookie:', { uid, reason: lifetime.reason });
+      recordAuthEventFromRequest(req, {
+        type: 'session_expired', userId: String(uid), reason: lifetime.reason,
+      });
+      return null;
+    }
 
     // For our users the Firebase uid equals the Mongo _id (sign-in mints custom
     // tokens with uid = String(user._id)); fall back to firebaseUid lookup.
@@ -117,6 +146,45 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     firebaseUid = decoded?.uid;
     if (!firebaseUid) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // REVOCATION ENFORCEMENT (spec: production-security-hardening, Req 6).
+    // A verified signature only proves the token was issued by us — not that it
+    // is still valid. Reject tokens whose sessionVersion is behind the user's
+    // current version (logout / global invalidation / password change).
+    const bearerVerdict = await checkSessionRevoked(String(firebaseUid), decoded?.sessionVersion);
+    if (bearerVerdict.revoked) {
+      console.warn('[AUTH] Rejected revoked bearer token:', {
+        uid: firebaseUid,
+        reason: bearerVerdict.reason,
+      });
+      recordAuthEventFromRequest(req, {
+        type: 'session_revoked', userId: String(firebaseUid), reason: bearerVerdict.reason,
+      });
+      return res.status(401).json({
+        error: 'Unauthorized',
+        code: bearerVerdict.reason,
+        requiresReauth: true,
+      });
+    }
+
+    // SESSION LIFETIME (Req 7) for the Bearer path.
+    const bearerLifetime = await checkSessionLifetime(
+      String(firebaseUid),
+      (decoded as any)?.auth_time ?? (decoded as any)?.iat
+    );
+    if (bearerLifetime.expired) {
+      console.warn('[AUTH] Rejected expired bearer token:', {
+        uid: firebaseUid, reason: bearerLifetime.reason,
+      });
+      recordAuthEventFromRequest(req, {
+        type: 'session_expired', userId: String(firebaseUid), reason: bearerLifetime.reason,
+      });
+      return res.status(401).json({
+        error: 'Unauthorized',
+        code: bearerLifetime.reason,
+        requiresReauth: true,
+      });
     }
 
     let user: any;

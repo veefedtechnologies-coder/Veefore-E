@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
+import { csrfHeaders } from './csrf'
 
 export const SUBSCRIPTION_QUERY_KEY = ['subscription', 'me'] as const
 
@@ -183,6 +184,13 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
   }
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   
+  // CSRF (spec: production-security-hardening, Req 8): echo the readable `vf_csrf`
+  // cookie in the X-CSRF-Token header on state-changing requests. Added centrally
+  // here so every mutation that goes through apiRequest is covered — the server
+  // rejects a cookie-authorized mutation without it once enforcement is enabled.
+  // No-op for GET/HEAD and when no token is present yet.
+  Object.assign(headers, csrfHeaders(options.method))
+
   // [SERVER-SIDE OAUTH - Task 16.2] Include credentials for cookie-based authentication
   const response = await fetch(url, {
     ...options,
@@ -230,7 +238,10 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
         return await fetch(url, {
           ...options,
           cache: 'no-store',
-          headers: retryHeaders,
+          // Re-attach the CSRF header on retry. The token is re-read from the
+          // cookie because a session refresh can rotate it — reusing the original
+          // header value would then fail the double-submit comparison.
+          headers: { ...retryHeaders, ...csrfHeaders(options.method) },
           credentials: 'include',
           signal: retryController.signal,
         })

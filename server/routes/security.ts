@@ -9,6 +9,46 @@ import { getThreatIntelligence, activeThreatEvents, ThreatLevel } from '../middl
 const router = Router();
 
 /**
+ * CSP violation report sink
+ * (spec: production-security-hardening, Requirements 3.5, 16.4).
+ *
+ * The CSP ships in report-only mode, which is only useful if the reports land
+ * somewhere. Point `SECURITY_CSP_REPORT_URI` at this endpoint, watch what gets
+ * reported, widen the policy for anything legitimate, and only then set
+ * `SECURITY_CSP_ENFORCE=true`.
+ *
+ * Deliberately UNAUTHENTICATED: the browser posts these without credentials, so
+ * requiring auth would silence the entire report stream. It is therefore treated as
+ * untrusted input — nothing is executed, only a bounded, sanitised summary is
+ * logged, and it answers 204 so a flood of reports costs almost nothing.
+ */
+router.post('/csp-report', (req, res) => {
+  try {
+    // Browsers send `application/csp-report`; the payload is nested under
+    // `csp-report` (Level 2) or sent as a bare object (Level 3 / report-to).
+    const body: any = (req.body as any)?.['csp-report'] ?? req.body ?? {};
+
+    /** Cap length so an oversized field cannot bloat the logs. */
+    const clip = (v: unknown) =>
+      typeof v === 'string' ? v.slice(0, 300) : undefined;
+
+    console.warn('[csp-violation]', JSON.stringify({
+      directive: clip(body['violated-directive'] ?? body.effectiveDirective),
+      blockedUri: clip(body['blocked-uri'] ?? body.blockedURL),
+      documentUri: clip(body['document-uri'] ?? body.documentURL),
+      // The offending inline snippet is useful for diagnosis but could contain
+      // user content, so keep it short.
+      sample: clip(body['script-sample'] ?? body.sample),
+      disposition: clip(body.disposition),
+    }));
+  } catch {
+    /* never let a malformed report produce an error response */
+  }
+  // 204 regardless: the browser ignores the body and must not retry.
+  res.status(204).end();
+});
+
+/**
  * P8-2.1: Real-time Threat Intelligence Dashboard
  */
 router.get('/threat-intelligence', (req, res) => {

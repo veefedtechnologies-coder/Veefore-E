@@ -245,8 +245,13 @@ export async function validateWorkspaceMembership(req: Request, res: Response, n
       return;
     }
 
-    // userId is set by requireAuth middleware
-    const userId: string | undefined = (req as any).userId;
+    // BUG FIX: this read `(req as any).userId`, which `requireAuth` NEVER sets —
+    // it attaches the user document as `req.user` (with `.id`). Any route adopting
+    // this middleware would therefore have 401'd every request. It has no callers
+    // today, so this was a latent trap rather than a live outage; reading the same
+    // property the factory guards use keeps the two consistent.
+    const userId: string | undefined =
+      (req as any).user?.id ?? (req as any).userId;
 
     if (!userId) {
       res.status(401).json({

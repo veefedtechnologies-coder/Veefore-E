@@ -16,6 +16,7 @@ import type { Request } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { getFirebaseAdmin } from '../firebase-admin';
+import { checkSessionRevoked } from './session-revocation';
 
 // Firebase custom tokens are issued for this fixed audience.
 const FIREBASE_CT_AUDIENCE =
@@ -73,12 +74,31 @@ export function verifyFirebaseCustomToken(token: string): string | null {
 export async function resolveVerifiedUid(req: Request): Promise<string | null> {
   const cookies = (req as any).cookies || {};
 
+  // REVOCATION ENFORCEMENT (spec: production-security-hardening, Req 6.1, 6.5).
+  // A verified signature proves the token was ISSUED by us; it does not prove the
+  // session is still VALID. Every path below therefore also confirms the token's
+  // `sessionVersion` claim is current, so a logged-out or globally invalidated
+  // session stops resolving a uid instead of remaining usable until expiry.
+  const notRevoked = async (uid: string, tokenVersion: unknown): Promise<string | null> => {
+    const verdict = await checkSessionRevoked(uid, tokenVersion);
+    if (verdict.revoked) {
+      console.warn('[auth] resolveVerifiedUid rejected revoked session:', {
+        uid,
+        reason: verdict.reason,
+      });
+      return null;
+    }
+    return uid;
+  };
+
   // 1) Durable Firebase session cookie.
   if (cookies.__session && typeof cookies.__session === 'string') {
     try {
       const admin = getFirebaseAdmin();
       const decoded = await admin.auth().verifySessionCookie(cookies.__session, false);
-      if (decoded?.uid) return decoded.uid as string;
+      if (decoded?.uid) {
+        return await notRevoked(decoded.uid as string, (decoded as any)?.sessionVersion);
+      }
     } catch { /* fall through */ }
   }
 
@@ -88,12 +108,26 @@ export async function resolveVerifiedUid(req: Request): Promise<string | null> {
     try {
       const admin = getFirebaseAdmin();
       const decoded = await admin.auth().verifyIdToken(authToken);
-      if (decoded?.uid) return decoded.uid as string;
+      if (decoded?.uid) {
+        return await notRevoked(decoded.uid as string, (decoded as any)?.sessionVersion);
+      }
     } catch { /* not an ID token — try custom token next */ }
 
-    // 3) auth_token as a Firebase custom token (signature-verified).
+    // 3) auth_token as a Firebase custom token (signature-verified above).
     const uid = verifyFirebaseCustomToken(authToken);
-    if (uid) return uid;
+    if (uid) {
+      // Safe to decode WITHOUT verifying here: `verifyFirebaseCustomToken` has
+      // already validated the signature, so the payload is authentic. Firebase
+      // custom tokens nest developer claims under `claims`.
+      let tokenVersion: unknown;
+      try {
+        const payload = jwt.decode(authToken) as any;
+        tokenVersion = payload?.claims?.sessionVersion ?? payload?.sessionVersion;
+      } catch {
+        tokenVersion = undefined;
+      }
+      return await notRevoked(uid, tokenVersion);
+    }
   }
 
   return null;

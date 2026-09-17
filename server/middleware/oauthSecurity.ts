@@ -51,13 +51,13 @@ export const initializeOAuthRateLimiting = (redis: Redis | null) => {
 /**
  * OAuth Rate Limiting Middleware
  * 
- * Implements rate limiting of 10 requests per minute per IP address for OAuth endpoints.
+ * Implements rate limiting of 20 OAuth *initiations* per minute per IP address.
  * This prevents brute force attacks and abuse of OAuth flows.
  * 
  * Exempts the metrics endpoint from rate limiting to allow monitoring systems
  * to poll without restrictions.
  * 
- * @requirement 11.7 - Rate limiting of 10 requests per minute per IP for OAuth endpoints
+ * @requirement 11.7 - Rate limiting per IP for OAuth initiation endpoints (20/min)
  * @requirement 11.8 - Return HTTP 429 if rate limit exceeded
  */
 export const oauthRateLimiter = async (
@@ -68,7 +68,7 @@ export const oauthRateLimiter = async (
   try {
     // Only rate-limit genuine OAuth *initiation* (e.g. GET /google/start). The
     // oauthSecurityMiddleware that wraps this limiter is mounted on the WHOLE
-    // /api/auth OAuth router, so without this guard the 10/min bucket is drained
+    // /api/auth OAuth router, so without this guard the 20/min bucket is drained
     // by the auto-fired session-maintenance endpoints that run on every page load
     // and during login/logout (/session, /update-token, /refresh, /logout,
     // /debug-client-log, /google/callback). A single "logout → login" cycle fires

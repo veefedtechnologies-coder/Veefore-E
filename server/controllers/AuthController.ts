@@ -10,6 +10,14 @@ import { emailService } from '../email-service';
 import { getFirebaseAdmin } from '../firebase-admin';
 import { resolveVerifiedUid } from '../lib/verify-auth-token';
 import { getRedisClient } from '../lib/redis';
+import {
+  AUTH_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  SESSION_COOKIE_MAX_AGE_MS,
+  authCookieOptions,
+  sessionCookieOptions,
+  clearAuthCookieVariants,
+} from '../config/cookies';
 
 const LinkFirebaseSchema = z.object({
   email: z.string().email(),
@@ -147,17 +155,10 @@ export class AuthController extends BaseController {
       }
     );
 
-    // Set auth cookie (same as OAuth flow)
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false,
-      sameSite: 'lax' as const,
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
-    };
-
-    res.cookie('auth_token', customToken, cookieOptions);
+    // Set auth cookie via the canonical cookie policy so the scope matches the
+    // OAuth flow EXACTLY. Previously this site omitted `domain` while the OAuth
+    // callback set it, producing two distinct `auth_token` jar entries.
+    res.cookie(AUTH_COOKIE_NAME, customToken, authCookieOptions());
 
     console.log('[SignIn] Backend session created for:', normalizedEmail);
 
@@ -202,18 +203,18 @@ export class AuthController extends BaseController {
       /* fail-open: a lookup failure must not break a legitimate session-login */
     }
 
-    const expiresIn = 14 * 24 * 60 * 60 * 1000; // 14 days
-    const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
+    const sessionCookie = await admin
+      .auth()
+      .createSessionCookie(idToken, { expiresIn: SESSION_COOKIE_MAX_AGE_MS });
 
-    const isProd = process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false;
-    res.cookie('__session', sessionCookie, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: expiresIn,
-      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
-    });
+    // SESSION FIXATION / DUPLICATE-COOKIE DEFENSE: drop every legacy (domain,
+    // secure) variant of the session cookie before writing the canonical one.
+    // Without this, a differently-scoped `__session` written by an older deploy
+    // survives alongside the new one; the browser sends both and cookie-parser
+    // keeps only the first, which may be the stale value — the exact cause of the
+    // "server says logged out while the user is logged in" landing-page flash.
+    clearAuthCookieVariants(res, SESSION_COOKIE_NAME);
+    res.cookie(SESSION_COOKIE_NAME, sessionCookie, sessionCookieOptions());
 
     this.sendSuccess(res, { success: true });
   });
@@ -227,15 +228,10 @@ export class AuthController extends BaseController {
     req: TypedRequest,
     res: Response
   ) => {
-    const isProd = process.env.NODE_ENV === 'production' || process.env.FRONTEND_URL?.startsWith('https') || false;
-    res.cookie('__session', '', {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
-    });
+    // Clear EVERY (domain, secure) variant, not just the canonical one. A single
+    // scoped clear left a differently-scoped duplicate alive, so the server kept
+    // resolving a valid session after logout.
+    clearAuthCookieVariants(res, SESSION_COOKIE_NAME);
     this.sendSuccess(res, { success: true });
   });
 

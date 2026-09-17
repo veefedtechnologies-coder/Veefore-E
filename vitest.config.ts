@@ -17,16 +17,44 @@ export default defineConfig({
         inline: ['@tanstack/react-query', 'react', 'react-dom'],
       },
     },
-    include: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.tsx', '**/*.spec.tsx'],
+    // NOTE: no root-level `include`. With `extends: true` each project inherits it
+    // and merges it with its own, which made every server suite match the client
+    // project too and run TWICE (once per environment). Scope is defined solely by
+    // the per-project `include` below.
     testTimeout: 30000,
-    // Use environment selector for client vs server tests
-    environmentMatchGlobs: [
-      ['**/*.client.test.ts', 'happy-dom'],
-      ['**/*.client.test.tsx', 'happy-dom'],
-      ['client/**/*.test.ts', 'happy-dom'],
-      ['client/**/*.test.tsx', 'happy-dom'],
-      ['server/**/*.test.ts', 'node'],
-      ['server/**/*.test.tsx', 'node'],
+    // Per-file environment selection.
+    //
+    // `environmentMatchGlobs` was REMOVED in Vitest 3+ and is silently ignored by
+    // the installed version (4.x). Every client suite therefore ran under the
+    // `node` environment with no `document`/`window`, which is why the
+    // animation-config / animation-performance suites failed on `matchMedia`.
+    // `test.projects` is the supported replacement and is honoured.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'client',
+          environment: 'happy-dom',
+          include: [
+            'client/**/*.test.{ts,tsx}',
+            'client/**/*.spec.{ts,tsx}',
+            '**/*.client.test.{ts,tsx}',
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'server',
+          environment: 'node',
+          include: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
+          exclude: [
+            '**/node_modules/**',
+            'client/**',
+            '**/*.client.test.{ts,tsx}',
+          ],
+        },
+      },
     ],
   },
   resolve: {

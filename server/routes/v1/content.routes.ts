@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { contentController } from '../../controllers';
 import { requireAuth } from '../../middleware/require-auth';
+import { validateWorkspaceAccess } from '../../middleware/workspace-validation';
 import { validateRequest } from '../../middleware/validation';
 import { auditMiddleware } from '../../middleware/audit-middleware';
 import { AuditActions } from '../../utils/audit-logger';
@@ -33,6 +34,11 @@ router.get('/debug-counts', contentController.debugCounts);
 
 router.get('/workspace/:workspaceId/drafts',
   requireAuth,
+  // TENANT ISOLATION (Req 13): requireWorkspaceAccessible() only enforces the
+  // plan's maxWorkspaces limit and fails OPEN on error — it is NOT a membership
+  // check. Without this guard any authenticated user could read or create content
+  // in another tenant's workspace via the :workspaceId path segment.
+  validateWorkspaceAccess({ source: 'params' }),
   requireWorkspaceAccessible(),
   // Drafts are a Creator+ feature. Free users cannot list drafts at all.
   requireFeature('draftPosts'),
@@ -42,6 +48,11 @@ router.get('/workspace/:workspaceId/drafts',
 
 router.get('/workspace/:workspaceId/scheduled',
   requireAuth,
+  // TENANT ISOLATION (Req 13): requireWorkspaceAccessible() only enforces the
+  // plan's maxWorkspaces limit and fails OPEN on error — it is NOT a membership
+  // check. Without this guard any authenticated user could read or create content
+  // in another tenant's workspace via the :workspaceId path segment.
+  validateWorkspaceAccess({ source: 'params' }),
   requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams }),
   contentController.getScheduled
@@ -49,6 +60,11 @@ router.get('/workspace/:workspaceId/scheduled',
 
 router.get('/workspace/:workspaceId',
   requireAuth,
+  // TENANT ISOLATION (Req 13): requireWorkspaceAccessible() only enforces the
+  // plan's maxWorkspaces limit and fails OPEN on error — it is NOT a membership
+  // check. Without this guard any authenticated user could read or create content
+  // in another tenant's workspace via the :workspaceId path segment.
+  validateWorkspaceAccess({ source: 'params' }),
   requireWorkspaceAccessible(),
   validateRequest({ params: WorkspaceIdParams, query: PaginationQuery }),
   contentController.getByWorkspace
@@ -56,6 +72,11 @@ router.get('/workspace/:workspaceId',
 
 router.post('/workspace/:workspaceId',
   requireAuth,
+  // TENANT ISOLATION (Req 13): requireWorkspaceAccessible() only enforces the
+  // plan's maxWorkspaces limit and fails OPEN on error — it is NOT a membership
+  // check. Without this guard any authenticated user could read or create content
+  // in another tenant's workspace via the :workspaceId path segment.
+  validateWorkspaceAccess({ source: 'params' }),
   requireWorkspaceAccessible(),
   // Saving a post as a draft (status: 'draft') is a Creator+ feature. Publish /
   // schedule flows are untouched (they don't send status: 'draft').

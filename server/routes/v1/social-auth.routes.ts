@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import { requireAuth } from '../../middleware/require-auth';
+import { validateWorkspaceAccess } from '../../middleware/workspace-validation';
 import { socialAccountService } from '../../services';
 import { InstagramOAuthService } from '../../instagram-oauth';
 import { MongoStorage } from '../../mongodb-storage';
@@ -11,7 +13,10 @@ const router = Router();
  * Handle OAuth Authorize Redirect
  * URL: /api/v1/social-auth/:platform/authorize
  */
-router.get('/:platform/authorize', async (req: Request, res: Response) => {
+// SECURITY FIX (Req 13): this had NO authentication and took workspaceId from the
+// query string, embedding it in the OAuth state — so an unauthenticated caller
+// could start a flow that attaches a social account to an arbitrary workspace.
+router.get('/:platform/authorize', requireAuth, validateWorkspaceAccess({ source: 'query' }), async (req: Request, res: Response) => {
   try {
     const { platform } = req.params;
     const workspaceId = req.query.workspaceId as string;

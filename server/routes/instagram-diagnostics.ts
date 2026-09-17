@@ -1,11 +1,32 @@
 import express from 'express'
 import type { Request, Response } from 'express'
 import { InstagramService } from '../features/instagram/services/instagram.service'
+import { requireAuth } from '../middleware/require-auth'
+import { validateWorkspaceAccess } from '../middleware/workspace-validation'
 
 // Create singleton instance of InstagramService
 const instagramService = new InstagramService();
 
 const router = express.Router()
+
+/**
+ * SECURITY (spec: production-security-hardening, Req 13).
+ *
+ * Every route here accepts a client-supplied `workspaceId` and reads that
+ * workspace's Instagram account — including stored-token diagnostics and account
+ * totals — with no authentication whatsoever.
+ *
+ * This router does not appear to be mounted today, so it is not a live leak. It is
+ * exactly the kind of latent hole that becomes live the moment someone wires it up,
+ * so authentication is applied at the router level: any future mount is guarded by
+ * default rather than depending on the mounter remembering.
+ */
+router.use(requireAuth)
+
+// Membership check for whichever of params/query/body carries the workspaceId.
+// `required: false` so a route without one is not rejected outright — but when an
+// id IS supplied it must belong to the caller.
+router.use(validateWorkspaceAccess({ required: false }))
 
 // POST /api/diagnostics/instagram
 // Body: { accessToken: string, limit?: number }
