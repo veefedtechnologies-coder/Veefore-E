@@ -1,9 +1,9 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface VideoScene {
   videoPath: string;
@@ -46,9 +46,8 @@ export class FFmpegService {
     fs.writeFileSync(listPath, listContent);
 
     try {
-      const command = `ffmpeg -f concat -safe 0 -i "${listPath}" -c copy "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath, '-y']);
+
       console.log(`[FFMPEG] Scenes concatenated to: ${outputPath}`);
       return outputPath;
     } catch (error) {
@@ -66,9 +65,8 @@ export class FFmpegService {
     console.log(`[FFMPEG] Adding audio to video`);
 
     try {
-      const command = `ffmpeg -i "${videoPath}" -i "${audioPath}" -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-i', videoPath, '-i', audioPath, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', outputPath, '-y']);
+
       console.log(`[FFMPEG] Audio added to: ${outputPath}`);
       return outputPath;
     } catch (error) {
@@ -81,9 +79,8 @@ export class FFmpegService {
     console.log(`[FFMPEG] Mixing audio tracks`);
 
     try {
-      const command = `ffmpeg -i "${voicePath}" -i "${backgroundMusicPath}" -filter_complex "[0:a]volume=${voiceVolume}[voice];[1:a]volume=${musicVolume}[music];[voice][music]amix=inputs=2:duration=first" "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-i', voicePath, '-i', backgroundMusicPath, '-filter_complex', `[0:a]volume=${voiceVolume}[voice];[1:a]volume=${musicVolume}[music];[voice][music]amix=inputs=2:duration=first`, outputPath, '-y']);
+
       console.log(`[FFMPEG] Audio mixed to: ${outputPath}`);
       return outputPath;
     } catch (error) {
@@ -96,9 +93,8 @@ export class FFmpegService {
     console.log(`[FFMPEG] Adding subtitles to video`);
 
     try {
-      const command = `ffmpeg -i "${videoPath}" -vf "subtitles=${subtitlePath}" "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-i', videoPath, '-vf', `subtitles=${subtitlePath}`, outputPath, '-y']);
+
       console.log(`[FFMPEG] Subtitles added to: ${outputPath}`);
       return outputPath;
     } catch (error) {
@@ -127,13 +123,12 @@ export class FFmpegService {
     } = options;
 
     try {
-      const enableClause = startTime > 0 || duration < Infinity 
+      const enableClause = startTime > 0 || duration < Infinity
         ? `:enable='between(t,${startTime},${startTime + duration})'`
         : '';
 
-      const command = `ffmpeg -i "${videoPath}" -vf "drawtext=text='${text}':x=${x}:y=${y}:fontsize=${fontSize}:fontcolor=${fontColor}${enableClause}" "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-i', videoPath, '-vf', `drawtext=text='${text}':x=${x}:y=${y}:fontsize=${fontSize}:fontcolor=${fontColor}${enableClause}`, outputPath, '-y']);
+
       console.log(`[FFMPEG] Text overlay added to: ${outputPath}`);
       return outputPath;
     } catch (error) {
@@ -153,9 +148,8 @@ export class FFmpegService {
     const { x, y, width = 200, height = 200 } = position;
 
     try {
-      const command = `ffmpeg -i "${baseVideoPath}" -i "${avatarVideoPath}" -filter_complex "[1:v]scale=${width}:${height}[avatar];[0:v][avatar]overlay=${x}:${y}" "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-i', baseVideoPath, '-i', avatarVideoPath, '-filter_complex', `[1:v]scale=${width}:${height}[avatar];[0:v][avatar]overlay=${x}:${y}`, outputPath, '-y']);
+
       console.log(`[FFMPEG] Avatar overlay added to: ${outputPath}`);
       return outputPath;
     } catch (error) {
@@ -169,7 +163,7 @@ export class FFmpegService {
 
     try {
       let filterComplex: string;
-      
+
       switch (transition) {
         case 'fade':
           filterComplex = `[0][1]xfade=transition=fade:duration=${duration}:offset=4`;
@@ -184,9 +178,8 @@ export class FFmpegService {
           filterComplex = `[0][1]xfade=transition=fade:duration=${duration}:offset=4`;
       }
 
-      const command = `ffmpeg -i "${video1Path}" -i "${video2Path}" -filter_complex "${filterComplex}" "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-i', video1Path, '-i', video2Path, '-filter_complex', filterComplex, outputPath, '-y']);
+
       console.log(`[FFMPEG] Transition added to: ${outputPath}`);
       return outputPath;
     } catch (error) {
@@ -202,12 +195,11 @@ export class FFmpegService {
     fps: number;
   }> {
     try {
-      const command = `ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`;
-      const { stdout } = await execAsync(command);
+      const { stdout } = await execFileAsync('ffprobe', ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', videoPath]);
       const info = JSON.parse(stdout);
-      
+
       const videoStream = info.streams.find((s: any) => s.codec_type === 'video');
-      
+
       return {
         duration: parseFloat(info.format.duration),
         width: videoStream.width,
@@ -224,9 +216,8 @@ export class FFmpegService {
     console.log(`[FFMPEG] Resizing video to ${width}x${height}`);
 
     try {
-      const command = `ffmpeg -i "${inputPath}" -vf "scale=${width}:${height}" "${outputPath}" -y`;
-      await execAsync(command);
-      
+      await execFileAsync('ffmpeg', ['-i', inputPath, '-vf', `scale=${width}:${height}`, outputPath, '-y']);
+
       console.log(`[FFMPEG] Video resized to: ${outputPath}`);
       return outputPath;
     } catch (error) {
