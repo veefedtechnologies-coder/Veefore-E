@@ -399,7 +399,7 @@ app.use(csrfProtection);
 // P2 SECURITY: Session management for OAuth 2.0 flows
 import session from 'express-session';
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret-for-development',
+  secret: process.env.SESSION_SECRET || (() => { throw new Error('SESSION_SECRET environment variable is required'); })(),
   resave: false,
   saveUninitialized: false,
   cookie: {
