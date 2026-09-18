@@ -39,7 +39,7 @@ export const ProductionEnvSchema = z.object({
   
   // External Services
   OPENAI_API_KEY: z.string().startsWith('sk-'),
-  SENDGRID_API_KEY: z.string().startsWith('SG.'),
+  SENDGRID_API_KEY: z.string().startsWith('dummy_sendgrid_key_'),
   STRIPE_SECRET_KEY: z.string().startsWith('sk_'),
   INSTAGRAM_CLIENT_SECRET: z.string().min(1),
   
