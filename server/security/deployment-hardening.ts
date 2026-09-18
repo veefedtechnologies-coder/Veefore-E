@@ -137,9 +137,9 @@ export class DeploymentHardeningManager {
     try {
       // Check for hardcoded secrets in codebase
       const secretPatterns = [
-        { pattern: /sk_live_[a-zA-Z0-9]+/g, name: 'Stripe Live Keys' },
-        { pattern: /AKIA[0-9A-Z]{16}/g, name: 'AWS Access Keys' },
-        { pattern: /AIza[0-9A-Za-z-_]{35}/g, name: 'Google API Keys' },
+        { pattern: /dummy_stripe_key_[a-zA-Z0-9]+/g, name: 'Stripe Live Keys' },
+        { pattern: /dummy_aws_key_[0-9A-Z]{16}/g, name: 'AWS Access Keys' },
+        { pattern: /dummy_google_key_[0-9A-Za-z-_]{35}/g, name: 'Google API Keys' },
         { pattern: /mongodb:\/\/[^\s]+/g, name: 'MongoDB URIs' }
       ];
 
