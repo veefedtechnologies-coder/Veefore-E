@@ -323,7 +323,7 @@ describe('GET /api/facebook/callback — success path', () => {
 
     expect(res.status).toBe(302)
     expect(res.headers.location).toContain('/settings')
-    // // expect(res.headers.location).toContain('connected=facebook')
+    expect(res.headers.location).toContain('connected=facebook')
   })
 
   it('auto-connects SocialAccount in the callback (new auto-connect flow)', async () => {
@@ -390,7 +390,7 @@ describe('Full OAuth flow: callback auto-connects Facebook Page', () => {
 
     // Callback now redirects directly to settings — no session token
     expect(callbackRes.status).toBe(302)
-    // expect(callbackRes.headers.location).toContain('connected=facebook')
+    expect(callbackRes.headers.location).toContain('connected=facebook')
 
     // SocialAccount was persisted by the callback itself
     expect(SocialAccountModel.findOneAndUpdate).toHaveBeenCalled()
@@ -461,7 +461,7 @@ describe('Full OAuth flow: callback auto-connects Facebook Page', () => {
 
     expect(res.status).toBe(302)
     expect(res.headers.location).toMatch(/\/settings/)
-    // expect(res.headers.location).toContain('connected=facebook')
+    expect(res.headers.location).toContain('connected=facebook')
   })
 })
 
