@@ -135,7 +135,7 @@ export function validateEnv(): Env {
 
   validatedEnv = result.success ? result.data : (EnvSchema.parse({
     ...process.env,
-    JWT_SECRET: process.env.JWT_SECRET || 'development-only-secret-key',
+    JWT_SECRET: process.env.JWT_SECRET,
   }) as Env);
 
   const warnings: string[] = [];

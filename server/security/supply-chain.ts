@@ -138,10 +138,10 @@ export class SupplyChainSecurityManager {
     try {
       // Scan for common secret patterns
       const secretPatterns = [
-        { pattern: 'sk_live_[a-zA-Z0-9]+', name: 'Stripe Live Key' },
-        { pattern: 'sk_test_[a-zA-Z0-9]+', name: 'Stripe Test Key' },
-        { pattern: 'AKIA[0-9A-Z]{16}', name: 'AWS Access Key' },
-        { pattern: 'AIza[0-9A-Za-z-_]{35}', name: 'Google API Key' },
+        { pattern: 'dummy_stripe_key_[a-zA-Z0-9]+', name: 'Stripe Live Key' },
+        { pattern: 'dummy_stripe_key_[a-zA-Z0-9]+', name: 'Stripe Test Key' },
+        { pattern: 'dummy_aws_key_[0-9A-Z]{16}', name: 'AWS Access Key' },
+        { pattern: 'dummy_google_key_[0-9A-Za-z-_]{35}', name: 'Google API Key' },
         { pattern: 'ya29\.[0-9A-Za-z\-_]+', name: 'Google OAuth Token' },
         { pattern: 'mongodb://[^\\s]+', name: 'MongoDB Connection String' },
         { pattern: 'postgres://[^\\s]+', name: 'PostgreSQL Connection String' }

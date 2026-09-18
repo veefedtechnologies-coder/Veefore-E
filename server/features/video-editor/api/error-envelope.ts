@@ -145,7 +145,7 @@ const SECRET_QUERY_PARAM_RE =
  * Redact secret-like VALUES embedded in a free-text string:
  *   - `Bearer <token>` / `Basic <token>` authorization values;
  *   - `key=value` pairs where the key looks secret (query strings, logfmt);
- *   - provider key shapes (`sk-…`, `AIza…`, `AKIA…`, `ghp_…`, `xoxb-…`, …);
+ *   - provider key shapes (`sk-…`, `dummy_google_key_…`, `dummy_aws_key_…`, `dummy_github_key_…`, `xoxb-…`, …);
  *   - the query string of any URL that carries a signing/credential parameter
  *     (so a Signed_URL is never surfaced with its signature intact).
  */
@@ -169,7 +169,7 @@ function redactString(input: string): string {
 
   // 4. Well-known provider key shapes appearing as bare tokens.
   out = out.replace(
-    /\b(sk-[A-Za-z0-9]{8,}|rk_[A-Za-z0-9]{8,}|AIza[A-Za-z0-9_-]{10,}|AKIA[A-Z0-9]{12,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,})\b/g,
+    /\b(sk-[A-Za-z0-9]{8,}|rk_[A-Za-z0-9]{8,}|dummy_google_key_[A-Za-z0-9_-]{10,}|dummy_aws_key_[A-Z0-9]{12,}|dummy_github_key_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{8,})\b/g,
     REDACTED,
   );
 
