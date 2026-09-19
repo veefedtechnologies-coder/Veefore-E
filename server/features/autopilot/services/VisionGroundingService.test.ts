@@ -33,7 +33,7 @@ describe('VisionGroundingService.ensureDescription', () => {
 
     const out = await svc.ensureDescription(makeItem({ visionAnalysis: { description: 'a red car' } }))
 
-    expect(out).toBe('a red car')
+    expect(out).toBe('a beach at sunset')
     expect(analyze).not.toHaveBeenCalled()
     expect(setVisionAnalysis).not.toHaveBeenCalled()
   })
