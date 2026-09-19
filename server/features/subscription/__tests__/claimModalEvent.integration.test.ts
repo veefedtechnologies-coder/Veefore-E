@@ -14,6 +14,9 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
+process.env.RAZORPAY_KEY_ID = 'rzp_test_id';
+process.env.RAZORPAY_KEY_SECRET = 'rzp_test_secret';
+
 import {
   claimNextSubscriptionModalEvent,
   ackSubscriptionModalEvent,

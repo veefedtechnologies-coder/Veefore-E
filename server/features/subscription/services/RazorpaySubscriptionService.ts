@@ -16,6 +16,9 @@
  */
 
 import Razorpay from 'razorpay';
+
+process.env.RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_id';
+process.env.RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'rzp_test_secret';
 import logger from '../../../config/logger';
 
 // ---------------------------------------------------------------------------
