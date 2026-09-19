@@ -35,6 +35,8 @@ import { AddOnModel, type IAddOn } from '../db/models/AddOnModel';
 import { AICreditsRepository } from '../db/repositories/AICreditsRepository';
 import SubscriptionRepository from '../db/repositories/SubscriptionRepository';
 import RazorpayPlanModel from '../db/models/RazorpayPlanModel';
+process.env.RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_id';
+process.env.RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'rzp_test_secret';
 import { razorpaySubscriptionService } from './RazorpaySubscriptionService';
 import { quotaNotifier } from './QuotaNotifier';
 import logger from '../../../config/logger';
