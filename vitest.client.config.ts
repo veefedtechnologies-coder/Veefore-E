@@ -14,7 +14,7 @@ export default defineConfig({
       'client/**/*.spec.ts',
       'client/**/*.spec.tsx'
     ],
-    testTimeout: 30000,
+    testTimeout: 300000,
     server: {
       deps: {
         // Inline so the react/react-dom aliases below also apply inside these

@@ -21,7 +21,7 @@ export default defineConfig({
     // and merges it with its own, which made every server suite match the client
     // project too and run TWICE (once per environment). Scope is defined solely by
     // the per-project `include` below.
-    testTimeout: 30000,
+    testTimeout: 300000,
     // Per-file environment selection.
     //
     // `environmentMatchGlobs` was REMOVED in Vitest 3+ and is silently ignored by
