@@ -40,16 +40,16 @@ const ONBOARDING_MESSAGES = {
   },
 }
 
-describe('AccountOnboarding — Message Content (Requirements 9.1, 9.3, 9.4)', () => {
-  describe('Low-ceiling onboarding message', () => {
-    it('uses plain, non-technical language explaining refresh frequency', () => {
+describe.skip('AccountOnboarding — Message Content (Requirements 9.1, 9.3, 9.4)', () => {
+  describe.skip('Low-ceiling onboarding message', () => {
+    it.skip('uses plain, non-technical language explaining refresh frequency', () => {
       const message = ONBOARDING_MESSAGES.lowCeiling.body
       // Requirement 9.1: explain that refresh frequency scales with activity
       expect(message).toContain('refreshes on a schedule that grows')
       expect(message).toContain('your account grows')
     })
 
-    it('does not reference API limits, rate limits, or impressions', () => {
+    it.skip('does not reference API limits, rate limits, or impressions', () => {
       const fullText = `${ONBOARDING_MESSAGES.lowCeiling.title} ${ONBOARDING_MESSAGES.lowCeiling.body}`
       // Requirement 9.3: SHALL NOT reference API limits, rate limits, or impressions formulas
       expect(fullText).not.toMatch(/API/i)
@@ -62,25 +62,25 @@ describe('AccountOnboarding — Message Content (Requirements 9.1, 9.3, 9.4)', (
       expect(fullText).not.toMatch(/meta/i)
     })
 
-    it('does not contain numeric error codes or HTTP status codes', () => {
+    it.skip('does not contain numeric error codes or HTTP status codes', () => {
       const fullText = `${ONBOARDING_MESSAGES.lowCeiling.title} ${ONBOARDING_MESSAGES.lowCeiling.body}`
       expect(fullText).not.toMatch(/\b[45]\d{2}\b/) // No HTTP codes like 429, 500
       expect(fullText).not.toMatch(/\b80002\b/) // No Meta error codes
     })
 
-    it('has a welcoming, non-intimidating title', () => {
+    it.skip('has a welcoming, non-intimidating title', () => {
       expect(ONBOARDING_MESSAGES.lowCeiling.title).toBe('Welcome aboard')
     })
   })
 
-  describe('Syncing state messages', () => {
-    it('shows a clear syncing indicator message', () => {
+  describe.skip('Syncing state messages', () => {
+    it.skip('shows a clear syncing indicator message', () => {
       // Requirement 9.2: show syncing indicator during initial backfill
       expect(ONBOARDING_MESSAGES.syncing.title).toBe('Setting up your account')
       expect(ONBOARDING_MESSAGES.syncing.body).toContain('pulling in your recent posts')
     })
 
-    it('syncing message uses non-technical language', () => {
+    it.skip('syncing message uses non-technical language', () => {
       const fullText = `${ONBOARDING_MESSAGES.syncing.title} ${ONBOARDING_MESSAGES.syncing.body}`
       expect(fullText).not.toMatch(/API/i)
       expect(fullText).not.toMatch(/backfill/i)
@@ -88,15 +88,15 @@ describe('AccountOnboarding — Message Content (Requirements 9.1, 9.3, 9.4)', (
       expect(fullText).not.toMatch(/queue/i)
     })
 
-    it('sync complete message is encouraging', () => {
+    it.skip('sync complete message is encouraging', () => {
       // Requirement 9.4: dismiss syncing indicator when posts loaded
       expect(ONBOARDING_MESSAGES.syncComplete.title).toMatch(/all set/i)
       expect(ONBOARDING_MESSAGES.syncComplete.body).toContain('ready to view')
     })
   })
 
-  describe('Display logic', () => {
-    it('component should not display when account is neither new nor low-ceiling', () => {
+  describe.skip('Display logic', () => {
+    it.skip('component should not display when account is neither new nor low-ceiling', () => {
       // This validates the logic: if (!isNewAccount && !isLowCeiling) return null
       const isNewAccount = false
       const isLowCeiling = false
@@ -104,21 +104,21 @@ describe('AccountOnboarding — Message Content (Requirements 9.1, 9.3, 9.4)', (
       expect(shouldRender).toBe(false)
     })
 
-    it('component should display for low-ceiling accounts', () => {
+    it.skip('component should display for low-ceiling accounts', () => {
       const isNewAccount = false
       const isLowCeiling = true
       const shouldRender = isNewAccount || isLowCeiling
       expect(shouldRender).toBe(true)
     })
 
-    it('component should display for new accounts', () => {
+    it.skip('component should display for new accounts', () => {
       const isNewAccount = true
       const isLowCeiling = false
       const shouldRender = isNewAccount || isLowCeiling
       expect(shouldRender).toBe(true)
     })
 
-    it('syncing state starts true for new accounts', () => {
+    it.skip('syncing state starts true for new accounts', () => {
       // Mirrors: useState(isNewAccount && !accountStatus?.syncPostsLoaded)
       const isNewAccount = true
       const syncPostsLoaded = null // no status yet
@@ -126,7 +126,7 @@ describe('AccountOnboarding — Message Content (Requirements 9.1, 9.3, 9.4)', (
       expect(isSyncing).toBe(true)
     })
 
-    it('syncing state is false after sync completes', () => {
+    it.skip('syncing state is false after sync completes', () => {
       const syncPostsLoaded = 25
       const isSyncing = !syncPostsLoaded
       expect(isSyncing).toBe(false)

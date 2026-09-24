@@ -1,3 +1,4 @@
+import { describe, it, test, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 /**
  * Unit tests for POST /api/auth/logout endpoint
  * 

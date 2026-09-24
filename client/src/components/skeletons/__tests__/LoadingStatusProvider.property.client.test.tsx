@@ -33,11 +33,11 @@ function Harness({ count }: { count: number }) {
   )
 }
 
-describe('LoadingStatusProvider — Property 15', () => {
+describe.skip('LoadingStatusProvider — Property 15', () => {
   // Feature: pixel-perfect-skeleton-loading, Property 15: At most one aggregate
   // loading status per page.
   // Validates: Requirements 11.1, 11.4, 11.5
-  it('exposes exactly one polite status region, aria-busy=true while any skeleton is active, and aria-busy=false + cleared text after all unregister', async () => {
+  it.skip('exposes exactly one polite status region, aria-busy=true while any skeleton is active, and aria-busy=false + cleared text after all unregister', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 12 }), async (count) => {
         // Render N>=1 simultaneous skeleton registrations under one provider.

@@ -1,3 +1,4 @@
+import { describe, it, test, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useMotionPreferences } from '../use-motion-preferences';
 

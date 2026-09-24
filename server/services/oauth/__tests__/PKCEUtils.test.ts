@@ -1,3 +1,4 @@
+import { describe, it, test, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import crypto from 'crypto';
 import {
   PKCEUtils,

@@ -1,3 +1,4 @@
+import { describe, it, test, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { StateValidator, OAuthRequest } from '../StateValidator';
 
 /**
