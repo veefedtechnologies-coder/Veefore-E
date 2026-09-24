@@ -192,7 +192,7 @@
     "selfsigned": "^3.0.1",
     "supertest": "^7.2.2",
     "tsx": "^4.20.3",
-    "vitest": "^4.1.8"
+    "vitest": "^0.34.6"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8",

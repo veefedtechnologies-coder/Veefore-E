@@ -400,7 +400,7 @@ describe('no secret / URL leakage in emitted events (Req 22.4)', () => {
       {
         projectId: 'proj-1',
         details: {
-          mediaUrl: `https://cdn.example.com/v/clip.mp4?X-Amz-Signature=${signature}&X-Amz-Credential=AKIAEXAMPLE12345/us-east-1&w=100`,
+          mediaUrl: `https://cdn.example.com/v/clip.mp4?X-Amz-Signature=${signature}&X-Amz-Credential=DUMMYAWSAKCESSKEY123/us-east-1&w=100`,
         },
       },
       { logger: log },

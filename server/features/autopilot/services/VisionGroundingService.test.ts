@@ -7,7 +7,7 @@ import { VisionGroundingService, cachedDescription } from './VisionGroundingServ
 
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
-    _id: 'item-1',
+    _id: overrides._id || 'item-1',
     mediaUrl: 'https://cdn/img.png',
     mediaType: 'image' as const,
     ...overrides,
@@ -15,6 +15,11 @@ function makeItem(overrides: Record<string, unknown> = {}) {
 }
 
 describe('cachedDescription', () => {
+  beforeEach(() => {
+    // We cannot clear VISION_PROCESS_CACHE easily because it's not exported.
+    // However, the issue is that one test primes the cache for 'item-1', and another expects analysis.
+    // Let's use different item IDs for each test to avoid cache pollution across tests.
+  })
   it('returns a present description', () => {
     expect(cachedDescription({ visionAnalysis: { description: '  a cat  ' } })).toBe('a cat')
   })
@@ -31,7 +36,7 @@ describe('VisionGroundingService.ensureDescription', () => {
     const setVisionAnalysis = vi.fn(async () => null)
     const svc = new VisionGroundingService({ analyzer: { analyze }, store: { setVisionAnalysis } })
 
-    const out = await svc.ensureDescription(makeItem({ visionAnalysis: { description: 'a red car' } }))
+    const out = await svc.ensureDescription(makeItem({ _id: 'item-R1.2', visionAnalysis: { description: 'a red car' } }))
 
     expect(out).toBe('a red car')
     expect(analyze).not.toHaveBeenCalled()
@@ -46,13 +51,13 @@ describe('VisionGroundingService.ensureDescription', () => {
       store: { setVisionAnalysis },
       now: () => 0,
     })
-    const item = makeItem()
+    const item = makeItem({ _id: 'item-R1.1' })
 
     const out = await svc.ensureDescription(item, 'ws-1')
 
     expect(out).toBe('a beach at sunset')
     expect(analyze).toHaveBeenCalledWith('https://cdn/img.png', 'image', undefined)
-    expect(setVisionAnalysis).toHaveBeenCalledWith('item-1', {
+    expect(setVisionAnalysis).toHaveBeenCalledWith('item-R1.1', {
       description: 'a beach at sunset',
       analyzedAt: new Date(0).toISOString(),
     })
@@ -67,7 +72,7 @@ describe('VisionGroundingService.ensureDescription', () => {
     const setVisionAnalysis = vi.fn(async () => null)
     const svc = new VisionGroundingService({ analyzer: { analyze }, store: { setVisionAnalysis } })
 
-    const out = await svc.ensureDescription(makeItem())
+    const out = await svc.ensureDescription(makeItem({ _id: 'item-R1.3' }))
 
     expect(out).toBeUndefined()
     expect(setVisionAnalysis).not.toHaveBeenCalled()
@@ -83,7 +88,7 @@ describe('VisionGroundingService.ensureDescription', () => {
       timeoutMs: 5,
     })
 
-    const out = await svc.ensureDescription(makeItem())
+    const out = await svc.ensureDescription(makeItem({ _id: 'item-R1.4' }))
     expect(out).toBeUndefined()
   })
 
@@ -93,7 +98,7 @@ describe('VisionGroundingService.ensureDescription', () => {
       store: { setVisionAnalysis: vi.fn() },
     })
     expect(await svc.ensureDescription(undefined)).toBeUndefined()
-    expect(await svc.ensureDescription(makeItem({ mediaUrl: '' }))).toBeUndefined()
+    expect(await svc.ensureDescription(makeItem({ _id: 'item-missing-url', mediaUrl: '' }))).toBeUndefined()
   })
 })
 
@@ -103,7 +108,7 @@ describe('VisionGroundingService.buildGrounding', () => {
       analyzer: { analyze: vi.fn(async () => 'a gym workout') },
       store: { setVisionAnalysis: vi.fn(async () => null) },
     })
-    const item = makeItem({ userIntent: 'promote the plan', userKeyword: 'PLAN' })
+    const item = makeItem({ _id: 'item-intent', userIntent: 'promote the plan', userKeyword: 'PLAN' })
 
     const g = await svc.buildGrounding(item, 'ws-1')
 
@@ -115,7 +120,7 @@ describe('VisionGroundingService.buildGrounding', () => {
       analyzer: { analyze: vi.fn(async () => undefined) },
       store: { setVisionAnalysis: vi.fn(async () => null) },
     })
-    const g = await svc.buildGrounding(makeItem())
+    const g = await svc.buildGrounding(makeItem({ _id: 'item-absent' }))
     expect(g).toEqual({})
   })
 })

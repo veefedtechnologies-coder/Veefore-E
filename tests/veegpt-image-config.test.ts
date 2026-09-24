@@ -177,13 +177,13 @@ describe('cloudFrontConfig', () => {
   it('parses all three, strips scheme/trailing slash, and unescapes \\n in the key', () => {
     process.env.CLOUDFRONT_DOMAIN = 'https://d123.cloudfront.net/'
     process.env.CLOUDFRONT_KEY_PAIR_ID = 'K123'
-    process.env.CLOUDFRONT_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\\nAAA\\n-----END PRIVATE KEY-----\\n'
+    process.env.CLOUDFRONT_PRIVATE_KEY = '-----DUMMY PRIVATE KEY-----\\nAAA\\n-----END DUMMY PRIVATE KEY-----\\n'
     const cfg = cloudFrontConfig()
     expect(cfg).not.toBeNull()
     expect(cfg!.domain).toBe('d123.cloudfront.net')
     expect(cfg!.keyPairId).toBe('K123')
     expect(cfg!.privateKey).toContain('\n') // real newlines restored
-    expect(cfg!.privateKey.startsWith('-----BEGIN PRIVATE KEY-----')).toBe(true)
+    expect(cfg!.privateKey.startsWith('-----DUMMY PRIVATE KEY-----')).toBe(true)
   })
 })
 

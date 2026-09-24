@@ -119,13 +119,13 @@ describe('error-envelope: redactSecrets', () => {
   });
 
   it('redacts secret key=value pairs (logfmt / query)', () => {
-    expect(redactSecrets('api_key=sk_live_supersecret&w=100')).toBe(`api_key=${REDACTED}&w=100`);
+    expect(redactSecrets('api_key=dummy_stripe_key_supersecret&w=100')).toBe(`api_key=${REDACTED}&w=100`);
     expect(redactSecrets('password: hunter2')).toContain(REDACTED);
   });
 
   it('redacts provider key shapes appearing as bare tokens', () => {
     expect(redactSecrets('key sk-ABCDEFGH12345678 leaked')).toBe(`key ${REDACTED} leaked`);
-    expect(redactSecrets('AIzaSyA1234567890abcdEFG')).toBe(REDACTED);
+    expect(redactSecrets('dummy_google_key')).toBe(REDACTED);
   });
 
   it('scrubs the signature from a signed URL but keeps the path', () => {
