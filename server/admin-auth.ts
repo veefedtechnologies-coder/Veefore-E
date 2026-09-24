@@ -9,7 +9,7 @@ if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET environment variable is missing.');
   process.exit(1);
 }
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key_12345';
 const JWT_EXPIRES_IN = '24h';
 
 export interface AdminRequest extends Request {
