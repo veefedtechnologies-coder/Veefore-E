@@ -174,7 +174,7 @@ describe('Razorpay client-side payment signature scheme', () => {
   // and the legacy order-based flows. Documented scheme:
   //   subscription checkout: HMAC(key_secret, `${payment_id}|${subscription_id}`)
   //   order checkout:        HMAC(key_secret, `${order_id}|${payment_id}`)
-  const KEY_SECRET = 'rzp_test_key_secret';
+  const KEY_SECRET = 'dummy_razorpay_secret';
 
   function verifyPair(a: string, b: string, provided: string): boolean {
     const expected = crypto

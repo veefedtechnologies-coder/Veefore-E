@@ -3,7 +3,7 @@
 // applied by the installed vitest version — without this the suite runs under the
 // node environment and `document` is undefined.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import {
   CSRF_COOKIE_NAME,

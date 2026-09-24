@@ -122,7 +122,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -143,7 +143,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -203,7 +203,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -245,7 +245,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -263,7 +263,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -282,7 +282,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -303,7 +303,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -344,7 +344,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       
@@ -376,7 +376,7 @@ describe('OAuth Environment Validation', () => {
       process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
         type: 'service_account',
         project_id: 'test-project',
-        private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+        private_key: '-----DUMMY PRIVATE KEY-----\ntest\n-----END DUMMY PRIVATE KEY-----\n',
         client_email: 'test@test.iam.gserviceaccount.com'
       });
       

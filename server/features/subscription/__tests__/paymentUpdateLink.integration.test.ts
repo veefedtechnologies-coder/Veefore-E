@@ -19,8 +19,8 @@ import {
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
-process.env.RAZORPAY_KEY_ID = 'rzp_test_key';
-process.env.RAZORPAY_KEY_SECRET = 'rzp_test_secret';
+process.env.RAZORPAY_KEY_ID = 'dummy_razorpay_keyid';
+process.env.RAZORPAY_KEY_SECRET = 'dummy_razorpay_secret';
 
 // In-memory Redis so getServices() never opens a real connection.
 const { fakeRedis } = vi.hoisted(() => {

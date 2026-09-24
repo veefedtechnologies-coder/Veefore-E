@@ -33,8 +33,8 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 
 const WEBHOOK_SECRET = 'whsec_integration_test';
 process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
-process.env.RAZORPAY_KEY_ID = 'rzp_test_key';
-process.env.RAZORPAY_KEY_SECRET = 'rzp_test_secret';
+process.env.RAZORPAY_KEY_ID = 'dummy_razorpay_keyid';
+process.env.RAZORPAY_KEY_SECRET = 'dummy_razorpay_secret';
 
 // ── Mock external I/O only ──────────────────────────────────────────────────
 

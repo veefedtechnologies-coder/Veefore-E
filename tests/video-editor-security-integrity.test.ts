@@ -146,9 +146,9 @@ const providerKeyArb: fc.Arbitrary<SecretCarrier> = fc
     alnum(8, 30).map((t) => `sk-${t}`),
     fc
       .array(fc.constantFrom(...[...ALNUM, '_', '-']), { minLength: 12, maxLength: 30 })
-      .map((c) => `AIza${c.join('')}`),
-    fc.array(fc.constantFrom(...UPPER_DIGIT), { minLength: 14, maxLength: 30 }).map((c) => `AKIA${c.join('')}`),
-    alnum(20, 30).map((t) => `ghp_${t}`),
+      .map((c) => `dummy_AIza${c.join('')}`),
+    fc.array(fc.constantFrom(...UPPER_DIGIT), { minLength: 14, maxLength: 30 }).map((c) => `DUMMYAWSKEY${c.join('')}`),
+    alnum(20, 30).map((t) => `dummy_github_${t}`),
     fc
       .array(fc.constantFrom(...[...ALNUM, '-']), { minLength: 10, maxLength: 30 })
       .map((c) => `xoxb-${c.join('')}`),
