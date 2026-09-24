@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 /**
  * OAuth Error Handler Unit Tests
  * 

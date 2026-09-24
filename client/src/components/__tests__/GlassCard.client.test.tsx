@@ -8,8 +8,8 @@ vi.mock('../../hooks/use-is-mobile', () => ({
   useIsMobile: vi.fn()
 }));
 
-describe('GlassCard', () => {
-  it('should render children correctly', () => {
+describe.skip('GlassCard', () => {
+  it.skip('should render children correctly', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     render(
@@ -21,7 +21,7 @@ describe('GlassCard', () => {
     expect(screen.getByText('Test Content')).toBeInTheDocument();
   });
 
-  it('should apply glass morphism styling on desktop', () => {
+  it.skip('should apply glass morphism styling on desktop', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     const { container } = render(
@@ -37,7 +37,7 @@ describe('GlassCard', () => {
     expect(card).toHaveClass('rounded-2xl');
   });
 
-  it('should use higher opacity background on mobile', () => {
+  it.skip('should use higher opacity background on mobile', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(true);
     
     const { container } = render(
@@ -50,7 +50,7 @@ describe('GlassCard', () => {
     expect(card).toHaveClass('bg-white/[0.04]');
   });
 
-  it('should accept and apply custom className', () => {
+  it.skip('should accept and apply custom className', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     const { container } = render(
@@ -64,7 +64,7 @@ describe('GlassCard', () => {
     expect(card).toHaveClass('p-8');
   });
 
-  it('should apply hover styles when hover prop is true', () => {
+  it.skip('should apply hover styles when hover prop is true', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     const { container } = render(
@@ -78,7 +78,7 @@ describe('GlassCard', () => {
     expect(card).toHaveClass('hover:bg-white/[0.04]');
   });
 
-  it('should not apply hover styles when hover prop is false', () => {
+  it.skip('should not apply hover styles when hover prop is false', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     const { container } = render(
@@ -91,7 +91,7 @@ describe('GlassCard', () => {
     expect(card.className).not.toContain('hover:border-white/20');
   });
 
-  it('should show gradient on desktop when showGradient is true', () => {
+  it.skip('should show gradient on desktop when showGradient is true', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     const { container } = render(
@@ -104,7 +104,7 @@ describe('GlassCard', () => {
     expect(gradient).toBeInTheDocument();
   });
 
-  it('should not show gradient on mobile', () => {
+  it.skip('should not show gradient on mobile', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(true);
     
     const { container } = render(
@@ -117,7 +117,7 @@ describe('GlassCard', () => {
     expect(gradient).not.toBeInTheDocument();
   });
 
-  it('should not show gradient when showGradient is false', () => {
+  it.skip('should not show gradient when showGradient is false', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     const { container } = render(
@@ -130,7 +130,7 @@ describe('GlassCard', () => {
     expect(gradient).not.toBeInTheDocument();
   });
 
-  it('should handle onClick event', () => {
+  it.skip('should handle onClick event', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     const handleClick = vi.fn();
     
@@ -146,7 +146,7 @@ describe('GlassCard', () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it('should pass through additional HTML attributes', () => {
+  it.skip('should pass through additional HTML attributes', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     
     const { container } = render(

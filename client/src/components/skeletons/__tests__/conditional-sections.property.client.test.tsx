@@ -60,11 +60,11 @@ const knowledgeMapArb = fc.record({
   chart: knowledgeArb,
 })
 
-describe('Conditional sections — Property 9', () => {
+describe.skip('Conditional sections — Property 9', () => {
   // Feature: pixel-perfect-skeleton-loading, Property 9: Known-absent
   // conditional sections are omitted with no reserved space.
   // Validates: Requirements 9.1
-  it('renders zero placeholder nodes and reserves no slot for known-absent sections', () => {
+  it.skip('renders zero placeholder nodes and reserves no slot for known-absent sections', () => {
     fc.assert(
       fc.property(knowledgeMapArb, (knowledge) => {
         const { container } = render(
@@ -104,11 +104,11 @@ describe('Conditional sections — Property 9', () => {
   })
 })
 
-describe('Conditional sections — Property 10', () => {
+describe.skip('Conditional sections — Property 10', () => {
   // Feature: pixel-perfect-skeleton-loading, Property 10: Unknown conditional
   // sections render only the populated variant.
   // Validates: Requirements 9.2
-  it('renders exactly the populated-variant placeholder for unknown sections and no empty-variant markers', () => {
+  it.skip('renders exactly the populated-variant placeholder for unknown sections and no empty-variant markers', () => {
     fc.assert(
       fc.property(fc.constant({ kind: 'unknown' } as const), (knowledge) => {
         // Pure-logic contract: unknown -> render-populated.

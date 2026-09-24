@@ -1,3 +1,4 @@
+import { describe, it, test, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { EmailAuthController, EmailService, UserRepository, AuthUser } from './EmailAuthController';
 import { Request, Response } from 'express';
 

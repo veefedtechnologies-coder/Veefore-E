@@ -1,3 +1,4 @@
+import { describe, it, test, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 /**
  * Test for Task 11.2: Multi-Variation Generation
  * 
