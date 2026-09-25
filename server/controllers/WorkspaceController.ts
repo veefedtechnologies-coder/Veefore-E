@@ -5,6 +5,7 @@ import { workspaceService } from '../services';
 import { storage } from '../mongodb-storage';
 import { NotFoundError, ForbiddenError, PaymentRequiredError, ConflictError } from '../errors';
 import { invalidateBootstrapCache } from '../lib/html-bootstrap';
+import crypto from 'crypto';
 
 const WorkspaceIdParams = z.object({
   workspaceId: z.string().min(1),
@@ -260,7 +261,7 @@ export class WorkspaceController extends BaseController {
   ) => {
     let userId = req.user!.id;
     const isObjectId = typeof userId === 'string' && /^[a-f0-9]{24}$/.test(userId);
-    
+
     if (!isObjectId) {
       try {
         const byUid = req.user!.firebaseUid ? await storage.getUserByFirebaseUid(req.user!.firebaseUid) : null;
@@ -469,7 +470,7 @@ export class WorkspaceController extends BaseController {
       email,
       role,
       invitedBy: user.id,
-      token: Math.random().toString(36).substring(2, 15),
+      token: crypto.randomBytes(16).toString('hex'),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
 
