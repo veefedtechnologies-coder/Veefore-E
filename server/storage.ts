@@ -1894,24 +1894,7 @@ export class MemStorage implements IStorage {
     this.feedbackMessages.delete(id);
   }
 
-  async getAdminStats(): Promise<{
-    totalUsers: number;
-    totalWorkspaces: number;
-    totalContent: number;
-    totalCreditsUsed: number;
-    revenueThisMonth: number;
-    activeUsers: number;
-  }> {
-    // This is a stub - real implementation uses MongoDB
-    return {
-      totalUsers: this.users.size,
-      totalWorkspaces: this.workspaces.size,
-      totalContent: this.content.size,
-      totalCreditsUsed: 0,
-      revenueThisMonth: 0,
-      activeUsers: 0,
-    };
-  }
+
 
   // Missing admin methods for interface compatibility
   async getAdminUsers(

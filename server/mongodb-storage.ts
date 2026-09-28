@@ -1499,12 +1499,7 @@ export class MongoStorage implements IStorage {
     return popup ? convertPopup(popup) : undefined;
   }
 
-  async updatePopup(id: string, updates: Partial<Popup>): Promise<Popup> {
-    await connectionManager.ensureConnected();
-    const popup = await popupRepository.updateById(id, updates);
-    if (!popup) throw new Error('Popup not found');
-    return convertPopup(popup);
-  }
+
 
   async deletePopup(id: string): Promise<void> {
     await connectionManager.ensureConnected();

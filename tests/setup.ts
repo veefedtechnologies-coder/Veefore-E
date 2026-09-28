@@ -1,13 +1,7 @@
-import dotenv from 'dotenv';
-import '@testing-library/jest-dom';
 
-// Load environment variables for testing
-dotenv.config();
+process.env.SESSION_SECRET = 'test-session-secret-which-must-be-32-chars-long';
+process.env.OAUTH_CALLBACK_URL = 'http://localhost:3000/callback';
+process.env.JWT_SECRET = 'test-jwt-secret-which-must-be-long-enough';
+process.env.RAZORPAY_KEY_ID = 'rzp_test_keyid';
 
-// Ensure required environment variables are set for tests
-if (!process.env.OPENAI_API_KEY) {
-  console.warn('Warning: OPENAI_API_KEY not set in environment');
-}
-
-// Setup global test environment
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+process.env.RAZORPAY_KEY_SECRET = 'dummy_rzp_test_secret';

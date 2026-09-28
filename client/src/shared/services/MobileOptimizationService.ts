@@ -111,9 +111,9 @@ export class MobileOptimizationService {
       return this.deviceInfo;
     }
 
-    const userAgent = navigator.userAgent.toLowerCase();
-    const screenWidth = window.screen.width;
-    const viewportWidth = window.innerWidth;
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : ''.toLowerCase();
+    const screenWidth = typeof window !== 'undefined' ? window.screen : { width: 1024 }.width;
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
     const viewportHeight = window.innerHeight;
 
     // Detect device type
@@ -193,7 +193,7 @@ export class MobileOptimizationService {
       orientation,
       screenSize,
       touchSupport: 'ontouchstart' in window,
-      pixelRatio: window.devicePixelRatio || 1,
+      pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : 1 || 1,
       viewportWidth,
       viewportHeight,
       os,
@@ -274,7 +274,7 @@ export class MobileOptimizationService {
    * Validates: Requirements 23.3
    */
   public getScreenSizeCategory(width?: number): 'xs' | 'sm' | 'md' | 'lg' | 'xl' {
-    const viewportWidth = width ?? window.innerWidth;
+    const viewportWidth = width ?? typeof window !== 'undefined' ? window.innerWidth : 1024;
 
     for (const breakpoint of BREAKPOINTS) {
       if (viewportWidth >= breakpoint.minWidth) {
@@ -305,7 +305,7 @@ export class MobileOptimizationService {
    * Check if viewport is at or above a breakpoint
    */
   public isBreakpointOrLarger(breakpoint: 'xs' | 'sm' | 'md' | 'lg' | 'xl'): boolean {
-    const currentWidth = window.innerWidth;
+    const currentWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
     const targetBreakpoint = BREAKPOINTS.find(bp => bp.name === breakpoint);
     
     if (!targetBreakpoint) return false;
@@ -317,7 +317,7 @@ export class MobileOptimizationService {
    * Check if viewport is at or below a breakpoint
    */
   public isBreakpointOrSmaller(breakpoint: 'xs' | 'sm' | 'md' | 'lg' | 'xl'): boolean {
-    const currentWidth = window.innerWidth;
+    const currentWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
     const targetBreakpoint = BREAKPOINTS.find(bp => bp.name === breakpoint);
     
     if (!targetBreakpoint) return false;
@@ -732,8 +732,8 @@ export class MobileOptimizationService {
    */
   public isStandalone(): boolean {
     return (
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true
+      typeof window !== 'undefined' ? window.matchMedia : () => ({ matches: false })('(display-mode: standalone)').matches ||
+      (typeof window !== 'undefined' ? window.navigator : {} as any).standalone === true
     );
   }
 
@@ -741,28 +741,28 @@ export class MobileOptimizationService {
    * Get device pixel ratio
    */
   public getPixelRatio(): number {
-    return window.devicePixelRatio || 1;
+    return typeof window !== 'undefined' ? window.devicePixelRatio : 1 || 1;
   }
 
   /**
    * Check if device supports hover
    */
   public supportsHover(): boolean {
-    return window.matchMedia('(hover: hover)').matches;
+    return typeof window !== 'undefined' ? window.matchMedia : () => ({ matches: false })('(hover: hover)').matches;
   }
 
   /**
    * Check if reduced motion is preferred
    */
   public prefersReducedMotion(): boolean {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return typeof window !== 'undefined' ? window.matchMedia : () => ({ matches: false })('(prefers-reduced-motion: reduce)').matches;
   }
 
   /**
    * Check if dark mode is preferred
    */
   public prefersDarkMode(): boolean {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return typeof window !== 'undefined' ? window.matchMedia : () => ({ matches: false })('(prefers-color-scheme: dark)').matches;
   }
 }
 
