@@ -16,6 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+process.env.RAZORPAY_KEY_SECRET = 'dummy_secret';
 import { AddOnService } from './AddOnService';
 import { ADDON_CONFIG, type AddOnType } from '../../../config/plan-config';
 
