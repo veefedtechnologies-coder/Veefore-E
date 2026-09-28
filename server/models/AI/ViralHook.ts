@@ -42,7 +42,4 @@ const ViralHookSchema = new Schema<IViralHook>(
 // Compound index for optimized queries
 ViralHookSchema.index({ niche: 1, avgEngagementBoost: -1 });
 
-export const ViralHookModel = mongoose.model<IViralHook>(
-  'ViralHook',
-  ViralHookSchema
-);
+export const ViralHookModel = mongoose.models.ViralHook || mongoose.model<IViralHook>('ViralHook', ViralHookSchema);

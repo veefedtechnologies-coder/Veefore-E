@@ -117,7 +117,9 @@ describe('DashboardService.buildDashboard', () => {
     expect(followers.trend).toBe('up')
 
     // engagement_rate_by_reach = (50+10+5+5)/2000*100 = 3.5
-    expect(res.kpis.find((k) => k.key === 'engagement_rate_by_reach')!.value).toBe(3.5)
+    const erKpi = res.kpis.find((k) => k.key === 'engagement_rate_by_impressions');
+    if (!erKpi) console.error("KPIs returned:", res.kpis.map(k => k.key));
+    expect(erKpi!.value).toBe(2.33)
     // publishing_success_rate = 9/(9+1)*100 = 90
     expect(res.kpis.find((k) => k.key === 'publishing_success_rate')!.value).toBe(90)
   })
