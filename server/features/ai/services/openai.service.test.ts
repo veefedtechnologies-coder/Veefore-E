@@ -151,16 +151,14 @@ describe('OpenAIService', () => {
         },
       });
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
           temperature: 0.9,
           max_tokens: 100,
           top_p: 0.95,
           frequency_penalty: 0.5,
           presence_penalty: 0.5,
           stop: ['END'],
-        })
-      );
+        }), undefined);
     });
 
     it('should throw AIProviderAuthError on authentication failure', async () => {
@@ -245,15 +243,13 @@ describe('OpenAIService', () => {
         prompt: 'Test image',
       });
 
-      expect(mockGenerate).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(mockGenerate).toHaveBeenCalledWith(expect.objectContaining({
           model: OpenAIImageModel.DALL_E_3,
           prompt: 'Test image',
           n: 1,
           size: '1024x1024',
           quality: 'standard',
-        })
-      );
+        }), undefined);
     });
 
     it('should throw error when no image URL returned', async () => {

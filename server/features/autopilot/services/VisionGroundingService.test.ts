@@ -1,3 +1,4 @@
+import { VISION_PROCESS_CACHE } from './VisionGroundingService'
 /**
  * Unit tests for VisionGroundingService — analyze-once + cache + degrade.
  */
@@ -26,6 +27,7 @@ describe('cachedDescription', () => {
 })
 
 describe('VisionGroundingService.ensureDescription', () => {
+  beforeEach(() => { VISION_PROCESS_CACHE.clear() })
   it('reuses a cached description and never analyzes (R1.2)', async () => {
     const analyze = vi.fn(async () => 'should not be called')
     const setVisionAnalysis = vi.fn(async () => null)
@@ -98,6 +100,7 @@ describe('VisionGroundingService.ensureDescription', () => {
 })
 
 describe('VisionGroundingService.buildGrounding', () => {
+  beforeEach(() => { VISION_PROCESS_CACHE.clear() })
   it('folds vision description with user intent + keyword', async () => {
     const svc = new VisionGroundingService({
       analyzer: { analyze: vi.fn(async () => 'a gym workout') },
@@ -115,7 +118,7 @@ describe('VisionGroundingService.buildGrounding', () => {
       analyzer: { analyze: vi.fn(async () => undefined) },
       store: { setVisionAnalysis: vi.fn(async () => null) },
     })
-    const g = await svc.buildGrounding(makeItem())
+    const g = await svc.buildGrounding(makeItem({_id: 'item-2'}))
     expect(g).toEqual({})
   })
 })
