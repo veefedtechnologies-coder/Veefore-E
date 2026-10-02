@@ -113,7 +113,7 @@ async function scanForMaliciousContent(filePath: string, mimeType: string): Prom
 
     // Malicious patterns to detect
     const maliciousPatterns = [
-      /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, // Script tags
+      /<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, // Script tags
       /javascript:/gi, // JavaScript URLs
       /vbscript:/gi, // VBScript URLs
       /on\w+\s*=/gi, // Event handlers
@@ -405,24 +405,30 @@ export async function validateExistingFile(filePath: string): Promise<{
   const errors: string[] = [];
 
   try {
-    const stats = await fs.stat(filePath);
-    const buffer = await fs.readFile(filePath);
+    const fileHandle = await fs.open(filePath, 'r');
+    const stats = await fileHandle.stat();
 
     // Basic checks
     if (!stats.isFile()) {
+      await fileHandle.close();
       errors.push('Not a regular file');
       return { isValid: false, errors };
     }
 
     if (stats.size === 0) {
+      await fileHandle.close();
       errors.push('File is empty');
       return { isValid: false, errors };
     }
 
     if (stats.size > 100 * 1024 * 1024) { // 100MB limit
+      await fileHandle.close();
       errors.push('File too large');
       return { isValid: false, errors };
     }
+
+    const buffer = await fileHandle.readFile();
+    await fileHandle.close();
 
     // Generate hash
     const hash = createHash('sha256').update(buffer).digest('hex');
