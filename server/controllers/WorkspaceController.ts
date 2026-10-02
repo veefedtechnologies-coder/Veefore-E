@@ -360,33 +360,23 @@ export class WorkspaceController extends BaseController {
     }
 
     const userPlan = user.plan || 'Free';
-    let hasTeamAccess = userPlan !== 'Free';
+        let hasTeamAccess = false;
 
-    if (!hasTeamAccess) {
+    if (userPlan !== 'Free') {
+      hasTeamAccess = true;
+    } else {
       console.log(`[TEAM INVITE] Checking team access for user ${user.id} (${user.username})`);
-
       try {
         const userAddons = await storage.getUserAddons(user.id);
         console.log(`[TEAM INVITE] Found ${userAddons.length} addons for user`);
-        userAddons.forEach((addon, index) => {
-          console.log(`[TEAM INVITE] Addon ${index + 1}: Type: ${addon.type}, Name: ${addon.name}, Active: ${addon.isActive}`);
-        });
 
         const teamMemberAddon = userAddons.find(addon =>
-          (addon.type === 'team-member' || addon.name?.includes('Team Member') || addon.name?.includes('team-member')) &&
+          (addon.type === 'team-member' || (addon.name && addon.name.includes('team-member'))) &&
           addon.isActive
         );
 
         if (teamMemberAddon) {
-          console.log(`[TEAM INVITE] Found active team member addon:`, {
-            type: teamMemberAddon.type,
-            name: teamMemberAddon.name,
-            isActive: teamMemberAddon.isActive
-          });
           hasTeamAccess = true;
-        } else {
-          console.log(`[TEAM INVITE] No valid team member addon found`);
-          hasTeamAccess = false;
         }
       } catch (error) {
         console.error(`[TEAM INVITE] Error during team access check:`, error);

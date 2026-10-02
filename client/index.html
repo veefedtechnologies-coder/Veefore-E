@@ -29,17 +29,17 @@
       // Override all console methods immediately
       console.warn = function (...args) {
         if (args.some(isGraphQLFragmentWarning)) return;
-        originalWarn.apply(console, args);
+        originalWarn.apply(console, args.map(a => typeof a === "string" ? a.replace(/[<>\`]/g, "") : a));
       };
 
       console.error = function (...args) {
         if (args.some(isGraphQLFragmentWarning)) return;
-        originalError.apply(console, args);
+        originalError.apply(console, args.map(a => typeof a === "string" ? a.replace(/[<>\`]/g, "") : a));
       };
 
       console.log = function (...args) {
         if (args.some(isGraphQLFragmentWarning)) return;
-        originalLog.apply(console, args);
+        originalLog.apply(console, args.map(a => typeof a === "string" ? a.replace(/[<>\`]/g, "") : a));
       };
 
       // Also block any window.console access

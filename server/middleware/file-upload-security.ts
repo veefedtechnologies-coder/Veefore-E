@@ -113,7 +113,7 @@ async function scanForMaliciousContent(filePath: string, mimeType: string): Prom
 
     // Malicious patterns to detect
     const maliciousPatterns = [
-      /<script[\s\S]*?<\/script>/gi, // Script tags
+      /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, // Script tags
       /javascript:/gi, // JavaScript URLs
       /vbscript:/gi, // VBScript URLs
       /on\w+\s*=/gi, // Event handlers
