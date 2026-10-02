@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { BaseController, TypedRequest } from './BaseController';
 import { workspaceService } from '../services';
 import { storage } from '../mongodb-storage';
@@ -260,7 +261,7 @@ export class WorkspaceController extends BaseController {
   ) => {
     let userId = req.user!.id;
     const isObjectId = typeof userId === 'string' && /^[a-f0-9]{24}$/.test(userId);
-    
+
     if (!isObjectId) {
       try {
         const byUid = req.user!.firebaseUid ? await storage.getUserByFirebaseUid(req.user!.firebaseUid) : null;
@@ -359,33 +360,23 @@ export class WorkspaceController extends BaseController {
     }
 
     const userPlan = user.plan || 'Free';
-    let hasTeamAccess = userPlan !== 'Free';
+        let hasTeamAccess = false;
 
-    if (!hasTeamAccess) {
+    if (userPlan !== 'Free') {
+      hasTeamAccess = true;
+    } else {
       console.log(`[TEAM INVITE] Checking team access for user ${user.id} (${user.username})`);
-
       try {
         const userAddons = await storage.getUserAddons(user.id);
         console.log(`[TEAM INVITE] Found ${userAddons.length} addons for user`);
-        userAddons.forEach((addon, index) => {
-          console.log(`[TEAM INVITE] Addon ${index + 1}: Type: ${addon.type}, Name: ${addon.name}, Active: ${addon.isActive}`);
-        });
 
         const teamMemberAddon = userAddons.find(addon =>
-          (addon.type === 'team-member' || addon.name?.includes('Team Member') || addon.name?.includes('team-member')) &&
+          (addon.type === 'team-member' || (addon.name && addon.name.includes('team-member'))) &&
           addon.isActive
         );
 
         if (teamMemberAddon) {
-          console.log(`[TEAM INVITE] Found active team member addon:`, {
-            type: teamMemberAddon.type,
-            name: teamMemberAddon.name,
-            isActive: teamMemberAddon.isActive
-          });
           hasTeamAccess = true;
-        } else {
-          console.log(`[TEAM INVITE] No valid team member addon found`);
-          hasTeamAccess = false;
         }
       } catch (error) {
         console.error(`[TEAM INVITE] Error during team access check:`, error);
@@ -469,7 +460,7 @@ export class WorkspaceController extends BaseController {
       email,
       role,
       invitedBy: user.id,
-      token: Math.random().toString(36).substring(2, 15),
+      token: crypto.randomBytes(32).toString('hex'),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
 
