@@ -1,6 +1,6 @@
 /**
  * P1-4.4 SECURITY: Comprehensive File Upload Validation & Security
- * 
+ *
  * Production-ready file upload protection against malicious files,
  * oversized uploads, and path traversal attacks
  */
@@ -9,7 +9,7 @@ import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { sanitizeFileName } from './xss-protection';
 
 /**
@@ -65,17 +65,17 @@ const FILE_SIGNATURES = {
   'image/gif': [Buffer.from([0x47, 0x49, 0x46, 0x38]), Buffer.from([0x47, 0x49, 0x46, 0x39])],
   'image/webp': [Buffer.from([0x52, 0x49, 0x46, 0x46])], // RIFF
   'image/bmp': [Buffer.from([0x42, 0x4D])],
-  
+
   // Videos
   'video/mp4': [Buffer.from([0x66, 0x74, 0x79, 0x70])], // ftyp
   'video/avi': [Buffer.from([0x52, 0x49, 0x46, 0x46])], // RIFF
   'video/quicktime': [Buffer.from([0x66, 0x74, 0x79, 0x70, 0x71, 0x74])], // ftyp qt
-  
+
   // Audio
   'audio/mp3': [Buffer.from([0x49, 0x44, 0x33]), Buffer.from([0xFF, 0xFB])],
   'audio/wav': [Buffer.from([0x52, 0x49, 0x46, 0x46])], // RIFF
   'audio/ogg': [Buffer.from([0x4F, 0x67, 0x67, 0x53])], // OggS
-  
+
   // Documents
   'application/pdf': [Buffer.from([0x25, 0x50, 0x44, 0x46])], // %PDF
   'application/zip': [Buffer.from([0x50, 0x4B, 0x03, 0x04])], // PK
@@ -89,12 +89,12 @@ async function validateFileContent(filePath: string, expectedMime: string): Prom
   try {
     const buffer = await fs.readFile(filePath);
     const signatures = FILE_SIGNATURES[expectedMime as keyof typeof FILE_SIGNATURES];
-    
+
     if (!signatures) {
       console.warn(`⚠️ FILE SECURITY: No signature validation for MIME type: ${expectedMime}`);
       return true; // Allow if no signature defined
     }
-    
+
     // Check if file starts with any of the expected signatures
     return signatures.some(signature => buffer.subarray(0, signature.length).equals(signature));
   } catch (error) {
@@ -110,7 +110,7 @@ async function scanForMaliciousContent(filePath: string, mimeType: string): Prom
   try {
     const buffer = await fs.readFile(filePath);
     const content = buffer.toString('utf8', 0, Math.min(buffer.length, 1024 * 10)); // First 10KB
-    
+
     // Malicious patterns to detect
     const maliciousPatterns = [
       /<script[\s\S]*?<\/script>/gi, // Script tags
@@ -128,14 +128,14 @@ async function scanForMaliciousContent(filePath: string, mimeType: string): Prom
       /metasploit/gi, // Metasploit references
       /%u[0-9a-f]{4}/gi, // Unicode encoded potentially malicious content
     ];
-    
+
     const hasmaliciousContent = maliciousPatterns.some(pattern => pattern.test(content));
-    
+
     if (hasmaliciousContent) {
       console.error(`🚨 FILE SECURITY: Malicious content detected in file: ${filePath}`);
       return false;
     }
-    
+
     // Additional checks for specific file types
     if (mimeType.startsWith('image/svg')) {
       // SVG-specific security checks
@@ -148,14 +148,14 @@ async function scanForMaliciousContent(filePath: string, mimeType: string): Prom
         /<foreignObject/gi, // Can contain HTML/JS
         /<use\s+href\s*=\s*["']javascript:/gi
       ];
-      
+
       const hasSvgMaliciousContent = svgMaliciousPatterns.some(pattern => pattern.test(content));
       if (hasSvgMaliciousContent) {
         console.error(`🚨 FILE SECURITY: Malicious SVG content detected in: ${filePath}`);
         return false;
       }
     }
-    
+
     return true;
   } catch (error) {
     console.error('❌ FILE SECURITY: Malicious content scan failed:', error);
@@ -223,9 +223,9 @@ export function createSecureFileUpload(options: FileUploadOptions) {
       const extension = path.extname(sanitizedName).toLowerCase();
       const baseName = path.basename(sanitizedName, extension);
       const timestamp = Date.now();
-      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      const randomSuffix = randomBytes(4).toString('hex');
       const secureFilename = `${baseName}-${timestamp}-${randomSuffix}${extension}`;
-      
+
       cb(null, secureFilename);
     }
   });
@@ -281,7 +281,7 @@ export function createSecureFileUpload(options: FileUploadOptions) {
     upload.array('files', maxFiles)(req, res, async (err: any) => {
       if (err) {
         console.error('🚨 FILE UPLOAD ERROR:', err.message);
-        
+
         // Handle specific multer errors
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(413).json({
@@ -289,7 +289,7 @@ export function createSecureFileUpload(options: FileUploadOptions) {
             code: 'FILE_TOO_LARGE'
           });
         }
-        
+
         if (err.code === 'LIMIT_FILE_COUNT') {
           return res.status(413).json({
             error: `Too many files. Maximum: ${maxFiles}`,
@@ -349,7 +349,7 @@ export function createSecureFileUpload(options: FileUploadOptions) {
 
         } catch (error) {
           console.error('❌ FILE SECURITY: Validation failed:', error);
-          
+
           // Clean up uploaded files on validation failure
           if (files) {
             for (const file of files) {
@@ -381,7 +381,7 @@ export async function cleanupTempFiles(maxAge: number = 24 * 60 * 60 * 1000): Pr
     for (const filename of files) {
       const filePath = path.join(tempPath, filename);
       const stats = await fs.stat(filePath).catch(() => null);
-      
+
       if (stats && (now - stats.mtime.getTime() > maxAge)) {
         await fs.unlink(filePath);
         console.log(`🗑️ FILE CLEANUP: Removed old temp file: ${filename}`);
@@ -403,37 +403,37 @@ export async function validateExistingFile(filePath: string): Promise<{
   errors: string[];
 }> {
   const errors: string[] = [];
-  
+
   try {
     const stats = await fs.stat(filePath);
     const buffer = await fs.readFile(filePath);
-    
+
     // Basic checks
     if (!stats.isFile()) {
       errors.push('Not a regular file');
       return { isValid: false, errors };
     }
-    
+
     if (stats.size === 0) {
       errors.push('File is empty');
       return { isValid: false, errors };
     }
-    
+
     if (stats.size > 100 * 1024 * 1024) { // 100MB limit
       errors.push('File too large');
       return { isValid: false, errors };
     }
-    
+
     // Generate hash
     const hash = createHash('sha256').update(buffer).digest('hex');
-    
+
     return {
       isValid: errors.length === 0,
       size: stats.size,
       hash,
       errors
     };
-    
+
   } catch (error) {
     errors.push(`File access error: ${error}`);
     return { isValid: false, errors };
