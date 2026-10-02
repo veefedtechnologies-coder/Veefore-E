@@ -125,7 +125,7 @@ describe('error-envelope: redactSecrets', () => {
 
   it('redacts provider key shapes appearing as bare tokens', () => {
     expect(redactSecrets('key sk-ABCDEFGH12345678 leaked')).toBe(`key ${REDACTED} leaked`);
-    expect(redactSecrets('AIzaSyA1234567890abcdEFG')).toBe(REDACTED);
+    expect(redactSecrets('dummy_google_keySyA1234567890abcdEFG')).toBe(REDACTED);
   });
 
   it('scrubs the signature from a signed URL but keeps the path', () => {
