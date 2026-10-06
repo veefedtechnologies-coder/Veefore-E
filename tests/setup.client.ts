@@ -29,3 +29,6 @@ global.localStorage = localStorageMock as Storage;
 
 // Mock window.dispatchEvent
 global.dispatchEvent = vi.fn();
+
+// Add globals since some test environments are having issues
+globalThis.vi = vi;

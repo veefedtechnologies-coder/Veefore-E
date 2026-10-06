@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
 // Load environment variables for testing
@@ -11,3 +12,4 @@ if (!process.env.OPENAI_API_KEY) {
 
 // Setup global test environment
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.vi = vi;

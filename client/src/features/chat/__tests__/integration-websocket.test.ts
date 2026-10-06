@@ -24,7 +24,7 @@ describe('VeeGPT WebSocket Real-Time Functionality', () => {
       close: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      readyState: WebSocket.OPEN
+      readyState: 1 // WebSocket.OPEN is 1
     }
 
     // Determine WebSocket URL based on environment
