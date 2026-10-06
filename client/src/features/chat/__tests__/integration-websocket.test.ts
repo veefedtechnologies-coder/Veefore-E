@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * WebSocket Integration Test for VeeGPT Chat
  * 
@@ -24,7 +25,7 @@ describe('VeeGPT WebSocket Real-Time Functionality', () => {
       close: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      readyState: 1 // WebSocket.OPEN is 1
+      readyState: WebSocket.OPEN
     }
 
     // Determine WebSocket URL based on environment

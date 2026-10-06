@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * OAuth Error Handler Unit Tests
  * 
