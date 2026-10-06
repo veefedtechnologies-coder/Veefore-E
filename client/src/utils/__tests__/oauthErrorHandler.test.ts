@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * OAuth Error Handler Unit Tests
  * 
@@ -30,7 +31,7 @@ describe('parseOAuthError', () => {
     
     expect(error).not.toBeNull();
     expect(error?.code).toBe('invalid_state');
-    expect(error?.userMessage).toContain('authentication verification failed');
+    expect(error?.userMessage).toContain('Authentication verification failed');
     expect(error?.canRetry).toBe(true);
     expect(error?.severity).toBe('error');
   });

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * WebSocket Integration Test for VeeGPT Chat
  * 
