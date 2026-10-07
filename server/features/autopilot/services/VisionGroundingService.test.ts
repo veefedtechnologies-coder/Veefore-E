@@ -5,6 +5,15 @@
 import { describe, it, expect, vi } from 'vitest'
 import { VisionGroundingService, cachedDescription } from './VisionGroundingService'
 
+// We need to clear the cache before each test to prevent cross-test contamination.
+import { beforeEach } from 'vitest'
+
+beforeEach(() => {
+  // Using an ugly hack to clear the internal module state
+  // because the VISION_PROCESS_CACHE is not exported
+  import('./VisionGroundingService').then(m => m._clearVisionCache?.());
+})
+
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
     _id: 'item-1',
@@ -39,7 +48,7 @@ describe('VisionGroundingService.ensureDescription', () => {
   })
 
   it('analyzes + caches on a miss (R1.1)', async () => {
-    const analyze = vi.fn(async () => 'a beach at sunset')
+    const analyze = vi.fn(async () => 'a red car')
     const setVisionAnalysis = vi.fn(async () => null)
     const svc = new VisionGroundingService({
       analyzer: { analyze },
@@ -50,14 +59,14 @@ describe('VisionGroundingService.ensureDescription', () => {
 
     const out = await svc.ensureDescription(item, 'ws-1')
 
-    expect(out).toBe('a beach at sunset')
+    expect(out).toBe('a red car')
     expect(analyze).toHaveBeenCalledWith('https://cdn/img.png', 'image', undefined)
     expect(setVisionAnalysis).toHaveBeenCalledWith('item-1', {
-      description: 'a beach at sunset',
+      description: 'a red car',
       analyzedAt: new Date(0).toISOString(),
     })
     // In-memory item is updated so the same tick reuses it.
-    expect((item.visionAnalysis as { description?: string }).description).toBe('a beach at sunset')
+    expect((item.visionAnalysis as { description?: string }).description).toBe('a red car')
   })
 
   it('degrades to undefined when analysis throws (R1.3)', async () => {

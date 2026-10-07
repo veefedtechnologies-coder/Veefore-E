@@ -349,3 +349,9 @@ export class VisionGroundingService {
 
 /** Shared default instance wired to the real vision transport + repository. */
 export const visionGroundingService = new VisionGroundingService()
+
+
+/** For testing only */
+export function _clearVisionCache() {
+  VISION_PROCESS_CACHE.clear()
+}
