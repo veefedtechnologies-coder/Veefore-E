@@ -62,6 +62,7 @@ jobs:
           OAUTH_CALLBACK_URL: http://localhost:5000/callback
           RAZORPAY_KEY_ID: rzp_test_demo1234567890
           SESSION_SECRET: dummy_secret_1234567890abcdefghijklmnopqrstuvwxyz
+          OPENAI_API_KEY: dummy_openai_key
           REDIS_URL: redis://localhost:6379
 
       - name: Upload coverage report
