@@ -102,6 +102,7 @@
     "cross-env": "^10.1.0",
     "crypto": "^1.0.1",
     "date-fns": "^3.6.0",
+    "dompurify": "^3.4.17",
     "dotenv": "^16.6.1",
     "elevenlabs": "^1.59.0",
     "esbuild": "^0.25.0",
@@ -117,6 +118,7 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.7.0",
     "jimp": "^1.6.0",
+    "jsdom": "^29.1.1",
     "jsonwebtoken": "^9.0.2",
     "lenis": "1.1.21",
     "lucide-react": "^0.562.0",
@@ -166,9 +168,12 @@
     "zod-validation-error": "^3.5.2"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
+    "@types/dompurify": "^3.0.5",
     "@types/express": "4.17.21",
     "@types/express-session": "^1.18.0",
     "@types/fluent-ffmpeg": "^2.1.27",
