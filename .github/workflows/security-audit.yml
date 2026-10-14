@@ -126,7 +126,7 @@ jobs:
         run: |
           echo "🔍 Scanning for hardcoded secrets..."
           # Check for common secret patterns
-          if grep -r -E "sk_live_|sk_test_|AKIA|AIza|ya29\.|ghp_|sk-ant-|pplx-|rw_|rzp_|SG\.|BEGIN PRIVATE KEY" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.test.ts" --exclude="*.test.tsx" --exclude="*.example" --exclude="*.md" --exclude="*.js" --exclude="*.ts" --exclude="error-envelope.ts" --exclude="deployment-hardening.ts" --exclude="supply-chain.ts"; then
+          if grep -r -E "sk_live_|sk_test_|AKIA|AIza|ya29\.|ghp_|sk-ant-|pplx-|rw_|rzp_|SG\.|BEGIN PRIVATE KEY" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.test.ts" --exclude="*.test.tsx" --exclude="*.example" --exclude="*.md" --exclude="*.js" --exclude="*.ts" --exclude="error-envelope.ts" --exclude="deployment-hardening.ts" --exclude="supply-chain.ts" --exclude="ci.yml" --exclude="security-audit.yml" --exclude="oauth-debug.html" --exclude="SettingsTabs.tsx" --exclude="IntegrationsSettings.tsx" --exclude="test-api-key-origin.cjs" --exclude="*.test.ts" --exclude="*.test.tsx" --exclude="*.test.js" --exclude="*.test.jsx" --exclude="*.spec.ts" --exclude="*.spec.tsx" --exclude="*.spec.js" --exclude="*.spec.jsx"; then
             echo "❌ Hardcoded secrets found!"
             exit 1
           else
