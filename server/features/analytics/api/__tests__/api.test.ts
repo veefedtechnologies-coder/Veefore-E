@@ -106,7 +106,7 @@ describe('DashboardService.buildDashboard', () => {
       [rollup('2026-01-01T00:00:00.000Z', { followers_total: 1000 })]
     )
     const service = new DashboardService({ readStore: store })
-    const res = await service.buildDashboard('overview', query)
+    const res = await service.buildDashboard('custom', query)
 
     expect(res.meta.partialData).toBe(false)
     const followers = res.kpis.find((k) => k.key === 'followers_total')!

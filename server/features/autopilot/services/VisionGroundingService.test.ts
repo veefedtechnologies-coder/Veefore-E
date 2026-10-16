@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { VisionGroundingService, cachedDescription } from './VisionGroundingService'
+import { VisionGroundingService, cachedDescription, VISION_PROCESS_CACHE } from './VisionGroundingService'
 
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
@@ -13,6 +13,8 @@ function makeItem(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
+
+beforeEach(() => { VISION_PROCESS_CACHE.clear(); })
 
 describe('cachedDescription', () => {
   it('returns a present description', () => {

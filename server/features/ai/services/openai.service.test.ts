@@ -153,13 +153,21 @@ describe('OpenAIService', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
+          messages: [
+            {
+              content: 'Test prompt',
+              role: 'user',
+            },
+          ],
+          model: 'gpt-4o',
           temperature: 0.9,
           max_tokens: 100,
           top_p: 0.95,
           frequency_penalty: 0.5,
           presence_penalty: 0.5,
           stop: ['END'],
-        })
+        }),
+        undefined
       );
     });
 
@@ -252,7 +260,8 @@ describe('OpenAIService', () => {
           n: 1,
           size: '1024x1024',
           quality: 'standard',
-        })
+        }),
+        undefined
       );
     });
 

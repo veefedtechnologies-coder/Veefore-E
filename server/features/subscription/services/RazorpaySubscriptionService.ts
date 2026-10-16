@@ -84,10 +84,18 @@ export interface RazorpayRefundResult {
 // ---------------------------------------------------------------------------
 
 export class RazorpaySubscriptionService {
-  private readonly client: Razorpay;
+  private _client?: Razorpay;
+
+  private get client(): Razorpay {
+    if (!this._client) {
+      this._client = getRazorpayClient();
+    }
+    return this._client;
+  }
 
   constructor() {
-    this.client = getRazorpayClient();
+    // Defer initialization to first use, or handle lazily if in tests
+    // But wait, the client is readonly...
   }
 
   // -------------------------------------------------------------------------
