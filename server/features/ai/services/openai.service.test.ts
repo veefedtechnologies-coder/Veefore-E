@@ -153,6 +153,13 @@ describe('OpenAIService', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
+          messages: [
+            {
+              content: 'Test prompt',
+              role: 'user',
+            },
+          ],
+          model: 'gpt-4o',
           temperature: 0.9,
           max_tokens: 100,
           top_p: 0.95,
