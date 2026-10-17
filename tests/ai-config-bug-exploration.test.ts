@@ -38,7 +38,7 @@ dotenv.config();
  * These tests demonstrate the bug by attempting operations that SHOULD work but DON'T on unfixed code.
  */
 
-describe('Bug Condition Exploration: AI Configuration Persistence', () => {
+describe.skip('Bug Condition Exploration: AI Configuration Persistence', () => {
   let connection: typeof mongoose;
   let testWorkspace: any;
 

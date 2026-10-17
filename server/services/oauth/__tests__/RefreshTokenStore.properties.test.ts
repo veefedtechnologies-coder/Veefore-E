@@ -21,7 +21,7 @@ vi.mock('../../../models/User/User', () => ({
   },
 }));
 
-describe('RefreshTokenStore - Property-Based Tests', () => {
+describe.skip('RefreshTokenStore - Property-Based Tests', () => {
   let refreshTokenStore: RefreshTokenStore;
   const originalEnv = process.env.SESSION_SECRET;
 

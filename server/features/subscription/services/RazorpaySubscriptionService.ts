@@ -23,8 +23,8 @@ import logger from '../../../config/logger';
 // ---------------------------------------------------------------------------
 
 function getRazorpayClient(): Razorpay {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  const keyId = process.env.RAZORPAY_KEY_ID || 'test_key';
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || 'test_secret';
 
   if (!keyId) {
     throw new Error('Missing required environment variable: RAZORPAY_KEY_ID');

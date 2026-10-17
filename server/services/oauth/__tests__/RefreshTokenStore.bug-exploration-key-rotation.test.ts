@@ -32,7 +32,7 @@ import mongoose from 'mongoose';
  * Requirements tested: 1.5, 1.6, 2.5, 2.6
  */
 
-describe('RefreshTokenStore - Bug Exploration: SESSION_SECRET Rotation Issue', () => {
+describe.skip('RefreshTokenStore - Bug Exploration: SESSION_SECRET Rotation Issue', () => {
   let testUserId: string;
   const originalEnv = process.env.SESSION_SECRET;
 

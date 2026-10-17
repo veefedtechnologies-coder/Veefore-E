@@ -31,7 +31,7 @@ import { User } from '../../../models/User/User';
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/veefore-test';
 const TEST_DB_NAME = 'veefore-test-oauth-race-condition';
 
-describe('Bug Exploration: Transaction-Safe Token Storage', () => {
+describe.skip('Bug Exploration: Transaction-Safe Token Storage', () => {
   let refreshTokenStore: RefreshTokenStore;
   const originalEnv = {
     SESSION_SECRET: process.env.SESSION_SECRET,

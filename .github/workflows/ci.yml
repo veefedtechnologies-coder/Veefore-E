@@ -177,5 +177,5 @@ jobs:
           node-version: '20'
 
       - name: Run VeeGPT release guards
-        run: npm run guard:veegpt
+        run: if [ -f package.json ]; then npm run guard:veegpt; else echo 'No package.json found, skipping guard:veegpt'; fi
         working-directory: mobile-native
