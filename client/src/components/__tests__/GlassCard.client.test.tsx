@@ -8,7 +8,7 @@ vi.mock('../../hooks/use-is-mobile', () => ({
   useIsMobile: vi.fn()
 }));
 
-describe.skip('GlassCard', () => {
+describe('GlassCard', () => {
   it('should render children correctly', () => {
     vi.spyOn(useIsMobileHook, 'useIsMobile').mockReturnValue(false);
     

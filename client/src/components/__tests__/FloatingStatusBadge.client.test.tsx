@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import FloatingStatusBadge from '../FloatingStatusBadge';
 import { Zap, CheckCircle } from 'lucide-react';
 
-describe.skip('FloatingStatusBadge', () => {
+describe('FloatingStatusBadge', () => {
   it('renders with correct text content', () => {
     render(
       <FloatingStatusBadge

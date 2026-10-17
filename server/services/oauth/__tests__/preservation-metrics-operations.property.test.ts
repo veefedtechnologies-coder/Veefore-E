@@ -88,7 +88,7 @@ const refreshTokenArbitrary = fc.stringMatching(/^[A-Za-z0-9+/]{100,200}={0,2}$/
 // Normal traffic rate (requests within limits)
 const normalTrafficRateArbitrary = fc.integer({ min: 1, max: 9 }); // Under 10/min limit
 
-describe.skip('Task 14: Preservation Property Tests - Metrics and Operations', () => {
+describe('Task 14: Preservation Property Tests - Metrics and Operations', () => {
   let metricsTracker: OAuthMetricsTracker;
   let refreshTokenStore: RefreshTokenStore;
 
@@ -121,7 +121,7 @@ describe.skip('Task 14: Preservation Property Tests - Metrics and Operations', (
    * 
    * **Validates: Requirements 3.9, 3.10**
    */
-  describe.skip('Property 14.1: Metrics Collection Preservation', () => {
+  describe('Property 14.1: Metrics Collection Preservation', () => {
     it('should preserve metrics collection for flow initiation', () => {
       fc.assert(
         fc.property(requestIdArbitrary, (requestId) => {
@@ -261,7 +261,7 @@ describe.skip('Task 14: Preservation Property Tests - Metrics and Operations', (
    * 
    * **Validates: Requirements 3.11, 3.12**
    */
-  describe.skip('Property 14.2: Encryption/Decryption Preservation', () => {
+  describe('Property 14.2: Encryption/Decryption Preservation', () => {
     it('should preserve encryption/decryption round-trip with current SESSION_SECRET', () => {
       if (!process.env.SESSION_SECRET) {
         console.log('⏭️  Skipping - SESSION_SECRET not set in test environment');
@@ -346,7 +346,7 @@ describe.skip('Task 14: Preservation Property Tests - Metrics and Operations', (
    * 
    * **Validates: Requirements 3.13, 3.14**
    */
-  describe.skip('Property 14.3: Rate Limiting Preservation', () => {
+  describe('Property 14.3: Rate Limiting Preservation', () => {
     it('should preserve rate limiting behavior for normal traffic patterns', () => {
       fc.assert(
         fc.property(normalTrafficRateArbitrary, (requestCount) => {
@@ -390,7 +390,7 @@ describe.skip('Task 14: Preservation Property Tests - Metrics and Operations', (
    * 
    * **Validates: Requirements 3.15, 3.16**
    */
-  describe.skip('Property 14.4: Logout Functionality Preservation', () => {
+  describe('Property 14.4: Logout Functionality Preservation', () => {
     it('should preserve logout metrics recording', () => {
       fc.assert(
         fc.property(userIdArbitrary, (userId) => {
@@ -441,7 +441,7 @@ describe.skip('Task 14: Preservation Property Tests - Metrics and Operations', (
    * 
    * **Validates: Requirements 3.17, 3.18**
    */
-  describe.skip('Property 14.5: Token Exchange Preservation', () => {
+  describe('Property 14.5: Token Exchange Preservation', () => {
     it('should preserve token exchange operation tracking', () => {
       fc.assert(
         fc.property(
@@ -529,7 +529,7 @@ describe.skip('Task 14: Preservation Property Tests - Metrics and Operations', (
    * 
    * **Validates: Requirements 3.19, 3.20**
    */
-  describe.skip('Property 14.6: Security Operations Preservation', () => {
+  describe('Property 14.6: Security Operations Preservation', () => {
     it('should preserve OAuth operation types', () => {
       fc.assert(
         fc.property(oauthOperationArbitrary, (operation) => {

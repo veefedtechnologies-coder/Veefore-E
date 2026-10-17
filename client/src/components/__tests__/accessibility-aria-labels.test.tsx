@@ -15,8 +15,8 @@ import SideGraphics from '../SideGraphics';
 import GradientOrb from '../GradientOrb';
 import { Zap, CheckCircle } from 'lucide-react';
 
-describe.skip('ARIA Labels - Accessibility', () => {
-  describe.skip('FloatingStatusBadge', () => {
+describe('ARIA Labels - Accessibility', () => {
+  describe('FloatingStatusBadge', () => {
     it('should have role="status" for screen reader announcements', () => {
       const { container } = render(
         <FloatingStatusBadge
@@ -74,7 +74,7 @@ describe.skip('ARIA Labels - Accessibility', () => {
     });
   });
 
-  describe.skip('SideGraphics', () => {
+  describe('SideGraphics', () => {
     it('should mark entire component as decorative with aria-hidden', () => {
       const { container } = render(<SideGraphics side="left" />);
       
@@ -107,7 +107,7 @@ describe.skip('ARIA Labels - Accessibility', () => {
     });
   });
 
-  describe.skip('GradientOrb', () => {
+  describe('GradientOrb', () => {
     it('should mark gradient orbs as decorative with aria-hidden', () => {
       const { container } = render(
         <GradientOrb color="blue" className="w-96 h-96" />
@@ -131,7 +131,7 @@ describe.skip('ARIA Labels - Accessibility', () => {
     });
   });
 
-  describe.skip('Chart Visualizations', () => {
+  describe('Chart Visualizations', () => {
     it('should provide aria-label for entire chart with summary', () => {
       // This would be tested in the AnimatedDashboard test
       // Chart container should have role="img" and descriptive aria-label

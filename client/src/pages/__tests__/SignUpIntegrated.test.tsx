@@ -17,7 +17,7 @@ vi.mock('firebase/auth', () => ({
   signInWithCustomToken: vi.fn()
 }))
 
-describe.skip('SignUpIntegrated - Refactored Component Integration', () => {
+describe('SignUpIntegrated - Refactored Component Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useFirebaseAuth).mockReturnValue({
@@ -30,7 +30,7 @@ describe.skip('SignUpIntegrated - Refactored Component Integration', () => {
     global.fetch = vi.fn()
   })
 
-  describe.skip('Requirement 2.6: Update signup route to use refactored components', () => {
+  describe('Requirement 2.6: Update signup route to use refactored components', () => {
     it('should render SignUpForm component on initial load', () => {
       render(<SignUpIntegrated />)
       
@@ -112,7 +112,7 @@ describe.skip('SignUpIntegrated - Refactored Component Integration', () => {
     })
   })
 
-  describe.skip('Requirement 8.4: Verify OAuth integration still works', () => {
+  describe('Requirement 8.4: Verify OAuth integration still works', () => {
     it('should handle OAuth success callback correctly', async () => {
       // Mock OAuth success in URL params
       window.history.pushState({}, '', '?oauth_success=true')
@@ -160,7 +160,7 @@ describe.skip('SignUpIntegrated - Refactored Component Integration', () => {
     })
   })
 
-  describe.skip('Component Integration', () => {
+  describe('Component Integration', () => {
     it('should maintain form data across component transitions', async () => {
       const user = userEvent.setup()
       
@@ -222,7 +222,7 @@ describe.skip('SignUpIntegrated - Refactored Component Integration', () => {
     })
   })
 
-  describe.skip('Error Handling', () => {
+  describe('Error Handling', () => {
     it('should handle early access restriction errors', async () => {
       const user = userEvent.setup()
       

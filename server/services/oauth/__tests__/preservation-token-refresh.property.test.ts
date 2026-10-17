@@ -67,7 +67,7 @@ vi.mock('../../../firebase-admin', () => ({
   })),
 }));
 
-describe.skip('PRESERVATION PROPERTY: Valid Token Refresh Continues Working', () => {
+describe('PRESERVATION PROPERTY: Valid Token Refresh Continues Working', () => {
   let refreshTokenStore: RefreshTokenStore;
   let firebaseTokenService: FirebaseTokenService;
 

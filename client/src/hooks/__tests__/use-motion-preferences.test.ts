@@ -7,7 +7,7 @@ import { useMotionPreferences } from '../use-motion-preferences';
  * Requirements: 5.4, 6.4
  */
 
-describe.skip('useMotionPreferences', () => {
+describe('useMotionPreferences', () => {
   // Mock matchMedia
   const mockMatchMedia = (matches: boolean) => {
     Object.defineProperty(window, 'matchMedia', {

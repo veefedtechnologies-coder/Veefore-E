@@ -14,7 +14,7 @@ import { Request, Response } from 'express';
  * Task: 11.3
  */
 
-describe.skip('EmailAuthController', () => {
+describe('EmailAuthController', () => {
   let controller: EmailAuthController;
   let mockEmailService: jest.Mocked<EmailService>;
   let mockUserRepository: jest.Mocked<UserRepository>;
@@ -60,7 +60,7 @@ describe.skip('EmailAuthController', () => {
     jest.clearAllMocks();
   });
 
-  describe.skip('register', () => {
+  describe('register', () => {
     it('should successfully register a new user', async () => {
       mockRequest.body = {
         email: 'newuser@example.com',
@@ -193,7 +193,7 @@ describe.skip('EmailAuthController', () => {
     });
   });
 
-  describe.skip('login', () => {
+  describe('login', () => {
     it('should successfully login with valid credentials', async () => {
       mockRequest.body = {
         email: 'user@example.com',
@@ -297,7 +297,7 @@ describe.skip('EmailAuthController', () => {
     });
   });
 
-  describe.skip('verifyEmail', () => {
+  describe('verifyEmail', () => {
     it('should successfully verify email with valid code', async () => {
       mockRequest.body = {
         email: 'user@example.com',
@@ -417,7 +417,7 @@ describe.skip('EmailAuthController', () => {
     });
   });
 
-  describe.skip('forgotPassword', () => {
+  describe('forgotPassword', () => {
     it('should send password reset email for existing user', async () => {
       mockRequest.body = {
         email: 'user@example.com'
@@ -465,7 +465,7 @@ describe.skip('EmailAuthController', () => {
     });
   });
 
-  describe.skip('resetPassword', () => {
+  describe('resetPassword', () => {
     it('should successfully reset password with valid token', async () => {
       const resetToken = 'valid-reset-token-123';
       mockRequest.body = {
@@ -581,7 +581,7 @@ describe.skip('EmailAuthController', () => {
     });
   });
 
-  describe.skip('utility methods', () => {
+  describe('utility methods', () => {
     it('should hash and compare passwords correctly', async () => {
       const password = 'TestPassword123';
       const hashedPassword = await controller.hashPassword(password);

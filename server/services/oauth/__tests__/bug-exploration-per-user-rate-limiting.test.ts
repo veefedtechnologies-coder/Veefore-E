@@ -74,7 +74,7 @@ vi.mock('../../../firebase-admin', () => ({
  * **Validates: Requirements 1.10, 1.11, 2.10, 2.11**
  */
 
-describe.skip('OAuth /refresh - Bug Exploration: No Per-User Rate Limiting', () => {
+describe('OAuth /refresh - Bug Exploration: No Per-User Rate Limiting', () => {
   let app: Express;
   let testUserId: string;
   let testFirebaseUid: string;

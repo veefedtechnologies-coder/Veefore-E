@@ -14,14 +14,14 @@ import { StateValidator, OAuthRequest } from '../StateValidator';
  * Requirements tested: 1.2, 1.4, 2.2, 2.3, 2.4, 17.2, 17.4, 17.11
  */
 
-describe.skip('StateValidator', () => {
+describe('StateValidator', () => {
   let validator: StateValidator;
 
   beforeEach(() => {
     validator = new StateValidator();
   });
 
-  describe.skip('generateState', () => {
+  describe('generateState', () => {
     it('should generate a state parameter of at least 32 characters', () => {
       // Requirement 1.2: Generate random state parameter of at least 32 characters
       const state = validator.generateState();
@@ -61,7 +61,7 @@ describe.skip('StateValidator', () => {
     });
   });
 
-  describe.skip('storeState', () => {
+  describe('storeState', () => {
     it('should store state and code verifier in session', () => {
       // Requirement 1.4: Store state and code_verifier in session
       const mockReq = createMockRequest();
@@ -136,7 +136,7 @@ describe.skip('StateValidator', () => {
     });
   });
 
-  describe.skip('validateState', () => {
+  describe('validateState', () => {
     it('should return true for valid state parameter', () => {
       // Requirement 2.2: Retrieve stored state from session
       const mockReq = createMockRequest();
@@ -252,7 +252,7 @@ describe.skip('StateValidator', () => {
     });
   });
 
-  describe.skip('getCodeVerifier', () => {
+  describe('getCodeVerifier', () => {
     it('should return stored code verifier', () => {
       const mockReq = createMockRequest();
       const codeVerifier = 'test-code-verifier-789';
@@ -304,7 +304,7 @@ describe.skip('StateValidator', () => {
     });
   });
 
-  describe.skip('clearOAuthSession', () => {
+  describe('clearOAuthSession', () => {
     it('should clear OAuth session data', () => {
       const mockReq = createMockRequest();
       
@@ -333,7 +333,7 @@ describe.skip('StateValidator', () => {
     });
   });
 
-  describe.skip('edge cases', () => {
+  describe('edge cases', () => {
     it('should handle empty string state parameter', () => {
       const mockReq = createMockRequest();
       
@@ -407,7 +407,7 @@ describe.skip('StateValidator', () => {
     });
   });
 
-  describe.skip('security properties', () => {
+  describe('security properties', () => {
     it('should generate cryptographically random states', () => {
       // Test that states have high entropy and are not predictable
       const states: string[] = [];

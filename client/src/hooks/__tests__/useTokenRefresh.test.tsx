@@ -23,7 +23,7 @@ jest.mock('firebase/auth', () => ({
 // Mock fetch
 global.fetch = jest.fn();
 
-describe.skip('useTokenRefresh', () => {
+describe('useTokenRefresh', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();

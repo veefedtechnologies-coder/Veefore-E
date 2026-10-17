@@ -18,7 +18,7 @@ vi.mock('../../../firebase-admin', () => ({
   admin: {},
 }));
 
-describe.skip('FirebaseTokenService', () => {
+describe('FirebaseTokenService', () => {
   let firebaseTokenService: FirebaseTokenService;
   let mockAuth: any;
   let mockAdmin: any;
@@ -44,7 +44,7 @@ describe.skip('FirebaseTokenService', () => {
     vi.clearAllMocks();
   });
 
-  describe.skip('createFirebaseToken', () => {
+  describe('createFirebaseToken', () => {
     const mockGoogleUserInfo: GoogleUserInfo = {
       sub: 'google-user-123',
       email: 'test@example.com',
@@ -260,7 +260,7 @@ describe.skip('FirebaseTokenService', () => {
     });
   });
 
-  describe.skip('verifyToken', () => {
+  describe('verifyToken', () => {
     it('should successfully verify valid Firebase token', async () => {
       const mockToken = 'valid-firebase-id-token';
       const mockDecodedToken = {
@@ -306,7 +306,7 @@ describe.skip('FirebaseTokenService', () => {
     });
   });
 
-  describe.skip('username generation', () => {
+  describe('username generation', () => {
     it('should handle username collision by appending random number', async () => {
       const googleInfo: GoogleUserInfo = {
         sub: 'google-123',

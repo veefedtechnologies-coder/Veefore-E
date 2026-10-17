@@ -42,7 +42,7 @@ import mongoose from 'mongoose';
  * **Validates: Requirements 1.7, 1.8, 1.9, 2.7, 2.8, 2.9**
  */
 
-describe.skip('RefreshTokenStore - Bug Exploration: No Token Expiration/Cleanup', () => {
+describe('RefreshTokenStore - Bug Exploration: No Token Expiration/Cleanup', () => {
   let testUserId: string;
   const originalEnv = process.env.SESSION_SECRET;
 

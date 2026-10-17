@@ -11,7 +11,7 @@ vi.mock('../../../models/User/User', () => ({
   },
 }));
 
-describe.skip('RefreshTokenStore', () => {
+describe('RefreshTokenStore', () => {
   let refreshTokenStore: RefreshTokenStore;
   const originalEnv = process.env.SESSION_SECRET;
 
@@ -27,7 +27,7 @@ describe.skip('RefreshTokenStore', () => {
     process.env.SESSION_SECRET = originalEnv;
   });
 
-  describe.skip('constructor', () => {
+  describe('constructor', () => {
     it('should throw error if SESSION_SECRET is not set', () => {
       delete process.env.SESSION_SECRET;
       expect(() => new RefreshTokenStore()).toThrow(
@@ -48,7 +48,7 @@ describe.skip('RefreshTokenStore', () => {
     });
   });
 
-  describe.skip('storeRefreshToken', () => {
+  describe('storeRefreshToken', () => {
     it('should encrypt and store refresh token successfully', async () => {
       const userId = 'test-user-id';
       const refreshToken = 'test-refresh-token-12345';
@@ -109,7 +109,7 @@ describe.skip('RefreshTokenStore', () => {
     });
   });
 
-  describe.skip('getRefreshToken', () => {
+  describe('getRefreshToken', () => {
     it('should decrypt and return refresh token successfully', async () => {
       const userId = 'test-user-id';
       const originalToken = 'original-refresh-token-value';
@@ -224,7 +224,7 @@ describe.skip('RefreshTokenStore', () => {
     });
   });
 
-  describe.skip('deleteRefreshToken', () => {
+  describe('deleteRefreshToken', () => {
     it('should delete all refresh token fields', async () => {
       const userId = 'test-user-id';
 
@@ -253,7 +253,7 @@ describe.skip('RefreshTokenStore', () => {
     });
   });
 
-  describe.skip('encryption round-trip property', () => {
+  describe('encryption round-trip property', () => {
     it('should successfully encrypt and decrypt various token values', async () => {
       const testTokens = [
         'short',
@@ -303,8 +303,8 @@ describe.skip('RefreshTokenStore', () => {
    * - Decryption with corrupted ciphertext
    * - Decryption with wrong encryption key
    */
-  describe.skip('edge cases', () => {
-    describe.skip('encryption with empty key', () => {
+  describe('edge cases', () => {
+    describe('encryption with empty key', () => {
       it('should fail at initialization when SESSION_SECRET is empty', () => {
         // Requirements: 4.6 - Verify error handling when encryption key is empty
         // Empty string is caught by the !sessionSecret check
@@ -343,7 +343,7 @@ describe.skip('RefreshTokenStore', () => {
       });
     });
 
-    describe.skip('decryption with missing IV or auth tag', () => {
+    describe('decryption with missing IV or auth tag', () => {
       it('should return null when refreshTokenIV is missing', async () => {
         // Requirements: 4.6, 15.9 - Verify graceful handling of missing IV
         const userId = 'test-user-id';
@@ -425,7 +425,7 @@ describe.skip('RefreshTokenStore', () => {
       });
     });
 
-    describe.skip('decryption with corrupted ciphertext', () => {
+    describe('decryption with corrupted ciphertext', () => {
       it('should return null when ciphertext is corrupted (invalid hex)', async () => {
         // Requirements: 4.6, 15.9 - Verify handling of corrupted ciphertext data
         const userId = 'test-user-id';
@@ -568,7 +568,7 @@ describe.skip('RefreshTokenStore', () => {
       });
     });
 
-    describe.skip('decryption with wrong encryption key', () => {
+    describe('decryption with wrong encryption key', () => {
       it('should return null when decrypting with different SESSION_SECRET', async () => {
         // Requirements: 4.6, 15.9 - Verify key-based access control
         const userId = 'test-user-id';

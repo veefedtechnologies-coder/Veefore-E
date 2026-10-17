@@ -13,7 +13,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
+describe('VeeGPT WebSocket Real-Time Functionality', () => {
   let mockWebSocket: any
   let websocketUrl: string
 
@@ -39,7 +39,7 @@ describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
     vi.clearAllMocks()
   })
 
-  describe.skip('WebSocket Connection', () => {
+  describe('WebSocket Connection', () => {
     it('should establish WebSocket connection with correct URL', () => {
       const ws = new WebSocket(websocketUrl)
       
@@ -62,7 +62,7 @@ describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
     })
   })
 
-  describe.skip('Message Streaming', () => {
+  describe('Message Streaming', () => {
     it('should handle incoming chunk events', () => {
       const ws = new WebSocket(websocketUrl)
       const streamingContent: Record<number, string> = {}
@@ -123,7 +123,7 @@ describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
     })
   })
 
-  describe.skip('Status Updates', () => {
+  describe('Status Updates', () => {
     it('should handle status events before streaming', () => {
       const statusEvents = [
         '🔍 Analyzing trends and routing to Perplexity...',
@@ -161,7 +161,7 @@ describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
     })
   })
 
-  describe.skip('Conversation Subscription', () => {
+  describe('Conversation Subscription', () => {
     it('should subscribe to conversation on WebSocket open', () => {
       const ws = new WebSocket(websocketUrl)
       const conversationId = 42
@@ -196,7 +196,7 @@ describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
     })
   })
 
-  describe.skip('Stop Generation', () => {
+  describe('Stop Generation', () => {
     it('should stop streaming when requested', () => {
       const conversationId = 99
       let isGenerating = true
@@ -221,7 +221,7 @@ describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
     })
   })
 
-  describe.skip('Error Handling', () => {
+  describe('Error Handling', () => {
     it('should handle WebSocket errors gracefully', () => {
       const ws = new WebSocket(websocketUrl)
       
@@ -266,7 +266,7 @@ describe.skip('VeeGPT WebSocket Real-Time Functionality', () => {
     })
   })
 
-  describe.skip('Message Persistence', () => {
+  describe('Message Persistence', () => {
     it('should verify conversation messages persist', () => {
       const mockConversation = {
         id: 1,
