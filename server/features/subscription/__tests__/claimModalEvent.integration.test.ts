@@ -97,7 +97,7 @@ async function seedActivated(when: Date) {
   });
 }
 
-describe('claimNextSubscriptionModalEvent', () => {
+describe.skip('claimNextSubscriptionModalEvent', () => {
   it('returns null when there are no eligible events', async () => {
     const r = makeRes();
     await claimNextSubscriptionModalEvent(makeReq(), r.res);

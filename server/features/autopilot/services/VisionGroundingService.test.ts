@@ -3,11 +3,15 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { VisionGroundingService, cachedDescription } from './VisionGroundingService'
+import { VisionGroundingService, cachedDescription, VISION_PROCESS_CACHE } from './VisionGroundingService'
+
+beforeEach(() => {
+  VISION_PROCESS_CACHE.clear()
+})
 
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
-    _id: 'item-1',
+    _id: `item-${Math.random().toString(36).substring(7)}`,
     mediaUrl: 'https://cdn/img.png',
     mediaType: 'image' as const,
     ...overrides,
@@ -31,7 +35,7 @@ describe('VisionGroundingService.ensureDescription', () => {
     const setVisionAnalysis = vi.fn(async () => null)
     const svc = new VisionGroundingService({ analyzer: { analyze }, store: { setVisionAnalysis } })
 
-    const out = await svc.ensureDescription(makeItem({ visionAnalysis: { description: 'a red car' } }))
+    const item = makeItem({ visionAnalysis: { description: 'a red car' } }); const out = await svc.ensureDescription(item);
 
     expect(out).toBe('a red car')
     expect(analyze).not.toHaveBeenCalled()
@@ -52,7 +56,7 @@ describe('VisionGroundingService.ensureDescription', () => {
 
     expect(out).toBe('a beach at sunset')
     expect(analyze).toHaveBeenCalledWith('https://cdn/img.png', 'image', undefined)
-    expect(setVisionAnalysis).toHaveBeenCalledWith('item-1', {
+    expect(setVisionAnalysis).toHaveBeenCalledWith(item._id, {
       description: 'a beach at sunset',
       analyzedAt: new Date(0).toISOString(),
     })
@@ -67,7 +71,7 @@ describe('VisionGroundingService.ensureDescription', () => {
     const setVisionAnalysis = vi.fn(async () => null)
     const svc = new VisionGroundingService({ analyzer: { analyze }, store: { setVisionAnalysis } })
 
-    const out = await svc.ensureDescription(makeItem())
+    const item = makeItem(); const out = await svc.ensureDescription(item);
 
     expect(out).toBeUndefined()
     expect(setVisionAnalysis).not.toHaveBeenCalled()
@@ -83,7 +87,7 @@ describe('VisionGroundingService.ensureDescription', () => {
       timeoutMs: 5,
     })
 
-    const out = await svc.ensureDescription(makeItem())
+    const item2 = makeItem(); item2._id = 'item-2'; const out = await svc.ensureDescription(item2);
     expect(out).toBeUndefined()
   })
 
@@ -92,8 +96,8 @@ describe('VisionGroundingService.ensureDescription', () => {
       analyzer: { analyze: vi.fn() },
       store: { setVisionAnalysis: vi.fn() },
     })
-    expect(await svc.ensureDescription(undefined)).toBeUndefined()
-    expect(await svc.ensureDescription(makeItem({ mediaUrl: '' }))).toBeUndefined()
+    expect(await svc.ensureDescription(undefined)).toBeUndefined();
+    const item4 = makeItem({ mediaUrl: '' }); item4._id = 'item-4'; expect(await svc.ensureDescription(item4)).toBeUndefined();
   })
 })
 
@@ -115,7 +119,7 @@ describe('VisionGroundingService.buildGrounding', () => {
       analyzer: { analyze: vi.fn(async () => undefined) },
       store: { setVisionAnalysis: vi.fn(async () => null) },
     })
-    const g = await svc.buildGrounding(makeItem())
+    const item5 = makeItem(); item5._id = 'item-5'; const g = await svc.buildGrounding(item5);
     expect(g).toEqual({})
   })
 })
