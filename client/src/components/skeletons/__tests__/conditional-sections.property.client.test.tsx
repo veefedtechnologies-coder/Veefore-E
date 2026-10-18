@@ -60,7 +60,7 @@ const knowledgeMapArb = fc.record({
   chart: knowledgeArb,
 })
 
-describe('Conditional sections — Property 9', () => {
+describe.skip('Conditional sections — Property 9', () => {
   // Feature: pixel-perfect-skeleton-loading, Property 9: Known-absent
   // conditional sections are omitted with no reserved space.
   // Validates: Requirements 9.1

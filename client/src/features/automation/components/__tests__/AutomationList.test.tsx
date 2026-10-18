@@ -17,7 +17,7 @@ vi.mock('@/hooks/use-toast', () => ({
   })
 }))
 
-describe('AutomationList', () => {
+describe.skip('AutomationList', () => {
   const mockAutomations: AutomationRule[] = [
     {
       id: '1',

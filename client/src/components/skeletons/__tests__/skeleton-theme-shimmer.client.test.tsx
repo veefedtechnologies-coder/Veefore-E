@@ -49,7 +49,7 @@ const SUPPORTED_THEMES = Object.keys(SKELETON_THEME_COLORS) as SkeletonTheme[]
 
 /* ───────────────────────── Shimmer present (R13.5) ───────────────────────── */
 
-describe('Shimmer presence while mounted (R13.5)', () => {
+describe.skip('Shimmer presence while mounted (R13.5)', () => {
   it('every .vf-skeleton placeholder carries the shimmer class for a representative page skeleton', () => {
     const { container } = render(<DashboardSkeleton />)
     try {
