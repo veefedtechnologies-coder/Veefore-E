@@ -35,6 +35,7 @@
     "check": "tsc",
     "test": "vitest run",
     "test:server": "npx vitest run server/features/",
+    "test:client": "npx vitest run client/",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
@@ -170,6 +171,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/dompurify": "^3.0.5",
@@ -198,6 +200,7 @@
     "fast-check": "^4.8.0",
     "globals": "^17.13.0",
     "happy-dom": "^20.10.3",
+    "jsdom": "^29.1.1",
     "mongodb-memory-server": "^11.2.0",
     "selfsigned": "^3.0.1",
     "supertest": "^7.2.2",

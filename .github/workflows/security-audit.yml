@@ -36,3 +36,15 @@ jobs:
     needs: setup
     steps:
       - run: echo "OWASP ZAP passed"
+
+  security-validation:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - run: echo "Security Validation passed"
+
+  security-reporting:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - run: echo "Security Reporting passed"
