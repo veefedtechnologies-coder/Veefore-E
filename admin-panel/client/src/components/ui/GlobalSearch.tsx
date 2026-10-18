@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import DOMPurify from 'dompurify';
 import { useQuery } from 'react-query';
 import { Search, X, Clock, User, Shield, CreditCard, Ticket, Webhook, Megaphone, ExternalLink } from 'lucide-react';
 import { apiClient as api } from '../../services/api';
 import { clsx } from 'clsx';
+import DOMPurify from 'dompurify';
 
 interface SearchResult {
   id: string;

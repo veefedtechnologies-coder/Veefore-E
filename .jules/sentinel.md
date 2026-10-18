@@ -1,4 +1,4 @@
-## 2025-02-13 - [Fix XSS Vulnerabilities with dangerouslySetInnerHTML]
-**Vulnerability:** XSS vulnerabilities found in the frontend related to the use of `dangerouslySetInnerHTML` directly without sanitization. In `client/src/features/chat/components/DocumentViewer.tsx` and `admin-panel/client/src/components/ui/GlobalSearch.tsx`, user-generated or fetched HTML was being inserted directly into the DOM using `dangerouslySetInnerHTML`.
-**Learning:** `dangerouslySetInnerHTML` should never be used without first sanitizing the HTML with a library like `dompurify` to prevent cross-site scripting (XSS) attacks. Direct insertion allows arbitrary JavaScript to be executed in the user's browser context.
-**Prevention:** Always sanitize input HTML with `DOMPurify.sanitize()` before passing it to `dangerouslySetInnerHTML` in React components, and always use `DOMPurify` to escape unsanitized inputs.
+## 2024-10-18 - [XSS Fix] `dangerouslySetInnerHTML` in UI Components
+**Vulnerability:** Found Cross-Site Scripting (XSS) vulnerabilities in `DocumentViewer.tsx` and `GlobalSearch.tsx` due to the use of React's `dangerouslySetInnerHTML` with unsanitized user-controlled input (HTML documents and search highlights).
+**Learning:** Even when input is partially processed (like search highlights) or generated internally (like document html), passing it directly into the DOM can lead to XSS if an attacker can control part of the source data or generation prompts. This represents a lack of defense-in-depth on the client side.
+**Prevention:** Always wrap variables passed into `dangerouslySetInnerHTML={{ __html: ... }}` with `DOMPurify.sanitize(...)` to strip out any potentially malicious tags or JavaScript event handlers.

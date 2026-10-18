@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 /**
  * Unit tests for AutomationTable component
  * 

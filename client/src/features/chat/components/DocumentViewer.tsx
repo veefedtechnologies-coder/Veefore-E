@@ -7,8 +7,8 @@
  */
 
 import React, { useMemo, useState } from 'react'
-import DOMPurify from 'dompurify'
 import { X, Download, Loader2 } from 'lucide-react'
+import DOMPurify from 'dompurify'
 import {
   buildDocumentBodyHtml,
   downloadDocument,

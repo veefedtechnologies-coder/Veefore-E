@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 /**
  * Token Refresh Hook Tests
  * 
@@ -16,40 +15,40 @@ import { useTokenRefresh } from '../useTokenRefresh';
 import { useAuthState } from 'react-firebase-hooks/auth';
 
 // Mock Firebase auth
-vi.mock('react-firebase-hooks/auth');
-vi.mock('firebase/auth', () => ({
-  getAuth: vi.fn(() => ({})), setPersistence: vi.fn(() => Promise.resolve()), browserLocalPersistence: {},
+jest.mock('react-firebase-hooks/auth');
+jest.mock('firebase/auth', () => ({
+  getAuth: jest.fn(() => ({})),
 }));
 
 // Mock fetch
-global.fetch = vi.fn();
+global.fetch = jest.fn();
 
-describe.skip('useTokenRefresh', () => {
+describe('useTokenRefresh', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
+    jest.clearAllMocks();
+    jest.useFakeTimers();
     
     // Mock console methods to reduce noise in tests
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
-    vi.useRealTimers();
-    vi.restoreAllMocks();
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   it('should not start refresh timer when user is not authenticated', () => {
     // Mock no user
-    (useAuthState as vi.Mock).mockReturnValue([null, false]);
+    (useAuthState as jest.Mock).mockReturnValue([null, false]);
 
     renderHook(() => useTokenRefresh(true));
 
     // Fast-forward time
     act(() => {
-      vi.advanceTimersByTime(60 * 60 * 1000); // 1 hour
+      jest.advanceTimersByTime(60 * 60 * 1000); // 1 hour
     });
 
     // Should not have called refresh endpoint
@@ -58,13 +57,13 @@ describe.skip('useTokenRefresh', () => {
 
   it('should not start refresh timer when disabled', () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     renderHook(() => useTokenRefresh(false)); // disabled
 
     // Fast-forward time
     act(() => {
-      vi.advanceTimersByTime(60 * 60 * 1000); // 1 hour
+      jest.advanceTimersByTime(60 * 60 * 1000); // 1 hour
     });
 
     // Should not have called refresh endpoint
@@ -73,10 +72,10 @@ describe.skip('useTokenRefresh', () => {
 
   it('should schedule refresh 55 minutes after initialization for authenticated user', async () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     // Mock successful refresh
-    (fetch as vi.Mock).mockResolvedValue({
+    (fetch as jest.Mock).mockResolvedValue({
       ok: true,
       status: 200,
     });
@@ -88,14 +87,14 @@ describe.skip('useTokenRefresh', () => {
 
     // Fast-forward to just before 55 minutes
     act(() => {
-      vi.advanceTimersByTime(54 * 60 * 1000);
+      jest.advanceTimersByTime(54 * 60 * 1000);
     });
 
     expect(fetch).not.toHaveBeenCalled();
 
     // Fast-forward to 55 minutes
     act(() => {
-      vi.advanceTimersByTime(1 * 60 * 1000);
+      jest.advanceTimersByTime(1 * 60 * 1000);
     });
 
     await waitFor(() => {
@@ -111,10 +110,10 @@ describe.skip('useTokenRefresh', () => {
 
   it('should retry after 1 minute on refresh failure', async () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     // Mock failed refresh (non-401 error)
-    (fetch as vi.Mock).mockResolvedValue({
+    (fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 500,
       statusText: 'Internal Server Error',
@@ -124,7 +123,7 @@ describe.skip('useTokenRefresh', () => {
 
     // Fast-forward to trigger first refresh
     act(() => {
-      vi.advanceTimersByTime(55 * 60 * 1000);
+      jest.advanceTimersByTime(55 * 60 * 1000);
     });
 
     await waitFor(() => {
@@ -132,11 +131,11 @@ describe.skip('useTokenRefresh', () => {
     });
 
     // Clear the mock call history
-    (fetch as vi.Mock).mockClear();
+    (fetch as jest.Mock).mockClear();
 
     // Fast-forward to trigger retry (1 minute)
     act(() => {
-      vi.advanceTimersByTime(1 * 60 * 1000);
+      jest.advanceTimersByTime(1 * 60 * 1000);
     });
 
     await waitFor(() => {
@@ -146,10 +145,10 @@ describe.skip('useTokenRefresh', () => {
 
   it('should not schedule next refresh on 401 error (session expired)', async () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     // Mock 401 error (session expired)
-    (fetch as vi.Mock).mockResolvedValue({
+    (fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 401,
       statusText: 'Unauthorized',
@@ -159,7 +158,7 @@ describe.skip('useTokenRefresh', () => {
 
     // Fast-forward to trigger first refresh
     act(() => {
-      vi.advanceTimersByTime(55 * 60 * 1000);
+      jest.advanceTimersByTime(55 * 60 * 1000);
     });
 
     await waitFor(() => {
@@ -167,11 +166,11 @@ describe.skip('useTokenRefresh', () => {
     });
 
     // Clear the mock call history
-    (fetch as vi.Mock).mockClear();
+    (fetch as jest.Mock).mockClear();
 
     // Fast-forward 10 minutes - should not retry on 401
     act(() => {
-      vi.advanceTimersByTime(10 * 60 * 1000);
+      jest.advanceTimersByTime(10 * 60 * 1000);
     });
 
     // Should not have retried
@@ -180,10 +179,10 @@ describe.skip('useTokenRefresh', () => {
 
   it('should schedule next refresh after successful refresh', async () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     // Mock successful refresh
-    (fetch as vi.Mock).mockResolvedValue({
+    (fetch as jest.Mock).mockResolvedValue({
       ok: true,
       status: 200,
     });
@@ -192,7 +191,7 @@ describe.skip('useTokenRefresh', () => {
 
     // Fast-forward to trigger first refresh
     act(() => {
-      vi.advanceTimersByTime(55 * 60 * 1000);
+      jest.advanceTimersByTime(55 * 60 * 1000);
     });
 
     await waitFor(() => {
@@ -200,11 +199,11 @@ describe.skip('useTokenRefresh', () => {
     });
 
     // Clear the mock call history
-    (fetch as vi.Mock).mockClear();
+    (fetch as jest.Mock).mockClear();
 
     // Fast-forward to trigger next refresh (another 55 minutes)
     act(() => {
-      vi.advanceTimersByTime(55 * 60 * 1000);
+      jest.advanceTimersByTime(55 * 60 * 1000);
     });
 
     await waitFor(() => {
@@ -214,10 +213,10 @@ describe.skip('useTokenRefresh', () => {
 
   it('should trigger refresh when tab becomes visible', async () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     // Mock successful refresh
-    (fetch as vi.Mock).mockResolvedValue({
+    (fetch as jest.Mock).mockResolvedValue({
       ok: true,
       status: 200,
     });
@@ -249,10 +248,10 @@ describe.skip('useTokenRefresh', () => {
 
   it('should not trigger multiple concurrent refreshes', async () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     // Mock slow refresh (takes 2 seconds)
-    (fetch as vi.Mock).mockImplementation(() =>
+    (fetch as jest.Mock).mockImplementation(() =>
       new Promise((resolve) => 
         setTimeout(() => resolve({ ok: true, status: 200 }), 2000)
       )
@@ -272,7 +271,7 @@ describe.skip('useTokenRefresh', () => {
 
     // Fast-forward to complete the first refresh
     await act(async () => {
-      vi.advanceTimersByTime(2000);
+      jest.advanceTimersByTime(2000);
       await Promise.resolve();
     });
 
@@ -284,17 +283,17 @@ describe.skip('useTokenRefresh', () => {
 
   it('should cleanup timer on unmount', () => {
     // Mock authenticated user
-    (useAuthState as vi.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
+    (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     const { unmount } = renderHook(() => useTokenRefresh(true));
 
     // Verify timer is set
-    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    expect(jest.getTimerCount()).toBeGreaterThan(0);
 
     // Unmount the hook
     unmount();
 
     // Timers should be cleared
-    expect(vi.getTimerCount()).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
   });
 });
