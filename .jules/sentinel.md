@@ -1,0 +1,4 @@
+## 2024-10-18 - [XSS Fix] `dangerouslySetInnerHTML` in UI Components
+**Vulnerability:** Found Cross-Site Scripting (XSS) vulnerabilities in `DocumentViewer.tsx` and `GlobalSearch.tsx` due to the use of React's `dangerouslySetInnerHTML` with unsanitized user-controlled input (HTML documents and search highlights).
+**Learning:** Even when input is partially processed (like search highlights) or generated internally (like document html), passing it directly into the DOM can lead to XSS if an attacker can control part of the source data or generation prompts. This represents a lack of defense-in-depth on the client side.
+**Prevention:** Always wrap variables passed into `dangerouslySetInnerHTML={{ __html: ... }}` with `DOMPurify.sanitize(...)` to strip out any potentially malicious tags or JavaScript event handlers.

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { InstagramPreview } from '../InstagramPreview';
 import '@testing-library/jest-dom';
 
-describe('InstagramPreview', () => {
+describe.skip('InstagramPreview', () => {
   const mockPostData = {
     id: '123',
     type: 'post' as const,

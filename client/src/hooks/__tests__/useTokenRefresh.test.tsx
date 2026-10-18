@@ -251,7 +251,7 @@ describe('useTokenRefresh', () => {
     (useAuthState as jest.Mock).mockReturnValue([{ uid: 'test-user' }, false]);
 
     // Mock slow refresh (takes 2 seconds)
-    (fetch as jest.Mock).mockImplementation(() => 
+    (fetch as jest.Mock).mockImplementation(() =>
       new Promise((resolve) => 
         setTimeout(() => resolve({ ok: true, status: 200 }), 2000)
       )

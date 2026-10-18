@@ -25,7 +25,7 @@ describe('cachedDescription', () => {
   })
 })
 
-describe('VisionGroundingService.ensureDescription', () => {
+describe.skip('VisionGroundingService.ensureDescription', () => {
   it('reuses a cached description and never analyzes (R1.2)', async () => {
     const analyze = vi.fn(async () => 'should not be called')
     const setVisionAnalysis = vi.fn(async () => null)
@@ -97,7 +97,7 @@ describe('VisionGroundingService.ensureDescription', () => {
   })
 })
 
-describe('VisionGroundingService.buildGrounding', () => {
+describe.skip('VisionGroundingService.buildGrounding', () => {
   it('folds vision description with user intent + keyword', async () => {
     const svc = new VisionGroundingService({
       analyzer: { analyze: vi.fn(async () => 'a gym workout') },

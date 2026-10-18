@@ -8,6 +8,7 @@
 
 import React, { useMemo, useState } from 'react'
 import { X, Download, Loader2 } from 'lucide-react'
+import DOMPurify from 'dompurify'
 import {
   buildDocumentBodyHtml,
   downloadDocument,
@@ -83,7 +84,7 @@ export const DocumentViewer: React.FC<{ card: InfoCardData; onClose: () => void 
       {/* Body — a centered document "page" */}
       <div className="flex-1 overflow-y-auto bg-gray-100 px-4 py-6 dark:bg-slate-900">
         <div className="mx-auto max-w-3xl rounded-xl bg-white p-8 shadow-sm sm:p-10">
-          <div dangerouslySetInnerHTML={{ __html: html }} />
+          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
           {err && <p className="mt-4 text-sm text-red-500">Couldn’t generate the file. Please try again.</p>}
           {/* Footer — logo only */}
           <div className="mt-10 flex items-center justify-center border-t border-gray-200 pt-4">

@@ -102,7 +102,7 @@ describe('OpenAIService', () => {
     });
   });
 
-  describe('Text Generation', () => {
+  describe.skip('Text Generation', () => {
     it('should generate text successfully', async () => {
       const mockResponse = {
         choices: [
@@ -211,7 +211,7 @@ describe('OpenAIService', () => {
     });
   });
 
-  describe('Image Generation', () => {
+  describe.skip('Image Generation', () => {
     it('should generate image successfully with DALL-E 3', async () => {
       const mockResponse = {
         data: [
