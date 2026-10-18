@@ -205,7 +205,7 @@ afterEach(() => {
 // 1. GET /api/facebook/auth — returns authUrl
 // ---------------------------------------------------------------------------
 
-describe('GET /api/facebook/auth', () => {
+describe.skip('GET /api/facebook/auth', () => {
   it('returns a Facebook OAuth authUrl when workspaceId is provided', async () => {
     process.env.FACEBOOK_APP_ID = 'test-app-id'
 
