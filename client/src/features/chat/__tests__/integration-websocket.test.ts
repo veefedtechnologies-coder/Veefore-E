@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 /**
  * WebSocket Integration Test for VeeGPT Chat
  * 

@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { readFileSync } from 'node:fs'

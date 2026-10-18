@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // @vitest-environment happy-dom
 // Declared explicitly rather than relying on `environmentMatchGlobs`, which is not
 // applied by the installed vitest version — without this the suite runs under the
