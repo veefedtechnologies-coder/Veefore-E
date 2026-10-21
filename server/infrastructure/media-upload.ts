@@ -1,6 +1,7 @@
 import multer from 'multer';
 import path from 'path';
 import fsSync from 'fs';
+import crypto from 'crypto';
 
 export const UPLOAD_DIR = './uploads';
 
@@ -19,7 +20,7 @@ export function createMediaUpload(): multer.Multer {
         cb(null, UPLOAD_DIR);
       },
       filename: (_req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const uniqueSuffix = Date.now() + '-' + crypto.randomInt(1000000000);
         const ext = path.extname(file.originalname).toLowerCase();
         cb(null, file.fieldname + '-' + uniqueSuffix + ext);
       }
