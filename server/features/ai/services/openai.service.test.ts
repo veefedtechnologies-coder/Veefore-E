@@ -159,7 +159,8 @@ describe('OpenAIService', () => {
           frequency_penalty: 0.5,
           presence_penalty: 0.5,
           stop: ['END'],
-        })
+        }),
+        undefined // Added to match the actual call
       );
     });
 
@@ -252,7 +253,8 @@ describe('OpenAIService', () => {
           n: 1,
           size: '1024x1024',
           quality: 'standard',
-        })
+        }),
+        undefined // Added to match the actual call
       );
     });
 
