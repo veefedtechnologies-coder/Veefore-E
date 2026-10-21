@@ -1,0 +1,4 @@
+## 2024-10-21 - Fix insecure randomness usage
+**Vulnerability:** The application used `Math.random()` to generate security-sensitive tokens, identifiers (like team invitation tokens and user IDs), and random hashes. `Math.random()` is not cryptographically secure and is predictable.
+**Learning:** We need to always use cryptographically secure random number generators for security-related tokens and sensitive data. Native `JSON.parse` does not pose arbitrary code execution or insecure deserialization vulnerability as native Javascript `JSON.parse` does not execute code or instantiate classes, but `Math.random` does provide weak keys.
+**Prevention:** Always use Node.js's native `crypto` module (e.g., `crypto.randomBytes()`, `crypto.randomInt()`) to generate security tokens and identifiers instead of `Math.random()`.

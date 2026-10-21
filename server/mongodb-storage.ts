@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import { ObjectId } from 'mongodb';
 import { IStorage } from './storage';
 import {
@@ -1727,7 +1728,7 @@ export class MongoStorage implements IStorage {
       firebaseUid: ('email_' +
         Date.now() +
         '_' +
-        Math.random().toString(36).substring(7)) as string, // Temporary UID for manual signup
+        crypto.randomBytes(4).toString('hex')) as string, // Temporary UID for manual signup
       isEmailVerified: data.isEmailVerified,
       emailVerificationCode: data.emailVerificationCode,
       emailVerificationExpiry: data.emailVerificationExpiry,

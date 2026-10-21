@@ -119,7 +119,7 @@ describe('error-envelope: redactSecrets', () => {
   });
 
   it('redacts secret key=value pairs (logfmt / query)', () => {
-    expect(redactSecrets('api_key=sk_live_supersecret&w=100')).toBe(`api_key=${REDACTED}&w=100`);
+    expect(redactSecrets('api_key=dummy_stripe_live_key&w=100')).toBe(`api_key=${REDACTED}&w=100`);
     expect(redactSecrets('password: hunter2')).toContain(REDACTED);
   });
 

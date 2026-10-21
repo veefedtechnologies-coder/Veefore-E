@@ -32,7 +32,7 @@ describe('Task 8.3: API Key Security Test', () => {
   
   // Test API keys that should be secure
   const testApiKeys = {
-    googleAiStudioKey: 'AIzaSy_TEST_SENSITIVE_KEY_12345_SHOULD_NOT_BE_EXPOSED',
+    googleAiStudioKey: 'dummy_google_api_keyNOT_BE_EXPOSED',
     openAiKey: 'sk-test-SENSITIVE_OPENAI_KEY_67890_SHOULD_NOT_BE_EXPOSED'
   };
 
