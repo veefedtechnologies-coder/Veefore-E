@@ -37,24 +37,26 @@ export class CredentialGenerator {
     const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    
     const allChars = lowercase + uppercase + numbers + symbols;
-    
-    let password = '';
-    
-    // Ensure at least one character from each category
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += symbols[Math.floor(Math.random() * symbols.length)];
-    
+
+    let chars = [
+      lowercase[crypto.randomInt(lowercase.length)],
+      uppercase[crypto.randomInt(uppercase.length)],
+      numbers[crypto.randomInt(numbers.length)],
+      symbols[crypto.randomInt(symbols.length)]
+    ];
+
     // Fill the rest with random characters
     for (let i = 4; i < this.PASSWORD_LENGTH; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
+      chars.push(allChars[crypto.randomInt(allChars.length)]);
     }
-    
-    // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+
+    // Fisher-Yates shuffle using crypto
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = crypto.randomInt(i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    return chars.join('');
   }
 
   /**
@@ -82,7 +84,7 @@ export class CredentialGenerator {
    * Hash a password using bcrypt
    */
   static async hashPassword(password: string): Promise<string> {
-    const bcrypt = await import('bcrypt');
+    const bcrypt = await import('bcryptjs');
     const saltRounds = 12;
     return bcrypt.hash(password, saltRounds);
   }
@@ -91,7 +93,7 @@ export class CredentialGenerator {
    * Verify a password against its hash
    */
   static async verifyPassword(password: string, hash: string): Promise<boolean> {
-    const bcrypt = await import('bcrypt');
+    const bcrypt = await import('bcryptjs');
     return bcrypt.compare(password, hash);
   }
 
@@ -113,7 +115,24 @@ export class CredentialGenerator {
    * Generate a secure 2FA secret
    */
   static generate2FASecret(): string {
-    return crypto.randomBytes(20).toString('base32');
+    const buffer = crypto.randomBytes(20);
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let bits = 0;
+    let value = 0;
+    let output = '';
+
+    for (let i = 0; i < buffer.length; i++) {
+        value = (value << 8) | buffer[i];
+        bits += 8;
+        while (bits >= 5) {
+            output += alphabet[(value >>> (bits - 5)) & 31];
+            bits -= 5;
+        }
+    }
+    if (bits > 0) {
+        output += alphabet[(value << (5 - bits)) & 31];
+    }
+    return output;
   }
 
   /**
@@ -148,7 +167,7 @@ export class CredentialGenerator {
    * Generate a secure random number
    */
   static generateRandomNumber(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    return crypto.randomInt(min, max + 1);
   }
 
   /**

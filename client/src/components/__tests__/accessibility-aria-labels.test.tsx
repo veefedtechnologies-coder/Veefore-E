@@ -1,9 +1,9 @@
 /**
  * Accessibility ARIA Labels Test
- * 
+ *
  * Tests that all components in LiveDashboardSection have proper ARIA labels
  * for screen reader accessibility.
- * 
+ *
  * Task: 8.1 - Add ARIA labels to LiveDashboardSection
  * Requirements: 6.1 (ARIA labels for interactive elements)
  */
@@ -26,7 +26,7 @@ describe('ARIA Labels - Accessibility', () => {
           color="green"
         />
       );
-      
+
       const badge = container.querySelector('[role="status"]');
       expect(badge).toBeTruthy();
     });
@@ -40,7 +40,7 @@ describe('ARIA Labels - Accessibility', () => {
           color="blue"
         />
       );
-      
+
       const badge = container.querySelector('[aria-label="Status: 24/7 Automation Active"]');
       expect(badge).toBeTruthy();
     });
@@ -54,7 +54,7 @@ describe('ARIA Labels - Accessibility', () => {
           color="purple"
         />
       );
-      
+
       const badge = container.querySelector('[aria-live="polite"]');
       expect(badge).toBeTruthy();
     });
@@ -68,7 +68,7 @@ describe('ARIA Labels - Accessibility', () => {
           color="green"
         />
       );
-      
+
       const icon = container.querySelector('svg[aria-hidden="true"]');
       expect(icon).toBeTruthy();
     });
@@ -77,14 +77,14 @@ describe('ARIA Labels - Accessibility', () => {
   describe('SideGraphics', () => {
     it('should mark entire component as decorative with aria-hidden', () => {
       const { container } = render(<SideGraphics side="left" />);
-      
+
       const wrapper = container.firstElementChild;
       expect(wrapper?.getAttribute('aria-hidden')).toBe('true');
     });
 
     it('should have role="img" on metric cards for screen readers', () => {
       const { container } = render(<SideGraphics side="left" />);
-      
+
       const cards = container.querySelectorAll('[role="img"]');
       // Left side has 2 cards
       expect(cards.length).toBeGreaterThanOrEqual(2);
@@ -92,7 +92,7 @@ describe('ARIA Labels - Accessibility', () => {
 
     it('should provide descriptive aria-labels for metric cards', () => {
       const { container } = render(<SideGraphics side="left" />);
-      
+
       // Check for engagement rate label
       const engagementCard = container.querySelector('[aria-label*="Engagement rate"]');
       expect(engagementCard).toBeTruthy();
@@ -100,7 +100,7 @@ describe('ARIA Labels - Accessibility', () => {
 
     it('should mark decorative charts with aria-hidden', () => {
       const { container } = render(<SideGraphics side="left" />);
-      
+
       // Chart bars should be marked as decorative
       const charts = container.querySelectorAll('[aria-hidden="true"]');
       expect(charts.length).toBeGreaterThan(0);
@@ -112,19 +112,19 @@ describe('ARIA Labels - Accessibility', () => {
       const { container } = render(
         <GradientOrb color="blue" className="w-96 h-96" />
       );
-      
+
       const orb = container.firstElementChild;
       expect(orb?.getAttribute('aria-hidden')).toBe('true');
     });
 
     it('should apply aria-hidden regardless of color variant', () => {
       const colors: Array<'blue' | 'purple' | 'indigo' | 'cyan'> = ['blue', 'purple', 'indigo', 'cyan'];
-      
+
       colors.forEach(color => {
         const { container } = render(
           <GradientOrb color={color} className="w-96 h-96" />
         );
-        
+
         const orb = container.firstElementChild;
         expect(orb?.getAttribute('aria-hidden')).toBe('true');
       });
@@ -136,7 +136,7 @@ describe('ARIA Labels - Accessibility', () => {
       // This would be tested in the AnimatedDashboard test
       // Chart container should have role="img" and descriptive aria-label
       // Individual bars should have aria-hidden="true"
-      
+
       // Placeholder assertion - actual test would be in AnimatedDashboard tests
       expect(true).toBe(true);
     });

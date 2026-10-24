@@ -130,7 +130,7 @@ describe('FloatingStatusBadge', () => {
         color="green"
       />
     );
-    
+
     const badge = container.querySelector('[role="status"]');
     expect(badge).toBeInTheDocument();
   });
@@ -144,7 +144,7 @@ describe('FloatingStatusBadge', () => {
         color="blue"
       />
     );
-    
+
     const badge = container.querySelector('[aria-label="Status: 24/7 Automation Active"]');
     expect(badge).toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe('FloatingStatusBadge', () => {
         color="purple"
       />
     );
-    
+
     const badge = container.querySelector('[aria-live="polite"]');
     expect(badge).toBeInTheDocument();
   });
@@ -172,7 +172,7 @@ describe('FloatingStatusBadge', () => {
         color="green"
       />
     );
-    
+
     const icon = container.querySelector('svg[aria-hidden="true"]');
     expect(icon).toBeInTheDocument();
   });

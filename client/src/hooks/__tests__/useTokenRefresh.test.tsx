@@ -15,17 +15,19 @@ import { useTokenRefresh } from '../useTokenRefresh';
 import { useAuthState } from 'react-firebase-hooks/auth';
 
 // Mock Firebase auth
-jest.mock('react-firebase-hooks/auth');
-jest.mock('firebase/auth', () => ({
-  getAuth: jest.fn(() => ({})),
+vi.mock('react-firebase-hooks/auth');
+vi.mock('firebase/auth', () => ({
+  setPersistence: vi.fn(() => Promise.resolve()),
+  browserLocalPersistence: 'browserLocalPersistence',
+  getAuth: vi.fn(() => ({})),
 }));
 
 // Mock fetch
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 describe('useTokenRefresh', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     jest.useFakeTimers();
     
     // Mock console methods to reduce noise in tests

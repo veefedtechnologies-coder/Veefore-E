@@ -1,0 +1,4 @@
+## 2025-05-24 - [Sentinel] Replace insecure Math.random() with crypto in security contexts
+**Vulnerability:** Found `Math.random()` and `.sort(() => Math.random() - 0.5)` used for generating secure tokens (like passwords, OTPs, random keys). `Math.random()` is not cryptographically secure and can be predictable. Array sorting via `Math.random() - 0.5` is statistically biased, resulting in an insecure shuffle.
+**Learning:** In contexts generating credentials, passwords, or authentication factors, native JS randomization should never be used, as it can lead to credential predictability or bypassing security checks.
+**Prevention:** Always use Node.js `crypto` module (e.g., `crypto.randomInt()`, `crypto.randomBytes()`) for generation. For shuffling sensitive sets, implement a Fisher-Yates shuffle utilizing `crypto.randomInt()` instead of `sort()`.

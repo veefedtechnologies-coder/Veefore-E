@@ -178,4 +178,4 @@ jobs:
 
       - name: Run VeeGPT release guards
         run: npm run guard:veegpt
-        working-directory: mobile-native
+        working-directory: mobile
