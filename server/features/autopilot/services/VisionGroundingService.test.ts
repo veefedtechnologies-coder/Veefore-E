@@ -7,7 +7,7 @@ import { VisionGroundingService, cachedDescription } from './VisionGroundingServ
 
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
-    _id: 'item-1',
+    _id: overrides._id || `item-${Math.random()}`,
     mediaUrl: 'https://cdn/img.png',
     mediaType: 'image' as const,
     ...overrides,
@@ -46,7 +46,7 @@ describe('VisionGroundingService.ensureDescription', () => {
       store: { setVisionAnalysis },
       now: () => 0,
     })
-    const item = makeItem()
+    const item = makeItem({ _id: 'item-1' })
 
     const out = await svc.ensureDescription(item, 'ws-1')
 
