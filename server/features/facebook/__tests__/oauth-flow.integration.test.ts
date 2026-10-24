@@ -1,5 +1,3 @@
-process.env.RAZORPAY_KEY_ID = 'rzp_test_12345';
-process.env.RAZORPAY_KEY_SECRET = 'rzp_test_12345';
 /**
  * OAuth Flow Integration Tests — Facebook Page Integration
  *
@@ -239,7 +237,7 @@ describe.skip('GET /api/facebook/auth', () => {
 // 2. GET /api/facebook/callback — error path (Requirement 2.3, 3.3)
 // ---------------------------------------------------------------------------
 
-describe.skip('GET /api/facebook/callback — error path', () => {
+describe('GET /api/facebook/callback — error path', () => {
   it('redirects to /connect/facebook/error when ?error=access_denied', async () => {
     const app = buildApp()
     const res = await request(app)

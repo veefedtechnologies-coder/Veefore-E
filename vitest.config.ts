@@ -1,4 +1,3 @@
-
 process.env.RAZORPAY_KEY_ID = 'rzp_test_12345';
 process.env.RAZORPAY_KEY_SECRET = 'rzp_test_secret_12345';
 process.env.OAUTH_CALLBACK_URL = 'http://localhost/callback';

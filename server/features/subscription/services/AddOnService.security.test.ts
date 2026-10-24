@@ -1,5 +1,3 @@
-process.env.RAZORPAY_KEY_ID = 'rzp_test_12345';
-process.env.RAZORPAY_KEY_SECRET = 'rzp_test_12345';
 /**
  * Security regression tests for AddOnService.addAddOn.
  *
