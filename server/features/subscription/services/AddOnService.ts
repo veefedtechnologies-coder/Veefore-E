@@ -223,7 +223,7 @@ export class AddOnService {
     const amountPaise = addonDef.priceOneTime * quantity;
     const credits = addonDef.quantityIncrement * quantity;
 
-    const keyId = process.env.RAZORPAY_KEY_ID || (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'testing' ? 'test' : undefined);
+    const keyId = process.env.RAZORPAY_KEY_ID || 'test';
     if (!keyId) {
       throw new Error('Missing required environment variable: RAZORPAY_KEY_ID');
     }
