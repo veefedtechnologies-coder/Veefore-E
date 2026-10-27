@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import OpenAI from 'openai';
+import crypto from 'crypto';
 import { AuthenticatedRequest } from '../../../types/express';
 import { storage } from '../../../mongodb-storage';
 import {
@@ -42,7 +43,7 @@ export class ImageGenerationController {
         const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
         const idempotencyKey = requestId
           ? `image-generation:${userId}:${requestId}`
-          : `image-generation:${userId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+          : `image-generation:${userId}:${Date.now()}:${crypto.randomBytes(16).toString('hex')}`;
 
         const { result: generated, settlement } = await aiCreditMeteringService.runMetered(
           'imageGeneration',

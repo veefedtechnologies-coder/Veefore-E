@@ -7,6 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { logger, StructuredLogger } from './structured-logger';
+import crypto from 'crypto';
 
 /**
  * P4-4.1: Error tracking interfaces
@@ -370,7 +371,7 @@ export class ErrorTracker {
    */
   
   private static generateErrorId(): string {
-    return `err_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
+    return `err_${Date.now().toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
   }
 
   private static enforceStorageLimit(): void {

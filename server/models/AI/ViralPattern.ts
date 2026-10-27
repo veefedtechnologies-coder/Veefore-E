@@ -87,7 +87,4 @@ ViralPatternSchema.index({ trending: 1, avgEngagementRate: -1 });
 ViralPatternSchema.index({ category: 1, avgEngagementRate: -1 });
 ViralPatternSchema.index({ niches: 1, avgEngagementRate: -1 }); // Index on niches for filtering
 
-export const ViralPatternModel = mongoose.model<IViralPattern>(
-  'ViralPattern',
-  ViralPatternSchema
-);
+export const ViralPatternModel = (mongoose.models.ViralPattern as mongoose.Model<IViralPattern>) || mongoose.model<IViralPattern>('ViralPattern', ViralPatternSchema);
