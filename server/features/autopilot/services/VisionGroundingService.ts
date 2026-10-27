@@ -94,7 +94,7 @@ export function toFetchableMediaUrl(mediaUrl: string): string {
  * is stable (the underlying media doesn't change), so holding it for the
  * lifetime of the server process is safe and desirable.
  */
-const VISION_PROCESS_CACHE = new Map<string, string>()
+export const VISION_PROCESS_CACHE = new Map<string, string>()
 
 const COMPONENT = 'autopilot.VisionGroundingService'
 

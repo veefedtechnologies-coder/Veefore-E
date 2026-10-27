@@ -3,16 +3,20 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { VisionGroundingService, cachedDescription } from './VisionGroundingService'
+import { VisionGroundingService, cachedDescription, VISION_PROCESS_CACHE } from './VisionGroundingService'
+import { beforeEach } from 'vitest'
 
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
+    visionAnalysis: null,
     _id: 'item-1',
     mediaUrl: 'https://cdn/img.png',
     mediaType: 'image' as const,
     ...overrides,
   }
 }
+
+beforeEach(() => { VISION_PROCESS_CACHE.clear() })
 
 describe('cachedDescription', () => {
   it('returns a present description', () => {
