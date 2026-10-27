@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
+import crypto from 'crypto'
 import {
   AI_COST_MARGIN_TARGET,
   AUTO_INSIGHT_MONTHLY_CHARGE_CAP,
@@ -319,7 +320,7 @@ class AICreditMeteringService {
     creditsOverride?: number,
   ): Promise<CreditSettlement> {
     const idempotencyKey = ctx.idempotencyKey ??
-      `${feature}:${ctx.userId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+      `${feature}:${ctx.userId}:${Date.now()}:${crypto.randomBytes(16).toString('hex')}`
     let automaticClaimWasNew = false
 
     if (ctx.automatic && !ctx.automaticSlotClaimed) {
@@ -765,7 +766,7 @@ class AICreditMeteringService {
     const effectiveContext: MeteringContext = {
       ...ctx,
       idempotencyKey: ctx.idempotencyKey ??
-        `${feature}:${ctx.userId}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        `${feature}:${ctx.userId}:${Date.now()}:${crypto.randomBytes(16).toString('hex')}`,
     }
 
     let automaticClaimWasNew = false
